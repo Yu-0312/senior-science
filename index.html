@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>台灣高中物理實驗室</title>
+  <meta name="description" content="依教育部 108 課綱設計的高中物理互動模擬與教材網站。">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f7f4ed;
+      --ink: #1e293b;
+      --muted: #475569;
+      --line: #d9d2c3;
+      --accent: #0f766e;
+      --accent-2: #b45309;
+      --panel: #fffaf0;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111827;
+        --ink: #f8fafc;
+        --muted: #cbd5e1;
+        --line: #334155;
+        --accent: #5eead4;
+        --accent-2: #fbbf24;
+        --panel: #1f2937;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.7;
+    }
+
+    main {
+      width: min(1040px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 56px 0 72px;
+    }
+
+    header {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 32px;
+      margin-bottom: 32px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(2rem, 7vw, 4.75rem);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 40px 0 16px;
+      font-size: 1.4rem;
+    }
+
+    p {
+      max-width: 760px;
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 1.05rem;
+    }
+
+    ul {
+      padding-left: 1.2rem;
+      margin: 0;
+    }
+
+    li {
+      margin: 8px 0;
+    }
+
+    .stats,
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin: 24px 0;
+    }
+
+    .stat,
+    .module {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .stat strong {
+      display: block;
+      color: var(--accent);
+      font-size: 1.75rem;
+      line-height: 1.2;
+    }
+
+    .module strong {
+      color: var(--accent-2);
+    }
+
+    code {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 2px 6px;
+      background: color-mix(in srgb, var(--panel), var(--bg) 35%);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>台灣高中物理實驗室</h1>
+      <p>依教育部 108 課綱自然科學領域物理設計，整理高中物理必修與加深加廣教材，作為互動模擬網站的專案首頁。</p>
+    </header>
+
+    <section class="stats" aria-label="專案重點">
+      <div class="stat"><strong>12</strong>個學習模組</div>
+      <div class="stat"><strong>61</strong>個實驗主題</div>
+      <div class="stat"><strong>22</strong>個互動模擬規劃</div>
+    </section>
+
+    <section>
+      <h2>功能規劃</h2>
+      <ul>
+        <li>公式以 LaTeX 與 MathJax 排版。</li>
+        <li>支援全站搜尋、學習進度記錄、深淺色主題切換。</li>
+        <li>PWA 可安裝到桌面或手機，並支援離線使用。</li>
+        <li>免登入、免安裝，可部署為靜態網站。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>互動模擬主題</h2>
+      <div class="grid">
+        <div class="module"><strong>運動學</strong><br>拋體運動、自由落體</div>
+        <div class="module"><strong>牛頓運動定律</strong><br>斜面受力</div>
+        <div class="module"><strong>動量與碰撞</strong><br>一維碰撞</div>
+        <div class="module"><strong>功與能量</strong><br>軌道能量守恆</div>
+        <div class="module"><strong>圓周運動與萬有引力</strong><br>行星軌道、等速圓周運動</div>
+        <div class="module"><strong>簡諧運動</strong><br>彈簧振子、單擺</div>
+        <div class="module"><strong>流體與熱學</strong><br>理想氣體、浮力</div>
+        <div class="module"><strong>波動與聲音</strong><br>弦上駐波、都卜勒效應</div>
+        <div class="module"><strong>光學</strong><br>雙縫干涉、司乃耳折射、透鏡成像</div>
+        <div class="module"><strong>電場與電路</strong><br>電場線與等勢面、歐姆定律電路</div>
+        <div class="module"><strong>磁場與電磁感應</strong><br>電磁感應、勞侖茲力</div>
+        <div class="module"><strong>近代物理</strong><br>光電效應、波耳原子模型</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>目前狀態</h2>
+      <p>這個 GitHub Pages 首頁先用來避免網站 404。完整互動模擬程式若有 <code>index.html</code>、<code>css/</code>、<code>js/</code>、<code>icons/</code> 等原始檔，可以再加入同一個 repository。</p>
+    </section>
+  </main>
+</body>
+</html>
