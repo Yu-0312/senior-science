@@ -1,6 +1,6 @@
 /* sw.js — Service Worker（離線快取）
  * 更新任何檔案後，請調高 CACHE 版本號以觸發更新。 */
-const CACHE = "physics-lab-v3";
+const CACHE = "physics-lab-v5";
 const ASSETS = [
   "./",
   "index.html",
@@ -21,6 +21,7 @@ const ASSETS = [
   "js/experiments/electric.js",
   "js/experiments/magnetism.js",
   "js/experiments/modern.js",
+  "js/experiments/extended.js",
   "icons/icon.svg",
   "icons/icon-192.png",
   "icons/icon-512.png"

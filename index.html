@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>物理實驗室｜台灣高中互動物理</title>
-  <meta name="description" content="依台灣 108 課綱設計的高中物理互動實驗室：12 個學習模組、84 個實驗，全部附即時 canvas 模擬，涵蓋力學、熱學、波動、光學、電磁學與近代物理。公式以 MathJax 專業排版，深／淺色主題、全站搜尋、學習進度，免登入、可離線。" />
+  <meta name="description" content="依台灣 108 課綱設計的高中物理互動實驗室：12 個學習模組、120 個實驗，全部附即時 Canvas 模擬、實驗流程、即時讀數與圖表。" />
   <meta name="theme-color" content="#080b11" />
   <meta name="color-scheme" content="dark light" />
 
@@ -12,7 +12,7 @@
   <link rel="canonical" href="https://yu-0312.github.io/senior-science/" />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="物理實驗室｜台灣高中互動物理" />
-  <meta property="og:description" content="108 課綱高中物理互動實驗室，84 個實驗全部可即時操作模擬。" />
+  <meta property="og:description" content="108 課綱高中物理互動實驗室，120 個實驗全部可即時操作模擬。" />
   <meta property="og:locale" content="zh_TW" />
   <meta property="og:url" content="https://yu-0312.github.io/senior-science/" />
 
@@ -37,7 +37,24 @@
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
 </head>
 
-<body>
+<body class="access-locked">
+  <section class="access-gate" id="access-gate" role="dialog" aria-modal="true" aria-labelledby="access-title">
+    <div class="access-gate-panel">
+      <div class="access-mark" aria-hidden="true">PHYS</div>
+      <p class="access-kicker">TAIWAN SENIOR PHYSICS LAB</p>
+      <h1 id="access-title">進入實驗室</h1>
+      <p>輸入授權密碼後，即可使用完整的互動實驗工作台。</p>
+      <form id="access-form" class="access-form">
+        <label for="access-password">授權密碼</label>
+        <div class="access-input-row">
+          <input id="access-password" type="password" autocomplete="current-password" required />
+          <button type="submit">進入</button>
+        </div>
+        <p class="access-error" id="access-error" aria-live="polite"></p>
+      </form>
+      <div class="access-note">此授權僅在目前瀏覽器工作階段中保留。</div>
+    </div>
+  </section>
   <div class="aurora"><i></i></div>
 
   <div class="app">
@@ -62,6 +79,7 @@
       </div>
       <div class="spacer"></div>
       <div class="pill"><span class="dot"></span><span class="ver">v1.0</span> · <span id="clock">--:--:--</span></div>
+      <button class="icon-btn lock-session" id="lock-session" type="button" aria-label="鎖定實驗室"><span>鎖定</span></button>
       <button class="icon-btn" id="theme-toggle" aria-label="切換主題"></button>
     </header>
 
@@ -97,7 +115,7 @@
           <div class="hero">
             <div class="hero-badge"><span class="dot"></span>依教育部 108 課綱設計 · 全繁體原創</div>
             <h1 class="hero-title">看得見的物理，<br />可以動手玩的實驗室</h1>
-            <p class="hero-sub">12 個學習模組、84 個高中物理實驗，每一個都附即時互動模擬。調整參數、觀察現象、對照公式——把課本裡的物理變成手邊的實驗。</p>
+            <p class="hero-sub">12 個學習模組、120 個高中物理實驗，每一個都附即時互動模擬。調整參數、觀察現象、對照公式——把課本裡的物理變成手邊的實驗。</p>
             <div class="hero-actions">
               <button class="btn-hero" id="hero-start">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg>
@@ -176,6 +194,7 @@
   <script src="js/experiments/electric.js"></script>
   <script src="js/experiments/magnetism.js"></script>
   <script src="js/experiments/modern.js"></script>
+  <script src="js/experiments/extended.js"></script>
 
   <!-- 應用外殼 -->
   <script src="js/app.js"></script>

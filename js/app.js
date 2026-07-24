@@ -24,6 +24,9 @@
   let viewed = new Set(store.get("pl-progress", []));
   let currentSim = null;
   let currentId = null;
+  let initialized = false;
+  const ACCESS_SESSION_KEY = "physics-lab-access-v1";
+  const ACCESS_HASH = "faf16b5c720233e537cc50efe380a2170b2a2fd339ae6f9f3f74465cef67e8cd";
 
   /* ------------------------------- 主題 ------------------------------- */
   function applyTheme(t) {
@@ -230,6 +233,55 @@
     openExp(id);
   }
 
+  function lockLab() {
+    if (currentSim && currentSim.stop) { try { currentSim.stop(); } catch (e) {} }
+    currentSim = null;
+    sessionStorage.removeItem(ACCESS_SESSION_KEY);
+    document.body.classList.remove("has-access");
+    document.body.classList.add("access-locked");
+    $("#access-password").value = "";
+    $("#access-error").textContent = "";
+    setTimeout(() => $("#access-password").focus(), 0);
+  }
+
+  async function sha256(value) {
+    if (!window.crypto || !window.crypto.subtle) return "";
+    const bytes = new TextEncoder().encode(value);
+    const digest = await window.crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, "0")).join("");
+  }
+
+  function unlockLab() {
+    sessionStorage.setItem(ACCESS_SESSION_KEY, "granted");
+    document.body.classList.remove("access-locked");
+    document.body.classList.add("has-access");
+    if (!initialized) { initialized = true; init(); }
+    else route();
+  }
+
+  function initAccessGate() {
+    const form = $("#access-form");
+    const input = $("#access-password");
+    const error = $("#access-error");
+    if (sessionStorage.getItem(ACCESS_SESSION_KEY) === "granted") { unlockLab(); return; }
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      const submit = form.querySelector("button[type=submit]");
+      submit.disabled = true; error.textContent = "驗證中…";
+      try {
+        const digest = await sha256(input.value);
+        if (digest && digest === ACCESS_HASH) { unlockLab(); return; }
+        error.textContent = digest ? "密碼不正確，請再試一次。" : "此瀏覽器無法驗證密碼。";
+        input.select();
+      } catch (e) {
+        error.textContent = "驗證暫時無法完成，請重新整理後再試。";
+      } finally {
+        submit.disabled = false;
+      }
+    });
+    setTimeout(() => input.focus(), 0);
+  }
+
   /* ------------------------------- 啟動 ------------------------------- */
   function init() {
     buildSidebar();
@@ -239,6 +291,7 @@
     $("#theme-toggle").addEventListener("click", () => {
       applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
     });
+    $("#lock-session").addEventListener("click", lockLab);
     $("#menu-toggle").addEventListener("click", toggleSidebar);
     $("#scrim").addEventListener("click", closeSidebarMobile);
     $("#brand-home").addEventListener("click", () => location.hash = "");
@@ -275,6 +328,6 @@
     }
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
-  else init();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initAccessGate);
+  else initAccessGate();
 })();

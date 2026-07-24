@@ -2,7 +2,7 @@
  * curriculum.js
  * 物理實驗室 — 課程結構資料
  * 依教育部 108 課綱「自然科學領域—物理」規劃，涵蓋必修物理與選修物理（加深加廣）。
- * 12 個學習模組 · 84 個實驗主題，每一個都附即時互動模擬。
+ * 12 個學習模組 · 120 個實驗主題，每一個都附即時互動模擬。
  * 公式以 LaTeX 撰寫（String.raw 保留反斜線），由 MathJax 排版。
  * 本檔為原創教材資料，物理模型為教學簡化版，數值以概念示範為主。
  */
@@ -421,6 +421,71 @@
       ]
     }
   ];
+
+  // 第二批課程地圖：把課本中常被併入章節段落的關鍵知識點拆成獨立操作實驗。
+  const EXTENDED_EXPERIMENTS = {
+    kinematics: [
+      { id: "vector-components", title: "位移與速度的向量分解", interactive: I, concept: "將斜向位移或速度分解為互相垂直的分量；改變大小與方向，觀察分量如何決定合向量。", formula: R`\( A_x=A\cos\theta,\quad A_y=A\sin\theta \)`, points: ["向量有大小與方向", "正交分量可獨立處理", "合量由畢氏定理求得", "拋體運動可分方向分析"] },
+      { id: "distance-displacement", title: "路程、位移與平均速度", interactive: I, concept: "沿不同路線移動時，路程是實際走過的總長，位移只看起點到終點的向量。", formula: R`\( \bar v=\Delta x/\Delta t,\quad \text{速率}=\text{路程}/\Delta t \)`, points: ["路程為純量", "位移為向量", "回到原點位移為零", "平均速度與平均速率不同"] },
+      { id: "measurement-error", title: "量測、不確定度與有效數字", interactive: I, concept: "調整儀器解析度與重複量測次數，觀察平均值、離散程度與報告有效數字的關係。", formula: R`\( \bar x=\frac{1}{n}\sum x_i,\quad \%\,\text{誤差}=\frac{|x-x_0|}{x_0}\times100\% \)`, points: ["重複量測降低隨機誤差", "解析度限制讀值", "平均值代表最佳估計", "結果需附單位與有效數字"] }
+    ],
+    newton: [
+      { id: "force-components", title: "力的分解與正交合成", interactive: I, concept: "把一個斜向拉力分解為水平與鉛直分量，觀察角度改變如何影響物體的受力平衡。", formula: R`\( F_x=F\cos\theta,\quad F_y=F\sin\theta \)`, points: ["先選座標軸", "分量可分別列方程", "合力由分量相加", "常用於斜面與拉繩題"] },
+      { id: "apparent-weight", title: "超重與失重（電梯）", interactive: I, concept: "電梯加速時體重計讀數為支持力 N=m(g+a)，不是固定的 mg。", formula: R`\( N=m(g+a) \)`, points: ["向上加速會超重", "向下加速會失重", "自由落體時 N=0", "重量 mg 不隨運動改變"] },
+      { id: "spring-series-parallel", title: "彈簧串聯與並聯", interactive: I, concept: "兩彈簧串聯會變軟、並聯會變硬；以等效勁度比較相同外力下的伸長。", formula: R`\( \frac{1}{k_s}=\frac{1}{k_1}+\frac{1}{k_2},\quad k_p=k_1+k_2 \)`, points: ["串聯伸長量相加", "並聯受力分攤", "等效勁度決定變形", "符合虎克定律"] }
+    ],
+    momentum: [
+      { id: "center-of-mass", title: "質心與系統運動", interactive: I, concept: "系統內部物體可互相移動，但在外力為零時質心依然做等速直線運動。", formula: R`\( x_{cm}=\frac{\sum m_ix_i}{\sum m_i} \)`, points: ["質心是質量加權平均位置", "內力不改變質心運動", "爆炸後質心軌跡連續", "適用多物體系統"] },
+      { id: "force-time-profile", title: "力—時間曲線與緩衝", interactive: I, concept: "選擇不同碰撞力的時間分布，比較曲線面積相同時峰值力如何隨作用時間改變。", formula: R`\( J=\int Fdt=\Delta p \)`, points: ["曲線面積是衝量", "時間拉長可降峰值力", "安全氣囊增加作用時間", "平均力由面積除時間"] },
+      { id: "rocket-equation", title: "火箭推進與質量流失", interactive: I, concept: "火箭向後噴出燃氣而向前加速；觀察噴氣速度與燃料消耗如何影響推進結果。", formula: R`\( \Delta v=v_e\ln\frac{m_0}{m_f} \)`, points: ["反衝來自動量守恆", "不需要空氣也能推進", "排氣速度越大增速越大", "燃料使初始質量變大"] }
+    ],
+    energy: [
+      { id: "work-angle", title: "功與力的夾角", interactive: I, concept: "只有沿位移方向的力分量做功；拖動力的方向，觀察正功、零功與負功。", formula: R`\( W=Fs\cos\theta \)`, points: ["平行位移做功最大", "垂直位移不做功", "反向力做負功", "功是能量轉移"] },
+      { id: "power-lab", title: "功率與效率", interactive: I, concept: "在相同做功下，完成時間越短，功率越大；加入損耗後可比較輸入與有用輸出。", formula: R`\( P=\frac{W}{t}=Fv,\quad \eta=\frac{P_{out}}{P_{in}} \)`, points: ["功率描述做功快慢", "同功不同時間功率不同", "效率小於等於 1", "常見於馬達與爬樓梯"] },
+      { id: "friction-thermal", title: "摩擦耗散與熱能", interactive: I, concept: "滑塊受摩擦後，機械能減少並轉為內能；調整摩擦係數比較停止距離與熱量。", formula: R`\( W_f=-f_kd,\quad Q=f_kd \)`, points: ["非保守力改變機械能", "摩擦做負功", "損失的機械能轉為內能", "能量仍守恆"] }
+    ],
+    gravity: [
+      { id: "banked-curve", title: "傾斜彎道與向心力", interactive: I, concept: "車在傾斜彎道上可由正向力的水平分量提供向心力；改變速度與傾角判讀是否打滑。", formula: R`\( \tan\theta=\frac{v^2}{rg} \)`, points: ["向心力指向圓心", "傾角決定設計速度", "過快或過慢需摩擦補償", "道路與賽車彎道應用"] },
+      { id: "satellite-energy", title: "衛星軌道能量", interactive: I, concept: "衛星的重力位能與動能隨半徑改變；圓軌道的總機械能為負值。", formula: R`\( v=\sqrt{GM/r},\quad E=-\frac{GMm}{2r} \)`, points: ["重力提供向心力", "軌道半徑越大速度越小", "束縛系統總能量為負", "地球同步衛星有特定半徑"] },
+      { id: "escape-speed", title: "逃逸速度", interactive: I, concept: "從天體表面出發的物體若總能量不小於零，就能脫離重力束縛。", formula: R`\( v_e=\sqrt{\frac{2GM}{R}} \)`, points: ["忽略空氣阻力", "與發射物質量無關", "地表約 11.2 km/s", "並非離開大氣層的速度"] }
+    ],
+    shm: [
+      { id: "damped-oscillation", title: "阻尼振動", interactive: I, concept: "摩擦或阻力會使振幅逐漸衰減；調整阻尼比較欠阻尼、臨界阻尼與過阻尼。", formula: R`\( A(t)=A_0e^{-\beta t} \)`, points: ["阻尼消耗機械能", "振幅隨時間衰減", "臨界阻尼最快回到平衡", "避震器的原理"] },
+      { id: "shm-phase", title: "簡諧運動的相位關係", interactive: I, concept: "位移、速度、加速度同頻率但相位不同；同時觀看三條曲線與旋轉相量。", formula: R`\( x=A\cos\omega t,\ v=-\omega A\sin\omega t,\ a=-\omega^2x \)`, points: ["速度超前位移 90°", "加速度與位移反相", "平衡點速度最大", "端點加速度最大"] },
+      { id: "coupled-oscillators", title: "耦合振子與能量交換", interactive: I, concept: "兩個以彈簧連結的振子會週期性交換能量，形成拍與正常模態。", formula: R`\( E_1+E_2=\text{定值} \)`, points: ["能量在振子間傳遞", "總能量近似守恆", "可見拍的包絡", "正常模態有固定相位"] }
+    ],
+    thermal: [
+      { id: "hydrostatic-pressure", title: "液體壓力與深度", interactive: I, concept: "靜止液體內壓力隨深度線性增加，與容器形狀無關。", formula: R`\( P=P_0+\rho gh \)`, points: ["深度越大壓力越大", "同深度壓力相同", "與容器形狀無關", "水壩底部更厚"] },
+      { id: "phase-change", title: "相變與加熱曲線", interactive: I, concept: "物質在熔化、沸騰時吸收熱量但溫度保持不變；切換加熱功率觀察平台。", formula: R`\( Q=mc\Delta T,\quad Q=mL \)`, points: ["相變時溫度不變", "潛熱用來改變狀態", "斜段由比熱決定", "平台長度與質量成正比"] },
+      { id: "heat-engine", title: "熱機、效率與熵方向", interactive: I, concept: "熱機從高溫熱源吸熱，部分轉為功，其餘排向低溫熱源；效率受溫度限制。", formula: R`\( \eta=\frac{W}{Q_H}\le1-\frac{T_C}{T_H} \)`, points: ["不可能把熱全轉為功", "需高溫與低溫熱源", "卡諾效率是上限", "熱自發由高溫流向低溫"] }
+    ],
+    waves: [
+      { id: "reflection-boundary", title: "波的反射與邊界", interactive: I, concept: "波遇固定端反射會反相，遇自由端反射不反相；切換邊界條件觀察脈衝回傳。", formula: R`\( y_{\text{反}}=\pm y_{\text{入}} \)`, points: ["固定端反相", "自由端同相", "反射波速不變", "疊加可形成駐波"] },
+      { id: "sound-intensity", title: "聲音強度與分貝", interactive: I, concept: "聲強與振幅平方成正比，分貝尺度是對數尺度；調整距離與振幅比較聽覺變化。", formula: R`\( \beta=10\log_{10}(I/I_0) \)`, points: ["分貝是對數單位", "距離增加聲強下降", "振幅影響響度", "頻率影響音調"] },
+      { id: "air-column-resonance", title: "共鳴管與空氣柱", interactive: I, concept: "改變空氣柱長度，尋找聲音最響的共鳴位置，並由相鄰共鳴長度求波長。", formula: R`\( L_n=(2n-1)\frac{\lambda}{4} \)`, points: ["一端閉管為四分之一波長", "相鄰共鳴差 λ/2", "頻率由音叉決定", "可量測聲速"] }
+    ],
+    optics: [
+      { id: "critical-angle", title: "全反射與臨界角", interactive: I, concept: "光從高折射率介質射向低折射率介質時，入射角超過臨界角將完全反射。", formula: R`\( \sin\theta_c=\frac{n_2}{n_1} \)`, points: ["需從光密介質射向光疏介質", "臨界角時折射角 90°", "光纖利用全反射", "反射仍遵守反射定律"] },
+      { id: "refraction-slab", title: "平行玻璃板的側向位移", interactive: I, concept: "光穿過平行玻璃板後出射光與入射光平行，但會產生可量測的側向位移。", formula: R`\( n_1\sin\theta_1=n_2\sin\theta_2 \)`, points: ["兩次折射方向相反", "出射光與入射光平行", "厚度越大位移越大", "折射率決定偏折量"] },
+      { id: "optical-instruments", title: "顯微鏡與望遠鏡", interactive: I, concept: "複合顯微鏡以物鏡形成放大實像，再由目鏡放大；望遠鏡則將遠物成像於焦平面。", formula: R`\( M_{tel}=f_o/f_e \)`, points: ["物鏡負責集光成像", "目鏡負責角放大", "焦距比決定倍率", "像面需對焦"] }
+    ],
+    electric: [
+      { id: "kirchhoff", title: "基爾霍夫電路定律", interactive: I, concept: "在分岔點電流守恆、在閉合迴路電位升降總和為零；調整支路電阻解讀各支路電流。", formula: R`\( \sum I_{in}=\sum I_{out},\quad \sum\Delta V=0 \)`, points: ["電荷守恆給出節點定律", "能量守恆給出迴路定律", "支路電流可不同", "適用複雜電路"] },
+      { id: "meter-loading", title: "電表內阻與量測負載效應", interactive: I, concept: "真實電壓表與電流表都有內阻，接入電路會改變原本狀態；調整內阻比較量測誤差。", formula: R`\( R_V\gg R,\quad R_A\ll R \)`, points: ["電壓表應高內阻", "電流表應低內阻", "量測工具會擾動系統", "需注意接法與量程"] },
+      { id: "electrostatic-shield", title: "靜電屏蔽與法拉第籠", interactive: I, concept: "導體在靜電平衡時內部電場為零，電荷分布在表面；觀察外部電荷如何被金屬殼屏蔽。", formula: R`\( E_{\text{導體內}}=0 \)`, points: ["自由電荷重新分布", "導體內部等電位", "空腔可屏蔽外電場", "汽車金屬殼是應用"] }
+    ],
+    magnetism: [
+      { id: "ampere-force", title: "安培力的方向與大小", interactive: I, concept: "通電直導線置於磁場中受到安培力；改變電流方向、磁場方向與夾角，觀察受力。", formula: R`\( F=BIL\sin\theta \)`, points: ["力垂直電流與磁場", "夾角 90° 時最大", "反轉電流力反向", "馬達的基礎"] },
+      { id: "motional-emf", title: "動生電動勢", interactive: I, concept: "導體棒切割磁力線時，移動電荷受洛倫茲力而兩端產生電位差。", formula: R`\( \varepsilon=BLv \)`, points: ["速度越快電壓越大", "棒長越大電壓越大", "方向可用右手定則", "發電機的局部模型"] },
+      { id: "coil-torque", title: "通電線圈的力矩", interactive: I, concept: "線圈在磁場中兩側受安培力形成力偶，驅動轉子旋轉；改變角度觀察力矩。", formula: R`\( \tau=NIAB\sin\theta \)`, points: ["平面平行磁場時力矩最大", "法線平行磁場時力矩為零", "直流馬達需要換向", "線圈匝數增加力矩增大"] }
+    ],
+    modern: [
+      { id: "nuclear-reaction", title: "核反應與質能轉換", interactive: I, concept: "核融合與核分裂前後的質量差會轉為巨大能量；比較不同反應的束縛能與能量釋放。", formula: R`\( E=\Delta mc^2 \)`, points: ["質量虧損轉為能量", "融合驅動恆星", "分裂可形成鏈式反應", "核能密度遠高於化學能"] },
+      { id: "cosmological-redshift", title: "宇宙紅移與光譜", interactive: I, concept: "遙遠星系遠離時，光波長被宇宙膨脹拉長，譜線向紅端位移。", formula: R`\( z=\frac{\Delta\lambda}{\lambda_0}\approx\frac{v}{c} \)`, points: ["紅移表示遠離", "譜線提供速度資訊", "小紅移可近似都卜勒效應", "支持宇宙膨脹"] },
+      { id: "blackbody", title: "黑體輻射與恆星顏色", interactive: I, concept: "黑體光譜峰值隨溫度升高而向短波移動；恆星顏色可反映表面溫度。", formula: R`\( \lambda_{max}T=b \)`, points: ["溫度越高峰值越偏藍", "總輻射功率隨 T^4 增加", "黑體是理想吸收體", "可估計恆星溫度"] }
+    ]
+  };
+  MODULES.forEach(module => { module.experiments.push(...(EXTENDED_EXPERIMENTS[module.id] || [])); });
 
   let expCount = 0, interactiveCount = 0;
   MODULES.forEach(m => m.experiments.forEach(e => { expCount++; if (e.interactive) interactiveCount++; }));

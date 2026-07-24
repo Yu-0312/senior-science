@@ -55,6 +55,28 @@
     return Object.assign({ id: id || "", moduleId: module && module.id, moduleNo: module && module.no, moduleTitle: module && module.title }, stage);
   }
 
+  function workflowFor(profile) {
+    const subject = profile.moduleTitle || "這個主題";
+    const steps = {
+      mechanics: ["設定物體與初始條件", "啟動模型並觀察運動", "對照讀數與圖表驗證關係"],
+      orbital: ["設定初始條件與尺度", "觀察軌跡或場的演化", "比較模型預測與量測值"],
+      thermal: ["設定系統狀態與邊界", "改變熱學條件並觀察交換", "以數據判讀守恆或狀態變化"],
+      waves: ["調整波源與介質參數", "播放並鎖定一個觀測點", "比對波形、頻率與相位"],
+      optics: ["設定光源與光學元件", "觀察光路、像或條紋", "記錄量測並驗證幾何關係"],
+      circuit: ["設定電源與元件參數", "調整電路狀態並讀取儀表", "用讀數或曲線檢查電路定律"],
+      magnetism: ["設定電流、磁場或線圈", "顯示方向與作用效果", "比較向量、曲線與計算值"],
+      modern: ["選擇微觀條件與材料", "啟動探測或統計過程", "從分布與曲線判讀量子現象"]
+    };
+    return steps[profile.family] || ["設定 " + subject + " 的參數", "操作模型並觀察現象", "讀取數據並連結公式"];
+  }
+
+  function downloadText(filename, text, type) {
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(new Blob([text], { type: type || "text/plain;charset=utf-8" }));
+    link.href = url; link.download = filename; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
   /* ----------------------------- 版面 ----------------------------- */
   function layout(root) {
     root.innerHTML = "";
@@ -62,6 +84,65 @@
     const profile = root._labProfile || profileFor(root.dataset && root.dataset.simId);
     root._labProfile = profile;
     if (root.dataset) { root.dataset.labFamily = profile.family; root.dataset.labCode = profile.code; }
+    root._labReadouts = [];
+    const workflow = workflowFor(profile);
+    const commandBar = el("div", "sim-command-bar", root);
+    const commandTitle = el("div", "sim-command-title", commandBar);
+    const stageLabel = el("span", "sim-command-stage", commandTitle); stageLabel.textContent = profile.stage;
+    const stageMeta = el("span", "sim-command-meta", commandTitle); stageMeta.textContent = "操作 · 量測 · 驗證";
+    const commandTools = el("div", "sim-command-tools", commandBar);
+    const guideBtn = el("button", "sim-command", commandTools); guideBtn.type = "button"; guideBtn.textContent = "實驗指南"; guideBtn.setAttribute("aria-expanded", "false");
+    const stepBtn = el("button", "sim-command", commandTools); stepBtn.type = "button"; stepBtn.textContent = "分步演示";
+    const focusBtn = el("button", "sim-command", commandTools); focusBtn.type = "button"; focusBtn.textContent = "專注模式"; focusBtn.setAttribute("aria-pressed", "false");
+    const exportBtn = el("button", "sim-command", commandTools); exportBtn.type = "button"; exportBtn.textContent = "匯出讀數";
+    const screenBtn = el("button", "sim-command", commandTools); screenBtn.type = "button"; screenBtn.textContent = "截取主畫面";
+    const fullBtn = el("button", "sim-command", commandTools); fullBtn.type = "button"; fullBtn.textContent = "全螢幕";
+
+    const procedure = el("section", "sim-procedure", root);
+    const procedureHead = el("div", "sim-procedure-head", procedure);
+    const procedureTitle = el("span", "sim-panel-title", procedureHead); procedureTitle.textContent = "實驗流程";
+    const procedureState = el("span", "sim-procedure-state", procedureHead); procedureState.textContent = "準備中";
+    const procedureSteps = el("ol", "sim-procedure-steps", procedure);
+    const procedureNote = el("p", "sim-procedure-note", procedure); procedureNote.textContent = "每一步都會對應下方可操作的參數、模擬或量測讀數。";
+    let activeStep = -1;
+    const paintSteps = () => {
+      procedureSteps.innerHTML = "";
+      workflow.forEach((text, index) => {
+        const item = el("li", "sim-procedure-step" + (index === activeStep ? " active" : ""), procedureSteps);
+        const number = el("span", "sim-step-number", item); number.textContent = String(index + 1);
+        const copy = el("span", "sim-step-copy", item); copy.textContent = text;
+      });
+      procedureState.textContent = activeStep < 0 ? "準備中" : "第 " + (activeStep + 1) + " / " + workflow.length + " 步";
+    };
+    paintSteps();
+
+    guideBtn.addEventListener("click", () => {
+      const visible = root.classList.toggle("show-procedure");
+      guideBtn.setAttribute("aria-expanded", String(visible));
+      if (visible && activeStep < 0) { activeStep = 0; paintSteps(); }
+    });
+    stepBtn.addEventListener("click", () => {
+      root.classList.add("show-procedure"); guideBtn.setAttribute("aria-expanded", "true");
+      activeStep = (activeStep + 1) % workflow.length; paintSteps();
+      procedure.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+    focusBtn.addEventListener("click", () => {
+      const focused = root.classList.toggle("is-focused");
+      focusBtn.setAttribute("aria-pressed", String(focused));
+      focusBtn.textContent = focused ? "離開專注" : "專注模式";
+    });
+    exportBtn.addEventListener("click", () => {
+      const rows = [["實驗", profile.id], ["實驗台", profile.stage], ["匯出時間", new Date().toLocaleString("zh-TW")]];
+      root._labReadouts.forEach(item => rows.push([item.label, item.value + (item.unit ? " " + item.unit : "")]));
+      downloadText("physics-lab-" + profile.id + "-readings.csv", rows.map(row => row.map(value => '"' + String(value).replace(/"/g, '""') + '"').join(",")).join("\n"), "text/csv;charset=utf-8");
+    });
+    screenBtn.addEventListener("click", () => {
+      const canvas = root.querySelector(".sim-visual-panel canvas");
+      if (!canvas) return;
+      const link = document.createElement("a"); link.href = canvas.toDataURL("image/png"); link.download = "physics-lab-" + profile.id + ".png"; link.click();
+    });
+    fullBtn.addEventListener("click", () => { if (root.requestFullscreen) root.requestFullscreen().catch(() => {}); });
+
     const stage = el("div", "sim-stage", root);
     const visual = el("section", "sim-visual-panel", stage);
     const visualHead = el("div", "sim-panel-head", visual);
@@ -84,7 +165,7 @@
     const readoutTitle = el("span", "sim-panel-title", readoutHead); readoutTitle.textContent = "量測讀數";
     const readoutHint = el("span", "sim-panel-hint", readoutHead); readoutHint.textContent = "模型計算";
     const readouts = el("div", "sim-readouts", readoutPanel);
-    return { root, profile, stage, visual, canvasWrap, instrumentStrip, controlDeck, controls, readoutPanel, readouts };
+    return { root, profile, workflow, commandBar, procedure, stage, visual, canvasWrap, instrumentStrip, controlDeck, controls, readoutPanel, readouts };
   }
 
   /* --------------------------- 響應式畫布 --------------------------- */
@@ -203,8 +284,11 @@
     const box = el("div", "readout", parent);
     const v = el("div", "readout-value", box); v.textContent = "—";
     const l = el("div", "readout-label", box); l.textContent = o.label;
+    const record = { label: o.label, unit: o.unit || "", value: "—" };
+    const simRoot = parent.closest && parent.closest(".lab-sim");
+    if (simRoot && simRoot._labReadouts) simRoot._labReadouts.push(record);
     return {
-      set: (val, digits) => { v.textContent = (typeof val === "number" ? fmt(val, digits) : val) + (o.unit ? " " + o.unit : ""); },
+      set: (val, digits) => { record.value = typeof val === "number" ? fmt(val, digits) : val; v.textContent = record.value + (o.unit ? " " + o.unit : ""); },
       raw: v, box
     };
   }
