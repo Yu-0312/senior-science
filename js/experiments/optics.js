@@ -215,7 +215,7 @@
       D.text(ctx, "雙縫", slitX, cy - half - 23, { color: PL.col("text-dim"), size: 9, align: "center" });
       // 路程差
       if (layers.has("path")) { const fy = yPx(dxMM()); D.line(ctx, s1.x, s1.y, scrX, fy, "rgba(255,255,255,0.4)", 1, [4, 3]); D.line(ctx, s2.x, s2.y, scrX, fy, "rgba(255,255,255,0.4)", 1, [4, 3]); D.text(ctx, "r₂−r₁ = λ", (slitX + scrX) / 2 - 20, cy - 6, { color: PL.col("text-dim"), size: 11 }); }
-      // 屏幕上的理論條紋與單光子累積
+      // 光屏上的理論條紋與單光子累積
       support(scrX + 10, cy + half + 14, 32);
       D.rect(ctx, scrX, cy - half - 14, 20, 2 * half + 28, { fill: "#0a0e15", stroke: "rgba(255,255,255,0.24)", width: 1.5, r: 3 });
       ctx.save(); ctx.beginPath(); ctx.rect(scrX + 4, cy - half - 10, 12, 2 * half + 20); ctx.clip();

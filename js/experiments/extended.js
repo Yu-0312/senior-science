@@ -129,7 +129,7 @@
       D.text(ctx, "微觀 / 宇宙觀測", cx, cy + 5, { color: PL.col("text"), size: 12, align: "center", weight: "700" });
       fillPill(ctx, 18, 18, "探測讀值", PL.fmt(value, 2), 118, c);
     }
-    D.text(ctx, "互動模型：調整左側參數，讀取右側數據與曲線", W / 2, H - 25, { color: PL.col("text-faint"), size: 9.5, align: "center" });
+    D.text(ctx, "互動模型：調整左側參數，讀取右側資料與曲線", W / 2, H - 25, { color: PL.col("text-faint"), size: 9.5, align: "center" });
   }
 
   Object.keys(T).forEach(id => {

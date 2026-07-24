@@ -1,11 +1,11 @@
 /* sw.js — Service Worker（離線快取）
  * 更新任何檔案後，請調高 CACHE 版本號以觸發更新。 */
-const CACHE = "physics-lab-v9";
+const CACHE = "physics-lab-v10";
 const ASSETS = [
   "./",
   "index.html",
   "manifest.json",
-  "css/style.css",
+  "css/style.css?v=20260724-3",
   "js/curriculum.js",
   "js/advanced-curriculum.js?v=20260724-2",
   "js/sim-core.js",

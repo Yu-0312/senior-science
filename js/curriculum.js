@@ -281,7 +281,7 @@
           formula: R`\( \dfrac{1}{f} = \dfrac{1}{p} + \dfrac{1}{q},\quad m = -\dfrac{q}{p} \)`,
           points: ["凸透鏡會聚光線", "凹透鏡發散光線", "物在 2f 外成縮小倒立實像", "近視與遠視矯正"] },
         { id: "double-slit", title: "雙縫干涉", interactive: I,
-          concept: "同調光通過雙狹縫後在屏幕上形成明暗相間的干涉條紋，證明光具有波動性。調整縫距與波長觀察條紋間距。",
+          concept: "同調光通過雙狹縫後在光屏上形成明暗相間的干涉條紋，證明光具有波動性。調整縫距與波長觀察條紋間距。",
           formula: R`\( d\sin\theta = m\lambda,\quad \Delta y = \dfrac{\lambda L}{d} \)`,
           points: ["亮紋：路程差為 λ 整數倍", "縫距越小條紋越寬", "波長越長條紋越寬", "楊氏實驗證明波動性"] },
         { id: "diffraction", title: "單狹縫繞射", interactive: I,
