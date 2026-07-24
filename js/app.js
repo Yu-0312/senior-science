@@ -16,6 +16,29 @@
   const byId = {};
   FLAT.forEach((f, i) => { f.order = i; byId[f.exp.id] = f; });
 
+  function auditCurriculum() {
+    const ids = FLAT.map(f => f.exp.id);
+    const duplicateIds = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
+    const registeredIds = PL.ids ? PL.ids() : [];
+    const registered = new Set(registeredIds);
+    const expected = new Set(ids);
+    const missingSimulations = ids.filter(id => !registered.has(id));
+    const extraSimulations = registeredIds.filter(id => !expected.has(id));
+    const audit = {
+      modules: C.totalModules,
+      experiments: ids.length,
+      registeredSimulations: registeredIds.length,
+      duplicateIds,
+      missingSimulations,
+      extraSimulations
+    };
+    window.PhysicsLabAudit = audit;
+    if (duplicateIds.length || missingSimulations.length || extraSimulations.length) {
+      console.error("物理實驗室課程稽核失敗", audit);
+    }
+    return audit;
+  }
+
   const store = {
     get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
@@ -280,6 +303,7 @@
 
   /* ------------------------------- 啟動 ------------------------------- */
   function init() {
+    auditCurriculum();
     buildSidebar();
     buildHome();
     applyTheme(store.get("pl-theme", "dark"));
