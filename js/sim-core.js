@@ -32,16 +32,46 @@
     return e;
   };
 
+  // 每個課程模組有自己的儀器語言；所有實驗由註冊表自動帶入，不必在 84 個檔案裡重複設定。
+  const STAGE_BY_MODULE = {
+    kinematics: { family: "mechanics", stage: "運動量測台", code: "KIN" },
+    newton: { family: "mechanics", stage: "受力分析台", code: "FOR" },
+    momentum: { family: "mechanics", stage: "動量量測台", code: "MOM" },
+    energy: { family: "mechanics", stage: "能量轉換台", code: "ENG" },
+    gravity: { family: "orbital", stage: "軌道觀測台", code: "ORB" },
+    shm: { family: "mechanics", stage: "振動量測台", code: "OSC" },
+    thermal: { family: "thermal", stage: "熱流量測台", code: "THM" },
+    waves: { family: "waves", stage: "波形量測台", code: "WAV" },
+    optics: { family: "optics", stage: "光學量測台", code: "OPT" },
+    electric: { family: "circuit", stage: "電路量測台", code: "ELC" },
+    magnetism: { family: "magnetism", stage: "電磁觀測台", code: "MAG" },
+    modern: { family: "modern", stage: "微觀探測台", code: "QNT" }
+  };
+
+  function profileFor(id) {
+    const modules = window.PhysicsLabCurriculum && window.PhysicsLabCurriculum.modules;
+    const module = modules && modules.find(m => m.experiments.some(e => e.id === id));
+    const stage = STAGE_BY_MODULE[module && module.id] || { family: "general", stage: "互動量測台", code: "PHY" };
+    return Object.assign({ id: id || "", moduleId: module && module.id, moduleNo: module && module.no, moduleTitle: module && module.title }, stage);
+  }
+
   /* ----------------------------- 版面 ----------------------------- */
   function layout(root) {
     root.innerHTML = "";
     root.classList.add("lab-sim");
+    const profile = root._labProfile || profileFor(root.dataset && root.dataset.simId);
+    root._labProfile = profile;
+    if (root.dataset) { root.dataset.labFamily = profile.family; root.dataset.labCode = profile.code; }
     const stage = el("div", "sim-stage", root);
     const visual = el("section", "sim-visual-panel", stage);
     const visualHead = el("div", "sim-panel-head", visual);
-    const visualTitle = el("span", "sim-panel-title", visualHead); visualTitle.textContent = "即時實驗視窗";
-    const visualState = el("span", "sim-live", visualHead); visualState.textContent = "LIVE";
+    const visualTitle = el("span", "sim-panel-title", visualHead); visualTitle.textContent = profile.stage;
+    const visualState = el("span", "sim-live", visualHead); visualState.textContent = "LIVE MODEL";
     const canvasWrap = el("div", "sim-canvas-wrap", visual);
+    canvasWrap._labProfile = profile;
+    const instrumentStrip = el("div", "sim-instrument-strip", visual);
+    const instrumentCode = el("span", "sim-instrument-code", instrumentStrip); instrumentCode.textContent = profile.code + " · " + (profile.moduleNo ? "模組" + profile.moduleNo : "物理模型");
+    const instrumentMode = el("span", "sim-instrument-mode", instrumentStrip); instrumentMode.textContent = "即時量測 / 可調參數";
 
     const controlDeck = el("section", "sim-control-deck", stage);
     const controlHead = el("div", "sim-panel-head", controlDeck);
@@ -51,10 +81,10 @@
 
     const readoutPanel = el("section", "sim-readout-panel", root);
     const readoutHead = el("div", "sim-readout-head", readoutPanel);
-    const readoutTitle = el("span", "sim-panel-title", readoutHead); readoutTitle.textContent = "即時讀數";
+    const readoutTitle = el("span", "sim-panel-title", readoutHead); readoutTitle.textContent = "量測讀數";
     const readoutHint = el("span", "sim-panel-hint", readoutHead); readoutHint.textContent = "模型計算";
     const readouts = el("div", "sim-readouts", readoutPanel);
-    return { root, stage, visual, canvasWrap, controlDeck, controls, readoutPanel, readouts };
+    return { root, profile, stage, visual, canvasWrap, instrumentStrip, controlDeck, controls, readoutPanel, readouts };
   }
 
   /* --------------------------- 響應式畫布 --------------------------- */
@@ -63,7 +93,7 @@
     maxW = maxW || 780;
     const canvas = el("canvas", "sim-canvas", wrap);
     const ctx = canvas.getContext("2d");
-    const cv = { canvas, ctx, W: 640, H: 400, dpr: 1, _resizeCbs: [] };
+    const cv = { canvas, ctx, W: 640, H: 400, dpr: 1, _resizeCbs: [], profile: wrap._labProfile || profileFor() };
 
     function fit() {
       const rect = wrap.getBoundingClientRect();
@@ -239,6 +269,40 @@
     return c;
   }
 
+  function instrumentChrome(ctx, W, H, profile) {
+    const family = profile && profile.family || "general";
+    const faint = "rgba(255,255,255,0.10)", dim = "rgba(255,255,255,0.055)", accent = col("m-color", col("accent"));
+    ctx.save(); ctx.lineWidth = 1; ctx.strokeStyle = faint; ctx.fillStyle = dim;
+    const y = H - 12;
+    if (family === "mechanics" || family === "optics") {
+      ctx.fillRect(14, y, W - 28, 5); ctx.strokeRect(14.5, y + 0.5, W - 29, 4);
+      for (let x = 24; x < W - 20; x += 24) { ctx.beginPath(); ctx.moveTo(x, y + 1); ctx.lineTo(x, y + (x % 72 === 24 ? 5 : 3)); ctx.stroke(); }
+    } else if (family === "circuit") {
+      const py = H - 16; ctx.strokeStyle = "rgba(90,162,255,0.14)";
+      [[16, 76], [W * 0.30, W * 0.53], [W * 0.68, W - 18]].forEach((span, i) => {
+        ctx.beginPath(); ctx.moveTo(span[0], py + (i % 2 ? 5 : 0)); ctx.lineTo(span[1], py + (i % 2 ? 5 : 0)); ctx.stroke();
+        [span[0], span[1]].forEach(x => { ctx.beginPath(); ctx.arc(x, py + (i % 2 ? 5 : 0), 2.3, 0, TAU); ctx.fillStyle = "rgba(90,162,255,0.22)"; ctx.fill(); });
+      });
+    } else if (family === "thermal") {
+      ctx.fillRect(14, y - 2, W - 28, 7); ctx.strokeRect(14.5, y - 1.5, W - 29, 6);
+      for (let x = 26; x < W - 20; x += 20) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 8, y); ctx.stroke(); }
+    } else if (family === "waves") {
+      ctx.strokeStyle = "rgba(77,208,225,0.16)"; ctx.beginPath();
+      for (let x = 14; x <= W - 14; x += 5) { const yy = y + Math.sin((x - 14) / 14) * 2.5; x === 14 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy); }
+      ctx.stroke();
+    } else if (family === "magnetism") {
+      ctx.strokeStyle = "rgba(185,139,255,0.14)";
+      for (let x = 24; x < W - 22; x += 30) { ctx.beginPath(); ctx.arc(x, y - 1, 9, Math.PI, 0); ctx.stroke(); }
+    } else if (family === "orbital" || family === "modern") {
+      ctx.strokeStyle = "rgba(90,162,255,0.12)";
+      for (let x = 20; x < W - 16; x += 28) { ctx.beginPath(); ctx.arc(x, y, 4, 0, TAU); ctx.stroke(); }
+    }
+    ctx.fillStyle = accent; ctx.globalAlpha = 0.62; ctx.font = "8px system-ui, sans-serif";
+    ctx.fillText((profile && profile.code || "PHY") + " / CALIBRATED", 15, H - 18);
+    ctx.textAlign = "right"; ctx.fillStyle = faint; ctx.fillText("INTERACTIVE LAB", W - 15, H - 18);
+    ctx.restore();
+  }
+
   /* --------------------------- 繪圖助手 --------------------------- */
   const D = {
     grid(ctx, x, y, w, h, step, color) {
@@ -354,6 +418,7 @@
         ctx.beginPath(); ctx.moveTo(p[0], p[1] + p[3] * mark); ctx.lineTo(p[0], p[1]); ctx.lineTo(p[0] + p[2] * mark, p[1]); ctx.stroke();
       });
       ctx.restore();
+      instrumentChrome(ctx, W, H, cv.profile);
     }
   };
 
@@ -425,7 +490,16 @@
   const registry = {};
   const PhysicsLab = {
     _registry: registry,
-    register(id, def) { registry[id] = def; },
+    register(id, def) {
+      registry[id] = Object.assign({}, def, {
+        build(root) {
+          const profile = profileFor(id);
+          root._labProfile = profile;
+          if (root.dataset) root.dataset.simId = id;
+          return def.build(root);
+        }
+      });
+    },
     get(id) { return registry[id]; },
     has(id) { return !!registry[id]; },
     ids() { return Object.keys(registry); },
