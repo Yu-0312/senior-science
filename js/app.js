@@ -25,7 +25,6 @@
   let currentSim = null;
   let currentId = null;
   let initialized = false;
-  const ACCESS_SESSION_KEY = "physics-lab-access-v1";
   const ACCESS_HASH = "faf16b5c720233e537cc50efe380a2170b2a2fd339ae6f9f3f74465cef67e8cd";
 
   /* ------------------------------- 主題 ------------------------------- */
@@ -236,7 +235,6 @@
   function lockLab() {
     if (currentSim && currentSim.stop) { try { currentSim.stop(); } catch (e) {} }
     currentSim = null;
-    sessionStorage.removeItem(ACCESS_SESSION_KEY);
     document.body.classList.remove("has-access");
     document.body.classList.add("access-locked");
     $("#access-password").value = "";
@@ -252,7 +250,6 @@
   }
 
   function unlockLab() {
-    sessionStorage.setItem(ACCESS_SESSION_KEY, "granted");
     document.body.classList.remove("access-locked");
     document.body.classList.add("has-access");
     if (!initialized) { initialized = true; init(); }
@@ -263,7 +260,6 @@
     const form = $("#access-form");
     const input = $("#access-password");
     const error = $("#access-error");
-    if (sessionStorage.getItem(ACCESS_SESSION_KEY) === "granted") { unlockLab(); return; }
     form.addEventListener("submit", async event => {
       event.preventDefault();
       const submit = form.querySelector("button[type=submit]");
