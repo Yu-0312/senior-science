@@ -1,6 +1,6 @@
 /* sw.js — Service Worker（離線快取）
  * 更新任何檔案後，請調高 CACHE 版本號以觸發更新。 */
-const CACHE = "physics-lab-v1";
+const CACHE = "physics-lab-v3";
 const ASSETS = [
   "./",
   "index.html",

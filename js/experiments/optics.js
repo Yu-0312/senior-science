@@ -135,7 +135,7 @@
   /* 雙縫干涉 — 光具座 · 單光子累積 */
   PL.register("double-slit", { build(root) {
     const L = PL.ui.layout(root);
-    const cv = PL.canvas.create(L.canvasWrap, 0.5, 900);
+    const cv = PL.canvas.create(L.canvasWrap, 0.54, 900);
     // 控制項
     PL.ui.section(L.controls, "光源與幾何");
     const stLam = PL.ui.stepper(L.controls, { label: "波長 λ (nm)", value: 600, min: 400, max: 700, step: 10, onInput: reset });
@@ -180,31 +180,51 @@
 
     function scene() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const col = nmColor(stLam.get()), cy = H * 0.44, benchY = H - 18, laserX = 58, slitX = W * 0.4, scrX = W - 104, half = Math.min(H * 0.4, (H - 44) / 2);
+      const col = nmColor(stLam.get()), cy = H * 0.46, benchY = H - 20, laserX = 68, slitX = W * 0.4, scrX = W - 104, half = Math.min(H * 0.37, (H - 56) / 2);
       const yPx = yMM => cy + (yMM / yMaxMM()) * half, gap = 20, s1 = { x: slitX, y: cy - gap / 2 }, s2 = { x: slitX, y: cy + gap / 2 };
-      // 光學導軌
-      D.rect(ctx, 24, benchY, W - 48, 8, { fill: "rgba(255,255,255,0.06)", r: 4 });
+      const support = (x, top, wide) => {
+        const footW = wide || 26;
+        D.rect(ctx, x - footW / 2, benchY - 4, footW, 6, { fill: "#273242", stroke: "rgba(255,255,255,0.18)", width: 1, r: 2 });
+        D.line(ctx, x, top + 8, x, benchY - 4, "#59667a", 3);
+        D.rect(ctx, x - 7, top, 14, 9, { fill: "#303b4c", stroke: "rgba(255,255,255,0.18)", width: 1, r: 2 });
+      };
+      // 光學導軌與刻度
+      D.rect(ctx, 24, benchY, W - 48, 7, { fill: "#263140", stroke: "rgba(255,255,255,0.18)", width: 1, r: 3 });
+      D.line(ctx, 30, benchY + 3.5, W - 30, benchY + 3.5, "rgba(255,255,255,0.14)", 1);
+      for (let x = 38; x < W - 34; x += 24) D.line(ctx, x, benchY + 1, x, benchY + (x % 72 === 38 ? 6 : 4), "rgba(255,255,255,0.16)", 1);
       D.text(ctx, "示意 · 非真實比例", 16, 20, { color: PL.col("text-faint"), size: 10.5 });
+      D.text(ctx, `λ ${stLam.get()} nm   ·   d ${stD.get().toFixed(2)} mm   ·   L ${stL.get().toFixed(1)} m`, W - 16, 20, { color: PL.col("text-dim"), size: 10, align: "right" });
       // 光束錐
       ctx.save(); ctx.globalAlpha = 0.14; ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(laserX + 14, cy); ctx.lineTo(slitX, cy - gap * 1.5); ctx.lineTo(slitX, cy + gap * 1.5); ctx.closePath(); ctx.fill(); ctx.restore();
+      D.line(ctx, laserX + 12, cy, slitX - 3, cy, col, 1.15);
       // 波前
       if (layers.has("wave")) { ctx.save(); ctx.beginPath(); ctx.rect(slitX, 0, scrX - slitX, H); ctx.clip(); [s1, s2].forEach(s => { for (let n = 0; n < 26; n++) { const r = ((n * 22 + phase * 22) % ((scrX - slitX) + 22)); ctx.strokeStyle = col; ctx.globalAlpha = 0.16 * (1 - r / (scrX - slitX)); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(s.x, s.y, r, -1.2, 1.2); ctx.stroke(); } }); ctx.restore(); }
-      // 光源（雷射）
-      D.line(ctx, laserX, cy, laserX, benchY, PL.col("text-faint"), 3);
-      D.rect(ctx, laserX - 30, cy - 11, 42, 22, { fill: "#2a3444", stroke: "rgba(255,255,255,0.25)", width: 1, r: 5 });
-      D.rect(ctx, laserX + 8, cy - 5, 8, 10, { fill: "#3a4658", r: 2 });
-      D.disc(ctx, laserX + 16, cy, 4, { fill: col, glow: col, glowSize: 12 });
+      // 雷射光源與固定座
+      support(laserX - 4, cy + 13, 30);
+      D.rect(ctx, laserX - 35, cy - 13, 46, 26, { fill: "#293545", stroke: "rgba(255,255,255,0.27)", width: 1, r: 4 });
+      D.rect(ctx, laserX - 31, cy - 9, 10, 18, { fill: "#1a222e", stroke: "rgba(255,255,255,0.15)", width: 1, r: 2 });
+      D.rect(ctx, laserX + 7, cy - 6, 11, 12, { fill: "#435165", stroke: "rgba(255,255,255,0.2)", width: 1, r: 2 });
+      D.disc(ctx, laserX + 18, cy, 4.5, { fill: col, glow: col, glowSize: 15 });
+      D.text(ctx, "LASER", laserX - 10, cy + 3, { color: PL.col("text-faint"), size: 7.5, align: "center" });
       // 雙縫屏障
       const barW = 12;
+      support(slitX, cy + half + 14, 30);
       const seg = (y0, y1) => D.rect(ctx, slitX - barW / 2, y0, barW, y1 - y0, { fill: "#161d29", stroke: "rgba(255,255,255,0.18)", width: 1, r: 3 });
       seg(cy - half - 14, s1.y - 5); seg(s1.y + 5, s2.y - 5); seg(s2.y + 5, cy + half + 14);
-      D.line(ctx, slitX, cy, slitX, benchY, PL.col("text-faint"), 3);
       D.disc(ctx, s1.x, s1.y, 2.5, { fill: "#fff" }); D.disc(ctx, s2.x, s2.y, 2.5, { fill: "#fff" });
+      D.text(ctx, "雙縫", slitX, cy - half - 23, { color: PL.col("text-dim"), size: 9, align: "center" });
       // 路程差
       if (layers.has("path")) { const fy = yPx(dxMM()); D.line(ctx, s1.x, s1.y, scrX, fy, "rgba(255,255,255,0.4)", 1, [4, 3]); D.line(ctx, s2.x, s2.y, scrX, fy, "rgba(255,255,255,0.4)", 1, [4, 3]); D.text(ctx, "r₂−r₁ = λ", (slitX + scrX) / 2 - 20, cy - 6, { color: PL.col("text-dim"), size: 11 }); }
-      // 屏幕與累積
-      D.rect(ctx, scrX, cy - half - 14, 20, 2 * half + 28, { fill: "#0a0e15", stroke: "rgba(255,255,255,0.2)", width: 1.5, r: 4 });
-      D.line(ctx, scrX + 10, cy, scrX + 10, benchY, PL.col("text-faint"), 3);
+      // 屏幕上的理論條紋與單光子累積
+      support(scrX + 10, cy + half + 14, 32);
+      D.rect(ctx, scrX, cy - half - 14, 20, 2 * half + 28, { fill: "#0a0e15", stroke: "rgba(255,255,255,0.24)", width: 1.5, r: 3 });
+      ctx.save(); ctx.beginPath(); ctx.rect(scrX + 4, cy - half - 10, 12, 2 * half + 20); ctx.clip();
+      for (let y = cy - half - 10; y <= cy + half + 10; y += 1.5) {
+        const intensity = Iy((y - cy) / half * yMaxMM());
+        ctx.globalAlpha = 0.05 + intensity * 0.36; ctx.fillStyle = col; ctx.fillRect(scrX + 4, y, 12, 1.5);
+      }
+      ctx.restore(); ctx.globalAlpha = 1;
+      D.text(ctx, "探測屏", scrX + 10, cy - half - 24, { color: PL.col("text-dim"), size: 9, align: "center" });
       ctx.save(); ctx.globalCompositeOperation = "lighter";
       hits.forEach(h => { ctx.fillStyle = col; ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.arc(scrX + 4 + (h.x % 12), yPx(h.y), 1.8, 0, PL.TAU); ctx.fill(); });
       ctx.restore(); ctx.globalAlpha = 1;

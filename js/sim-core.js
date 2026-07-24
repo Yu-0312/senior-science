@@ -35,11 +35,26 @@
   /* ----------------------------- 版面 ----------------------------- */
   function layout(root) {
     root.innerHTML = "";
+    root.classList.add("lab-sim");
     const stage = el("div", "sim-stage", root);
-    const canvasWrap = el("div", "sim-canvas-wrap", stage);
-    const controls = el("div", "sim-controls", stage);
-    const readouts = el("div", "sim-readouts", root);
-    return { root, stage, canvasWrap, controls, readouts };
+    const visual = el("section", "sim-visual-panel", stage);
+    const visualHead = el("div", "sim-panel-head", visual);
+    const visualTitle = el("span", "sim-panel-title", visualHead); visualTitle.textContent = "即時實驗視窗";
+    const visualState = el("span", "sim-live", visualHead); visualState.textContent = "LIVE";
+    const canvasWrap = el("div", "sim-canvas-wrap", visual);
+
+    const controlDeck = el("section", "sim-control-deck", stage);
+    const controlHead = el("div", "sim-panel-head", controlDeck);
+    const controlTitle = el("span", "sim-panel-title", controlHead); controlTitle.textContent = "實驗參數";
+    const controlHint = el("span", "sim-panel-hint", controlHead); controlHint.textContent = "可即時調整";
+    const controls = el("div", "sim-controls", controlDeck);
+
+    const readoutPanel = el("section", "sim-readout-panel", root);
+    const readoutHead = el("div", "sim-readout-head", readoutPanel);
+    const readoutTitle = el("span", "sim-panel-title", readoutHead); readoutTitle.textContent = "即時讀數";
+    const readoutHint = el("span", "sim-panel-hint", readoutHead); readoutHint.textContent = "模型計算";
+    const readouts = el("div", "sim-readouts", readoutPanel);
+    return { root, stage, visual, canvasWrap, controlDeck, controls, readoutPanel, readouts };
   }
 
   /* --------------------------- 響應式畫布 --------------------------- */
@@ -113,6 +128,7 @@
     const val = el("span", "ctrl-value", head);
     const input = el("input", null, wrap);
     input.type = "range";
+    input.setAttribute("aria-label", o.ariaLabel || o.label || "數值滑桿");
     input.min = o.min; input.max = o.max; input.step = o.step == null ? 1 : o.step;
     input.value = o.value;
     const f = o.fmt || (v => fmt(v, o.digits == null ? 1 : o.digits));
@@ -126,6 +142,7 @@
     const wrap = el("div", "ctrl-select", parent);
     if (o.label) { const l = el("div", "ctrl-label", wrap); l.textContent = o.label; }
     const sel = el("select", null, wrap);
+    if (o.label) sel.setAttribute("aria-label", o.ariaLabel || o.label);
     o.options.forEach(op => {
       const oe = el("option", null, sel);
       oe.value = op.value; oe.textContent = op.label;
@@ -178,6 +195,9 @@
     const val = el("span", "stepper-val", box);
     if (o.unit) { const u = el("span", "stepper-unit", box); u.textContent = o.unit; }
     const inc = el("button", "stepper-btn", box); inc.type = "button"; inc.textContent = "+";
+    const name = o.ariaLabel || o.label || "數值";
+    dec.setAttribute("aria-label", name + " 減少");
+    inc.setAttribute("aria-label", name + " 增加");
     const step = o.step == null ? 1 : o.step, dg = o.digits == null ? 0 : o.digits;
     let v = o.value;
     const show = () => { val.textContent = typeof o.format === "function" ? o.format(v) : (+v).toFixed(dg); };
@@ -307,7 +327,7 @@
       }
       ctx.lineTo(x2, y2); ctx.stroke(); ctx.restore();
     },
-    // 陰影漸層背景 + 暈影 + 內框（讓每個 canvas 都有一致的質感）
+    // 陰影漸層、儀器格線與內框，讓所有模擬共享實驗台的質感。
     bg(cv) {
       const ctx = cv.ctx, W = cv.W, H = cv.H;
       const g = ctx.createLinearGradient(0, 0, 0, H);
@@ -319,7 +339,21 @@
       rg.addColorStop(0, "rgba(0,0,0,0)");
       rg.addColorStop(1, light ? "rgba(30,50,90,0.05)" : "rgba(0,0,0,0.30)");
       ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
-      ctx.save(); ctx.strokeStyle = light ? "rgba(30,50,90,0.08)" : "rgba(255,255,255,0.05)"; ctx.lineWidth = 1; ctx.strokeRect(0.5, 0.5, W - 1, H - 1); ctx.restore();
+      const step = Math.max(24, Math.round(Math.min(W, H) / 11));
+      ctx.save();
+      ctx.strokeStyle = light ? "rgba(30,50,90,0.045)" : "rgba(255,255,255,0.035)";
+      ctx.lineWidth = 1; ctx.beginPath();
+      for (let x = step; x < W; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+      for (let y = step; y < H; y += step) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+      ctx.stroke();
+      ctx.strokeStyle = light ? "rgba(30,50,90,0.10)" : "rgba(255,255,255,0.075)";
+      ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+      ctx.strokeStyle = col("m-color", col("accent")); ctx.globalAlpha = 0.55; ctx.lineWidth = 1.4;
+      const mark = 10;
+      [[8, 8, 1, 1], [W - 8, 8, -1, 1], [8, H - 8, 1, -1], [W - 8, H - 8, -1, -1]].forEach(p => {
+        ctx.beginPath(); ctx.moveTo(p[0], p[1] + p[3] * mark); ctx.lineTo(p[0], p[1]); ctx.lineTo(p[0] + p[2] * mark, p[1]); ctx.stroke();
+      });
+      ctx.restore();
     }
   };
 
@@ -332,16 +366,25 @@
       X, Y, box, dom,
       frame(o) {
         o = o || {};
-        D.rect(ctx, box.x, box.y, box.w, box.h, { fill: col("sim-bg-1", "#0a0f16"), stroke: col("border", "#26303d"), width: 1, r: 8 });
+        D.rect(ctx, box.x, box.y, box.w, box.h, { fill: col("sim-bg-1", "#0a0f16"), stroke: col("border", "#26303d"), width: 1, r: 7 });
         // 零軸
         if (dom.y0 < 0 && dom.y1 > 0) D.line(ctx, box.x, Y(0), box.x + box.w, Y(0), col("text-faint", "#62707f"), 1);
         if (dom.x0 < 0 && dom.x1 > 0) D.line(ctx, X(0), box.y, X(0), box.y + box.h, col("text-faint", "#62707f"), 1);
+        if (o.ticks !== false) {
+          const n = o.tickCount || 4;
+          for (let i = 0; i <= n; i++) {
+            const xv = lerp(dom.x0, dom.x1, i / n), yv = lerp(dom.y0, dom.y1, i / n);
+            D.text(ctx, fmt(xv, Math.abs(dom.x1 - dom.x0) < 2 ? 2 : 1), X(xv), box.y + box.h + 13, { color: col("text-faint"), size: 8.5, align: "center" });
+            D.text(ctx, fmt(yv, Math.abs(dom.y1 - dom.y0) < 2 ? 2 : 1), box.x - 5, Y(yv) + 3, { color: col("text-faint"), size: 8.5, align: "right" });
+          }
+        }
         if (o.xlabel) D.text(ctx, o.xlabel, box.x + box.w - 4, box.y + box.h - 6, { color: col("text-faint"), size: 11, align: "right" });
         if (o.ylabel) D.text(ctx, o.ylabel, box.x + 6, box.y + 12, { color: col("text-faint"), size: 11 });
         if (o.title) D.text(ctx, o.title, box.x + box.w / 2, box.y - 6, { color: col("text-dim"), size: 11.5, align: "center" });
       },
       grid(nx, ny) {
-        ctx.save(); ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 1; ctx.beginPath();
+        const light = document.documentElement.getAttribute("data-theme") === "light";
+        ctx.save(); ctx.strokeStyle = light ? "rgba(30,50,90,0.08)" : "rgba(255,255,255,0.055)"; ctx.lineWidth = 1; ctx.beginPath();
         for (let i = 1; i < nx; i++) { const gx = box.x + box.w * i / nx; ctx.moveTo(gx, box.y); ctx.lineTo(gx, box.y + box.h); }
         for (let j = 1; j < ny; j++) { const gy = box.y + box.h * j / ny; ctx.moveTo(box.x, gy); ctx.lineTo(box.x + box.w, gy); }
         ctx.stroke(); ctx.restore();

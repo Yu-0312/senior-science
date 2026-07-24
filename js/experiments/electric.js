@@ -133,6 +133,237 @@
     return { stop() { anim.stop(); cv.destroy(); cc.destroy(); }, rerender: draw };
   }});
 
+  /* 閉合電路：伏安法、安阻法、伏阻法與內電阻量測 */
+  PL.register("closed-circuit-emf", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.6);
+    let closed = true, method = "va", records = [], feedback = "", guideStep = 0;
+
+    PL.ui.section(L.controls, "電源與負載");
+    const clearForSourceChange = () => { records = []; feedback = "電源設定已變更，舊的量測資料已清除。"; draw(); };
+    const sE = PL.ui.stepper(L.controls, { label: "電動勢 E", min: 1.5, max: 12, step: 0.5, value: 3, unit: "V", digits: 1, onInput: clearForSourceChange });
+    const sr = PL.ui.stepper(L.controls, { label: "內電阻 r", min: 0.1, max: 4, step: 0.1, value: 0.5, unit: "Ω", digits: 1, onInput: clearForSourceChange });
+    const sR = PL.ui.slider(L.controls, { label: "外電阻 R（滑片）", min: 0.5, max: 30, step: 0.5, value: 12, unit: "Ω", digits: 1, onInput: () => { feedback = ""; draw(); } });
+    PL.ui.section(L.controls, "儀表設定");
+    const sAmRange = PL.ui.select(L.controls, { label: "電流表量程", value: "0.6", options: [{ value: "0.6", label: "0 - 0.6 A" }, { value: "3", label: "0 - 3 A" }], onChange: draw });
+    const sVmRange = PL.ui.select(L.controls, { label: "電壓表量程", value: "3", options: [{ value: "3", label: "0 - 3 V" }, { value: "15", label: "0 - 15 V" }], onChange: draw });
+    const stateNote = PL.ui.note(L.controls, "閉合開關後可改變滑片位置；每個設定值可記錄成一組量測資料。");
+
+    PL.ui.section(L.controls, "量測控制");
+    const methodChips = PL.ui.chipGroup(L.controls, {
+      value: method,
+      options: [
+        { value: "va", label: "伏安法", color: MC() },
+        { value: "ar", label: "安阻法" },
+        { value: "vr", label: "伏阻法" }
+      ],
+      onChange: value => { method = value; draw(); }
+    });
+    const switchRow = PL.ui.buttonRow(L.controls);
+    const switchBtn = PL.ui.button(switchRow, "斷開開關 S", () => { closed = !closed; draw(); }, { primary: true });
+    const actionRow = PL.ui.buttonRow(L.controls);
+    const recordBtn = PL.ui.button(actionRow, "記錄量測點", () => {
+      if (!closed) return;
+      const s = circuitState();
+      if (records.some(p => Math.abs(p.R - s.R) < 1e-8)) {
+        feedback = "此阻值已記錄，請調整外電阻後再量測。";
+        draw();
+        return;
+      }
+      records.push({ R: s.R, I: s.I, U: s.U });
+      if (records.length > 10) records.shift();
+      feedback = "已記錄 R=" + PL.fmt(s.R, 1) + " Ω 的量測點。";
+      draw();
+    });
+    PL.ui.button(actionRow, "清空", () => { records = []; feedback = "量測資料已清空。"; draw(); });
+    PL.ui.button(L.controls, "重設設定", () => {
+      sE.set(3); sr.set(0.5); sR.set(12); closed = true; method = "va"; records = []; feedback = ""; guideStep = 0;
+      methodChips.set(method); draw();
+    });
+    PL.ui.section(L.controls, "實驗引導");
+    const guideNote = PL.ui.note(L.controls, "");
+    const guideRow = PL.ui.buttonRow(L.controls);
+    const guidePrev = PL.ui.button(guideRow, "上一步", () => setGuideStep(guideStep - 1));
+    const guideNext = PL.ui.button(guideRow, "下一步", () => setGuideStep(guideStep + 1), { primary: true });
+
+    const rI = PL.ui.readout(L.readouts, { label: "電流 I", unit: "A" });
+    const rU = PL.ui.readout(L.readouts, { label: "路端電壓 U", unit: "V" });
+    const rIr = PL.ui.readout(L.readouts, { label: "內壓降 Ir", unit: "V" });
+    const rP = PL.ui.readout(L.readouts, { label: "負載功率", unit: "W" });
+    const rLoss = PL.ui.readout(L.readouts, { label: "內耗功率", unit: "W" });
+    const rEta = PL.ui.readout(L.readouts, { label: "效率 η", unit: "%" });
+    const rMeter = PL.ui.readout(L.readouts, { label: "儀表量程狀態", unit: "" });
+    const rFit = PL.ui.readout(L.readouts, { label: "量測擬合 E、r", unit: "" });
+
+    const charts = PL.ui.charts(root);
+    const fitChart = PL.ui.chart(charts, { title: "量測擬合圖", cap: "每次調整外電阻後記錄一點；累積至少兩點即可用對應的線性關係求 E 與 r。" });
+    const charChart = PL.ui.chart(charts, { title: "路端特性 U-I 圖", cap: "開路時 U = E；電流愈大，內壓降 Ir 愈大，路端電壓愈低。" });
+
+    function circuitState() {
+      const E = sE.get(), r = sr.get(), R = sR.get();
+      const I = closed ? E / (R + r) : 0;
+      const U = E - I * r;
+      return { E, r, R, I, U, drop: I * r, loadP: I * I * R, lossP: I * I * r, eta: closed ? R / (R + r) * 100 : 0 };
+    }
+
+    function pointFor(record) {
+      if (method === "va") return { x: record.I, y: record.U };
+      if (method === "ar") return { x: record.R, y: record.I > 1e-8 ? 1 / record.I : 0 };
+      return { x: record.R, y: record.U > 1e-8 ? record.R / record.U : 0 };
+    }
+
+    function lineFit(points) {
+      if (points.length < 2) return null;
+      let sx = 0, sy = 0, sxx = 0, sxy = 0;
+      points.forEach(p => { sx += p.x; sy += p.y; sxx += p.x * p.x; sxy += p.x * p.y; });
+      const den = points.length * sxx - sx * sx;
+      if (Math.abs(den) < 1e-9) return null;
+      const m = (points.length * sxy - sx * sy) / den;
+      return { m, b: (sy - m * sx) / points.length };
+    }
+
+    function inferredParams(fit) {
+      if (!fit) return null;
+      if (method === "va") return fit.b > 0 && fit.m < 0 ? { E: fit.b, r: -fit.m } : null;
+      return fit.m > 0 ? { E: 1 / fit.m, r: fit.b / fit.m } : null;
+    }
+
+    function measurementMeta() {
+      if (method === "va") return { title: "伏安法：U-I 圖（截距 E、斜率 -r）", x: "I (A)", y: "U (V)", eq: p => p.E - p.r * p.x };
+      if (method === "ar") return { title: "安阻法：1/I-R 圖", x: "R (Ω)", y: "1/I (A⁻¹)", eq: p => (p.x + p.r) / p.E };
+      return { title: "伏阻法：R/U-R 圖", x: "R (Ω)", y: "R/U (Ω/V)", eq: p => (p.x + p.r) / p.E };
+    }
+
+    const GUIDE_STEPS = [
+      "確認電動勢、內電阻與兩個電表量程；預設值可直接開始量測。",
+      "閉合開關，先以 R = 12 Ω 記錄第一組路端電壓與電流。",
+      "將外電阻調大到 R = 24 Ω，記錄第二組資料。",
+      "將外電阻調小到 R = 3 Ω，記錄第三組資料。",
+      "查看量測擬合圖，將推得的 E、r 與上方設定值比較。"
+    ];
+
+    function setGuideStep(next) {
+      guideStep = PL.clamp(next, 0, GUIDE_STEPS.length - 1);
+      const guideR = [12, 12, 24, 3, 3][guideStep];
+      sR.set(guideR);
+      if (guideStep > 0) closed = true;
+      feedback = "";
+      draw();
+    }
+
+    function updateGuide() {
+      guideNote.textContent = "步驟 " + (guideStep + 1) + "/" + GUIDE_STEPS.length + "：" + GUIDE_STEPS[guideStep];
+      guidePrev.disabled = guideStep === 0;
+      guideNext.disabled = guideStep === GUIDE_STEPS.length - 1;
+    }
+
+    function drawCircuit() {
+      const { ctx, W, H } = cv, s = circuitState();
+      cv.clear(); D.bg(cv);
+      const top = H * 0.28, bottom = H * 0.75, left = 46, right = W - 44;
+      const switchX = left + 44, meterX = W * 0.48, resistorX = W * 0.74, sourceX = W * 0.3;
+      const resistorW = Math.min(88, W * 0.17), batteryW = Math.min(106, W * 0.3);
+      const wire = closed ? "rgba(237,245,250,0.82)" : PL.col("text-faint");
+      const active = closed ? MC() : PL.col("text-faint");
+
+      const line = (x1, y1, x2, y2, color, width) => D.line(ctx, x1, y1, x2, y2, color || wire, width || 2);
+      const meter = (x, y, value, unit, label, color, limit) => {
+        const over = value > limit + 1e-8, meterColor = over ? PL.col("danger", "#ff6b6b") : color;
+        D.disc(ctx, x, y, 29, { fill: PL.col("panel-2"), stroke: meterColor, width: 2, glow: meterColor, glowSize: 8 });
+        D.ring(ctx, x, y, 20, PL.col("border"), 1);
+        for (let i = 0; i < 5; i++) {
+          const a = Math.PI * (1.12 + i * 0.19);
+          line(x + Math.cos(a) * 17, y + Math.sin(a) * 17, x + Math.cos(a) * 21, y + Math.sin(a) * 21, PL.col("text-faint"), 1);
+        }
+        const ratio = PL.clamp(value / limit, 0, 1);
+        const needle = Math.PI * (1.12 + ratio * 0.76);
+        line(x, y, x + Math.cos(needle) * 16, y + Math.sin(needle) * 16, over ? meterColor : PL.col("warn"), 1.7);
+        D.disc(ctx, x, y, 2.5, { fill: over ? meterColor : PL.col("warn") });
+        D.text(ctx, label, x, y - 6, { color: PL.col("text-faint"), size: 10, align: "center" });
+        D.text(ctx, over ? "超量程" : PL.fmt(value, 2) + " " + unit, x, y + 12, { color: over ? meterColor : "#fff", size: 10, align: "center", weight: "700" });
+        D.text(ctx, "0-" + PL.fmt(limit, 1) + " " + unit, x, y + 42, { color: PL.col("text-faint"), size: 8.5, align: "center" });
+      };
+      const resistor = (x, y, w, label) => {
+        ctx.save(); ctx.strokeStyle = active; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x, y);
+        for (let i = 0; i < 7; i++) ctx.lineTo(x + (i + 1) * w / 8, y + (i % 2 ? 9 : -9));
+        ctx.lineTo(x + w, y); ctx.stroke(); ctx.restore();
+        D.text(ctx, label, x + w / 2, y - 17, { color: active, size: 11, align: "center" });
+      };
+
+      line(left, top, switchX - 14, top);
+      D.disc(ctx, switchX - 14, top, 3, { fill: closed ? active : PL.col("text-faint") });
+      D.disc(ctx, switchX + 14, top, 3, { fill: closed ? active : PL.col("text-faint") });
+      line(switchX - 14, top, switchX + 14, closed ? top : top - 17, active, 2.5);
+      D.text(ctx, closed ? "S 閉合" : "S 斷開", switchX, top + 23, { color: active, size: 10, align: "center" });
+      line(switchX + 14, top, meterX - 34, top);
+      meter(meterX, top, s.I, "A", "A", MC(), +sAmRange.get());
+      line(meterX + 34, top, resistorX - resistorW / 2, top);
+      resistor(resistorX - resistorW / 2, top, resistorW, "滑動變阻器 R=" + PL.fmt(s.R, 1) + "Ω");
+      line(resistorX + resistorW / 2, top, right, top);
+      line(right, top, right, bottom);
+      line(right, bottom, sourceX + batteryW / 2, bottom);
+
+      D.rect(ctx, sourceX - batteryW / 2, bottom - 29, batteryW, 58, { fill: PL.col("panel-2"), stroke: active, width: 1.5, r: 7 });
+      line(sourceX - 13, bottom - 18, sourceX - 13, bottom + 18, "#fff", 3);
+      line(sourceX + 9, bottom - 11, sourceX + 9, bottom + 11, "#fff", 1.6);
+      D.text(ctx, "E=" + PL.fmt(s.E, 1) + "V", sourceX - 25, bottom + 43, { color: PL.col("warn"), size: 10, align: "center" });
+      D.text(ctx, "r=" + PL.fmt(s.r, 1) + "Ω", sourceX + 27, bottom + 43, { color: MC(), size: 10, align: "center" });
+      line(sourceX - batteryW / 2, bottom, left, bottom);
+      line(left, bottom, left, top);
+
+      const vmX = W * 0.58, vmY = bottom;
+      line(sourceX + batteryW / 2, bottom, vmX - 34, bottom, "rgba(90,162,255,0.64)", 1.5);
+      meter(vmX, vmY, s.U, "V", "V", "#5aa2ff", +sVmRange.get());
+      line(vmX + 34, bottom, right, bottom, "rgba(90,162,255,0.64)", 1.5);
+      if (closed) D.arrow(ctx, meterX + 38, top - 14, resistorX - 56, top - 14, { color: PL.col("warn"), width: 1.7, label: "I" });
+      D.text(ctx, closed ? "閉合電路：E = U + Ir" : "開關斷開：I = 0，U = E", W / 2, 30, { color: closed ? PL.col("text-dim") : PL.col("text-faint"), size: 12, align: "center", weight: "600" });
+    }
+
+    function drawFitChart(s) {
+      const meta = measurementMeta(), pts = records.map(pointFor), now = pointFor(s);
+      const all = pts.concat([now]);
+      const x1 = Math.max(1, ...all.map(p => p.x)) * 1.18;
+      const y1 = Math.max(1, ...all.map(p => p.y), method === "va" ? s.E : 0) * 1.18;
+      fitChart.clear(); D.bg(fitChart);
+      const g = PL.graph(fitChart, { x: 38, y: 24, w: fitChart.W - 52, h: fitChart.H - 42 }, { x0: 0, x1, y0: 0, y1 });
+      g.frame({ title: meta.title, xlabel: meta.x, ylabel: meta.y }); g.grid(5, 4);
+      const fit = lineFit(pts);
+      if (fit) g.fn(x => fit.m * x + fit.b, { color: MC(), width: 2.2 });
+      pts.forEach(p => g.dot(p.x, p.y, { color: PL.col("accent-2"), glow: PL.col("accent-2") }));
+      if (closed) g.dot(now.x, now.y, { color: PL.col("warn"), glow: PL.col("warn"), r: 4.5 });
+      D.text(fitChart.ctx, "已記錄 " + records.length + " 點", fitChart.W - 8, 14, { color: PL.col("text-faint"), size: 10, align: "right" });
+    }
+
+    function drawCharacteristic(s) {
+      const maxI = Math.max(1, Math.min(20, s.E / s.r));
+      charChart.clear(); D.bg(charChart);
+      const g = PL.graph(charChart, { x: 38, y: 24, w: charChart.W - 52, h: charChart.H - 42 }, { x0: 0, x1: maxI, y0: 0, y1: Math.max(1, s.E * 1.12) });
+      g.frame({ title: "U-I 特性：開路 U=E，斜率=-r", xlabel: "I (A)", ylabel: "U (V)" }); g.grid(5, 4);
+      g.fn(i => Math.max(0, s.E - i * s.r), { color: "#5aa2ff", width: 2.3 });
+      g.dot(0, s.E, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+      if (closed) g.dot(s.I, s.U, { color: PL.col("warn"), glow: PL.col("warn"), r: 4.5 });
+      D.text(charChart.ctx, "短路 Iₛ=" + PL.fmt(s.E / s.r, 2) + " A", charChart.W - 8, 14, { color: PL.col("text-faint"), size: 10, align: "right" });
+    }
+
+    function draw() {
+      const s = circuitState(), fit = inferredParams(lineFit(records.map(pointFor)));
+      const ammeterOver = s.I > +sAmRange.get() + 1e-8, voltmeterOver = s.U > +sVmRange.get() + 1e-8;
+      switchBtn.textContent = closed ? "斷開開關 S" : "閉合開關 S";
+      recordBtn.disabled = !closed;
+      const defaultNote = closed
+        ? "目前可記錄第 " + (records.length + 1) + " 組資料。改變 R 後再記錄，使用 " + ({ va: "伏安法", ar: "安阻法", vr: "伏阻法" }[method]) + " 擬合。"
+        : "開關已斷開，電流為 0。閉合後才能記錄有效量測點。";
+      stateNote.textContent = feedback || defaultNote;
+      updateGuide(); drawCircuit(); drawFitChart(s); drawCharacteristic(s);
+      rI.set(s.I, 3); rU.set(s.U, 3); rIr.set(s.drop, 3); rP.set(s.loadP, 3); rLoss.set(s.lossP, 3); rEta.set(s.eta, 1);
+      rMeter.set(ammeterOver || voltmeterOver ? (ammeterOver ? "電流表超量程" : "電壓表超量程") : "量程正常");
+      rFit.set(fit ? "E=" + PL.fmt(fit.E, 2) + " V；r=" + PL.fmt(fit.r, 2) + " Ω" : "記錄至少 2 個不同設定");
+    }
+
+    cv.onResize(draw); fitChart.onResize(draw); charChart.onResize(draw); draw();
+    return { stop() { cv.destroy(); fitChart.destroy(); charChart.destroy(); }, rerender: draw };
+  }});
+
   /* 電阻串並聯 */
   PL.register("resistors", { build(root) {
     const L = PL.ui.layout(root);
