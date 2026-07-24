@@ -190,4 +190,74 @@
     cv.onResize(draw); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
+
+  /* 電磁波與電磁波譜 */
+  PL.register("em-wave", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.62);
+    let t = 0; const c = 3e8;
+    const sP = PL.ui.slider(L.controls, { label: "波長 λ（10ˣ 公尺）", min: -13, max: 3, step: 0.1, value: -6.3, unit: "", digits: 1 });
+    PL.ui.note(L.controls, "電場 E 與磁場 B 互相垂直、也垂直於前進方向；真空中都以光速前進。");
+    const rLam = PL.ui.readout(L.readouts, { label: "波長 λ", unit: "m" });
+    const rF = PL.ui.readout(L.readouts, { label: "頻率 f", unit: "Hz" });
+    const rBand = PL.ui.readout(L.readouts, { label: "波段" });
+    const band = lam => lam > 0.1 ? "無線電波" : lam > 1e-3 ? "微波" : lam > 7e-7 ? "紅外線" : lam > 4e-7 ? "可見光" : lam > 1e-8 ? "紫外線" : lam > 1e-11 ? "X 射線" : "γ 射線";
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const p = sP.get(), lam = Math.pow(10, p), f = c / lam;
+      const swl = 18 + (p + 13) / 16 * 150, x0 = 30, x1 = W - 30, A = 30;
+      const eY = H * 0.3, bY = H * 0.56;
+      D.line(ctx, x0, eY, x1, eY, "rgba(255,255,255,0.14)", 1);
+      ctx.save(); ctx.strokeStyle = "#ff6b6b"; ctx.lineWidth = 2.2; ctx.beginPath();
+      for (let x = x0; x <= x1; x += 2) { const y = eY - A * Math.sin(PL.TAU * (x - x0) / swl - t * 4); x === x0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
+      D.text(ctx, "E 電場", x0, eY - A - 6, { color: "#ff6b6b", size: 11 });
+      D.line(ctx, x0, bY, x1, bY, "rgba(255,255,255,0.14)", 1);
+      ctx.save(); ctx.strokeStyle = "#5aa2ff"; ctx.lineWidth = 2.2; ctx.beginPath();
+      for (let x = x0; x <= x1; x += 2) { const y = bY - A * Math.sin(PL.TAU * (x - x0) / swl - t * 4); x === x0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
+      D.text(ctx, "B 磁場（⊥ E）", x0, bY - A - 6, { color: "#5aa2ff", size: 11 });
+      D.arrow(ctx, x1 - 44, (eY + bY) / 2, x1 - 8, (eY + bY) / 2, { color: "#fff", width: 2, label: "c" });
+      const bands = [["無線電", "#6b7cff"], ["微波", "#4db6ac"], ["紅外", "#ff8a65"], ["可見", "#7bd47b"], ["紫外", "#b98bff"], ["X", "#5aa2ff"], ["γ", "#ff6b6b"]];
+      const by = H - 28, bw = (W - 60) / bands.length;
+      bands.forEach((b, i) => { D.rect(ctx, 30 + i * bw, by, bw - 2, 14, { fill: b[1] }); D.text(ctx, b[0], 30 + i * bw + bw / 2, by + 26, { color: PL.col("text-faint"), size: 9, align: "center" }); });
+      const mx = 30 + PL.clamp((3 - p) / 16, 0, 1) * (W - 62);
+      D.line(ctx, mx, by - 6, mx, by + 16, "#fff", 2);
+      rLam.set(lam, 2); rF.set(f, 2); rBand.set(band(lam));
+    }
+    const anim = PL.loop(dt => { if (dt) t += dt; draw(); });
+    cv.onResize(draw); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
+
+  /* 質譜儀（速度選擇器） */
+  PL.register("mass-spec", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.7);
+    let x = 0, ang = 0, phase = "sel";
+    const sE = PL.ui.slider(L.controls, { label: "選擇器電場 E", min: 1, max: 8, step: 0.5, value: 4, unit: "", digits: 1, onInput: reset });
+    const sB = PL.ui.slider(L.controls, { label: "磁場 B", min: 1, max: 6, step: 0.5, value: 3, unit: "", digits: 1, onInput: reset });
+    const sM = PL.ui.slider(L.controls, { label: "離子質量 m", min: 1, max: 6, step: 0.5, value: 3, unit: "", digits: 1, onInput: reset });
+    PL.ui.button(PL.ui.buttonRow(L.controls), "射入離子", () => { reset(); anim.start(); }, { primary: true });
+    const rV = PL.ui.readout(L.readouts, { label: "選擇速率 v=E/B", unit: "" });
+    const rR = PL.ui.readout(L.readouts, { label: "迴轉半徑 r", unit: "" });
+    const rLand = PL.ui.readout(L.readouts, { label: "落點 ∝ m" });
+    function reset() { x = 0; ang = 0; phase = "sel"; }
+    reset();
+    function radius() { const v = sE.get() / sB.get(); return PL.clamp(sM.get() * v / sB.get() * 8, 12, (cv.H - 60) / 2); }
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const v = sE.get() / sB.get(), r = radius(), selY = H * 0.28, selX0 = 30, selX1 = W * 0.44, entryX = selX1;
+      D.rect(ctx, selX0, selY - 22, selX1 - selX0, 44, { stroke: PL.col("text-faint"), width: 1.5, r: 4 });
+      D.text(ctx, "速度選擇器 (E⊥B)", selX0, selY - 30, { color: PL.col("text-dim"), size: 10 });
+      D.text(ctx, "磁場分析區 ⊗", entryX + 10, 18, { color: PL.col("text-faint"), size: 10 });
+      ctx.save(); ctx.strokeStyle = "rgba(149,117,205,0.3)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(entryX, selY + r, r, -Math.PI / 2, Math.PI / 2); ctx.stroke(); ctx.restore();
+      D.line(ctx, entryX, selY, entryX, H - 18, PL.col("text-faint"), 2);
+      D.disc(ctx, entryX, selY + 2 * r, 5, { fill: MC(), glow: MC() }); D.text(ctx, "落點", entryX + 10, selY + 2 * r + 4, { color: MC(), size: 10 });
+      let ix, iy; if (phase === "sel") { ix = selX0 + x; iy = selY; } else { ix = entryX + r * Math.sin(ang); iy = selY + r - r * Math.cos(ang); }
+      D.disc(ctx, ix, iy, 6, { fill: "#5aa2ff", glow: "#5aa2ff", glowSize: 8 });
+      rV.set(v, 2); rR.set(r / 8, 2); rLand.set(PL.fmt(2 * r / 8, 1));
+    }
+    const anim = PL.loop(dt => { if (dt) { if (phase === "sel") { x += 130 * dt; if (30 + x >= cv.W * 0.44) { phase = "arc"; ang = 0; } } else if (phase === "arc") { ang += 1.4 * dt; if (ang >= Math.PI) anim.stop(); } } draw(); });
+    cv.onResize(draw); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
 })();

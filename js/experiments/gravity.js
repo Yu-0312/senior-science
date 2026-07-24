@@ -226,4 +226,85 @@
     cv.onResize(draw); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
+
+  /* 剛體轉動與轉動慣量 */
+  PL.register("rotation", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.66);
+    let w = 0, ang = 0;
+    const sTau = PL.ui.slider(L.controls, { label: "外加力矩 τ", min: 0, max: 12, step: 0.5, value: 6, unit: "N·m", digits: 1 });
+    const sI = PL.ui.slider(L.controls, { label: "轉動慣量 I", min: 1, max: 10, step: 0.5, value: 4, unit: "kg·m²", digits: 1 });
+    const row = PL.ui.buttonRow(L.controls);
+    PL.ui.button(row, "施加力矩", () => { anim.start(); }, { primary: true });
+    PL.ui.button(row, "重設", () => { w = 0; ang = 0; });
+    PL.ui.note(L.controls, "τ = Iα 是轉動版的牛頓第二定律；轉動慣量越大越難改變轉動狀態。");
+    const rI = PL.ui.readout(L.readouts, { label: "轉動慣量 I", unit: "kg·m²" });
+    const rA = PL.ui.readout(L.readouts, { label: "角加速度 α", unit: "rad/s²" });
+    const rW = PL.ui.readout(L.readouts, { label: "角速度 ω", unit: "rad/s" });
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.32;
+      D.disc(ctx, cx, cy, R, { fill: "rgba(255,213,79,0.08)", stroke: MC(), width: 2 });
+      for (let k = 0; k < 6; k++) { const a = ang + k * Math.PI / 3; D.line(ctx, cx, cy, cx + R * Math.cos(a), cy + R * Math.sin(a), k === 0 ? MC() : "rgba(255,255,255,0.16)", k === 0 ? 3 : 1.5); }
+      D.disc(ctx, cx + R * Math.cos(ang), cy + R * Math.sin(ang), 7, { fill: MC(), glow: MC(), glowSize: 10 });
+      D.disc(ctx, cx, cy, 6, { fill: "#fff" });
+      ctx.save(); ctx.strokeStyle = PL.col("danger"); ctx.lineWidth = 2.4; ctx.beginPath(); ctx.arc(cx, cy, R + 16, -0.7, 0.7); ctx.stroke(); ctx.restore();
+      D.arrow(ctx, cx + (R + 16) * Math.cos(0.7), cy + (R + 16) * Math.sin(0.7), cx + (R + 16) * Math.cos(0.86), cy + (R + 16) * Math.sin(0.86), { color: PL.col("danger"), width: 2.4, label: "τ" });
+      rI.set(sI.get(), 1); rA.set(sTau.get() / sI.get(), 2); rW.set(w, 2);
+    }
+    const anim = PL.loop(dt => { if (dt) { w += (sTau.get() / sI.get()) * dt; ang += w * dt; } draw(); });
+    cv.onResize(draw); draw();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
+
+  /* 鉛直圓周運動 */
+  PL.register("vertical-circle", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.8);
+    const g = 9.8, m = 1; let beta = 0, dir = 1, mode = "circle", px = 0, py = 0, vx = 0, vy = 0;
+    const sV = PL.ui.slider(L.controls, { label: "最低點速率 v₀", min: 2, max: 10, step: 0.5, value: 7, unit: "m/s", digits: 1, onInput: reset });
+    const sR = PL.ui.slider(L.controls, { label: "半徑 r", min: 1, max: 3, step: 0.5, value: 2, unit: "m", digits: 1, onInput: reset });
+    PL.ui.button(PL.ui.buttonRow(L.controls), "重新開始", reset, { primary: true });
+    PL.ui.note(L.controls, "要能通過最高點，該處速率至少 √(gr)，否則繩鬆脫、物體脫離圓周。");
+    const rTop = PL.ui.readout(L.readouts, { label: "頂點速率", unit: "m/s" });
+    const rT = PL.ui.readout(L.readouts, { label: "底點張力", unit: "N" });
+    const rMin = PL.ui.readout(L.readouts, { label: "過頂最小速率", unit: "m/s" });
+    function reset() { beta = 0; dir = 1; mode = "circle"; }
+    reset();
+    const speed2 = b => sV.get() * sV.get() - 2 * g * sR.get() * (1 - Math.cos(b));
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const r = sR.get(), cx = W / 2, cy = H * 0.46, R = Math.min(W, H) * 0.3;
+      D.ring(ctx, cx, cy, R, "rgba(255,255,255,0.12)", 1.5, [4, 4]);
+      D.disc(ctx, cx, cy, 4, { fill: PL.col("text-faint") });
+      let ballx, bally;
+      if (mode === "circle") {
+        ballx = cx + R * Math.sin(beta); bally = cy + R * Math.cos(beta);
+        D.line(ctx, cx, cy, ballx, bally, MC(), 2);
+        const v2 = Math.max(0, speed2(beta)), T = m * v2 / r + m * g * Math.cos(beta);
+        if (T > 0) { const f = PL.clamp(T / 80, 0.12, 0.5); D.arrow(ctx, ballx, bally, ballx + (cx - ballx) * f, bally + (cy - bally) * f, { color: PL.col("danger"), width: 2, label: "T" }); }
+      } else { ballx = px; bally = py; D.text(ctx, "繩鬆脫，物體脫離圓周！", cx, H - 14, { color: PL.col("danger"), size: 12, align: "center" }); }
+      D.disc(ctx, ballx, bally, 11, { fill: MC(), glow: MC(), glowSize: 12 });
+      const vt2 = speed2(Math.PI);
+      rTop.set(vt2 > 0 ? Math.sqrt(vt2) : 0, 2); rT.set(m * sV.get() * sV.get() / r + m * g, 1); rMin.set(Math.sqrt(g * r), 2);
+    }
+    const anim = PL.loop(dt => {
+      if (dt) {
+        dt = Math.min(dt, 0.02);
+        const r = sR.get(), cx = cv.W / 2, cy = cv.H * 0.46, R = Math.min(cv.W, cv.H) * 0.3, scale = R / r;
+        if (mode === "circle") {
+          const v2 = speed2(beta);
+          if (v2 <= 0) { dir = -dir; beta += dir * 0.02; }
+          else {
+            const T = m * v2 / r + m * g * Math.cos(beta), v = Math.sqrt(v2);
+            if (Math.cos(beta) < 0 && T < 0) { px = cx + R * Math.sin(beta); py = cy + R * Math.cos(beta); vx = dir * v * Math.cos(beta); vy = -dir * v * Math.sin(beta); mode = "projectile"; }
+            else beta += dir * (v / r) * dt;
+          }
+        } else { vy += g * dt; px += vx * scale * dt; py += vy * scale * dt; if (py > cv.H + 20) reset(); }
+      }
+      draw();
+    });
+    cv.onResize(draw); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
 })();

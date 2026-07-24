@@ -200,4 +200,68 @@
     cv.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
+
+  /* 惠斯登電橋 */
+  PL.register("wheatstone", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.66);
+    const sR1 = PL.ui.slider(L.controls, { label: "R₁", min: 1, max: 20, step: 1, value: 6, unit: "Ω", digits: 0, onInput: draw });
+    const sR2 = PL.ui.slider(L.controls, { label: "R₂", min: 1, max: 20, step: 1, value: 4, unit: "Ω", digits: 0, onInput: draw });
+    const sR3 = PL.ui.slider(L.controls, { label: "R₃", min: 1, max: 20, step: 1, value: 9, unit: "Ω", digits: 0, onInput: draw });
+    const sRx = PL.ui.slider(L.controls, { label: "Rₓ（未知）", min: 1, max: 20, step: 1, value: 6, unit: "Ω", digits: 0, onInput: draw });
+    PL.ui.note(L.controls, "調到檢流計歸零即平衡：R₁Rₓ = R₂R₃。");
+    const rG = PL.ui.readout(L.readouts, { label: "檢流計", unit: "" });
+    const rBal = PL.ui.readout(L.readouts, { label: "狀態" });
+    const rRx = PL.ui.readout(L.readouts, { label: "平衡時 Rₓ", unit: "Ω" });
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const R1 = sR1.get(), R2 = sR2.get(), R3 = sR3.get(), Rx = sRx.get();
+      const cx = W / 2, cy = H / 2, s = Math.min(W, H) * 0.34;
+      const T = { x: cx, y: cy - s }, B = { x: cx, y: cy + s }, Ln = { x: cx - s, y: cy }, Rn = { x: cx + s, y: cy };
+      const arm = (a, b, lab, c) => { D.line(ctx, a.x, a.y, b.x, b.y, c, 2); D.text(ctx, lab, (a.x + b.x) / 2 + 12, (a.y + b.y) / 2 - 4, { color: c, size: 11, align: "center" }); };
+      arm(T, Ln, "R₁=" + R1, PL.col("accent-2")); arm(T, Rn, "R₂=" + R2, PL.col("accent-2"));
+      arm(Ln, B, "R₃=" + R3, MC()); arm(Rn, B, "Rₓ=" + Rx, MC());
+      D.disc(ctx, T.x, T.y, 4, { fill: "#fff" }); D.disc(ctx, B.x, B.y, 4, { fill: "#fff" });
+      D.text(ctx, "＋電池－", T.x, T.y - 12, { color: PL.col("warn"), size: 11, align: "center" });
+      D.line(ctx, Ln.x, Ln.y, Rn.x, Rn.y, PL.col("text-faint"), 1.5);
+      const gm = { x: cx, y: cy }; D.disc(ctx, gm.x, gm.y, 16, { fill: PL.col("panel-2"), stroke: PL.col("text-faint"), width: 2 });
+      const VL = R3 / (R1 + R3), VR = Rx / (R2 + Rx), diff = VL - VR, needle = PL.clamp(diff * 4, -1, 1) * Math.PI / 3;
+      D.line(ctx, gm.x, gm.y, gm.x + 13 * Math.sin(needle), gm.y - 13 * Math.cos(needle), PL.col("danger"), 2);
+      D.text(ctx, "G", gm.x, gm.y + 30, { color: PL.col("text-dim"), size: 11, align: "center" });
+      const balanced = Math.abs(R1 * Rx - R2 * R3) < 0.5;
+      rG.set(diff * 100, 1); rBal.set(balanced ? "平衡 ✓" : "不平衡"); rRx.set(R2 * R3 / R1, 2);
+    }
+    cv.onResize(draw); draw();
+    return { stop() { cv.destroy(); }, rerender: draw };
+  }});
+
+  /* 帶電粒子在電場中的偏轉 */
+  PL.register("e-deflection", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.56);
+    let t = 0;
+    const sV = PL.ui.slider(L.controls, { label: "入射速度 v", min: 2, max: 10, step: 0.5, value: 6, unit: "", digits: 1 });
+    const sE = PL.ui.slider(L.controls, { label: "偏轉電壓 V", min: -10, max: 10, step: 0.5, value: 6, unit: "", digits: 1 });
+    PL.ui.note(L.controls, "板內水平等速、鉛直等加速，軌跡為拋物線——與拋體運動一模一樣。");
+    const rY = PL.ui.readout(L.readouts, { label: "板內偏轉量", unit: "" });
+    const rAng = PL.ui.readout(L.readouts, { label: "出射角", unit: "°" });
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const cy = H / 2, plateL = 90, plateR = W * 0.62, gap = 74, v = sV.get(), E = sE.get(), K = E / (v * v) * 0.9;
+      D.rect(ctx, plateL, cy - gap / 2 - 8, plateR - plateL, 8, { fill: POS }); D.text(ctx, "＋", plateL - 14, cy - gap / 2, { color: POS, size: 13 });
+      D.rect(ctx, plateL, cy + gap / 2, plateR - plateL, 8, { fill: NEG }); D.text(ctx, "－", plateL - 14, cy + gap / 2 + 12, { color: NEG, size: 13 });
+      for (let x = plateL + 20; x < plateR; x += 40) D.arrow(ctx, x, cy - gap / 2, x, cy + gap / 2, { color: "rgba(77,182,170,0.28)", width: 1 });
+      const yR = K * (plateR - plateL) * (plateR - plateL), slope = 2 * K * (plateR - plateL);
+      ctx.save(); ctx.strokeStyle = "#ffe08a"; ctx.lineWidth = 2; ctx.beginPath();
+      for (let x = plateL; x <= W - 20; x += 2) { let y = x <= plateR ? cy + K * (x - plateL) * (x - plateL) : cy + yR + slope * (x - plateR); if (y > cy + gap / 2 && x < plateR) { y = cy + gap / 2; } x === plateL ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
+      D.arrow(ctx, 20, cy, plateL - 4, cy, { color: "#fff", width: 2, label: "v" });
+      const tt = (t * v * 26) % (W - plateL - 20), xp = plateL + tt;
+      const yp = xp <= plateR ? cy + K * (xp - plateL) * (xp - plateL) : cy + yR + slope * (xp - plateR);
+      if (Math.abs(yp - cy) < gap / 2 || xp > plateR) D.disc(ctx, xp, yp, 6, { fill: "#5aa2ff", glow: "#5aa2ff", glowSize: 8 });
+      rY.set(Math.abs(yR), 1); rAng.set(Math.atan(slope) * 180 / Math.PI, 1);
+    }
+    const anim = PL.loop(dt => { if (dt) t += dt; draw(); });
+    cv.onResize(draw); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
 })();

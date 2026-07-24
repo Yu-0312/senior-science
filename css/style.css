@@ -28,6 +28,7 @@
   --sidebar-w: 306px;
   --shadow: 0 18px 44px -18px rgba(0, 0, 0, 0.75);
   --glow: 0 0 26px -4px var(--accent);
+  --hover: rgba(255, 255, 255, 0.05);
   font-synthesis: none;
 }
 
@@ -83,7 +84,7 @@ body {
   position: sticky; top: 0; z-index: 40;
 }
 .brand { display: flex; align-items: center; gap: 13px; cursor: pointer; border-radius: 12px; padding: 3px 8px 3px 4px; transition: background 0.16s; }
-.brand:hover { background: rgba(255, 255, 255, 0.04); }
+.brand:hover { background: var(--hover); }
 .brand-logo {
   width: 40px; height: 40px; border-radius: 12px; position: relative;
   background: conic-gradient(from 210deg, var(--accent), var(--accent-2), var(--accent-3), var(--accent));
@@ -124,8 +125,7 @@ body {
 /* ------------------------------- 側邊課程目錄 ------------------------------- */
 .sidebar {
   width: var(--sidebar-w); flex-shrink: 0;
-  background: linear-gradient(180deg, rgba(13, 17, 25, 0.6), rgba(9, 12, 18, 0.6));
-  backdrop-filter: blur(6px);
+  background: linear-gradient(180deg, var(--bg-2), var(--bg));
   border-right: 1px solid var(--border-soft);
   overflow-y: auto; max-height: calc(100vh - 65px);
   position: sticky; top: 65px;
@@ -160,7 +160,7 @@ body {
   user-select: none; transition: background 0.15s; position: relative;
 }
 .module-head::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--m-color, var(--accent)); opacity: 0; transition: opacity 0.16s; }
-.module-head:hover { background: rgba(255, 255, 255, 0.03); }
+.module-head:hover { background: var(--hover); }
 .module.open .module-head::before { opacity: 0.9; }
 .module-no {
   width: 27px; height: 27px; flex-shrink: 0; border-radius: 8px;
@@ -181,7 +181,7 @@ body {
   padding: 8px 16px 8px 26px; cursor: pointer; font-size: 12.8px; color: var(--text-dim);
   border-left: 2px solid transparent; transition: background 0.14s, color 0.14s;
 }
-.exp-item:hover { background: rgba(255, 255, 255, 0.03); color: var(--text); }
+.exp-item:hover { background: var(--hover); color: var(--text); }
 .exp-item.active { color: var(--text); border-left-color: var(--m-color, var(--accent)); background: color-mix(in srgb, var(--m-color, var(--accent)) 8%, transparent); }
 .exp-item .idx {
   width: 21px; height: 21px; flex-shrink: 0; border-radius: 6px; font-size: 10.5px;
@@ -298,9 +298,9 @@ body {
 .sim-canvas { display: block; width: 100%; border-radius: 12px; background: var(--sim-bg-1); border: 1px solid var(--border); box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.4); }
 .sim-controls { width: 224px; flex-shrink: 0; display: flex; flex-direction: column; gap: 15px; }
 
-.ctrl-slider .ctrl-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
-.ctrl-label { font-size: 12.5px; color: var(--text-dim); }
-.ctrl-value { font-size: 12.5px; color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 600; }
+.ctrl-slider .ctrl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.ctrl-label { font-size: 12.5px; color: var(--text-dim); flex: 1; min-width: 0; }
+.ctrl-value { font-size: 12.5px; color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
 input[type=range] {
   -webkit-appearance: none; appearance: none; width: 100%; height: 5px; border-radius: 3px;
   background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 45%, var(--panel-2)), var(--panel-2)); outline: none; cursor: pointer;
@@ -334,8 +334,8 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .sim-readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 11px; margin-top: 16px; }
 .readout { background: linear-gradient(180deg, var(--panel-2), var(--panel-solid)); border: 1px solid var(--border-soft); border-radius: 11px; padding: 12px 13px; transition: border-color 0.16s; }
 .readout:hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
-.readout-value { font-size: 19px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: 0.3px; }
-.readout-label { font-size: 11px; color: var(--text-faint); margin-top: 3px; }
+.readout-value { font-size: 18px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: 0.2px; line-height: 1.25; overflow-wrap: anywhere; }
+.readout-label { font-size: 11px; color: var(--text-faint); margin-top: 3px; overflow-wrap: anywhere; }
 
 /* 概念 / 公式指南 */
 .guide .card-body > * + * { margin-top: 18px; }
@@ -395,6 +395,7 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   --border: #d3dcea; --border-soft: #e1e8f2; --text: #16202e; --text-dim: #465468; --text-faint: #8291a4;
   --accent: #08a99a; --accent-2: #2f7ff0; --accent-3: #8b5cf6;
   --sim-bg-1: #f5f8fc; --sim-bg-2: #eef3f9;
+  --hover: rgba(24, 40, 68, 0.06);
   --shadow: 0 18px 40px -20px rgba(30, 50, 90, 0.28);
 }
 [data-theme="light"] body { background: var(--bg); }

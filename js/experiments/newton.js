@@ -230,4 +230,95 @@
     cv.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
+
+  /* 力矩與靜力平衡 */
+  PL.register("torque-equilibrium", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.56);
+    let ang = 0;
+    const sM1 = PL.ui.slider(L.controls, { label: "左側質量 m₁", min: 1, max: 8, step: 0.5, value: 3, unit: "kg", digits: 1 });
+    const sD1 = PL.ui.slider(L.controls, { label: "左側力臂 d₁", min: 1, max: 5, step: 0.5, value: 3, unit: "m", digits: 1 });
+    const sM2 = PL.ui.slider(L.controls, { label: "右側質量 m₂", min: 1, max: 8, step: 0.5, value: 2, unit: "kg", digits: 1 });
+    const sD2 = PL.ui.slider(L.controls, { label: "右側力臂 d₂", min: 1, max: 5, step: 0.5, value: 4, unit: "m", digits: 1 });
+    PL.ui.note(L.controls, "當 m₁d₁ = m₂d₂ 時左右力矩相等，橫桿保持水平平衡。");
+    const rL = PL.ui.readout(L.readouts, { label: "左力矩 τ₁", unit: "" });
+    const rR = PL.ui.readout(L.readouts, { label: "右力矩 τ₂", unit: "" });
+    const rS = PL.ui.readout(L.readouts, { label: "狀態" });
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const m1 = sM1.get(), d1 = sD1.get(), m2 = sM2.get(), d2 = sD2.get(), tauL = m1 * d1, tauR = m2 * d2;
+      const cx = W / 2, cy = H * 0.42, half = Math.min(W * 0.4, 180), sc = half / 5, c = Math.cos(ang), s = Math.sin(ang);
+      D.line(ctx, cx, cy, cx - 24, cy + 48, PL.col("text-faint"), 2); D.line(ctx, cx, cy, cx + 24, cy + 48, PL.col("text-faint"), 2); D.line(ctx, cx - 34, cy + 48, cx + 34, cy + 48, PL.col("text-faint"), 2);
+      D.line(ctx, cx - half * c, cy - half * s, cx + half * c, cy + half * s, MC(), 6);
+      D.disc(ctx, cx, cy, 5, { fill: "#fff" });
+      const hang = (dist, m, side) => { const ax = cx + side * dist * sc * c, ay = cy + side * dist * sc * s, bw = 20 + m * 4; D.line(ctx, ax, ay, ax, ay + 24, "#c9d3e0", 1.5); D.rect(ctx, ax - bw / 2, ay + 24, bw, 18 + m * 2, { fill: side < 0 ? MC() : "#ffab80", stroke: "rgba(255,255,255,0.4)", r: 4 }); D.text(ctx, m + "", ax, ay + 38, { color: "#04121a", size: 11, align: "center", weight: "700" }); };
+      hang(d1, m1, -1); hang(d2, m2, 1);
+      rL.set(tauL, 1); rR.set(tauR, 1); rS.set(Math.abs(tauL - tauR) < 0.1 ? "平衡" : tauL > tauR ? "左傾" : "右傾");
+    }
+    const anim = PL.loop(dt => { if (dt) { const net = sM2.get() * sD2.get() - sM1.get() * sD1.get(); ang += (PL.clamp(net * 0.02, -0.3, 0.3) - ang) * Math.min(1, dt * 3); } draw(); });
+    cv.onResize(draw); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
+
+  /* 力的合成與分解（力桌） */
+  PL.register("force-table", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.72);
+    const sF1 = PL.ui.slider(L.controls, { label: "F₁ 大小", min: 1, max: 8, step: 0.5, value: 5, unit: "N", digits: 1, onInput: draw });
+    const sA1 = PL.ui.slider(L.controls, { label: "F₁ 方向", min: 0, max: 360, step: 5, value: 30, unit: "°", digits: 0, onInput: draw });
+    const sF2 = PL.ui.slider(L.controls, { label: "F₂ 大小", min: 1, max: 8, step: 0.5, value: 4, unit: "N", digits: 1, onInput: draw });
+    const sA2 = PL.ui.slider(L.controls, { label: "F₂ 方向", min: 0, max: 360, step: 5, value: 120, unit: "°", digits: 0, onInput: draw });
+    const rMag = PL.ui.readout(L.readouts, { label: "合力大小", unit: "N" });
+    const rAng = PL.ui.readout(L.readouts, { label: "合力方向", unit: "°" });
+    const rEq = PL.ui.readout(L.readouts, { label: "平衡力方向", unit: "°" });
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const cx = W / 2, cy = H / 2, S = 15;
+      D.ring(ctx, cx, cy, Math.min(W, H) * 0.4, "rgba(255,255,255,0.12)", 1.5);
+      D.disc(ctx, cx, cy, 5, { fill: "#fff" });
+      const f1 = sF1.get(), a1 = sA1.get() * Math.PI / 180, f2 = sF2.get(), a2 = sA2.get() * Math.PI / 180;
+      const v1 = { x: f1 * Math.cos(a1), y: -f1 * Math.sin(a1) }, v2 = { x: f2 * Math.cos(a2), y: -f2 * Math.sin(a2) }, rs = { x: v1.x + v2.x, y: v1.y + v2.y };
+      D.line(ctx, cx + v1.x * S, cy + v1.y * S, cx + rs.x * S, cy + rs.y * S, "rgba(255,255,255,0.2)", 1, [4, 4]);
+      D.line(ctx, cx + v2.x * S, cy + v2.y * S, cx + rs.x * S, cy + rs.y * S, "rgba(255,255,255,0.2)", 1, [4, 4]);
+      D.arrow(ctx, cx, cy, cx + v1.x * S, cy + v1.y * S, { color: PL.col("accent-2"), width: 2.4, label: "F₁" });
+      D.arrow(ctx, cx, cy, cx + v2.x * S, cy + v2.y * S, { color: PL.col("accent-3"), width: 2.4, label: "F₂" });
+      D.arrow(ctx, cx, cy, cx + rs.x * S, cy + rs.y * S, { color: MC(), width: 3, label: "合力" });
+      D.arrow(ctx, cx, cy, cx - rs.x * S, cy - rs.y * S, { color: PL.col("warn"), width: 2, label: "平衡力", dash: [5, 4] });
+      const mag = Math.hypot(rs.x, rs.y), ang = (Math.atan2(-rs.y, rs.x) * 180 / Math.PI + 360) % 360;
+      rMag.set(mag, 2); rAng.set(ang, 0); rEq.set((ang + 180) % 360, 0);
+    }
+    cv.onResize(draw); draw();
+    return { stop() { cv.destroy(); }, rerender: draw };
+  }});
+
+  /* 虎克定律與彈簧 */
+  PL.register("hookes-law", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.72);
+    const sM = PL.ui.slider(L.controls, { label: "懸掛質量 m", min: 0, max: 5, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: draw });
+    const sK = PL.ui.slider(L.controls, { label: "彈簧勁度 k", min: 20, max: 200, step: 10, value: 100, unit: "N/m", digits: 0, onInput: draw });
+    PL.ui.note(L.controls, "伸長量 x = mg/k；F–x 圖為過原點的直線，斜率就是 k。");
+    const rX = PL.ui.readout(L.readouts, { label: "伸長量 x", unit: "cm" });
+    const rF = PL.ui.readout(L.readouts, { label: "拉力 F=mg", unit: "N" });
+    const rK = PL.ui.readout(L.readouts, { label: "勁度 k", unit: "N/m" });
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const m = sM.get(), k = sK.get(), F = m * 9.8, x = F / k;
+      const topY = 34, cx = W * 0.26, natural = 66, ext = PL.clamp(x * 320, 0, H - 150);
+      D.rect(ctx, cx - 40, topY - 8, 80, 8, { fill: PL.col("text-faint") });
+      D.spring(ctx, cx, topY, cx, topY + natural + ext, 10, 11, MC());
+      D.rect(ctx, cx - 24, topY + natural + ext, 48, 34, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 5 });
+      D.text(ctx, m + "kg", cx, topY + natural + ext + 22, { color: "#04121a", size: 11, align: "center", weight: "700" });
+      D.line(ctx, cx + 58, topY + natural, cx + 58, topY + natural + ext, PL.col("accent-2"), 2);
+      D.text(ctx, "x", cx + 66, topY + natural + ext / 2, { color: PL.col("accent-2"), size: 12 });
+      const bx = W * 0.52, by = 30, bw = W - bx - 20, bh = H - 60;
+      const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: 0.6, y0: 0, y1: 60 });
+      g.frame({ title: "F – x（斜率 = k）", xlabel: "x (m)", ylabel: "F (N)" }); g.grid(4, 4);
+      g.fn(xx => k * xx, { color: MC(), width: 2.2 });
+      g.dot(Math.min(x, 0.6), F, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+      rX.set(x * 100, 1); rF.set(F, 1); rK.set(k, 0);
+    }
+    cv.onResize(draw); draw();
+    return { stop() { cv.destroy(); }, rerender: draw };
+  }});
 })();

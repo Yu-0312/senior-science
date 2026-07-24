@@ -236,4 +236,31 @@
     cv.onResize(draw); draw();
     return { stop() { cv.destroy(); }, rerender: draw };
   }});
+
+  /* 打點計時器（測速度與加速度） */
+  PL.register("ticker-tape", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.5);
+    const sV = PL.ui.slider(L.controls, { label: "初速 v₀", min: 0, max: 8, step: 0.5, value: 2, unit: "m/s", digits: 1, onInput: draw });
+    const sA = PL.ui.slider(L.controls, { label: "加速度 a", min: 0, max: 8, step: 0.5, value: 3, unit: "m/s²", digits: 1, onInput: draw });
+    const sT = PL.ui.slider(L.controls, { label: "打點週期 T", min: 0.02, max: 0.1, step: 0.01, value: 0.05, unit: "s", digits: 2, onInput: draw });
+    PL.ui.note(L.controls, "點距等差增加代表等加速；相鄰點距差 ÷ T² 即加速度。");
+    const rV = PL.ui.readout(L.readouts, { label: "第 5 點速度", unit: "m/s" });
+    const rA = PL.ui.readout(L.readouts, { label: "量得加速度", unit: "m/s²" });
+    const rT = PL.ui.readout(L.readouts, { label: "每格時間", unit: "s" });
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const v0 = sV.get(), a = sA.get(), T = sT.get(), N = 13;
+      const xn = k => v0 * (k * T) + 0.5 * a * (k * T) * (k * T);
+      const total = xn(N) || 1, sc = (W - 60) / total, ty = H * 0.4;
+      D.rect(ctx, 20, ty - 22, W - 40, 44, { fill: "rgba(255,255,255,0.04)", stroke: PL.col("border"), width: 1, r: 6 });
+      D.text(ctx, "點距（cm）逐格增加 →", 30, ty - 30, { color: PL.col("text-dim"), size: 11 });
+      for (let k = 0; k <= N; k++) { const px = 30 + xn(k) * sc; if (px < W - 24) D.disc(ctx, px, ty, 3, { fill: k === 5 ? MC() : "#e6edf3" }); }
+      for (let k = 0; k < 5; k++) { const x1 = 30 + xn(k) * sc, x2 = 30 + xn(k + 1) * sc; D.line(ctx, x1, ty + 16, x2, ty + 16, PL.col("text-faint"), 1); D.text(ctx, PL.fmt((xn(k + 1) - xn(k)) * 100, 1), (x1 + x2) / 2, ty + 30, { color: PL.col("text-faint"), size: 9, align: "center" }); }
+      const v5 = (xn(6) - xn(4)) / (2 * T), am = ((xn(6) - xn(5)) - (xn(5) - xn(4))) / (T * T);
+      rV.set(v5, 2); rA.set(am, 2); rT.set(T, 2);
+    }
+    cv.onResize(draw); draw();
+    return { stop() { cv.destroy(); }, rerender: draw };
+  }});
 })();

@@ -134,7 +134,7 @@
       // F–t 圖，面積=衝量
       const bx = 40, by = gy + 24, bw = W - 80, bh = H - by - 20;
       const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: Math.max(3, sDt.get() + 0.5), y0: 0, y1: 22 });
-      g.frame({ title: "F – t 圖（面積 = 衝量 = Δp）", xlabel: "t (s)", ylabel: "F (N)" }); g.grid(6, 4);
+      g.frame({ title: "F – t（面積＝衝量＝Δp）", xlabel: "t (s)", ylabel: "F (N)" }); g.grid(6, 4);
       g.area([[0, F], [Dt, F]], { fill: "rgba(186,104,204,0.22)" });
       g.curve([[0, 0], [0, F], [Dt, F], [Dt, 0]], { color: MC(), width: 2 });
       g.vline(Math.min(t, g.dom.x1), { color: PL.col("accent-2"), dash: [4, 3] });
@@ -222,6 +222,40 @@
       rV1.set(Math.abs(v1), 2); rV2.set(v2, 1); rP.set(M * v1 + m * v2, 2);
     }
     const anim = PL.loop(dt => { if (dt && fired) { x1 += v1 * dt; x2 += v2 * dt; if (cv.W / 2 + 40 + x2 * 30 > cv.W - 20) anim.stop(); } draw(); });
+    cv.onResize(draw); draw();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
+
+  /* 彈道擺 */
+  PL.register("ballistic-pendulum", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.66);
+    const g = 9.8, Lp = 2; let phase = "ready", bx = 0, th = 0, V = 0, hmax = 0, t = 0;
+    const sm = PL.ui.slider(L.controls, { label: "子彈質量 m", min: 0.01, max: 0.2, step: 0.01, value: 0.05, unit: "kg", digits: 2 });
+    const sM = PL.ui.slider(L.controls, { label: "木塊質量 M", min: 1, max: 5, step: 0.5, value: 2, unit: "kg", digits: 1 });
+    const sv = PL.ui.slider(L.controls, { label: "子彈初速 v", min: 100, max: 500, step: 10, value: 300, unit: "m/s", digits: 0 });
+    PL.ui.button(PL.ui.buttonRow(L.controls), "發射", () => { const m = sm.get(), M = sM.get(); V = m * sv.get() / (m + M); hmax = V * V / (2 * g); phase = "fly"; bx = 0; th = 0; t = 0; anim.start(); }, { primary: true });
+    const rV = PL.ui.readout(L.readouts, { label: "合體速度 V", unit: "m/s" });
+    const rH = PL.ui.readout(L.readouts, { label: "上升高度 h", unit: "m" });
+    const rTh = PL.ui.readout(L.readouts, { label: "擺角", unit: "°" });
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const px = W * 0.6, py = 40, Lpx = Math.min(H - 110, W * 0.4);
+      D.rect(ctx, px - 40, py - 8, 80, 8, { fill: PL.col("text-faint") });
+      const bxp = px + Lpx * Math.sin(th), byp = py + Lpx * Math.cos(th);
+      D.line(ctx, px, py, bxp, byp, "#c9d3e0", 2);
+      D.rect(ctx, bxp - 22, byp - 20, 44, 40, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 5 });
+      if (phase === "fly") { const bulletX = 40 + bx; D.disc(ctx, bulletX, byp, 5, { fill: "#ff6b6b", glow: "#ff6b6b" }); D.arrow(ctx, bulletX, byp, bulletX + 26, byp, { color: "#ff6b6b", width: 2 }); }
+      D.text(ctx, "h = " + PL.fmt(hmax, 3) + " m", px + 34, py + 18, { color: PL.col("text-dim"), size: 11 });
+      rV.set(V, 2); rH.set(hmax, 3); rTh.set(Math.acos(PL.clamp(1 - hmax / Lp, -1, 1)) * 180 / Math.PI, 1);
+    }
+    const anim = PL.loop(dt => {
+      if (dt) {
+        if (phase === "fly") { bx += 420 * dt; if (40 + bx >= cv.W * 0.6 - 22) { phase = "swing"; t = 0; } }
+        else if (phase === "swing") { t += dt; const thMax = Math.acos(PL.clamp(1 - hmax / Lp, -1, 1)), w = Math.sqrt(g / Lp); th = thMax * Math.sin(w * t) * Math.exp(-0.08 * t); if (t > 14) { phase = "ready"; th = 0; anim.stop(); } }
+      }
+      draw();
+    });
     cv.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});

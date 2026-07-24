@@ -245,4 +245,30 @@
     cv.onResize(draw); draw();
     return { stop() { cv.destroy(); }, rerender: draw };
   }});
+
+  /* 繞射光柵 */
+  PL.register("grating", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.6);
+    const sN = PL.ui.slider(L.controls, { label: "光柵刻線", min: 100, max: 600, step: 20, value: 300, unit: "線/mm", digits: 0, onInput: draw });
+    const sLam = PL.ui.slider(L.controls, { label: "波長 λ", min: 400, max: 700, step: 10, value: 550, unit: "nm", digits: 0, onInput: draw });
+    PL.ui.note(L.controls, "d sinθ = mλ。刻線越密、波長越長，各級譜線分得越開。");
+    const rD = PL.ui.readout(L.readouts, { label: "縫距 d", unit: "nm" });
+    const rTh = PL.ui.readout(L.readouts, { label: "第一級角度", unit: "°" });
+    const rOrders = PL.ui.readout(L.readouts, { label: "可見級數" });
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const lines = sN.get(), d = 1e6 / lines, lam = sLam.get(), col = nmColor(lam);
+      const gx = 74, cy = H / 2, scr = W - 46;
+      for (let y = cy - 42; y <= cy + 42; y += 4) D.line(ctx, gx, y, gx, y + 2, MC(), 2);
+      D.text(ctx, "光柵", gx, cy - 52, { color: MC(), size: 11, align: "center" });
+      D.line(ctx, scr, 18, scr, H - 18, PL.col("text-faint"), 2);
+      for (let mm = -5; mm <= 5; mm++) { const s = mm * lam / d; if (Math.abs(s) <= 1) { const th = Math.asin(s), yy = cy + Math.tan(th) * (scr - gx); if (yy > 14 && yy < H - 14) { D.line(ctx, gx, cy, scr, yy, "rgba(255,255,255,0.1)", 1); D.disc(ctx, scr + 6, yy, mm === 0 ? 6 : 5, { fill: col, glow: col, glowSize: 8 }); D.text(ctx, "m=" + mm, scr - 8, yy + 3, { color: PL.col("text-faint"), size: 9, align: "right" }); } } }
+      D.arrow(ctx, 22, cy, gx - 4, cy, { color: "#fff", width: 2 });
+      const th1 = Math.asin(PL.clamp(lam / d, -1, 1)) * 180 / Math.PI;
+      rD.set(d, 0); rTh.set(th1, 1); rOrders.set("±" + Math.floor(d / lam));
+    }
+    cv.onResize(draw); draw();
+    return { stop() { cv.destroy(); }, rerender: draw };
+  }});
 })();

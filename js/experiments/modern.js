@@ -217,4 +217,67 @@
     cv.onResize(draw); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
+
+  /* 密立根油滴實驗 */
+  PL.register("millikan", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.72);
+    const e = 1.6e-19, g = 9.8, d = 0.01; let y = 0, n = 3, mass = 3e-15;
+    const sV = PL.ui.slider(L.controls, { label: "電壓 V", min: 0, max: 600, step: 5, value: 200, unit: "V", digits: 0 });
+    PL.ui.button(PL.ui.buttonRow(L.controls), "換一顆油滴", () => { n = 1 + Math.floor(Math.random() * 5); mass = (2 + Math.random() * 3) * 1e-15; y = 0; }, { primary: true });
+    PL.ui.note(L.controls, "調電壓讓油滴懸浮：qE = mg。測得電量都是基本電荷 e 的整數倍。");
+    const rQ = PL.ui.readout(L.readouts, { label: "油滴電量 q", unit: "C" });
+    const rN = PL.ui.readout(L.readouts, { label: "= 基本電荷", unit: "×e" });
+    const rState = PL.ui.readout(L.readouts, { label: "狀態" });
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const q = n * e, E = sV.get() / d, Fnet = q * E - mass * g;
+      const topY = 40, botY = H - 40, cx = W / 2;
+      D.rect(ctx, cx - 90, topY - 8, 180, 8, { fill: "#ff6b6b" }); D.text(ctx, "＋ " + sV.get() + "V", cx - 90, topY - 14, { color: "#ff6b6b", size: 11 });
+      D.rect(ctx, cx - 90, botY, 180, 8, { fill: "#5aa2ff" }); D.text(ctx, "－", cx - 90, botY + 16, { color: "#5aa2ff", size: 11 });
+      const dropY = PL.clamp(botY - 20 - y, topY + 14, botY - 12);
+      D.disc(ctx, cx, dropY, 8, { fill: "#ffe08a", glow: "#ffe08a", glowSize: 10 });
+      D.arrow(ctx, cx + 22, dropY, cx + 22, dropY + 30, { color: PL.col("warn"), width: 2, label: "mg" });
+      if (E > 0) D.arrow(ctx, cx - 22, dropY, cx - 22, dropY - PL.clamp(q * E * 4e13, 6, 40), { color: "#5aa2ff", width: 2, label: "qE" });
+      const bal = Math.abs(Fnet) < mass * g * 0.04;
+      rQ.set(q, 2); rN.set(Math.round(q / e), 0); rState.set(bal ? "懸浮 ✓" : Fnet > 0 ? "上升" : "下降");
+    }
+    const anim = PL.loop(dt => { if (dt) { const q = n * e, E = sV.get() / d, Fnet = q * E - mass * g; y += (Fnet / (mass * g)) * dt * 42; y = PL.clamp(y, -(cv.H - 110), cv.H - 110); } draw(); });
+    cv.onResize(draw); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
+
+  /* 拉塞福散射（金箔實驗） */
+  PL.register("rutherford", { build(root) {
+    const L = PL.ui.layout(root);
+    let alphas = [], hi = null;
+    const cv = PL.canvas.create(L.canvasWrap, 0.66);
+    const sZ = PL.ui.slider(L.controls, { label: "原子核電荷 Z", min: 20, max: 90, step: 5, value: 79, unit: "", digits: 0 });
+    const sB = PL.ui.slider(L.controls, { label: "瞄準參數 b", min: 0, max: 60, step: 2, value: 20, unit: "", digits: 0, onInput: () => { hi = spawn(sB.get(), true); alphas.push(hi); } });
+    PL.ui.note(L.controls, "多數 α 粒子直穿；瞄準參數越小、越接近核心，散射角越大。");
+    const rAng = PL.ui.readout(L.readouts, { label: "此粒子散射角", unit: "°" });
+    const nucleus = () => ({ x: cv.W * 0.62, y: cv.H / 2 });
+    function spawn(b, highlight) { const N = nucleus(); return { x: -10, y: N.y - b, vx: 150, vy: 0, trail: [], hl: highlight }; }
+    function step(p, dt) { const N = nucleus(), K = sZ.get() * 26; for (let i = 0; i < 4; i++) { const dx = p.x - N.x, dy = p.y - N.y, r2 = dx * dx + dy * dy, r = Math.sqrt(r2) + 4, f = K / (r2 + 60); p.vx += f * dx / r * dt / 4; p.vy += f * dy / r * dt / 4; p.x += p.vx * dt / 4; p.y += p.vy * dt / 4; } if (p.trail.length < 220) p.trail.push({ x: p.x, y: p.y }); }
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const N = nucleus();
+      D.disc(ctx, N.x, N.y, 10, { fill: PL.col("danger"), glow: PL.col("danger"), glowSize: 16 }); D.text(ctx, "原子核 +", N.x, N.y - 18, { color: PL.col("danger"), size: 11, align: "center" });
+      alphas.forEach(p => { ctx.save(); ctx.strokeStyle = p.hl ? MC() : "rgba(255,255,255,0.22)"; ctx.lineWidth = p.hl ? 2 : 1; ctx.beginPath(); p.trail.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke(); ctx.restore(); D.disc(ctx, p.x, p.y, p.hl ? 5 : 3, { fill: p.hl ? MC() : "#ffe08a" }); });
+      if (hi) rAng.set(Math.atan2(-hi.vy, hi.vx) * 180 / Math.PI, 1);
+    }
+    hi = spawn(sB.get(), true); alphas.push(hi);
+    const anim = PL.loop(dt => {
+      if (dt) {
+        dt = Math.min(dt, 0.03);
+        if (Math.random() < 0.25) alphas.push(spawn((Math.random() - 0.5) * 130, false));
+        alphas.forEach(p => step(p, dt * 60));
+        alphas = alphas.filter(p => p.x < cv.W + 30 && p.x > -40 && p.y > -30 && p.y < cv.H + 30);
+        if (!alphas.includes(hi)) { hi = spawn(sB.get(), true); alphas.push(hi); }
+      }
+      draw();
+    });
+    cv.onResize(draw); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
 })();
