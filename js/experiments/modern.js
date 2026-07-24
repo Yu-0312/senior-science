@@ -1,0 +1,220 @@
+/* 模組十二 · 近代物理與宇宙學 */
+(function () {
+  "use strict";
+  const PL = window.PhysicsLab, D = PL.draw, TAU = PL.TAU;
+  const MC = () => PL.col("m-color", "#ffb74d");
+  const nmColor = nm => { let r = 0, g = 0, b = 0; if (nm < 440) { r = -(nm - 440) / 60; b = 1; } else if (nm < 490) { g = (nm - 440) / 50; b = 1; } else if (nm < 510) { g = 1; b = -(nm - 510) / 20; } else if (nm < 580) { r = (nm - 510) / 70; g = 1; } else if (nm < 645) { r = 1; g = -(nm - 645) / 65; } else r = 1; return `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`; };
+
+  /* 光電效應 */
+  PL.register("photoelectric", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.6);
+    let electrons = [], acc = 0;
+    const sF = PL.ui.slider(L.controls, { label: "入射光頻率 f", min: 3, max: 12, step: 0.1, value: 8, unit: "×10¹⁴Hz", digits: 1 });
+    const sI = PL.ui.slider(L.controls, { label: "光強度", min: 0, max: 1, step: 0.05, value: 0.6, unit: "", digits: 2 });
+    const sMetal = PL.ui.select(L.controls, { label: "金屬（功函數 W）", value: "2.3", options: [{ value: "2.3", label: "鈉 W=2.3 eV" }, { value: "2.9", label: "鈣 W=2.9 eV" }, { value: "4.3", label: "鎢 W=4.3 eV" }] });
+    const rK = PL.ui.readout(L.readouts, { label: "最大動能 Kmax", unit: "eV" });
+    const rF0 = PL.ui.readout(L.readouts, { label: "底限頻率 f₀", unit: "×10¹⁴" });
+    const rStat = PL.ui.readout(L.readouts, { label: "狀態" });
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const E = 0.414 * sF.get(), Wf = +sMetal.get(), Kmax = E - Wf, emit = Kmax > 0;
+      const f0 = Wf / 0.414;
+      // 金屬板
+      const plateX = 70, cy = H / 2;
+      D.rect(ctx, plateX - 16, cy - 60, 16, 120, { fill: MC(), r: 3 });
+      // 入射光
+      for (let i = 0; i < 3; i++) D.arrow(ctx, 20, cy - 40 + i * 40, plateX - 18, cy - 20 + i * 20, { color: nmColor(700 - (sF.get() - 3) / 9 * 300), width: 2 });
+      // 電子
+      electrons.forEach(e => D.disc(ctx, e.x, e.y, 3, { fill: "#5aa2ff", glow: "#5aa2ff", glowSize: 6 }));
+      // Kmax–f 圖
+      const bx = W * 0.5, by = 24, bw = W - bx - 20, bh = H - 48;
+      const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 3, x1: 12, y0: 0, y1: 4 });
+      g.frame({ title: "最大動能 Kmax 對 頻率 f", xlabel: "f", ylabel: "eV" }); g.grid(4, 4);
+      g.fn(f => Math.max(0, 0.414 * f - Wf), { color: MC(), width: 2.2 });
+      g.vline(f0, { color: "rgba(255,255,255,0.25)", dash: [3, 3] }); g.label(f0 + 0.1, 3.6, "f₀", { color: PL.col("text-faint"), size: 10 });
+      g.dot(sF.get(), Math.max(0, Kmax), { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+      rK.set(Math.max(0, Kmax), 2); rF0.set(f0, 1); rStat.set(emit ? "射出電子" : "無電子（f < f₀）");
+    }
+    const anim = PL.loop(dt => {
+      if (dt) {
+        const E = 0.414 * sF.get(), Wf = +sMetal.get(), Kmax = E - Wf;
+        acc += dt; if (Kmax > 0 && acc > (0.16 - sI.get() * 0.14)) { acc = 0; const sp = 40 + Math.sqrt(Kmax) * 60; electrons.push({ x: 60, y: cv.H / 2 + (Math.random() * 80 - 40), vx: sp, vy: (Math.random() - 0.5) * 20 }); }
+        electrons.forEach(e => { e.x += e.vx * dt; e.y += e.vy * dt; }); electrons = electrons.filter(e => e.x < cv.W * 0.5);
+      }
+      draw();
+    });
+    cv.onResize(draw); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
+
+  /* 波耳原子模型與原子光譜 */
+  PL.register("bohr", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.66);
+    let ni = 3, nf = 2, er = 3, photons = [];
+    const sNi = PL.ui.slider(L.controls, { label: "初始能階 nᵢ", min: 2, max: 6, step: 1, value: 3, unit: "", digits: 0, onInput: v => { ni = v; } });
+    const sNf = PL.ui.slider(L.controls, { label: "終能階 n_f", min: 1, max: 5, step: 1, value: 2, unit: "", digits: 0, onInput: v => { nf = v; } });
+    const row = PL.ui.buttonRow(L.controls);
+    PL.ui.button(row, "電子躍遷", () => { if (ni > nf) { er = ni; anim.start(); tgt = nf; } }, { primary: true });
+    const rE = PL.ui.readout(L.readouts, { label: "放出能量 ΔE", unit: "eV" });
+    const rLam = PL.ui.readout(L.readouts, { label: "光波長 λ", unit: "nm" });
+    const rSeries = PL.ui.readout(L.readouts, { label: "譜線系" });
+    let tgt = 2;
+    function En(n) { return -13.6 / (n * n); }
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const cx = W * 0.32, cy = H / 2;
+      D.disc(ctx, cx, cy, 8, { fill: NPcol(), glow: MC(), glowSize: 12 });
+      for (let n = 1; n <= 6; n++) D.ring(ctx, cx, cy, 14 + n * 14, "rgba(255,255,255,0.12)", 1);
+      const R = 14 + er * 14, ea = Date.now() / 300;
+      D.disc(ctx, cx + R * Math.cos(ea), cy + R * Math.sin(ea), 5, { fill: "#5aa2ff", glow: "#5aa2ff", glowSize: 8 });
+      const dE = En(nf) - En(ni), lam = 1240 / Math.abs(dE);
+      photons.forEach(p => { D.line(ctx, p.x - 8, p.y, p.x, p.y, nmColor(PL.clamp(lam, 380, 720)), 2); });
+      // 能階圖
+      const bx = W * 0.62, top = 30, bot = H - 30;
+      for (let n = 1; n <= 6; n++) { const y = PL.lerp(bot, top, (En(n) + 13.6) / 13.6); D.line(ctx, bx, y, W - 24, y, "rgba(255,255,255,0.2)", 1.4); D.text(ctx, "n=" + n, bx - 6, y + 4, { color: PL.col("text-faint"), size: 10, align: "right" }); }
+      const yi = PL.lerp(bot, top, (En(ni) + 13.6) / 13.6), yf = PL.lerp(bot, top, (En(nf) + 13.6) / 13.6);
+      if (ni > nf) D.arrow(ctx, bx + 40, yi, bx + 40, yf, { color: nmColor(PL.clamp(lam, 380, 720)), width: 2, label: "ΔE" });
+      const series = nf === 1 ? "萊曼系（紫外）" : nf === 2 ? "巴耳末系（可見）" : "帕申系（紅外）";
+      rE.set(Math.abs(dE), 2); rLam.set(lam, 0); rSeries.set(series);
+    }
+    function NPcol() { return MC(); }
+    const anim = PL.loop(dt => { if (dt) { if (er > tgt + 0.02) { er += (tgt - er) * Math.min(1, dt * 4); if (er <= tgt + 0.05) { photons.push({ x: cv.W * 0.32 + 60, y: cv.H / 2 }); } } photons.forEach(p => p.x += 120 * dt); photons = photons.filter(p => p.x < cv.W); if (er <= tgt + 0.05 && photons.length === 0) anim.stop(); } draw(); });
+    cv.onResize(draw); draw();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
+
+  /* 物質波（德布羅意） */
+  PL.register("matter-wave", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.5);
+    let t = 0;
+    const sV = PL.ui.slider(L.controls, { label: "速度 v", min: 1, max: 10, step: 0.5, value: 4, unit: "×10⁶ m/s", digits: 1 });
+    const sM = PL.ui.select(L.controls, { label: "粒子", value: "1", options: [{ value: "1", label: "電子" }, { value: "1836", label: "質子（重 1836 倍）" }] });
+    PL.ui.note(L.controls, "λ = h / (mv)：動量越大，物質波波長越短，波動性越不明顯。");
+    const rLam = PL.ui.readout(L.readouts, { label: "德布羅意波長 λ", unit: "（相對）" });
+    const rP = PL.ui.readout(L.readouts, { label: "動量 p", unit: "（相對）" });
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const m = +sM.get(), v = sV.get(), p = m * v, lamPx = PL.clamp(4000 / p, 8, 220), cy = H / 2;
+      ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 2.2; ctx.beginPath();
+      for (let x = 20; x < W - 20; x += 2) { const u = (x - W / 2) / (W * 0.28); const env = Math.exp(-(u * u)); const y = cy - 34 * env * Math.sin(TAU * (x - 20) / lamPx - t * 6); x === 20 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
+      D.disc(ctx, W / 2, cy, 9, { fill: "#5aa2ff", glow: "#5aa2ff", glowSize: 10 });
+      D.arrow(ctx, W / 2, cy, W / 2 + v * 6, cy, { color: "#fff", width: 2, label: "v" });
+      // 波長標示
+      D.line(ctx, W / 2 - lamPx / 2, cy + 44, W / 2 + lamPx / 2, cy + 44, MC(), 1.5);
+      D.text(ctx, "λ", W / 2, cy + 40, { color: MC(), size: 12, align: "center" });
+      rLam.set(4000 / p, 1); rP.set(p, 1);
+    }
+    const anim = PL.loop(dt => { if (dt) t += dt; draw(); });
+    cv.onResize(draw); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
+
+  /* 狹義相對論（時間膨脹光鐘） */
+  PL.register("relativity", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.56);
+    let t = 0;
+    const sV = PL.ui.slider(L.controls, { label: "速度 v", min: 0, max: 0.99, step: 0.01, value: 0.6, unit: "c", digits: 2, onInput: draw });
+    PL.ui.note(L.controls, "運動時鐘走得較慢：光在移動光鐘中走斜線、路徑較長，故一次滴答耗時較久。");
+    const rG = PL.ui.readout(L.readouts, { label: "時間膨脹因子 γ", unit: "" });
+    const rT = PL.ui.readout(L.readouts, { label: "運動時鐘 1 秒 = 靜止", unit: "s" });
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const v = sV.get(), gamma = 1 / Math.sqrt(1 - v * v);
+      // 靜止光鐘
+      const c1x = W * 0.22, top = 46, bot = H - 80, ph = (t % 1);
+      D.text(ctx, "靜止光鐘", c1x, top - 14, { color: PL.col("accent-2"), size: 11, align: "center" });
+      D.line(ctx, c1x - 24, top, c1x + 24, top, PL.col("text-faint"), 3); D.line(ctx, c1x - 24, bot, c1x + 24, bot, PL.col("text-faint"), 3);
+      const y1 = ph < 0.5 ? PL.lerp(top, bot, ph * 2) : PL.lerp(bot, top, (ph - 0.5) * 2);
+      D.disc(ctx, c1x, y1, 5, { fill: "#ffe08a", glow: "#ffe08a", glowSize: 8 });
+      // 運動光鐘（光走斜線）
+      const c2x = W * 0.62, drift = 90;
+      D.text(ctx, "運動光鐘（v=" + PL.fmt(v, 2) + "c）", c2x + drift / 2, top - 14, { color: MC(), size: 11, align: "center" });
+      const php = (t / gamma) % 1;
+      const x2 = c2x + php * drift, xr = c2x + (php < 0.5 ? php : (1 - php)) * drift * 2 * 0 + php * drift;
+      D.line(ctx, c2x - 24, top, c2x + 24, top, PL.col("text-faint"), 3); D.line(ctx, c2x - 24 + drift, bot, c2x + 24 + drift, bot, PL.col("text-faint"), 3);
+      const y2 = php < 0.5 ? PL.lerp(top, bot, php * 2) : PL.lerp(bot, top, (php - 0.5) * 2);
+      const mx = c2x + php * drift;
+      D.disc(ctx, mx, y2, 5, { fill: MC(), glow: MC(), glowSize: 8 });
+      D.line(ctx, c2x, top, mx, y2, "rgba(255,183,77,0.3)", 1, [3, 3]);
+      // γ 曲線
+      const bx = 30, by = H - 60, bw = W - 60, bh = 44;
+      const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: 1, y0: 1, y1: 7 });
+      g.frame({ xlabel: "v/c", ylabel: "γ" });
+      g.fn(vv => 1 / Math.sqrt(1 - Math.min(0.999, vv) ** 2), { color: MC(), width: 2, samples: 120 });
+      g.dot(v, Math.min(7, gamma), { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+      rG.set(gamma, 3); rT.set(gamma, 3);
+    }
+    const anim = PL.loop(dt => { if (dt) t += dt * 0.6; draw(); });
+    cv.onResize(draw); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
+
+  /* 原子核與放射性半衰期 */
+  PL.register("halflife", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.6);
+    const N0 = 144; let t = 0, nuclei = [];
+    const sT = PL.ui.slider(L.controls, { label: "半衰期 T½", min: 1, max: 6, step: 0.5, value: 3, unit: "s", digits: 1, onInput: reset });
+    const row = PL.ui.buttonRow(L.controls);
+    PL.ui.button(row, "開始衰變", () => { anim.start(); }, { primary: true });
+    PL.ui.button(row, "重設", reset);
+    const rN = PL.ui.readout(L.readouts, { label: "剩餘核數", unit: "" });
+    const rHl = PL.ui.readout(L.readouts, { label: "經過半衰期", unit: "個" });
+    function reset() { t = 0; nuclei = []; for (let i = 0; i < N0; i++) nuclei.push(1); }
+    reset();
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const remain = nuclei.reduce((a, b) => a + b, 0);
+      // 核格
+      const cols = 18, cellW = (W * 0.42 - 20) / cols, r = Math.min(cellW, 9) * 0.42;
+      nuclei.forEach((alive, i) => { const cxp = 20 + (i % cols) * cellW + cellW / 2, cyp = 30 + Math.floor(i / cols) * cellW + cellW / 2; D.disc(ctx, cxp, cyp, r, { fill: alive ? MC() : "rgba(255,255,255,0.12)" }); });
+      // 衰變曲線
+      const bx = W * 0.5, by = 24, bw = W - bx - 20, bh = H - 48, Tm = sT.get() * 5;
+      const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: Tm, y0: 0, y1: N0 });
+      g.frame({ title: "剩餘核數 – 時間", xlabel: "t (s)", ylabel: "N" }); g.grid(5, 4);
+      g.fn(tt => N0 * Math.pow(0.5, tt / sT.get()), { color: MC(), width: 2.2 });
+      for (let k = 1; k <= 4; k++) { g.vline(k * sT.get(), { color: "rgba(255,255,255,0.15)", dash: [2, 3], width: 1 }); }
+      g.dot(Math.min(t, Tm), remain, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+      rN.set(remain, 0); rHl.set(t / sT.get(), 2);
+    }
+    const anim = PL.loop(dt => {
+      if (dt) { t += dt; const T = sT.get(); const pDecay = 1 - Math.pow(0.5, dt / T); nuclei = nuclei.map(a => a && Math.random() < pDecay ? 0 : a); if (t > T * 5) anim.stop(); }
+      draw();
+    });
+    cv.onResize(draw); draw();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
+
+  /* 大霹靂與哈伯定律 */
+  PL.register("hubble", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.6);
+    let galaxies = [], t = 0;
+    const sH = PL.ui.slider(L.controls, { label: "哈伯常數 H₀", min: 40, max: 100, step: 5, value: 70, unit: "km/s/Mpc", digits: 0, onInput: draw });
+    PL.ui.note(L.controls, "越遠的星系退行越快：v = H₀ d。這是宇宙整體膨脹的證據，遠方星系呈現紅移。");
+    const rV = PL.ui.readout(L.readouts, { label: "最遠星系退行速度", unit: "km/s" });
+    for (let i = 0; i < 7; i++) galaxies.push({ d: 20 + i * 55 + Math.random() * 10, y: 0 });
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const H0 = sH.get(), oy = H * 0.4, ox = 40;
+      // 我方星系
+      D.disc(ctx, ox, oy, 8, { fill: "#fff", glow: "#fff", glowSize: 8 }); D.text(ctx, "銀河系", ox, oy + 22, { color: PL.col("text-dim"), size: 10, align: "center" });
+      galaxies.forEach((g, i) => { const x = ox + g.d, v = H0 * (g.d / 55); if (x < W - 20) { const z = PL.clamp(v / 700, 0, 1); D.disc(ctx, x, oy, 6, { fill: `rgb(${Math.round(160 + 90 * z)},${Math.round(140 - 80 * z)},${Math.round(160 - 60 * z)})`, glow: MC(), glowSize: 5 }); D.arrow(ctx, x, oy, x + v * 0.05, oy, { color: PL.col("danger"), width: 1.6 }); } });
+      // v–d 圖
+      const bx = 40, by = H * 0.55, bw = W - 80, bh = H * 0.36;
+      const g2 = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: 8, y0: 0, y1: H0 * 8 * 1.1 });
+      g2.frame({ title: "退行速度 – 距離（哈伯定律 v = H₀d）", xlabel: "距離 (相對)", ylabel: "v" }); g2.grid(4, 4);
+      g2.fn(d => H0 * d, { color: MC(), width: 2.2 });
+      galaxies.forEach(g => g2.dot(g.d / 55, H0 * (g.d / 55), { color: PL.col("accent-2") }));
+      rV.set(H0 * (galaxies[galaxies.length - 1].d / 55), 0);
+    }
+    const anim = PL.loop(dt => { if (dt) { t += dt; galaxies.forEach(g => { g.d += sH.get() * (g.d / 55) * dt * 0.05; if (ox_off(g)) g.d = 20 + Math.random() * 20; }); } draw(); });
+    function ox_off(g) { return 40 + g.d > cv.W - 20; }
+    cv.onResize(draw); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
+})();

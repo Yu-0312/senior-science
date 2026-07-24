@@ -1,7 +1,0 @@
-# 系統與編輯器
-.DS_Store
-Thumbs.db
-*.log
-node_modules/
-.vscode/
-.idea/

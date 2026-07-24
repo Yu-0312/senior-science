@@ -1,180 +1,183 @@
 <!DOCTYPE html>
-<html lang="zh-Hant" data-theme="dark">
+<html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>台灣高中物理實驗室 · 108 課綱互動模擬</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>物理實驗室｜台灣高中互動物理</title>
+  <meta name="description" content="依台灣 108 課綱設計的高中物理互動實驗室：12 個學習模組、69 個實驗，全部附即時 canvas 模擬，涵蓋力學、熱學、波動、光學、電磁學與近代物理。公式以 MathJax 專業排版，深／淺色主題、全站搜尋、學習進度，免登入、可離線。" />
+  <meta name="theme-color" content="#080b11" />
+  <meta name="color-scheme" content="dark light" />
 
-  <!-- SEO -->
-  <meta name="description" content="依台灣 108 課綱設計的高中物理互動模擬網站：涵蓋必修與選修物理的力學、電磁學、光學、熱學與近代物理，22 個可即時操作的模擬，含公式推導與重點整理。免登入免費使用。">
-  <meta name="keywords" content="高中物理,108課綱,物理模擬,互動物理,力學,電磁學,光學,近代物理,必修物理,選修物理,物理實驗,台灣物理">
-  <meta name="author" content="台灣高中物理實驗室">
-  <meta name="robots" content="index, follow">
-  <link rel="canonical" href="https://yu-0312.github.io/senior-science/">
-
-  <!-- Open Graph / Twitter -->
-  <meta property="og:type" content="website">
-  <meta property="og:locale" content="zh_TW">
-  <meta property="og:site_name" content="台灣高中物理實驗室">
-  <meta property="og:title" content="台灣高中物理實驗室 · 108 課綱互動模擬">
-  <meta property="og:description" content="涵蓋台灣 108 課綱必修與選修物理的互動模擬：22 個可即時操作的實驗，含公式與重點整理。">
-  <meta property="og:url" content="https://yu-0312.github.io/senior-science/">
-  <meta property="og:image" content="icons/icon-512.png">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="台灣高中物理實驗室 · 108 課綱互動模擬">
-  <meta name="twitter:description" content="涵蓋台灣 108 課綱必修與選修物理的 22 個互動模擬。">
-  <meta name="twitter:image" content="icons/icon-512.png">
+  <!-- SEO / 社群分享（部署後請改成你的實際網址） -->
+  <link rel="canonical" href="https://yu-0312.github.io/senior-science/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="物理實驗室｜台灣高中互動物理" />
+  <meta property="og:description" content="108 課綱高中物理互動實驗室，69 個實驗全部可即時操作模擬。" />
+  <meta property="og:locale" content="zh_TW" />
+  <meta property="og:url" content="https://yu-0312.github.io/senior-science/" />
 
   <!-- PWA -->
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0d1117">
-  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="物理實驗室">
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="物理實驗室" />
 
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css" />
 
-  <!-- 主題（避免載入閃爍） -->
-  <script>
-    (function () { try { var t = localStorage.getItem("pl-theme"); if (t) document.documentElement.setAttribute("data-theme", t); } catch (e) {} })();
-  </script>
-
-  <!-- 結構化資料 -->
-  <script type="application/ld+json">
-  {"@context":"https://schema.org","@type":"WebSite","name":"台灣高中物理實驗室","inLanguage":"zh-Hant","description":"依台灣 108 課綱設計的高中物理互動模擬網站。","about":"高中物理教育"}
-  </script>
-
-  <!-- MathJax（公式排版） -->
+  <!-- MathJax（LaTeX 公式排版） -->
   <script>
     window.MathJax = {
-      tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] },
+      tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["$$", "$$"]] },
       svg: { fontCache: "global" },
-      startup: { typeset: false }
+      options: { skipHtmlTags: ["script", "noscript", "style", "textarea"], enableMenu: false }
     };
   </script>
-  <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
 </head>
+
 <body>
+  <div class="aurora"><i></i></div>
+
   <div class="app">
+    <!-- 頂欄 -->
     <header class="topbar">
-      <button class="menu-toggle" id="menu-toggle" aria-label="選單">☰</button>
-      <div class="brand" id="go-home" role="button" tabindex="0" title="回到總覽首頁">
-        <div class="brand-logo">物</div>
+      <button class="menu-toggle" id="menu-toggle" aria-label="選單">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <div class="brand" id="brand-home" title="回首頁">
+        <div class="brand-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#04121a" stroke-width="1.7">
+            <circle cx="12" cy="12" r="2.4" fill="#04121a" stroke="none"/>
+            <ellipse cx="12" cy="12" rx="10" ry="4.4"/>
+            <ellipse cx="12" cy="12" rx="10" ry="4.4" transform="rotate(60 12 12)"/>
+            <ellipse cx="12" cy="12" rx="10" ry="4.4" transform="rotate(120 12 12)"/>
+          </svg>
+        </div>
         <div class="brand-text">
-          <h1>台灣高中物理實驗室</h1>
-          <div class="sub">108 課綱 · 必修與選修物理互動模擬</div>
+          <h1>物理實驗室</h1>
+          <div class="sub">台灣高中互動物理 · 108 課綱</div>
         </div>
       </div>
       <div class="spacer"></div>
-      <button class="icon-btn" id="home-btn" title="回到總覽首頁">🏠 首頁</button>
-      <button class="icon-btn" id="install-btn" title="安裝到裝置" style="display:none">⬇ 安裝</button>
-      <button class="icon-btn" id="theme-btn" title="切換深／淺色主題">🌙</button>
-      <span class="pill"><span class="dot"></span><span id="clock">—</span></span>
+      <div class="pill"><span class="dot"></span><span class="ver">v1.0</span> · <span id="clock">--:--:--</span></div>
+      <button class="icon-btn" id="theme-toggle" aria-label="切換主題"></button>
     </header>
 
     <div class="layout">
+      <!-- 側邊課程目錄 -->
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-head">
           <div class="title">課程目錄</div>
           <div class="stat">
-            <div><div class="num" id="stat-modules">12</div><div class="cap">學習模組</div></div>
-            <div><div class="num" id="stat-exp">0</div><div class="cap">實驗主題</div></div>
-            <div><div class="num" id="stat-int">0</div><div class="cap">互動模擬</div></div>
-          </div>
-          <div class="progress-wrap">
-            <div class="progress-label"><span>學習進度</span><span id="progress-text">0 / 0</span></div>
-            <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
-          </div>
-          <div class="search-box">
-            <input type="search" id="search" placeholder="🔍 搜尋實驗或主題…" autocomplete="off">
+            <div><div class="num" id="side-exp">0</div><div class="cap">實驗主題</div></div>
+            <div><div class="num" id="side-int">0</div><div class="cap">互動模擬</div></div>
           </div>
         </div>
-        <nav id="module-nav"></nav>
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="search-input" type="search" placeholder="搜尋實驗、概念、公式…" autocomplete="off" />
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-label"><span>學習進度</span><span id="progress-count">0 / 0</span></div>
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        </div>
+        <div id="module-list"></div>
         <div class="sidebar-foot">
-          <button class="btn-reset-progress" id="reset-progress">重設學習進度</button>
+          <button class="btn-reset-progress" id="btn-reset">重設學習進度</button>
         </div>
       </aside>
       <div class="scrim" id="scrim"></div>
 
-      <main class="main" id="main">
-        <!-- 首頁總覽 -->
+      <!-- 主內容 -->
+      <main class="main">
+        <!-- 首頁 -->
         <section id="home-view">
           <div class="hero">
-            <div class="hero-badge">108 課綱 · 必修 × 選修</div>
-            <h2 class="hero-title">親手操作，把物理讀活</h2>
-            <p class="hero-sub">27 個可即時操作的互動模擬，涵蓋力學、電磁、光學、熱學與近代物理。調參數、看變化、讀公式。</p>
+            <div class="hero-badge"><span class="dot"></span>依教育部 108 課綱設計 · 全繁體原創</div>
+            <h1 class="hero-title">看得見的物理，<br />可以動手玩的實驗室</h1>
+            <p class="hero-sub">12 個學習模組、69 個高中物理實驗，每一個都附即時互動模擬。調整參數、觀察現象、對照公式——把課本裡的物理變成手邊的實驗。</p>
             <div class="hero-actions">
-              <button class="btn-hero" id="hero-start">開始探索 →</button>
-              <button class="btn-hero ghost" id="hero-random">🎲 隨機一個實驗</button>
+              <button class="btn-hero" id="hero-start">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg>
+                開始探索
+              </button>
+              <button class="btn-hero ghost" id="hero-browse">瀏覽全部模組</button>
             </div>
-            <div class="hero-stats" id="hero-stats"></div>
+            <div class="hero-stats">
+              <div><div class="hstat-n" id="stat-mod">0</div><div class="hstat-l">學習模組</div></div>
+              <div><div class="hstat-n b2" id="stat-exp">0</div><div class="hstat-l">實驗主題</div></div>
+              <div><div class="hstat-n b3" id="stat-int">0</div><div class="hstat-l">互動模擬</div></div>
+            </div>
           </div>
+
+          <div class="section-label">課程模組</div>
           <div class="module-grid" id="module-grid"></div>
+
+          <div class="disclaimer">
+            本站為配合台灣 108 課綱自製之開放教學工具，所有模擬程式與文字內容皆為原創。物理模型為教學簡化版，數值以概念示範為主，僅供教學與學習用途。
+          </div>
         </section>
 
-        <!-- 實驗檢視 -->
-        <div id="exp-view">
+        <!-- 實驗頁 -->
+        <section id="exp-view" style="display:none">
           <div class="exp-header">
-            <div class="exp-crumb" id="crumb"></div>
-            <h2 id="exp-title">載入中…</h2>
-            <div class="lead" id="exp-lead"></div>
+            <div class="exp-crumb" id="exp-crumb"></div>
+            <h2 id="exp-title"></h2>
+            <p class="lead" id="exp-lead"></p>
           </div>
 
           <div class="content-grid">
-            <section class="card">
-              <div class="card-title"><span class="accent-bar"></span>實驗工作區</div>
+            <div class="card">
+              <div class="card-title"><span class="accent-bar"></span>互動模擬工作區</div>
               <div class="card-body"><div id="sim-root"></div></div>
-            </section>
-            <aside class="card guide">
-              <div class="card-title"><span class="accent-bar"></span>實驗指南</div>
-              <div class="card-body" id="guide-body"></div>
-            </aside>
+            </div>
+
+            <div class="card guide">
+              <div class="card-title"><span class="accent-bar"></span>概念 · 公式 · 重點</div>
+              <div class="card-body">
+                <div><h4>核心概念</h4><p id="guide-concept"></p></div>
+                <div><h4>關鍵公式</h4><div class="formula-box" id="guide-formula"></div></div>
+                <div><h4>學習重點</h4><ul class="points" id="guide-points"></ul></div>
+              </div>
+            </div>
           </div>
 
-          <nav class="exp-nav" id="exp-nav">
-            <button class="nav-btn prev" id="prev-btn"><span class="nav-dir">← 上一個</span><span class="nav-title" id="prev-title"></span></button>
-            <button class="nav-btn next" id="next-btn"><span class="nav-dir">下一個 →</span><span class="nav-title" id="next-title"></span></button>
-          </nav>
+          <div class="exp-nav">
+            <button class="nav-btn prev" id="nav-prev"><span class="nav-dir">上一個實驗</span><span class="nav-title">—</span></button>
+            <button class="nav-btn next" id="nav-next"><span class="nav-dir">下一個實驗</span><span class="nav-title">—</span></button>
+          </div>
+        </section>
 
-          <p class="disclaimer">
-            本站為配合台灣 108 課綱自製之開放教學工具，所有模擬程式與文字內容皆為原創，
-            僅供教學與學習用途。物理模型為教學簡化版，數值以概念示範為主。
-          </p>
-        </div>
+        <!-- 搜尋結果 -->
+        <section id="search-results" style="display:none">
+          <div class="section-label">搜尋結果 · 共 <span id="sr-count" style="margin:0 4px">0</span> 筆</div>
+          <div class="sr-list" id="sr-list"></div>
+        </section>
       </main>
     </div>
   </div>
 
+  <!-- 核心 -->
   <script src="js/curriculum.js"></script>
   <script src="js/sim-core.js"></script>
-  <script src="js/experiments/projectile.js"></script>
-  <script src="js/experiments/freefall.js"></script>
-  <script src="js/experiments/incline.js"></script>
-  <script src="js/experiments/collision.js"></script>
-  <script src="js/experiments/energy-track.js"></script>
-  <script src="js/experiments/orbit.js"></script>
-  <script src="js/experiments/circular.js"></script>
-  <script src="js/experiments/spring.js"></script>
-  <script src="js/experiments/pendulum.js"></script>
-  <script src="js/experiments/gas.js"></script>
-  <script src="js/experiments/buoyancy.js"></script>
-  <script src="js/experiments/standing-wave.js"></script>
-  <script src="js/experiments/doppler.js"></script>
-  <script src="js/experiments/superposition.js"></script>
-  <script src="js/experiments/double-slit.js"></script>
-  <script src="js/experiments/snell.js"></script>
-  <script src="js/experiments/lens.js"></script>
-  <script src="js/experiments/mirror.js"></script>
-  <script src="js/experiments/efield.js"></script>
-  <script src="js/experiments/ohms.js"></script>
-  <script src="js/experiments/induction.js"></script>
-  <script src="js/experiments/lorentz.js"></script>
-  <script src="js/experiments/ac.js"></script>
-  <script src="js/experiments/photoelectric.js"></script>
-  <script src="js/experiments/bohr.js"></script>
-  <script src="js/experiments/halflife.js"></script>
-  <script src="js/experiments/relativity.js"></script>
+
+  <!-- 互動模擬（依模組拆檔） -->
+  <script src="js/experiments/kinematics.js"></script>
+  <script src="js/experiments/newton.js"></script>
+  <script src="js/experiments/momentum.js"></script>
+  <script src="js/experiments/energy.js"></script>
+  <script src="js/experiments/gravity.js"></script>
+  <script src="js/experiments/shm.js"></script>
+  <script src="js/experiments/thermal.js"></script>
+  <script src="js/experiments/waves.js"></script>
+  <script src="js/experiments/optics.js"></script>
+  <script src="js/experiments/electric.js"></script>
+  <script src="js/experiments/magnetism.js"></script>
+  <script src="js/experiments/modern.js"></script>
+
+  <!-- 應用外殼 -->
   <script src="js/app.js"></script>
 </body>
 </html>

@@ -1,304 +1,280 @@
 /*
- * app.js — 主程式
- * 目錄、路由、實驗載入、首頁總覽、上一個/下一個、搜尋、進度、主題、PWA。
+ * app.js — 應用外殼
+ * 建立側邊目錄、首頁模組卡片、實驗頁面（模擬 + 教材）、搜尋、
+ * 學習進度、深／淺色主題、上一個／下一個與鍵盤導覽，並註冊 PWA。
  */
 (function () {
   "use strict";
   const C = window.PhysicsLabCurriculum;
-  const Lab = window.PhysicsLab;
-  let activeSim = null;
-  let current = null;              // { m, e }
-  const flat = [];                 // 全部實驗的線性清單
-  const PROGRESS_KEY = "pl-progress";
-  let progress = loadProgress();
+  const PL = window.PhysicsLab;
+  const $ = (s, r) => (r || document).querySelector(s);
+  const el = PL.el;
 
-  document.addEventListener("DOMContentLoaded", init);
+  // 建立扁平的實驗索引（含所屬模組），供導覽與搜尋使用
+  const FLAT = [];
+  C.modules.forEach(m => m.experiments.forEach((e, i) => FLAT.push({ exp: e, mod: m, indexInMod: i })));
+  const byId = {};
+  FLAT.forEach((f, i) => { f.order = i; byId[f.exp.id] = f; });
 
-  function init() {
-    C.modules.forEach((mod, mi) => mod.experiments.forEach((exp, ei) => flat.push({ m: mi, e: ei })));
-    buildTopbar(); buildSidebar(); buildHome();
-    startClock(); setupMobile(); setupSearch(); setupTheme(); setupProgressReset();
-    updateProgressUI(); registerSW(); setupInstall(); setupNav();
-    showHome();
-  }
+  const store = {
+    get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  };
 
-  // ---------- 頂端列 ----------
-  function buildTopbar() {
-    document.getElementById("stat-modules").textContent = C.totalModules;
-    document.getElementById("stat-exp").textContent = C.totalExperiments;
-    document.getElementById("stat-int").textContent = C.totalInteractive;
-  }
-  function startClock() {
-    const el = document.getElementById("clock");
-    function tick() {
-      const d = new Date(), p = n => String(n).padStart(2, "0");
-      el.textContent = d.getFullYear() + "." + p(d.getMonth() + 1) + "." + p(d.getDate()) +
-        " " + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
-    }
-    tick(); setInterval(tick, 1000);
-  }
+  let viewed = new Set(store.get("pl-progress", []));
+  let currentSim = null;
+  let currentId = null;
 
-  // ---------- 首頁總覽 ----------
-  function buildHome() {
-    document.getElementById("hero-stats").innerHTML =
-      chip(C.totalModules, "學習模組") + chip(C.totalExperiments, "實驗主題") + chip(C.totalInteractive, "互動模擬");
-    const grid = document.getElementById("module-grid");
-    grid.innerHTML = "";
-    C.modules.forEach((mod, mi) => {
-      const nInt = mod.experiments.filter(e => e.interactive).length;
-      const card = document.createElement("div");
-      card.className = "mcard"; card.style.setProperty("--m-color", mod.color);
-      card.setAttribute("role", "button"); card.tabIndex = 0;
-      card.innerHTML =
-        '<div class="mcard-top"><span class="mcard-no">' + mod.no + '</span><span class="mcard-track">' + mod.track + '</span></div>' +
-        '<div class="mcard-title">' + mod.title + '</div>' +
-        '<div class="mcard-intro">' + mod.intro + '</div>' +
-        '<div class="mcard-meta">' + mod.experiments.length + ' 實驗 · <b>' + nInt + ' 互動</b></div>';
-      const go = () => selectExperiment(mi, 0);
-      card.addEventListener("click", go);
-      card.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
-      grid.appendChild(card);
-    });
-    document.getElementById("hero-start").addEventListener("click", () => selectExperiment(0, 0));
-    document.getElementById("hero-random").addEventListener("click", randomInteractive);
+  /* ------------------------------- 主題 ------------------------------- */
+  function applyTheme(t) {
+    document.documentElement.setAttribute("data-theme", t);
+    store.set("pl-theme", t);
+    const btn = $("#theme-toggle");
+    if (btn) btn.innerHTML = t === "light" ? moonIcon + "<span>深色</span>" : sunIcon + "<span>淺色</span>";
+    // 主題切換後重繪目前模擬
+    if (currentSim && currentSim.rerender) currentSim.rerender();
   }
-  function chip(n, label) { return '<div class="hstat"><div class="hstat-n">' + n + '</div><div class="hstat-l">' + label + '</div></div>'; }
-  function randomInteractive() {
-    const pool = flat.filter(f => C.modules[f.m].experiments[f.e].interactive);
-    const r = pool[Math.floor(Math.random() * pool.length)];
-    selectExperiment(r.m, r.e);
-  }
+  const sunIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+  const moonIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>';
 
-  function showHome() {
-    document.getElementById("home-view").style.display = "block";
-    document.getElementById("exp-view").style.display = "none";
-    if (activeSim && activeSim.stop) { try { activeSim.stop(); } catch (e) {} }
-    activeSim = null;
-    document.querySelectorAll(".exp-item").forEach(x => x.classList.remove("active"));
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-  function showExp() {
-    document.getElementById("home-view").style.display = "none";
-    document.getElementById("exp-view").style.display = "block";
-  }
-
-  // ---------- 側邊目錄 ----------
+  /* ------------------------------- 側邊目錄 ------------------------------- */
   function buildSidebar() {
-    const nav = document.getElementById("module-nav");
-    nav.innerHTML = "";
-    C.modules.forEach((mod, mi) => {
-      const wrap = document.createElement("div");
-      wrap.className = "module"; wrap.style.setProperty("--m-color", mod.color); wrap.dataset.mi = mi;
-      const head = document.createElement("div");
-      head.className = "module-head";
-      head.innerHTML =
-        '<span class="module-no">' + mod.no + '</span>' +
-        '<span class="module-title">' + mod.title + '<span class="track">' + mod.track + '</span></span>' +
-        '<span class="module-caret">▶</span>';
-      head.addEventListener("click", () => toggleModule(mi));
-      const list = document.createElement("div");
-      list.className = "exp-list";
-      mod.experiments.forEach((exp, ei) => {
-        const item = document.createElement("div");
-        item.className = "exp-item" + (isViewed(mi, ei) ? " viewed" : "");
-        item.dataset.mi = mi; item.dataset.ei = ei;
-        item.dataset.search = (exp.title + " " + mod.title).toLowerCase();
-        item.innerHTML =
-          '<span class="idx">' + (ei + 1) + '</span>' +
-          '<span class="exp-name">' + exp.title + '</span>' +
-          '<span class="check">✓</span>' +
-          (exp.interactive ? '<span class="tag-int">互動</span>' : '');
-        item.addEventListener("click", () => selectExperiment(mi, ei));
-        list.appendChild(item);
+    const wrap = $("#module-list");
+    wrap.innerHTML = "";
+    C.modules.forEach(m => {
+      const mod = el("div", "module", wrap);
+      mod.style.setProperty("--m-color", m.color);
+      mod.dataset.mod = m.id;
+      const head = el("div", "module-head", mod);
+      const no = el("div", "module-no", head); no.textContent = m.no;
+      const t = el("div", "module-title", head); t.innerHTML = m.title + '<span class="track">' + m.track + "</span>";
+      const car = el("div", "module-caret", head); car.textContent = "▶";
+      head.addEventListener("click", () => mod.classList.toggle("open"));
+
+      const list = el("div", "exp-list", mod);
+      m.experiments.forEach((e, i) => {
+        const item = el("div", "exp-item", list);
+        item.dataset.id = e.id;
+        const idx = el("div", "idx", item); idx.textContent = i + 1;
+        const name = el("div", "exp-name", item); name.textContent = e.title;
+        if (e.interactive) { const tag = el("span", "tag-int", item); tag.textContent = "互動"; }
+        const chk = el("span", "check", item); chk.textContent = "✓";
+        item.addEventListener("click", () => location.hash = "#" + e.id);
       });
-      wrap.appendChild(head); wrap.appendChild(list); nav.appendChild(wrap);
     });
-  }
-  function toggleModule(mi) { document.querySelector('.module[data-mi="' + mi + '"]').classList.toggle("open"); }
-  function openModule(mi, on) {
-    const el = document.querySelector('.module[data-mi="' + mi + '"]');
-    if (el) el.classList[on ? "add" : "remove"]("open");
+    refreshViewedMarks();
   }
 
-  // ---------- 載入實驗 ----------
-  function selectExperiment(mi, ei) {
-    showExp();
-    current = { m: mi, e: ei };
-    const mod = C.modules[mi], exp = mod.experiments[ei];
-    document.querySelectorAll(".exp-item").forEach(x => x.classList.remove("active"));
-    const item = document.querySelector('.exp-item[data-mi="' + mi + '"][data-ei="' + ei + '"]');
-    if (item) { item.classList.add("active"); item.scrollIntoView({ block: "nearest" }); }
-    openModule(mi, true);
+  /* ------------------------------- 首頁 ------------------------------- */
+  function buildHome() {
+    const grid = $("#module-grid");
+    grid.innerHTML = "";
+    C.modules.forEach(m => {
+      const card = el("div", "mcard", grid);
+      card.style.setProperty("--m-color", m.color);
+      const top = el("div", "mcard-top", card);
+      const no = el("div", "mcard-no", top); no.textContent = "模組 " + m.no;
+      const tr = el("div", "mcard-track", top); tr.textContent = m.track;
+      const ti = el("div", "mcard-title", card); ti.textContent = m.title;
+      const intro = el("div", "mcard-intro", card); intro.textContent = m.intro;
+      const meta = el("div", "mcard-meta", card);
+      meta.innerHTML = '<b>' + m.experiments.length + '</b> 個實驗<span class="chip">全互動</span>';
+      card.addEventListener("click", () => {
+        const first = m.experiments[0];
+        location.hash = "#" + first.id;
+      });
+    });
+    // 統計數字
+    $("#stat-mod").textContent = C.totalModules;
+    $("#stat-exp").textContent = C.totalExperiments;
+    $("#stat-int").textContent = C.totalInteractive;
+    $("#side-exp").textContent = C.totalExperiments;
+    $("#side-int").textContent = C.totalInteractive;
+  }
 
-    if (activeSim && activeSim.stop) { try { activeSim.stop(); } catch (e) {} }
-    activeSim = null;
+  /* ------------------------------- 實驗頁 ------------------------------- */
+  function typeset(node) {
+    if (window.MathJax && MathJax.typesetPromise) {
+      MathJax.typesetPromise([node]).catch(() => {});
+    }
+  }
 
-    const view = document.getElementById("exp-view");
+  function openExp(id) {
+    const f = byId[id];
+    if (!f) { location.hash = ""; return; }
+    if (currentSim && currentSim.stop) { try { currentSim.stop(); } catch (e) {} }
+    currentSim = null; currentId = id;
+    const { exp, mod } = f;
+
+    showView("exp");
+    const view = $("#exp-view");
+    view.style.setProperty("--m-color", mod.color);
+    document.documentElement.style.setProperty("--m-color", mod.color); // 讓 canvas 也能取用模組色
+
     view.classList.remove("fade-in"); void view.offsetWidth; view.classList.add("fade-in");
 
-    document.getElementById("main").style.setProperty("--m-color", mod.color);
-    document.getElementById("crumb").innerHTML = '<b>' + mod.no + '　' + mod.title + '</b>　·　' + mod.track;
-    document.getElementById("exp-title").textContent = exp.title;
-    document.getElementById("exp-lead").textContent = exp.concept;
+    // 頁首
+    $("#exp-crumb").innerHTML = '<b>模組' + mod.no + " · " + mod.title + '</b><span class="sep">/</span>' +
+      "第 " + (f.indexInMod + 1) + " 個實驗";
+    $("#exp-title").textContent = exp.title;
+    $("#exp-lead").textContent = exp.concept;
 
-    const simRoot = document.getElementById("sim-root");
+    // 模擬工作區
+    const simRoot = $("#sim-root");
     simRoot.innerHTML = "";
-    if (exp.interactive && Lab.get(exp.id)) {
-      try { activeSim = Lab.get(exp.id).build(simRoot) || null; }
-      catch (err) { showError(simRoot, err); }
+    if (PL.has(exp.id)) {
+      try {
+        currentSim = PL.get(exp.id).build(simRoot) || {};
+      } catch (err) {
+        console.error("模擬載入失敗：" + exp.id, err);
+        simRoot.innerHTML = '<div class="empty">此模擬載入時發生問題。</div>';
+      }
     } else {
-      simRoot.innerHTML =
-        '<div class="placeholder-sim"><div class="big">🧪</div>' +
-        '<div class="msg">此實驗的互動模擬尚在建置中</div>' +
-        '<div class="note">下方為完整概念、公式與重點整理，可作為教材使用</div></div>';
+      simRoot.innerHTML = '<div class="empty">此實驗的互動模擬尚在開發中。</div>';
     }
 
-    buildGuide(exp);
-    updateNav();
-    markViewed(mi, ei);
-    closeMobile();
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // 教材：公式與重點
+    $("#guide-concept").textContent = exp.concept;
+    $("#guide-formula").innerHTML = exp.formula;
+    const ul = $("#guide-points"); ul.innerHTML = "";
+    exp.points.forEach(p => { const li = el("li", null, ul); li.textContent = p; });
+    typeset($("#guide-formula"));
+
+    // 上一個 / 下一個
+    const prev = FLAT[f.order - 1], next = FLAT[f.order + 1];
+    setNav($("#nav-prev"), prev, "上一個實驗");
+    setNav($("#nav-next"), next, "下一個實驗");
+
+    // 進度與側邊高亮
+    markViewed(id);
+    highlightSidebar(id, mod.id);
+    $(".main").scrollTop = 0; window.scrollTo(0, 0);
+    document.title = exp.title + "｜物理實驗室";
   }
 
-  function buildGuide(exp) {
-    const g = document.getElementById("guide-body");
-    let html = '<div><h4>概念</h4><p>' + exp.concept + '</p></div>';
-    if (exp.formula) html += '<div><h4>關鍵公式</h4><div class="formula-box">' + exp.formula + '</div></div>';
-    if (exp.points && exp.points.length) {
-      html += '<div><h4>重點整理</h4><ul class="points">';
-      exp.points.forEach(p => html += '<li>' + p + '</li>');
-      html += '</ul></div>';
+  function setNav(btn, target, dir) {
+    if (!target) { btn.disabled = true; btn.onclick = null; btn.querySelector(".nav-title").textContent = "—"; btn.querySelector(".nav-dir").textContent = dir; return; }
+    btn.disabled = false;
+    btn.querySelector(".nav-dir").textContent = dir;
+    btn.querySelector(".nav-title").textContent = target.exp.title;
+    btn.onclick = () => location.hash = "#" + target.exp.id;
+  }
+
+  function highlightSidebar(id, modId) {
+    document.querySelectorAll(".exp-item.active").forEach(x => x.classList.remove("active"));
+    const item = document.querySelector('.exp-item[data-id="' + CSS.escape(id) + '"]');
+    if (item) {
+      item.classList.add("active");
+      const mod = item.closest(".module");
+      if (mod && !mod.classList.contains("open")) mod.classList.add("open");
+      item.scrollIntoView({ block: "nearest" });
     }
-    g.innerHTML = html; typeset(g);
+    closeSidebarMobile();
   }
-  function typeset(el) {
-    if (window.MathJax && window.MathJax.typesetPromise) {
-      window.MathJax.typesetClear && window.MathJax.typesetClear([el]);
-      window.MathJax.typesetPromise([el]).catch(function () {});
+
+  /* ------------------------------- 進度 ------------------------------- */
+  function markViewed(id) {
+    if (!viewed.has(id)) { viewed.add(id); store.set("pl-progress", [...viewed]); }
+    refreshViewedMarks();
+  }
+  function refreshViewedMarks() {
+    document.querySelectorAll(".exp-item").forEach(it => {
+      it.classList.toggle("viewed", viewed.has(it.dataset.id));
+    });
+    const pct = Math.round(viewed.size / C.totalExperiments * 100);
+    const fill = $("#progress-fill"); if (fill) fill.style.width = pct + "%";
+    const lab = $("#progress-count"); if (lab) lab.textContent = viewed.size + " / " + C.totalExperiments;
+  }
+  function resetProgress() {
+    viewed = new Set(); store.set("pl-progress", []); refreshViewedMarks();
+  }
+
+  /* ------------------------------- 搜尋 ------------------------------- */
+  function runSearch(q) {
+    q = (q || "").trim().toLowerCase();
+    if (!q) { if (location.hash.replace("#", "")) return; showView("home"); return; }
+    const hits = FLAT.filter(f =>
+      f.exp.title.toLowerCase().includes(q) ||
+      f.exp.concept.toLowerCase().includes(q) ||
+      f.mod.title.toLowerCase().includes(q) ||
+      f.exp.points.some(p => p.toLowerCase().includes(q))
+    );
+    const list = $("#sr-list"); list.innerHTML = "";
+    $("#sr-count").textContent = hits.length;
+    if (!hits.length) { list.innerHTML = '<div class="empty">找不到符合「' + q + '」的實驗。</div>'; }
+    hits.forEach(f => {
+      const item = el("div", "sr-item", list);
+      item.style.setProperty("--m-color", f.mod.color);
+      item.innerHTML = '<div class="sr-mod">模組' + f.mod.no + " · " + f.mod.title + '</div>' +
+        '<div class="sr-title">' + f.exp.title + '</div>' +
+        '<div class="sr-desc">' + f.exp.concept + '</div>';
+      item.addEventListener("click", () => location.hash = "#" + f.exp.id);
+    });
+    showView("search");
+  }
+
+  /* ------------------------------- 視圖切換 ------------------------------- */
+  function showView(name) {
+    $("#home-view").style.display = name === "home" ? "" : "none";
+    $("#exp-view").style.display = name === "exp" ? "" : "none";
+    $("#search-results").style.display = name === "search" ? "" : "none";
+  }
+
+  function closeSidebarMobile() { $("#sidebar").classList.remove("open"); $("#scrim").classList.remove("show"); }
+  function toggleSidebar() { $("#sidebar").classList.toggle("open"); $("#scrim").classList.toggle("show"); }
+
+  /* ------------------------------- 路由 ------------------------------- */
+  function route() {
+    const id = decodeURIComponent(location.hash.replace(/^#/, ""));
+    if (!id || id === "home") { showView("home"); document.title = "物理實驗室｜台灣高中互動物理"; if (currentSim && currentSim.stop) currentSim.stop(); currentSim = null; return; }
+    openExp(id);
+  }
+
+  /* ------------------------------- 啟動 ------------------------------- */
+  function init() {
+    buildSidebar();
+    buildHome();
+    applyTheme(store.get("pl-theme", "dark"));
+
+    $("#theme-toggle").addEventListener("click", () => {
+      applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
+    });
+    $("#menu-toggle").addEventListener("click", toggleSidebar);
+    $("#scrim").addEventListener("click", closeSidebarMobile);
+    $("#brand-home").addEventListener("click", () => location.hash = "");
+    $("#hero-start").addEventListener("click", () => location.hash = "#" + FLAT[0].exp.id);
+    $("#hero-browse").addEventListener("click", () => $("#module-grid").scrollIntoView({ behavior: "smooth" }));
+    $("#btn-reset").addEventListener("click", resetProgress);
+
+    const search = $("#search-input");
+    search.addEventListener("input", () => runSearch(search.value));
+
+    document.addEventListener("keydown", e => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
+      if (currentId && $("#exp-view").style.display !== "none") {
+        const f = byId[currentId];
+        if (e.key === "ArrowRight" && FLAT[f.order + 1]) { location.hash = "#" + FLAT[f.order + 1].exp.id; }
+        if (e.key === "ArrowLeft" && FLAT[f.order - 1]) { location.hash = "#" + FLAT[f.order - 1].exp.id; }
+      }
+      if (e.key === "Escape") closeSidebarMobile();
+    });
+
+    window.addEventListener("hashchange", route);
+    route();
+
+    // 版本連線時間
+    const clock = $("#clock");
+    if (clock) {
+      const tick = () => { const d = new Date(); clock.textContent = d.toLocaleTimeString("zh-TW", { hour12: false }); };
+      tick(); setInterval(tick, 1000);
+    }
+
+    // PWA
+    if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+      window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
     }
   }
-  function showError(root, err) {
-    root.innerHTML = '<div class="placeholder-sim"><div class="big">⚠️</div><div class="msg">模擬載入失敗</div><div class="note">' + (err && err.message) + '</div></div>';
-  }
 
-  // ---------- 上一個 / 下一個 ----------
-  function posOf(mi, ei) { for (let i = 0; i < flat.length; i++) if (flat[i].m === mi && flat[i].e === ei) return i; return 0; }
-  function setupNav() {
-    document.getElementById("prev-btn").addEventListener("click", () => step(-1));
-    document.getElementById("next-btn").addEventListener("click", () => step(1));
-    document.getElementById("home-btn").addEventListener("click", showHome);
-    const gh = document.getElementById("go-home");
-    gh.addEventListener("click", showHome);
-    gh.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showHome(); } });
-    document.addEventListener("keydown", function (e) {
-      const tag = (document.activeElement && document.activeElement.tagName) || "";
-      if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
-      if (document.getElementById("exp-view").style.display === "none") return;
-      if (e.key === "ArrowLeft") step(-1);
-      else if (e.key === "ArrowRight") step(1);
-    });
-  }
-  function step(d) {
-    if (!current) return;
-    const pos = posOf(current.m, current.e) + d;
-    if (pos < 0 || pos >= flat.length) return;
-    selectExperiment(flat[pos].m, flat[pos].e);
-  }
-  function updateNav() {
-    const pos = posOf(current.m, current.e);
-    const prev = document.getElementById("prev-btn"), next = document.getElementById("next-btn");
-    const pt = document.getElementById("prev-title"), nt = document.getElementById("next-title");
-    if (pos > 0) { prev.style.visibility = "visible"; pt.textContent = C.modules[flat[pos - 1].m].experiments[flat[pos - 1].e].title; }
-    else prev.style.visibility = "hidden";
-    if (pos < flat.length - 1) { next.style.visibility = "visible"; nt.textContent = C.modules[flat[pos + 1].m].experiments[flat[pos + 1].e].title; }
-    else next.style.visibility = "hidden";
-  }
-
-  // ---------- 搜尋 ----------
-  function setupSearch() {
-    const box = document.getElementById("search");
-    box.addEventListener("input", function () {
-      const q = box.value.trim().toLowerCase();
-      document.querySelectorAll(".module").forEach(m => {
-        let any = false;
-        m.querySelectorAll(".exp-item").forEach(it => {
-          const hit = !q || it.dataset.search.indexOf(q) >= 0;
-          it.style.display = hit ? "" : "none"; if (hit) any = true;
-        });
-        m.style.display = any ? "" : "none";
-        if (q) m.classList.add("open");
-      });
-    });
-  }
-
-  // ---------- 進度 ----------
-  function loadProgress() { try { return JSON.parse(localStorage.getItem(PROGRESS_KEY)) || {}; } catch (e) { return {}; } }
-  function saveProgress() { try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); } catch (e) {} }
-  function keyOf(mi, ei) { return C.modules[mi].id + ":" + ei; }
-  function isViewed(mi, ei) { return !!progress[keyOf(mi, ei)]; }
-  function markViewed(mi, ei) {
-    const k = keyOf(mi, ei);
-    if (!progress[k]) { progress[k] = 1; saveProgress(); }
-    const item = document.querySelector('.exp-item[data-mi="' + mi + '"][data-ei="' + ei + '"]');
-    if (item) item.classList.add("viewed");
-    updateProgressUI();
-  }
-  function updateProgressUI() {
-    const done = Object.keys(progress).length, total = C.totalExperiments;
-    document.getElementById("progress-text").textContent = done + " / " + total;
-    document.getElementById("progress-fill").style.width = (total ? (done / total * 100) : 0) + "%";
-  }
-  function setupProgressReset() {
-    document.getElementById("reset-progress").addEventListener("click", function () {
-      progress = {}; saveProgress();
-      document.querySelectorAll(".exp-item.viewed").forEach(x => x.classList.remove("viewed"));
-      updateProgressUI();
-    });
-  }
-
-  // ---------- 主題 ----------
-  function setupTheme() {
-    const btn = document.getElementById("theme-btn");
-    function apply(t) {
-      document.documentElement.setAttribute("data-theme", t);
-      btn.textContent = t === "light" ? "☀️" : "🌙";
-      const meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) meta.setAttribute("content", t === "light" ? "#f4f6fb" : "#0d1117");
-    }
-    apply(document.documentElement.getAttribute("data-theme") || "dark");
-    btn.addEventListener("click", function () {
-      const cur = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
-      apply(cur); try { localStorage.setItem("pl-theme", cur); } catch (e) {}
-    });
-  }
-
-  // ---------- 手機選單 ----------
-  function setupMobile() {
-    const toggle = document.getElementById("menu-toggle"), scrim = document.getElementById("scrim");
-    toggle.addEventListener("click", () => {
-      document.getElementById("sidebar").classList.toggle("open");
-      scrim.classList.toggle("show");
-    });
-    scrim.addEventListener("click", closeMobile);
-  }
-  function closeMobile() {
-    document.getElementById("sidebar").classList.remove("open");
-    document.getElementById("scrim").classList.remove("show");
-  }
-
-  // ---------- PWA ----------
-  function registerSW() {
-    if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0)
-      window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
-  }
-  function setupInstall() {
-    let deferred = null;
-    const btn = document.getElementById("install-btn");
-    window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); deferred = e; btn.style.display = ""; });
-    btn.addEventListener("click", function () {
-      if (!deferred) return; deferred.prompt();
-      deferred.userChoice.finally(function () { deferred = null; btn.style.display = "none"; });
-    });
-    window.addEventListener("appinstalled", function () { btn.style.display = "none"; });
-  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
 })();
