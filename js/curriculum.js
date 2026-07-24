@@ -2,7 +2,7 @@
  * curriculum.js
  * 物理實驗室 — 課程結構資料
  * 依教育部 108 課綱「自然科學領域—物理」規劃，涵蓋必修物理與選修物理（加深加廣）。
- * 基礎與第二批課程地圖：12 個學習模組 · 120 個實驗主題；第三批延伸主題由 advanced-curriculum.js 載入。
+ * 基礎與第二批課程地圖：12 個學習模組 · 120 個實驗主題；第三、四批延伸主題分別由 advanced-curriculum.js 與 comprehensive-curriculum.js 載入。
  * 公式以 LaTeX 撰寫（String.raw 保留反斜線），由 MathJax 排版。
  * 本檔為原創教材資料，物理模型為教學簡化版，數值以概念示範為主。
  */

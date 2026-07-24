@@ -251,7 +251,7 @@
   /* ------------------------------- 路由 ------------------------------- */
   function route() {
     const id = decodeURIComponent(location.hash.replace(/^#/, ""));
-    if (!id || id === "home") { showView("home"); document.title = "物理實驗室｜台灣高中互動物理"; if (currentSim && currentSim.stop) currentSim.stop(); currentSim = null; return; }
+    if (!id || id === "home") { showView("home"); document.title = "物理實驗室｜台灣中學互動物理"; if (currentSim && currentSim.stop) currentSim.stop(); currentSim = null; return; }
     openExp(id);
   }
 
