@@ -132,37 +132,127 @@
     return { stop() { cv.destroy(); }, rerender: draw };
   }});
 
-  /* 雙縫干涉 */
+  /* 雙縫干涉 — 光具座 · 單光子累積 */
   PL.register("double-slit", { build(root) {
     const L = PL.ui.layout(root);
-    const cv = PL.canvas.create(L.canvasWrap, 0.62);
-    const sD = PL.ui.slider(L.controls, { label: "縫距 d", min: 20, max: 70, step: 2, value: 40, unit: "", digits: 0, onInput: draw });
-    const sLam = PL.ui.slider(L.controls, { label: "波長 λ", min: 400, max: 700, step: 10, value: 550, unit: "nm", digits: 0, onInput: draw });
-    PL.ui.note(L.controls, "縫距越小、波長越長，條紋間距越大。");
-    const rDy = PL.ui.readout(L.readouts, { label: "條紋間距（相對）", unit: "" });
-    function draw() {
+    const cv = PL.canvas.create(L.canvasWrap, 0.5, 900);
+    // 控制項
+    PL.ui.section(L.controls, "光源與幾何");
+    const stLam = PL.ui.stepper(L.controls, { label: "波長 λ (nm)", value: 600, min: 400, max: 700, step: 10, onInput: reset });
+    const stD = PL.ui.stepper(L.controls, { label: "縫間距 d (mm)", value: 0.2, min: 0.1, max: 0.6, step: 0.05, digits: 2, onInput: reset });
+    const stL = PL.ui.stepper(L.controls, { label: "屏距 L (m)", value: 1, min: 0.5, max: 2.5, step: 0.1, digits: 1, onInput: reset });
+    const stN = PL.ui.stepper(L.controls, { label: "測量跨度 ±N 條", value: 5, min: 2, max: 8, step: 1, onInput: reset });
+    PL.ui.section(L.controls, "快捷波長 · nm");
+    const preset = PL.ui.chipGroup(L.controls, { value: 0, options: [
+      { value: 650, label: '<span class="dotc"></span>紅 650', color: "#ff5b5b" },
+      { value: 532, label: '<span class="dotc"></span>綠 532', color: "#54d15a" },
+      { value: 450, label: '<span class="dotc"></span>藍 450', color: "#5b8dff" }
+    ], onChange: v => { stLam.set(v); reset(); } });
+    PL.ui.section(L.controls, "顯示與播放");
+    const layers = PL.ui.chipGroup(L.controls, { multi: true, value: ["wave", "order", "bracket"], options: [
+      { value: "wave", label: "波前" }, { value: "path", label: "路程差 r₂−r₁" }, { value: "order", label: "條紋級次" }, { value: "bracket", label: "測量括號" }
+    ] });
+    const row = PL.ui.buttonRow(L.controls);
+    const bP = PL.ui.button(row, "暫停", () => { anim.toggle(); bP.textContent = anim.running ? "暫停" : "播放"; }, { primary: true });
+    let speed = 1; const bS = PL.ui.button(row, "速率×1", () => { speed = speed >= 4 ? 1 : speed * 2; bS.textContent = "速率×" + speed; });
+    const row2 = PL.ui.buttonRow(L.controls);
+    PL.ui.button(row2, "清屏", () => { hits = []; photons = []; count = 0; hist.fill(0); });
+    PL.ui.button(row2, "重置", () => { stLam.set(600); stD.set(0.2); stL.set(1); stN.set(5); reset(); });
+    // 讀數
+    const rDx = PL.ui.readout(L.readouts, { label: "條紋間距 Δx=λL/d", unit: "mm" });
+    const rLam = PL.ui.readout(L.readouts, { label: "波長 λ", unit: "nm" });
+    const rFr = PL.ui.readout(L.readouts, { label: "屏內可見亮紋", unit: "條" });
+    const rCnt = PL.ui.readout(L.readouts, { label: "已到達光子", unit: "個" });
+    // 附屬圖表
+    const charts = PL.el("div", "sim-charts", root);
+    const w1 = PL.el("div", "sim-chart", charts); PL.el("div", "chart-title", w1).textContent = "光強分布 I(y)";
+    const cvI = PL.canvas.create(w1, 0.6); PL.el("div", "cap", w1).textContent = "各級亮紋等間距、亮度相同：相鄰亮紋間距 Δx=λL/d，亮紋處 I=I₀、暗紋處為 0。";
+    const w2 = PL.el("div", "sim-chart", charts); PL.el("div", "chart-title", w2).textContent = "單光子累積直方圖";
+    const cvH = PL.canvas.create(w2, 0.6); PL.el("div", "cap", w2).textContent = "光子逐個隨機到達（落點機率 ∝ 光強），少量時看似雜亂，累積越多越逼近 cos² 條紋——波粒二象性。";
+
+    const BINS = 141; let hist = new Array(BINS).fill(0), photons = [], hits = [], count = 0, phase = 0;
+    const dxMM = () => stLam.get() * 1e-3 * stL.get() / stD.get();
+    const Mrange = () => stN.get() + 2.4;
+    const yMaxMM = () => Mrange() * dxMM();
+    const Iy = yMM => Math.cos(Math.PI * yMM / dxMM()) ** 2;
+    function reset() { hits = []; photons = []; count = 0; hist.fill(0); }
+    function sampleY() { const ym = yMaxMM(); for (let i = 0; i < 48; i++) { const y = (Math.random() * 2 - 1) * ym; if (Math.random() < Iy(y)) return y; } return 0; }
+
+    function scene() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const lam = sLam.get() / 30, d = sD.get(), col = nmColor(sLam.get());
-      const sx = 70, cy = H / 2, s1 = { x: sx, y: cy - d / 2 }, s2 = { x: sx, y: cy + d / 2 };
-      const k = 2 * Math.PI / lam, step = 5;
-      for (let x = sx; x < W - 60; x += step) for (let y = 6; y < H - 6; y += step) {
-        const r1 = Math.hypot(x - s1.x, y - s1.y), r2 = Math.hypot(x - s2.x, y - s2.y);
-        const I = Math.cos(k * (r1 - r2) / 2) ** 2;
-        ctx.globalAlpha = I * 0.8; ctx.fillStyle = col; ctx.fillRect(x, y, step, step);
-      }
-      ctx.globalAlpha = 1;
-      // 屏幕
-      const scr = W - 54;
-      D.line(ctx, scr, 10, scr, H - 10, PL.col("text-faint"), 2);
-      for (let y = 10; y < H - 10; y += 2) { const r1 = Math.hypot(scr - s1.x, y - s1.y), r2 = Math.hypot(scr - s2.x, y - s2.y); const I = Math.cos(k * (r1 - r2) / 2) ** 2; ctx.globalAlpha = I; ctx.fillStyle = col; ctx.fillRect(scr + 4, y, 22, 2); }
-      ctx.globalAlpha = 1;
-      // 縫
-      D.rect(ctx, sx - 3, 10, 6, H - 20, { fill: "rgba(0,0,0,0.5)" });
-      D.disc(ctx, s1.x, s1.y, 3, { fill: "#fff" }); D.disc(ctx, s2.x, s2.y, 3, { fill: "#fff" });
-      rDy.set(lam * (W - 120) / d / 10, 1);
+      const col = nmColor(stLam.get()), cy = H * 0.44, benchY = H - 18, laserX = 58, slitX = W * 0.4, scrX = W - 104, half = Math.min(H * 0.4, (H - 44) / 2);
+      const yPx = yMM => cy + (yMM / yMaxMM()) * half, gap = 20, s1 = { x: slitX, y: cy - gap / 2 }, s2 = { x: slitX, y: cy + gap / 2 };
+      // 光學導軌
+      D.rect(ctx, 24, benchY, W - 48, 8, { fill: "rgba(255,255,255,0.06)", r: 4 });
+      D.text(ctx, "示意 · 非真實比例", 16, 20, { color: PL.col("text-faint"), size: 10.5 });
+      // 光束錐
+      ctx.save(); ctx.globalAlpha = 0.14; ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(laserX + 14, cy); ctx.lineTo(slitX, cy - gap * 1.5); ctx.lineTo(slitX, cy + gap * 1.5); ctx.closePath(); ctx.fill(); ctx.restore();
+      // 波前
+      if (layers.has("wave")) { ctx.save(); ctx.beginPath(); ctx.rect(slitX, 0, scrX - slitX, H); ctx.clip(); [s1, s2].forEach(s => { for (let n = 0; n < 26; n++) { const r = ((n * 22 + phase * 22) % ((scrX - slitX) + 22)); ctx.strokeStyle = col; ctx.globalAlpha = 0.16 * (1 - r / (scrX - slitX)); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(s.x, s.y, r, -1.2, 1.2); ctx.stroke(); } }); ctx.restore(); }
+      // 光源（雷射）
+      D.line(ctx, laserX, cy, laserX, benchY, PL.col("text-faint"), 3);
+      D.rect(ctx, laserX - 30, cy - 11, 42, 22, { fill: "#2a3444", stroke: "rgba(255,255,255,0.25)", width: 1, r: 5 });
+      D.rect(ctx, laserX + 8, cy - 5, 8, 10, { fill: "#3a4658", r: 2 });
+      D.disc(ctx, laserX + 16, cy, 4, { fill: col, glow: col, glowSize: 12 });
+      // 雙縫屏障
+      const barW = 12;
+      const seg = (y0, y1) => D.rect(ctx, slitX - barW / 2, y0, barW, y1 - y0, { fill: "#161d29", stroke: "rgba(255,255,255,0.18)", width: 1, r: 3 });
+      seg(cy - half - 14, s1.y - 5); seg(s1.y + 5, s2.y - 5); seg(s2.y + 5, cy + half + 14);
+      D.line(ctx, slitX, cy, slitX, benchY, PL.col("text-faint"), 3);
+      D.disc(ctx, s1.x, s1.y, 2.5, { fill: "#fff" }); D.disc(ctx, s2.x, s2.y, 2.5, { fill: "#fff" });
+      // 路程差
+      if (layers.has("path")) { const fy = yPx(dxMM()); D.line(ctx, s1.x, s1.y, scrX, fy, "rgba(255,255,255,0.4)", 1, [4, 3]); D.line(ctx, s2.x, s2.y, scrX, fy, "rgba(255,255,255,0.4)", 1, [4, 3]); D.text(ctx, "r₂−r₁ = λ", (slitX + scrX) / 2 - 20, cy - 6, { color: PL.col("text-dim"), size: 11 }); }
+      // 屏幕與累積
+      D.rect(ctx, scrX, cy - half - 14, 20, 2 * half + 28, { fill: "#0a0e15", stroke: "rgba(255,255,255,0.2)", width: 1.5, r: 4 });
+      D.line(ctx, scrX + 10, cy, scrX + 10, benchY, PL.col("text-faint"), 3);
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      hits.forEach(h => { ctx.fillStyle = col; ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.arc(scrX + 4 + (h.x % 12), yPx(h.y), 1.8, 0, PL.TAU); ctx.fill(); });
+      ctx.restore(); ctx.globalAlpha = 1;
+      // 括號
+      if (layers.has("bracket")) { const N = stN.get(), y0 = yPx(N * dxMM()), y1 = yPx(-N * dxMM()), bxx = scrX - 14; ctx.strokeStyle = "#f0a24a"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(bxx + 6, y0); ctx.lineTo(bxx, y0); ctx.lineTo(bxx, y1); ctx.lineTo(bxx + 6, y1); ctx.stroke(); D.text(ctx, (2 * N) + " Δx", bxx - 4, cy + 4, { color: "#f0a24a", size: 10, align: "right" }); }
+      // 級次刻度
+      if (layers.has("order")) { const Mi = Math.floor(Mrange()); for (let m = -Mi; m <= Mi; m++) { const y = yPx(m * dxMM()); if (y > 8 && y < H - 8) { D.line(ctx, scrX + 20, y, scrX + 26, y, PL.col("text-faint"), 1); D.text(ctx, m === 0 ? "m=0" : (m > 0 ? "+" + m : "" + m), scrX + 30, y + 3, { color: m === 0 ? col : PL.col("text-faint"), size: m === 0 ? 10 : 9 }); } } }
+      // 飛行光子
+      photons.forEach(p => { const x = p.x0 + (scrX - p.x0) * p.t, y = p.y0 + (yPx(p.ty) - p.y0) * p.t; D.disc(ctx, x, y, 3, { fill: col, glow: col, glowSize: 8 }); });
+      // 讀數
+      const Mi = Math.floor(Mrange());
+      rDx.set(dxMM(), 2); rLam.set(stLam.get(), 0); rFr.set(2 * Mi + 1, 0); rCnt.set(count, 0);
     }
-    cv.onResize(draw); draw();
-    return { stop() { cv.destroy(); }, rerender: draw };
+
+    function chartI() {
+      const { W, H } = cvI; cvI.clear();
+      const M = Mrange(), g = PL.graph(cvI, { x: 30, y: 14, w: W - 42, h: H - 34 }, { x0: -M, x1: M, y0: 0, y1: 1.06 });
+      g.frame({ xlabel: "y / Δx" }); g.grid(Math.min(12, 2 * Math.round(M)), 4);
+      const col = nmColor(stLam.get()), pts = []; for (let i = 0; i <= 240; i++) { const x = -M + 2 * M * i / 240; pts.push([x, Math.cos(Math.PI * x) ** 2]); }
+      g.area(pts, { fill: col.replace("rgb", "rgba").replace(")", ",0.18)") }); g.curve(pts, { color: col, width: 2 });
+      D.text(cvI.ctx, "I / I₀", W - 16, 20, { color: col, size: 10, align: "right" });
+    }
+    function chartH() {
+      const { W, H } = cvH; cvH.clear();
+      const M = Mrange(), mx = Math.max(4, ...hist), g = PL.graph(cvH, { x: 30, y: 14, w: W - 42, h: H - 34 }, { x0: -M, x1: M, y0: 0, y1: mx * 1.15 });
+      g.frame({ xlabel: "y / Δx" }); g.grid(Math.min(12, 2 * Math.round(M)), 4);
+      const col = nmColor(stLam.get()), ym = yMaxMM(), dx = dxMM(), bw = (g.box.w / BINS) * 0.9;
+      for (let i = 0; i < BINS; i++) { if (!hist[i]) continue; const yc = -ym + (i + 0.5) * (2 * ym / BINS), xu = yc / dx; const px = g.X(xu), py0 = g.Y(0), py1 = g.Y(hist[i]); cvH.ctx.fillStyle = col; cvH.ctx.globalAlpha = 0.8; cvH.ctx.fillRect(px - bw / 2, py1, bw, py0 - py1); }
+      cvH.ctx.globalAlpha = 1;
+      g.fn(x => Math.cos(Math.PI * x) ** 2 * mx, { color: "rgba(255,255,255,0.55)", width: 1.5, dash: [4, 3], samples: 200 });
+      D.text(cvH.ctx, "計數", 30, 12, { color: PL.col("text-faint"), size: 10 });
+    }
+    function drawAll() { scene(); chartI(); chartH(); }
+    cv.onResize(drawAll); cvI.onResize(drawAll); cvH.onResize(drawAll);
+
+    const anim = PL.loop(dt => {
+      if (dt) {
+        phase = (phase + dt * 0.6) % 1;
+        const nSpawn = Math.min(6, Math.round(speed * 1.6 + 0.3));
+        for (let i = 0; i < nSpawn; i++) if (photons.length < 60) { const s = Math.random() < 0.5 ? -1 : 1, cy = cv.H * 0.44; photons.push({ x0: cv.W * 0.4, y0: cy + s * 10, ty: sampleY(), t: 0 }); }
+        photons.forEach(p => p.t += dt * 3 * speed);
+        photons.filter(p => p.t >= 1).forEach(p => { hits.push({ x: (count * 7) % 12, y: p.ty }); if (hits.length > 2000) hits.shift(); count++; const bi = Math.floor((p.ty + yMaxMM()) / (2 * yMaxMM()) * BINS); if (bi >= 0 && bi < BINS) hist[bi]++; });
+        photons = photons.filter(p => p.t < 1);
+      }
+      drawAll();
+    });
+    anim.start();
+    return { stop() { anim.stop(); cv.destroy(); cvI.destroy(); cvH.destroy(); }, rerender: drawAll };
   }});
 
   /* 單狹縫繞射 */

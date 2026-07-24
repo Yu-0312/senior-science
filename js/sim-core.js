@@ -166,6 +166,59 @@
     const n = el("div", "ctrl-note", parent); n.innerHTML = text; return n;
   }
 
+  function section(parent, text) {
+    const s = el("div", "ctrl-section", parent); s.textContent = text; return s;
+  }
+
+  function stepper(parent, o) {
+    const wrap = el("div", "ctrl-stepper", parent);
+    if (o.label) { const l = el("div", "ctrl-label", wrap); l.innerHTML = o.label; }
+    const box = el("div", "stepper-box", wrap);
+    const dec = el("button", "stepper-btn", box); dec.type = "button"; dec.textContent = "−";
+    const val = el("span", "stepper-val", box);
+    if (o.unit) { const u = el("span", "stepper-unit", box); u.textContent = o.unit; }
+    const inc = el("button", "stepper-btn", box); inc.type = "button"; inc.textContent = "+";
+    const step = o.step == null ? 1 : o.step, dg = o.digits == null ? 0 : o.digits;
+    let v = o.value;
+    const show = () => { val.textContent = typeof o.format === "function" ? o.format(v) : (+v).toFixed(dg); };
+    const set = (nv, fire) => { v = clamp(Math.round(nv / step) * step, o.min, o.max); show(); if (fire !== false && o.onInput) o.onInput(v); };
+    dec.addEventListener("click", () => set(v - step));
+    inc.addEventListener("click", () => set(v + step));
+    show();
+    return { get: () => v, set: nv => set(nv, false), el: box };
+  }
+
+  function chipGroup(parent, o) {
+    const row = el("div", "chip-row", parent);
+    const multi = !!o.multi;
+    let value = multi ? new Set(o.value || []) : o.value;
+    const chips = [];
+    o.options.forEach(op => {
+      const c = el("button", "chip", row); c.type = "button"; c.innerHTML = op.label;
+      if (op.color) c.style.setProperty("--chip", op.color);
+      const isOn = () => multi ? value.has(op.value) : value === op.value;
+      const paint = () => c.classList.toggle("active", isOn());
+      c.addEventListener("click", () => {
+        if (multi) { value.has(op.value) ? value.delete(op.value) : value.add(op.value); }
+        else value = op.value;
+        chips.forEach(x => x.paint());
+        if (o.onChange) o.onChange(multi ? [...value] : value, op.value);
+      });
+      chips.push({ paint }); paint();
+    });
+    return { get: () => multi ? [...value] : value, has: v => multi && value.has(v), set: v => { value = multi ? new Set(v) : v; chips.forEach(x => x.paint()); } };
+  }
+
+  function charts(parent) { return el("div", "sim-charts", parent); }
+  function chart(container, o) {
+    o = o || {};
+    const w = el("div", "sim-chart", container);
+    if (o.title) { const t = el("div", "chart-title", w); t.textContent = o.title; }
+    const c = createCanvas(w, o.aspect || 0.6);
+    if (o.cap) { const p = el("div", "cap", w); p.textContent = o.cap; }
+    return c;
+  }
+
   /* --------------------------- 繪圖助手 --------------------------- */
   const D = {
     grid(ctx, x, y, w, h, step, color) {
@@ -254,13 +307,19 @@
       }
       ctx.lineTo(x2, y2); ctx.stroke(); ctx.restore();
     },
-    // 陰影漸層背景（讓 canvas 更有質感）
+    // 陰影漸層背景 + 暈影 + 內框（讓每個 canvas 都有一致的質感）
     bg(cv) {
-      const ctx = cv.ctx;
-      const g = ctx.createLinearGradient(0, 0, 0, cv.H);
+      const ctx = cv.ctx, W = cv.W, H = cv.H;
+      const g = ctx.createLinearGradient(0, 0, 0, H);
       g.addColorStop(0, col("sim-bg-1", "#0a0f16"));
       g.addColorStop(1, col("sim-bg-2", "#0c1219"));
-      ctx.fillStyle = g; ctx.fillRect(0, 0, cv.W, cv.H);
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      const light = document.documentElement.getAttribute("data-theme") === "light";
+      const rg = ctx.createRadialGradient(W / 2, H * 0.42, Math.min(W, H) * 0.15, W / 2, H * 0.5, Math.max(W, H) * 0.72);
+      rg.addColorStop(0, "rgba(0,0,0,0)");
+      rg.addColorStop(1, light ? "rgba(30,50,90,0.05)" : "rgba(0,0,0,0.30)");
+      ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+      ctx.save(); ctx.strokeStyle = light ? "rgba(30,50,90,0.08)" : "rgba(255,255,255,0.05)"; ctx.lineWidth = 1; ctx.strokeRect(0.5, 0.5, W - 1, H - 1); ctx.restore();
     }
   };
 
@@ -328,7 +387,7 @@
     has(id) { return !!registry[id]; },
     ids() { return Object.keys(registry); },
     // 對外助手
-    ui: { layout, slider, select, checkbox, buttonRow, button, readout, note },
+    ui: { layout, slider, select, checkbox, buttonRow, button, readout, note, section, stepper, chipGroup, charts, chart },
     canvas: { create: createCanvas },
     draw: D,
     graph,

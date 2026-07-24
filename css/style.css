@@ -322,6 +322,35 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .ctrl-check input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
 .ctrl-note { font-size: 11.5px; color: var(--text-faint); line-height: 1.5; padding: 8px 10px; border-left: 2px solid var(--border); background: rgba(255, 255, 255, 0.02); border-radius: 0 6px 6px 0; }
 
+/* 區段標題 */
+.ctrl-section { font-size: 10.5px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--text-faint); margin: 6px 0 -2px; display: flex; align-items: center; gap: 8px; }
+.ctrl-section::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border), transparent); }
+
+/* 數字步進器 */
+.ctrl-stepper .ctrl-label { margin-bottom: 6px; display: block; }
+.stepper-box { display: flex; align-items: center; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; transition: border-color 0.15s; }
+.stepper-box:hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
+.stepper-btn { flex-shrink: 0; width: 34px; height: 36px; border: none; background: transparent; color: var(--text-dim); font-size: 17px; cursor: pointer; transition: background 0.14s, color 0.14s; }
+.stepper-btn:hover { background: var(--hover); color: var(--accent); }
+.stepper-btn:active { transform: scale(0.92); }
+.stepper-val { flex: 1; text-align: center; font-size: 15px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.stepper-unit { font-size: 11px; color: var(--text-faint); padding: 0 10px 0 2px; }
+
+/* 膠囊選項 */
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font-family: inherit; font-size: 12px; padding: 7px 12px; border-radius: 999px; cursor: pointer; background: var(--panel-2); color: var(--text-dim); border: 1px solid var(--border); transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+.chip:hover { border-color: var(--chip, var(--accent)); color: var(--text); transform: translateY(-1px); }
+.chip.active { background: color-mix(in srgb, var(--chip, var(--accent)) 16%, transparent); border-color: var(--chip, var(--accent)); color: var(--chip, var(--accent)); font-weight: 600; }
+.chip .dotc { width: 8px; height: 8px; border-radius: 50%; background: var(--chip, var(--accent)); flex-shrink: 0; }
+
+/* 附屬圖表列 */
+.sim-charts { display: flex; gap: 16px; margin-top: 18px; flex-wrap: wrap; }
+.sim-chart { flex: 1 1 240px; min-width: 0; background: linear-gradient(180deg, var(--panel-2), var(--panel-solid)); border: 1px solid var(--border-soft); border-radius: 12px; padding: 12px 13px; }
+.sim-chart .sim-canvas { border: none; box-shadow: none; background: transparent; }
+.sim-chart .cap { font-size: 11.5px; color: var(--text-faint); margin: 8px 2px 0; line-height: 1.55; }
+.chart-title { font-size: 12px; color: var(--text-dim); letter-spacing: 0.4px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.chart-title::before { content: ""; width: 3px; height: 12px; border-radius: 2px; background: var(--m-color, var(--accent)); box-shadow: 0 0 8px var(--m-color, var(--accent)); }
+
 .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn {
   font-family: inherit; font-size: 13px; padding: 9px 14px; border-radius: 9px; cursor: pointer;

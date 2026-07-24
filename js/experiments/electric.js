@@ -99,10 +99,12 @@
     const L = PL.ui.layout(root);
     const cv = PL.canvas.create(L.canvasWrap, 0.56);
     let t = 0;
+    PL.ui.section(L.controls, "電路參數");
     const sV = PL.ui.slider(L.controls, { label: "電壓 V", min: 1, max: 12, step: 0.5, value: 6, unit: "V", digits: 1 });
     const sR = PL.ui.slider(L.controls, { label: "電阻 R", min: 1, max: 20, step: 1, value: 4, unit: "Ω", digits: 0 });
     const rI = PL.ui.readout(L.readouts, { label: "電流 I=V/R", unit: "A" });
     const rP = PL.ui.readout(L.readouts, { label: "功率 P=IV", unit: "W" });
+    const cc = PL.ui.chart(PL.ui.charts(root), { title: "I–V 特性曲線（歐姆定律）", cap: "定電阻下電流與電壓成正比，直線斜率為 1/R；電阻越大、線越平。" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const V = sV.get(), R = sR.get(), I = V / R;
@@ -119,10 +121,16 @@
       const peri = 2 * ((x1 - x0) + (y1 - y0)); const nd = 16;
       for (let i = 0; i < nd; i++) { let d = ((t * I * 30 + i * peri / nd) % peri + peri) % peri; let px, py; if (d < x1 - x0) { px = x0 + d; py = y0; } else if (d < (x1 - x0) + (y1 - y0)) { px = x1; py = y0 + (d - (x1 - x0)); } else if (d < 2 * (x1 - x0) + (y1 - y0)) { px = x1 - (d - (x1 - x0) - (y1 - y0)); py = y1; } else { px = x0; py = y1 - (d - 2 * (x1 - x0) - (y1 - y0)); } D.disc(ctx, px, py, 3, { fill: NEG }); }
       rI.set(I, 2); rP.set(I * V, 1);
+      // I–V 圖
+      cc.clear();
+      const g = PL.graph(cc, { x: 34, y: 14, w: cc.W - 46, h: cc.H - 34 }, { x0: 0, x1: 12, y0: 0, y1: 12 });
+      g.frame({ xlabel: "V (V)", ylabel: "I (A)" }); g.grid(6, 6);
+      g.fn(v => v / R, { color: MC(), width: 2.2 });
+      g.dot(V, I, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
     }
     const anim = PL.loop(dt => { if (dt) t += dt; draw(); });
-    cv.onResize(draw); anim.start();
-    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+    cv.onResize(draw); cc.onResize(draw); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); cc.destroy(); }, rerender: draw };
   }});
 
   /* 電阻串並聯 */

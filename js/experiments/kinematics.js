@@ -105,50 +105,65 @@
   /* 拋體運動 */
   PL.register("projectile", { build(root) {
     const L = PL.ui.layout(root);
-    const cv = PL.canvas.create(L.canvasWrap, 0.6);
+    const cv = PL.canvas.create(L.canvasWrap, 0.52, 860);
     const g = 9.8; let t = 0, flying = false, trail = [];
-    const sV = PL.ui.slider(L.controls, { label: "初速 v₀", min: 5, max: 40, step: 1, value: 24, unit: "m/s", digits: 0, onInput: reset });
-    const sA = PL.ui.slider(L.controls, { label: "發射角 θ", min: 10, max: 80, step: 1, value: 45, unit: "°", digits: 0, onInput: reset });
+    PL.ui.section(L.controls, "發射參數");
+    const sV = PL.ui.stepper(L.controls, { label: "初速 v₀ (m/s)", value: 24, min: 5, max: 40, step: 1, onInput: reset });
+    const sA = PL.ui.stepper(L.controls, { label: "發射角 θ (°)", value: 45, min: 10, max: 80, step: 1, onInput: reset });
+    PL.ui.section(L.controls, "快捷角度");
+    PL.ui.chipGroup(L.controls, { value: 45, options: [{ value: 30, label: "30°" }, { value: 45, label: "45°" }, { value: 60, label: "60°" }], onChange: v => { sA.set(v); reset(); } });
+    PL.ui.section(L.controls, "顯示");
+    const layers = PL.ui.chipGroup(L.controls, { multi: true, value: ["traj", "vcomp", "marks", "comp"], options: [
+      { value: "traj", label: "理論軌跡" }, { value: "vcomp", label: "速度分量" }, { value: "marks", label: "頂點/射程" }, { value: "comp", label: "45°對照" }
+    ] });
     const row = PL.ui.buttonRow(L.controls);
-    const bP = PL.ui.button(row, "發射", () => { reset(); flying = true; anim.start(); }, { primary: true });
+    const bP = PL.ui.button(row, "發射", () => { reset(); flying = true; }, { primary: true });
     PL.ui.button(row, "重設", reset);
     const rR = PL.ui.readout(L.readouts, { label: "射程 R", unit: "m" });
     const rHm = PL.ui.readout(L.readouts, { label: "最大高度", unit: "m" });
     const rTf = PL.ui.readout(L.readouts, { label: "飛行時間", unit: "s" });
     const rS = PL.ui.readout(L.readouts, { label: "當前速率", unit: "m/s" });
+    const charts = PL.el("div", "sim-charts", root);
+    const w1 = PL.el("div", "sim-chart", charts); PL.el("div", "chart-title", w1).textContent = "射程 R 對 發射角 θ";
+    const cvR = PL.canvas.create(w1, 0.58); PL.el("div", "cap", w1).textContent = "R = v₀²sin2θ / g，θ = 45° 時射程最遠；互餘角（如 30° 與 60°）射程相同。";
     function reset() { t = 0; flying = false; trail = []; }
     function params() { const v = sV.get(), th = sA.get() * Math.PI / 180; return { v, th, R: v * v * Math.sin(2 * th) / g, Hm: v * v * Math.sin(th) ** 2 / (2 * g), Tf: 2 * v * Math.sin(th) / g }; }
-
-    function draw() {
+    function scene() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const { v, th, R, Hm, Tf } = params(), m = MC();
-      const ox = 46, oy = H - 34, worldMax = Math.max(R, Hm * 1.4, 10);
-      const sc = Math.min((W - 80) / (R + 1e-3), (oy - 26) / (Hm + 1e-3));
-      D.line(ctx, 30, oy, W - 20, oy, PL.col("text-faint"), 2);
-      // 發射角指示
-      D.arrow(ctx, ox, oy, ox + 42 * Math.cos(th), oy - 42 * Math.sin(th), { color: PL.col("accent-2"), width: 2, label: "v₀" });
-      // 理論軌跡
-      ctx.save(); ctx.strokeStyle = "rgba(255,255,255,0.18)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5; ctx.beginPath();
-      for (let i = 0; i <= 60; i++) { const tt = Tf * i / 60, x = v * Math.cos(th) * tt, y = v * Math.sin(th) * tt - 0.5 * g * tt * tt; const px = ox + x * sc, py = oy - y * sc; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
-      ctx.stroke(); ctx.restore();
-      // 頂點與落點標記
-      D.line(ctx, ox + R * sc, oy - 5, ox + R * sc, oy + 5, m, 2);
-      D.text(ctx, "R = " + PL.fmt(R, 1) + " m", ox + R * sc, oy + 18, { color: m, size: 10, align: "center" });
-      // 飛行中球
+      const ox = 48, oy = H - 32, Rmax = v * v / g;
+      const sc = Math.min((W - 90) / (Rmax + 1e-3), (oy - 30) / (v * v / (2 * g) + 1e-3));
+      D.rect(ctx, 24, oy, W - 48, 6, { fill: "rgba(255,255,255,0.06)", r: 3 });
+      D.line(ctx, 24, oy, W - 24, oy, PL.col("text-faint"), 1.5);
+      const traj = (ang, style) => { ctx.save(); ctx.strokeStyle = style.c; ctx.lineWidth = style.w; if (style.dash) ctx.setLineDash(style.dash); ctx.beginPath(); const T = 2 * v * Math.sin(ang) / g; for (let i = 0; i <= 70; i++) { const tt = T * i / 70, x = v * Math.cos(ang) * tt, y = v * Math.sin(ang) * tt - 0.5 * g * tt * tt; const px = ox + x * sc, py = oy - y * sc; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.stroke(); ctx.restore(); };
+      if (layers.has("comp")) traj(Math.PI / 4, { c: "rgba(255,255,255,0.16)", w: 1.4, dash: [3, 4] });
+      if (layers.has("traj")) traj(th, { c: "rgba(77,208,225,0.35)", w: 1.6, dash: [5, 4] });
+      D.arrow(ctx, ox, oy, ox + 46 * Math.cos(th), oy - 46 * Math.sin(th), { color: PL.col("accent-2"), width: 2, label: "v₀" });
+      if (layers.has("marks")) {
+        D.line(ctx, ox + R * sc, oy - 6, ox + R * sc, oy + 6, m, 2); D.text(ctx, "R=" + PL.fmt(R, 1) + "m", ox + R * sc, oy + 18, { color: m, size: 10, align: "center" });
+        const apexX = ox + (R / 2) * sc, apexY = oy - Hm * sc; D.line(ctx, apexX, apexY, apexX, oy, "rgba(255,255,255,0.14)", 1, [3, 3]); D.text(ctx, "H=" + PL.fmt(Hm, 1) + "m", apexX + 4, apexY - 4, { color: PL.col("text-dim"), size: 10 });
+      }
       const tt = Math.min(t, Tf), x = v * Math.cos(th) * tt, y = v * Math.sin(th) * tt - 0.5 * g * tt * tt;
       const vx = v * Math.cos(th), vy = v * Math.sin(th) - g * tt, sp = Math.hypot(vx, vy);
-      trail.forEach((p, i) => D.disc(ctx, ox + p[0] * sc, oy - p[1] * sc, 2.5, { fill: "rgba(255,255,255,0.28)" }));
+      trail.forEach(p => D.disc(ctx, ox + p[0] * sc, oy - p[1] * sc, 2.2, { fill: "rgba(255,255,255,0.25)" }));
       const bx = ox + x * sc, by = oy - y * sc;
+      if (flying && layers.has("vcomp")) { D.arrow(ctx, bx, by, bx + vx * 1.5, by, { color: "#7ee0c0", width: 1.6 }); D.arrow(ctx, bx, by, bx, by - vy * 1.5, { color: PL.col("accent-3"), width: 1.6 }); }
+      if (flying) D.arrow(ctx, bx, by, bx + vx * 1.5, by - vy * 1.5, { color: PL.col("accent-2"), width: 1.8 });
       D.disc(ctx, bx, by, 8, { fill: m, glow: m, glowSize: 14 });
-      if (flying) { D.arrow(ctx, bx, by, bx + vx * 1.6, by - vy * 1.6, { color: PL.col("accent-2"), width: 1.8 }); }
       rR.set(R, 1); rHm.set(Hm, 1); rTf.set(Tf, 2); rS.set(sp, 1);
     }
-    const anim = PL.loop(dt => {
-      if (dt && flying) { t += dt; const { th, v, Tf } = params(); const x = v * Math.cos(th) * t, y = v * Math.sin(th) * t - 0.5 * g * t * t; if (y >= 0) trail.push([x, y]); if (t >= Tf) { flying = false; anim.stop(); } }
-      draw();
-    });
-    cv.onResize(draw); draw();
-    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+    function chart() {
+      const { W, H } = cvR; cvR.clear();
+      const v = sV.get(), gg = PL.graph(cvR, { x: 34, y: 14, w: W - 46, h: H - 34 }, { x0: 0, x1: 90, y0: 0, y1: v * v / g * 1.1 });
+      gg.frame({ xlabel: "θ (°)", ylabel: "R (m)" }); gg.grid(6, 4);
+      gg.fn(a => v * v * Math.sin(2 * a * Math.PI / 180) / g, { color: MC(), width: 2.2, samples: 90 });
+      gg.vline(45, { color: "rgba(255,255,255,0.2)", dash: [3, 3] });
+      gg.dot(sA.get(), v * v * Math.sin(2 * sA.get() * Math.PI / 180) / g, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+    }
+    function drawAll() { scene(); chart(); }
+    const anim = PL.loop(dt => { if (dt && flying) { t += dt; const { v, th, Tf } = params(); const y = v * Math.sin(th) * t - 0.5 * g * t * t; if (y >= 0) trail.push([v * Math.cos(th) * t, y]); if (t >= Tf) flying = false; } drawAll(); });
+    cv.onResize(drawAll); cvR.onResize(drawAll); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); cvR.destroy(); }, rerender: drawAll };
   }});
 
   /* 相對運動：過河船 */

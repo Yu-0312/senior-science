@@ -99,10 +99,12 @@
     const L = PL.ui.layout(root);
     const cv = PL.canvas.create(L.canvasWrap, 0.6);
     const c = 90, f0 = 1.2; let t = 0, fronts = [], sx = 0, emitAcc = 0;
+    PL.ui.section(L.controls, "波源");
     const sVs = PL.ui.slider(L.controls, { label: "波源速度 vₛ", min: -60, max: 60, step: 2, value: 40, unit: "px/s", digits: 0 });
     PL.ui.note(L.controls, "波源前方波前被壓縮（頻率變高），後方被拉開（頻率變低）。");
     const rFront = PL.ui.readout(L.readouts, { label: "前方觀測 f′", unit: "×f" });
     const rBack = PL.ui.readout(L.readouts, { label: "後方觀測 f′", unit: "×f" });
+    const cc = PL.ui.chart(PL.ui.charts(root), { title: "觀測頻率 f′/f – 波源速度", cap: "接近時 f′>f（藍移/變高）、遠離時 f′<f（紅移/變低）；速度越快偏移越大。" });
     function reset() { sx = -0; fronts = []; }
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
@@ -114,13 +116,21 @@
       D.disc(ctx, W - 30, cy, 6, { fill: PL.col("accent-2") }); D.text(ctx, "觀察者", W - 30, cy - 14, { color: PL.col("accent-2"), size: 10, align: "center" });
       const vs = sVs.get();
       rFront.set(c / (c - vs), 2); rBack.set(c / (c + vs), 2);
+      // f′/f – vₛ 圖
+      cc.clear();
+      const g = PL.graph(cc, { x: 36, y: 14, w: cc.W - 48, h: cc.H - 34 }, { x0: -60, x1: 60, y0: 0.4, y1: 3 });
+      g.frame({ xlabel: "vₛ (px/s)", ylabel: "f′/f" }); g.grid(6, 5); g.hline(1, { color: PL.col("text-faint"), width: 1 });
+      g.fn(v => PL.clamp(c / (c - v), 0, 3), { color: MC(), width: 2 });
+      g.fn(v => PL.clamp(c / (c + v), 0, 3), { color: PL.col("accent-2"), width: 2, dash: [4, 3] });
+      g.dot(vs, PL.clamp(c / (c - vs), 0, 3), { color: MC(), glow: MC() });
+      D.text(cc.ctx, "前方", cc.W - 46, 22, { color: MC(), size: 10 }); D.text(cc.ctx, "後方", cc.W - 46, 36, { color: PL.col("accent-2"), size: 10 });
     }
     const anim = PL.loop(dt => {
       if (dt) { t += dt; sx += sVs.get() * dt; emitAcc += dt; if (emitAcc > 1 / f0) { emitAcc = 0; fronts.push({ x0: sx, t0: t }); } fronts = fronts.filter(f => c * (t - f.t0) < cv.W); if (Math.abs(sx) > cv.W / 2 - 30) { sx = -Math.sign(sVs.get()) * (cv.W / 2 - 40); fronts = []; } }
       draw();
     });
-    cv.onResize(draw); anim.start();
-    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+    cv.onResize(draw); cc.onResize(draw); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); cc.destroy(); }, rerender: draw };
   }});
 
   /* 拍 */

@@ -35,12 +35,14 @@
     const L = PL.ui.layout(root);
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     let ang = 0;
+    PL.ui.section(L.controls, "粒子與磁場");
     const sV = PL.ui.slider(L.controls, { label: "速率 v", min: 1, max: 6, step: 0.5, value: 3, unit: "", digits: 1 });
     const sB = PL.ui.slider(L.controls, { label: "磁場 B", min: 1, max: 6, step: 0.5, value: 3, unit: "", digits: 1 });
     const sQ = PL.ui.select(L.controls, { label: "電荷", value: "pos", options: [{ value: "pos", label: "正電荷 +" }, { value: "neg", label: "負電荷 −" }], onChange: () => ang = 0 });
     PL.ui.note(L.controls, "磁力恆垂直於速度，使帶電粒子作等速率圓周運動；半徑 r = mv/qB。");
     const rR = PL.ui.readout(L.readouts, { label: "迴轉半徑 r", unit: "px" });
     const rT = PL.ui.readout(L.readouts, { label: "週期 T（相對）", unit: "" });
+    const cc = PL.ui.chart(PL.ui.charts(root), { title: "迴轉半徑 r – 速率 v", cap: "r = mv/qB：定磁場下半徑與速率成正比（直線過原點）；磁場越強、半徑越小。" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       // B 進入頁面（叉叉背景）
@@ -57,21 +59,29 @@
       D.arrow(ctx, px, py, px + vx * 34, py + vy * 34 * sgn, { color: "#fff", width: 2, label: "v" });
       D.arrow(ctx, px, py, px + (cx - px) * 0.4, py + (cy - py) * 0.4, { color: PL.col("warn"), width: 2, label: "F" });
       rR.set(r, 0); rT.set(6.28 / sB.get(), 2);
+      // r–v 圖
+      cc.clear();
+      const B = sB.get(), gg = PL.graph(cc, { x: 36, y: 14, w: cc.W - 48, h: cc.H - 34 }, { x0: 0, x1: 6, y0: 0, y1: 210 });
+      gg.frame({ xlabel: "v", ylabel: "r (px)" }); gg.grid(6, 4);
+      gg.fn(vv => 20 + vv / B * 30, { color: MC(), width: 2.2 });
+      gg.dot(sV.get(), r, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
     }
     const anim = PL.loop(dt => { if (dt) ang += sB.get() * dt * 0.6; draw(); });
-    cv.onResize(draw); anim.start();
-    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+    cv.onResize(draw); cc.onResize(draw); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); cc.destroy(); }, rerender: draw };
   }});
 
   /* 電磁感應（法拉第定律） */
   PL.register("induction", { build(root) {
     const L = PL.ui.layout(root);
     const cv = PL.canvas.create(L.canvasWrap, 0.6);
-    let t = 0, phiPrev = null, emf = 0;
+    let t = 0, phiPrev = null, emf = 0, hist = [];
+    PL.ui.section(L.controls, "磁鐵運動");
     const sSpd = PL.ui.slider(L.controls, { label: "磁鐵移動速率", min: 0.3, max: 2.5, step: 0.1, value: 1.2, unit: "", digits: 1 });
     PL.ui.note(L.controls, "磁通量改變才會感應電流；磁鐵移動越快，感應電動勢越大。");
     const rEmf = PL.ui.readout(L.readouts, { label: "感應電動勢 ε", unit: "（相對）" });
     const rDir = PL.ui.readout(L.readouts, { label: "感應電流" });
+    const cc = PL.ui.chart(PL.ui.charts(root), { title: "感應電動勢 ε – 時間", cap: "磁通量改變才有電動勢；正負代表感應電流方向相反（楞次定律），磁鐵越快峰值越高。" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const cy = H / 2, coilX = W * 0.62, mx = coilX - 150 + 90 * Math.sin(t);
@@ -89,13 +99,20 @@
       D.line(ctx, gx, gy, gx + 16 * Math.sin(needle), gy - 16 * Math.cos(needle), PL.col("danger"), 2);
       D.text(ctx, "檢流計", gx, gy + 34, { color: PL.col("text-dim"), size: 10, align: "center" });
       rEmf.set(Math.abs(emf), 2); rDir.set(emf > 0.05 ? "順時針" : emf < -0.05 ? "逆時針" : "無");
+      // ε–t 圖
+      cc.clear();
+      const Tw = 8, g = PL.graph(cc, { x: 30, y: 14, w: cc.W - 42, h: cc.H - 34 }, { x0: 0, x1: Tw, y0: -1.2, y1: 1.2 });
+      g.frame({ xlabel: "t", ylabel: "ε" }); g.grid(4, 4); g.hline(0, { color: PL.col("text-faint"), width: 1 });
+      const pts = hist.filter(h => h[0] > t - Tw).map(h => [h[0] - (t - Tw), PL.clamp(h[1], -1.15, 1.15)]);
+      if (pts.length > 1) g.curve(pts, { color: MC(), width: 2 });
+      if (pts.length) g.dot(pts[pts.length - 1][0], pts[pts.length - 1][1], { color: PL.col("accent-2"), glow: PL.col("accent-2") });
     }
     const anim = PL.loop(dt => {
-      if (dt) { t += dt * sSpd.get(); const coilX = cv.W * 0.62, mx = coilX - 150 + 90 * Math.sin(t); const d = (mx + 17) - coilX; const phi = 1 / (1 + (d / 60) ** 2); if (phiPrev != null) emf = -(phi - phiPrev) / dt * 0.1; phiPrev = phi; }
+      if (dt) { t += dt * sSpd.get(); const coilX = cv.W * 0.62, mx = coilX - 150 + 90 * Math.sin(t); const d = (mx + 17) - coilX; const phi = 1 / (1 + (d / 60) ** 2); if (phiPrev != null) emf = -(phi - phiPrev) / dt * 0.1; phiPrev = phi; hist.push([t, emf]); if (hist.length > 1400) hist.shift(); }
       draw();
     });
-    cv.onResize(draw); anim.start();
-    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+    cv.onResize(draw); cc.onResize(draw); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); cc.destroy(); }, rerender: draw };
   }});
 
   /* 楞次定律 */

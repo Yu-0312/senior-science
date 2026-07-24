@@ -77,6 +77,7 @@
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
     let s = 0, v = 0;
     const reset = () => { s = 0; v = 0; };
+    PL.ui.section(L.controls, "斜面參數");
     const sTh = PL.ui.slider(L.controls, { label: "傾角 θ", min: 5, max: 60, step: 1, value: 30, unit: "°", digits: 0, onInput: reset });
     const sMu = PL.ui.slider(L.controls, { label: "摩擦係數 μ", min: 0, max: 1, step: 0.02, value: 0.2, unit: "", digits: 2, onInput: reset });
     const row = PL.ui.buttonRow(L.controls);
@@ -85,6 +86,7 @@
     const rA = PL.ui.readout(L.readouts, { label: "加速度 a", unit: "m/s²" });
     const rN = PL.ui.readout(L.readouts, { label: "正向力 N", unit: "×mg" });
     const rState = PL.ui.readout(L.readouts, { label: "狀態" });
+    const cc = PL.ui.chart(PL.ui.charts(root), { title: "加速度 a 對 傾角 θ", cap: "a = g(sinθ − μcosθ)；當 θ ≤ 臨界角 θc = tan⁻¹μ 時物體靜止（a = 0）。" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const th = sTh.get() * Math.PI / 180, mu = sMu.get(), m = MC();
@@ -109,13 +111,20 @@
       const a = moving ? 9.8 * (Math.sin(th) - mu * Math.cos(th)) : 0;
       if (moving) D.arrow(ctx, cx, cy, cx - u.x * FS * mu * Math.cos(th), cy - u.y * FS * mu * Math.cos(th), { color: PL.col("danger"), width: 2, label: "f" });
       rA.set(a, 2); rN.set(Math.cos(th), 2); rState.set(moving ? "下滑" : "靜止");
+      // a–θ 圖
+      cc.clear();
+      const gg = PL.graph(cc, { x: 36, y: 14, w: cc.W - 48, h: cc.H - 34 }, { x0: 0, x1: 60, y0: 0, y1: 10 });
+      gg.frame({ xlabel: "θ (°)", ylabel: "a (m/s²)" }); gg.grid(6, 5);
+      gg.fn(deg => { const r = deg * Math.PI / 180; return Math.tan(r) > mu ? 9.8 * (Math.sin(r) - mu * Math.cos(r)) : 0; }, { color: MC(), width: 2.2, samples: 90 });
+      const thc = Math.atan(mu) * 180 / Math.PI; gg.vline(thc, { color: "rgba(255,255,255,0.25)", dash: [3, 3] }); gg.label(thc + 1, 9.2, "θc", { color: PL.col("text-faint"), size: 10 });
+      gg.dot(sTh.get(), a, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
     }
     const anim = PL.loop(dt => {
       if (dt) { const th = sTh.get() * Math.PI / 180, mu = sMu.get(); const a = Math.tan(th) > mu ? 9.8 * (Math.sin(th) - mu * Math.cos(th)) : 0; v += a * dt * 8; s += v * dt; const Lpx = Math.min((cv.W - 120) / Math.cos(th), (cv.H - 90) / Math.sin(th)); if (s > Lpx - 54) { s = 0; v = 0; } }
       draw();
     });
-    cv.onResize(draw); draw();
-    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+    cv.onResize(draw); cc.onResize(draw); draw();
+    return { stop() { anim.stop(); cv.destroy(); cc.destroy(); }, rerender: draw };
   }});
 
   /* 靜摩擦與動摩擦 */

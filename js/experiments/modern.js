@@ -8,44 +8,67 @@
   /* 光電效應 */
   PL.register("photoelectric", { build(root) {
     const L = PL.ui.layout(root);
-    const cv = PL.canvas.create(L.canvasWrap, 0.6);
-    let electrons = [], acc = 0;
-    const sF = PL.ui.slider(L.controls, { label: "入射光頻率 f", min: 3, max: 12, step: 0.1, value: 8, unit: "×10¹⁴Hz", digits: 1 });
-    const sI = PL.ui.slider(L.controls, { label: "光強度", min: 0, max: 1, step: 0.05, value: 0.6, unit: "", digits: 2 });
-    const sMetal = PL.ui.select(L.controls, { label: "金屬（功函數 W）", value: "2.3", options: [{ value: "2.3", label: "鈉 W=2.3 eV" }, { value: "2.9", label: "鈣 W=2.9 eV" }, { value: "4.3", label: "鎢 W=4.3 eV" }] });
+    const cv = PL.canvas.create(L.canvasWrap, 0.5, 860);
+    let electrons = [], acc = 0, Wf = 2.3;
+    PL.ui.section(L.controls, "光源");
+    const sF = PL.ui.stepper(L.controls, { label: "入射光頻率 f (×10¹⁴ Hz)", value: 8, min: 3, max: 12, step: 0.5, digits: 1 });
+    const sI = PL.ui.stepper(L.controls, { label: "光強度 (%)", value: 60, min: 0, max: 100, step: 10 });
+    PL.ui.section(L.controls, "金屬（逸出功 W）");
+    PL.ui.chipGroup(L.controls, { value: 2.3, options: [{ value: 2.3, label: "鈉 2.3" }, { value: 2.9, label: "鈣 2.9" }, { value: 4.3, label: "鎢 4.3" }], onChange: v => { Wf = v; electrons = []; } });
+    PL.ui.note(L.controls, "頻率須高於底限頻率 f₀ 才有光電子；增加光強只增加電子數、不改變 Kmax。");
     const rK = PL.ui.readout(L.readouts, { label: "最大動能 Kmax", unit: "eV" });
     const rF0 = PL.ui.readout(L.readouts, { label: "底限頻率 f₀", unit: "×10¹⁴" });
-    const rStat = PL.ui.readout(L.readouts, { label: "狀態" });
-    function draw() {
+    const rVs = PL.ui.readout(L.readouts, { label: "遏止電壓 Vₛ", unit: "V" });
+    const rW = PL.ui.readout(L.readouts, { label: "逸出功 W", unit: "eV" });
+    const charts = PL.el("div", "sim-charts", root);
+    const w1 = PL.el("div", "sim-chart", charts); PL.el("div", "chart-title", w1).textContent = "最大動能 Kmax – 頻率 f";
+    const cvK = PL.canvas.create(w1, 0.6); PL.el("div", "cap", w1).textContent = "Kmax = hf − W：直線斜率為 h、與 f 軸交點即底限頻率 f₀，與金屬種類無關（只平移）。";
+    const w2 = PL.el("div", "sim-chart", charts); PL.el("div", "chart-title", w2).textContent = "光電流 – 電壓 I–V";
+    const cvV = PL.canvas.create(w2, 0.6); PL.el("div", "cap", w2).textContent = "反向電壓達遏止電壓 Vₛ 時電流歸零（eVₛ = Kmax）；飽和電流正比於光強。";
+    const Eph = () => 0.414 * sF.get(), Kmax = () => Math.max(0, Eph() - Wf), f0 = () => Wf / 0.414, Isat = () => sI.get() / 100;
+    function scene() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const E = 0.414 * sF.get(), Wf = +sMetal.get(), Kmax = E - Wf, emit = Kmax > 0;
-      const f0 = Wf / 0.414;
-      // 金屬板
-      const plateX = 70, cy = H / 2;
-      D.rect(ctx, plateX - 16, cy - 60, 16, 120, { fill: MC(), r: 3 });
-      // 入射光
-      for (let i = 0; i < 3; i++) D.arrow(ctx, 20, cy - 40 + i * 40, plateX - 18, cy - 20 + i * 20, { color: nmColor(700 - (sF.get() - 3) / 9 * 300), width: 2 });
-      // 電子
+      const cy = H * 0.5, cath = 92, anode = W - 92, emit = Kmax() > 0, col = nmColor(700 - (sF.get() - 3) / 9 * 320);
+      // 入射光束
+      for (let i = 0; i < 4; i++) { const yy = cy - 48 + i * 32; D.arrow(ctx, 22, yy - 16, cath - 16, cy - 30 + i * 20, { color: col, width: 2 }); }
+      // 光陰極 / 陽極
+      D.rect(ctx, cath - 16, cy - 62, 16, 124, { fill: MC(), stroke: "rgba(255,255,255,0.3)", r: 3 }); D.text(ctx, "光陰極", cath - 8, cy + 78, { color: PL.col("text-dim"), size: 10, align: "center" });
+      D.rect(ctx, anode, cy - 62, 16, 124, { fill: "#3a4658", stroke: "rgba(255,255,255,0.3)", r: 3 }); D.text(ctx, "集電極", anode + 8, cy + 78, { color: PL.col("text-dim"), size: 10, align: "center" });
+      D.line(ctx, cath, cy + 62, cath, H - 16, PL.col("text-faint"), 2); D.line(ctx, anode + 8, cy + 62, anode + 8, H - 16, PL.col("text-faint"), 2);
+      D.disc(ctx, (cath + anode) / 2, H - 16, 3, { fill: PL.col("warn") }); D.text(ctx, "V", (cath + anode) / 2 + 8, H - 12, { color: PL.col("warn"), size: 11 });
       electrons.forEach(e => D.disc(ctx, e.x, e.y, 3, { fill: "#5aa2ff", glow: "#5aa2ff", glowSize: 6 }));
-      // Kmax–f 圖
-      const bx = W * 0.5, by = 24, bw = W - bx - 20, bh = H - 48;
-      const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 3, x1: 12, y0: 0, y1: 4 });
-      g.frame({ title: "最大動能 Kmax 對 頻率 f", xlabel: "f", ylabel: "eV" }); g.grid(4, 4);
-      g.fn(f => Math.max(0, 0.414 * f - Wf), { color: MC(), width: 2.2 });
-      g.vline(f0, { color: "rgba(255,255,255,0.25)", dash: [3, 3] }); g.label(f0 + 0.1, 3.6, "f₀", { color: PL.col("text-faint"), size: 10 });
-      g.dot(sF.get(), Math.max(0, Kmax), { color: PL.col("accent-2"), glow: PL.col("accent-2") });
-      rK.set(Math.max(0, Kmax), 2); rF0.set(f0, 1); rStat.set(emit ? "射出電子" : "無電子（f < f₀）");
+      if (!emit) D.text(ctx, "f < f₀：無光電子", (cath + anode) / 2, cy - 76, { color: PL.col("danger"), size: 12, align: "center" });
+      rK.set(Kmax(), 2); rF0.set(f0(), 1); rVs.set(Kmax(), 2); rW.set(Wf, 1);
     }
+    function chartK() {
+      const { W, H } = cvK; cvK.clear();
+      const g = PL.graph(cvK, { x: 34, y: 14, w: W - 46, h: H - 34 }, { x0: 0, x1: 12, y0: -0.5, y1: 4 });
+      g.frame({ xlabel: "f (×10¹⁴)", ylabel: "Kmax (eV)" }); g.grid(6, 4);
+      [2.3, 2.9, 4.3].forEach(wf => g.fn(f => 0.414 * f - wf, { color: wf === Wf ? MC() : "rgba(255,255,255,0.18)", width: wf === Wf ? 2.2 : 1.2 }));
+      g.hline(0, { color: PL.col("text-faint"), width: 1 });
+      g.vline(f0(), { color: "rgba(255,255,255,0.25)", dash: [3, 3] }); g.label(f0() + 0.2, 3.5, "f₀", { color: PL.col("text-faint"), size: 10 });
+      g.dot(sF.get(), Kmax(), { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+    }
+    function chartV() {
+      const { W, H } = cvV; cvV.clear();
+      const g = PL.graph(cvV, { x: 30, y: 14, w: W - 42, h: H - 34 }, { x0: -3, x1: 3, y0: 0, y1: 1.15 });
+      g.frame({ xlabel: "V", ylabel: "I" }); g.grid(6, 4);
+      const Vs = Kmax(), Is = Isat();
+      g.fn(V => V >= 0 ? Is : (V <= -Vs ? 0 : Is * (1 + V / (Vs || 1e-3))), { color: MC(), width: 2.2, samples: 120 });
+      if (Vs > 0) { g.vline(-Vs, { color: "rgba(255,255,255,0.25)", dash: [3, 3] }); g.label(-Vs, 1.05, "−Vₛ", { color: PL.col("text-faint"), size: 10, dx: 2 }); }
+    }
+    function drawAll() { scene(); chartK(); chartV(); }
+    cv.onResize(drawAll); cvK.onResize(drawAll); cvV.onResize(drawAll);
     const anim = PL.loop(dt => {
       if (dt) {
-        const E = 0.414 * sF.get(), Wf = +sMetal.get(), Kmax = E - Wf;
-        acc += dt; if (Kmax > 0 && acc > (0.16 - sI.get() * 0.14)) { acc = 0; const sp = 40 + Math.sqrt(Kmax) * 60; electrons.push({ x: 60, y: cv.H / 2 + (Math.random() * 80 - 40), vx: sp, vy: (Math.random() - 0.5) * 20 }); }
-        electrons.forEach(e => { e.x += e.vx * dt; e.y += e.vy * dt; }); electrons = electrons.filter(e => e.x < cv.W * 0.5);
+        acc += dt; const K = Kmax();
+        if (K > 0 && sI.get() > 0 && acc > (0.18 - sI.get() / 100 * 0.15)) { acc = 0; const sp = 40 + Math.sqrt(K) * 70; electrons.push({ x: cv.W * 0.5 * 0 + 96, y: cv.H * 0.5 + (Math.random() * 90 - 45), vx: sp, vy: (Math.random() - 0.5) * 22 }); }
+        electrons.forEach(e => { e.x += e.vx * dt; e.y += e.vy * dt; }); electrons = electrons.filter(e => e.x < cv.W - 92);
       }
-      draw();
+      drawAll();
     });
-    cv.onResize(draw); anim.start();
-    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+    anim.start();
+    return { stop() { anim.stop(); cv.destroy(); cvK.destroy(); cvV.destroy(); }, rerender: drawAll };
   }});
 
   /* 波耳原子模型與原子光譜 */
