@@ -281,6 +281,41 @@ body.access-locked .access-gate { display: grid; }
 }
 .section-label::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border), transparent); }
 
+/* 國中 → 高中 → 大學：同主題的銜接階梯，不把進階內容獨立丟在清單末端。 */
+.learning-ladder { max-width: 1140px; margin: 0 auto 12px; }
+.learning-ladder .section-label { margin-top: 38px; }
+.learning-ladder-intro { max-width: 68ch; margin: 12px 0 0; color: var(--text-dim); font-size: 13px; line-height: 1.7; }
+.path-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 13px; }
+.path-tab {
+  min-height: 34px; padding: 7px 12px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+  background: transparent; color: var(--text-dim); font: inherit; font-size: 12px; font-weight: 650; transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.path-tab:hover { color: var(--text); border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+.path-tab.active { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.path-timeline { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.path-stage {
+  --path-color: var(--accent); position: relative; min-width: 0; min-height: 176px; padding: 15px 15px 13px;
+  border-top: 2px solid var(--path-color); border-bottom: 1px solid var(--border-soft); background: linear-gradient(140deg, color-mix(in srgb, var(--path-color) 8%, transparent), transparent 64%);
+}
+.path-stage.path-junior { --path-color: #57c9de; }
+.path-stage.path-senior { --path-color: #5ed88e; }
+.path-stage.path-university { --path-color: #c795ff; }
+.path-stage:not(:last-child)::after {
+  content: "→"; position: absolute; z-index: 1; right: -21px; top: 22px; width: 28px; height: 28px; display: grid; place-items: center;
+  color: var(--path-color); background: var(--bg); font-size: 17px; font-weight: 800;
+}
+.path-stage-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.path-stage-number { color: var(--path-color); font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+.path-stage-level { color: var(--text); font-size: 15px; font-weight: 750; }
+.path-stage-note { min-height: 42px; margin: 9px 0 11px; color: var(--text-dim); font-size: 12px; line-height: 1.6; }
+.path-labs { display: grid; gap: 4px; }
+.path-lab {
+  display: flex; align-items: baseline; gap: 6px; width: 100%; min-width: 0; padding: 3px 0; border: 0; cursor: pointer; overflow-wrap: anywhere;
+  background: transparent; color: var(--text); text-align: left; font: inherit; font-size: 12px; line-height: 1.45;
+}
+.path-lab::before { content: "↗"; flex: 0 0 auto; color: var(--path-color); font-size: 11px; }
+.path-lab:hover { color: var(--path-color); text-decoration: underline; text-underline-offset: 3px; }
+
 /* 模組卡片網格 */
 .module-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 18px; margin: 22px auto 10px; max-width: 1140px; }
 .mcard {
@@ -313,6 +348,19 @@ body.access-locked .access-gate { display: grid; }
 .exp-crumb .sep { opacity: 0.5; }
 .exp-header h2 { margin: 0 0 8px; font-size: 27px; letter-spacing: 0.4px; font-weight: 800; }
 .exp-header .lead { color: var(--text-dim); font-size: 14.5px; max-width: 760px; }
+.exp-learning-path { max-width: 980px; margin-top: 18px; padding-top: 13px; border-top: 1px solid var(--border-soft); }
+.exp-path-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin-bottom: 9px; }
+.exp-path-eyebrow { color: var(--m-color, var(--accent)); font-size: 11px; font-weight: 800; letter-spacing: 1px; }
+.exp-path-summary { color: var(--text-faint); font-size: 11px; white-space: nowrap; }
+.exp-path-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.exp-path-step {
+  min-width: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); text-align: left; font: inherit;
+}
+button.exp-path-step { cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+button.exp-path-step:hover { border-color: var(--m-color, var(--accent)); background: color-mix(in srgb, var(--m-color, var(--accent)) 8%, transparent); }
+.exp-path-step.current { border-color: color-mix(in srgb, var(--m-color, var(--accent)) 60%, var(--border)); background: color-mix(in srgb, var(--m-color, var(--accent)) 10%, transparent); }
+.exp-path-label { display: block; color: var(--text-faint); font-size: 10px; letter-spacing: 0.6px; }
+.exp-path-title { display: block; margin-top: 2px; overflow-wrap: anywhere; color: inherit; font-size: 12px; line-height: 1.45; }
 
 .content-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
 
@@ -605,6 +653,17 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   .icon-btn { width: 40px; height: 40px; padding: 0; justify-content: center; }
   .icon-btn span { display: none; }
   .exp-header h2 { font-size: 22px; }
+  .learning-ladder .section-label { margin-top: 30px; }
+  .learning-ladder-intro { font-size: 12.5px; }
+  .path-tabs { gap: 6px; }
+  .path-tab { flex: 1 1 calc(50% - 6px); min-width: 0; padding-inline: 8px; font-size: 11.5px; }
+  .path-timeline { grid-template-columns: 1fr; gap: 10px; }
+  .path-stage { min-height: 0; padding: 13px; }
+  .path-stage:not(:last-child)::after { content: "↓"; top: auto; right: 14px; bottom: -23px; background: var(--bg); }
+  .path-stage-note { min-height: 0; }
+  .exp-path-heading { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .exp-path-summary { white-space: normal; }
+  .exp-path-steps { grid-template-columns: 1fr; }
   .main { padding: 18px 14px 48px; }
 }
 

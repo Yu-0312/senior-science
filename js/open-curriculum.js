@@ -67,4 +67,59 @@
       { id: "infinite-square-well", title: "無限深方形位阱與量子能階", interactive: I, concept: "受限在一維位阱中的粒子只能具有離散能量。改變阱寬與量子數，觀察能階如何依 n² 與 1/L² 改變。", formula: R`\( E_n=\dfrac{n^2h^2}{8mL^2} \)`, points: ["受限邊界造成能量量子化", "量子數 n 從 1 開始", "阱越窄，能階間距越大", "波函數節點數隨 n 增加"] }
     ]
   });
+
+  // 課程不是把不同學段的內容堆在一起，而是讓同一個核心概念逐步加深。
+  // app.js 讀取這份資料建立首頁路徑與各實驗頁的前後銜接導覽。
+  C.learningPaths = [
+    {
+      id: "motion",
+      title: "運動與力",
+      description: "從描述運動、畫圖，到用模型預測振動與天體運動。",
+      stages: [
+        { level: "國中打底", kind: "junior", note: "先以位置、時間與生活中的下落現象建立直覺。", ids: ["distance-displacement", "unit-conversion", "freefall"] },
+        { level: "高中建模", kind: "senior", note: "再用運動圖像、牛頓定律與能量守恆解題。", ids: ["uniform-accel", "newton2", "energy-track"] },
+        { level: "大學延伸", kind: "university", note: "最後以更通用的數學語言看振動與多物體系統。", ids: ["lagrangian-pendulum", "phase-space-oscillator", "two-body-barycenter"] }
+      ]
+    },
+    {
+      id: "thermal",
+      title: "熱與能量",
+      description: "從溫度與熱傳遞，走到能量流動及不可逆過程。",
+      stages: [
+        { level: "國中打底", kind: "junior", note: "先分辨溫度、熱與物態變化，讀懂日常熱現象。", ids: ["gas-laws", "heat", "phase-change"] },
+        { level: "高中建模", kind: "senior", note: "用熱力學第一定律、熱傳遞與熱機描述能量帳。", ids: ["thermo1", "heat-transfer", "heat-engine"] },
+        { level: "大學延伸", kind: "university", note: "把能量守恆延伸為熵與不可逆方向的觀點。", ids: ["entropy-mixing"] }
+      ]
+    },
+    {
+      id: "wave-optics",
+      title: "波動與光",
+      description: "由可見的振動與聲音出發，逐步讀懂干涉、繞射與頻譜。",
+      stages: [
+        { level: "國中打底", kind: "junior", note: "從波的種類、聲音特性與光影現象建立畫面。", ids: ["wave-types", "sound-properties", "shadow-pinhole"] },
+        { level: "高中建模", kind: "senior", note: "以疊加、駐波與干涉繞射連結波形和觀測結果。", ids: ["superposition", "standing-wave", "double-slit", "diffraction"] },
+        { level: "大學延伸", kind: "university", note: "再將波形拆成頻譜，理解近場與遠場繞射。", ids: ["fourier-spectrum", "fresnel-diffraction"] }
+      ]
+    },
+    {
+      id: "electromagnetism",
+      title: "電與磁",
+      description: "從安全量測電路，到訊號處理與磁場疊加的進階模型。",
+      stages: [
+        { level: "國中打底", kind: "junior", note: "先以電壓、電流、電阻和磁場方向建立操作感。", ids: ["ohms", "resistors", "current-field"] },
+        { level: "高中建模", kind: "senior", note: "進一步量測電容、電磁感應與交流共振的變化。", ids: ["capacitor", "induction", "rlc-resonance"] },
+        { level: "大學延伸", kind: "university", note: "最後用頻率響應與電流元疊加描述真實系統。", ids: ["bode-low-pass", "biot-savart-axis"] }
+      ]
+    },
+    {
+      id: "modern",
+      title: "光、原子與量子",
+      description: "從色光與光譜的可見現象，走向量子化的能階模型。",
+      stages: [
+        { level: "國中打底", kind: "junior", note: "先透過色光混合、色散與稜鏡觀察光的線索。", ids: ["rgb-color-mixing", "dispersion", "prism-spectrometer"] },
+        { level: "高中建模", kind: "senior", note: "以光電效應、原子模型與物質波建立量子觀念。", ids: ["photoelectric", "bohr", "matter-wave"] },
+        { level: "大學延伸", kind: "university", note: "最後用受限邊界理解量子能階為何離散。", ids: ["infinite-square-well"] }
+      ]
+    }
+  ];
 })();

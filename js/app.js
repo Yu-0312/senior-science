@@ -15,6 +15,8 @@
   C.modules.forEach(m => m.experiments.forEach((e, i) => FLAT.push({ exp: e, mod: m, indexInMod: i })));
   const byId = {};
   FLAT.forEach((f, i) => { f.order = i; byId[f.exp.id] = f; });
+  const LEARNING_PATHS = Array.isArray(C.learningPaths) ? C.learningPaths : [];
+  let activeLearningPath = LEARNING_PATHS[0] ? LEARNING_PATHS[0].id : "";
 
   function auditCurriculum() {
     const ids = FLAT.map(f => f.exp.id);
@@ -91,6 +93,99 @@
   }
 
   /* ------------------------------- 首頁 ------------------------------- */
+  function getPathContext(id) {
+    for (const path of LEARNING_PATHS) {
+      const sequence = [];
+      path.stages.forEach((stage, stageIndex) => {
+        stage.ids.forEach((expId, indexInStage) => {
+          sequence.push({ id: expId, stage, stageIndex, indexInStage });
+        });
+      });
+      const index = sequence.findIndex(step => step.id === id);
+      if (index !== -1) return { path, sequence, index, current: sequence[index] };
+    }
+    return null;
+  }
+
+  function makePathLab(parent, id) {
+    const target = byId[id];
+    if (!target) return;
+    const button = el("button", "path-lab", parent);
+    button.type = "button";
+    button.textContent = target.exp.title;
+    button.setAttribute("aria-label", "開啟實驗：" + target.exp.title);
+    button.addEventListener("click", () => location.hash = "#" + target.exp.id);
+  }
+
+  function renderLearningLadder() {
+    const ladder = $("#learning-ladder");
+    const tabs = $("#path-tabs");
+    const timeline = $("#path-timeline");
+    if (!ladder || !tabs || !timeline) return;
+    if (!LEARNING_PATHS.length) { ladder.hidden = true; return; }
+
+    const active = LEARNING_PATHS.find(path => path.id === activeLearningPath) || LEARNING_PATHS[0];
+    activeLearningPath = active.id;
+    ladder.hidden = false;
+    tabs.innerHTML = "";
+    timeline.innerHTML = "";
+
+    LEARNING_PATHS.forEach(path => {
+      const tab = el("button", "path-tab", tabs);
+      tab.type = "button";
+      tab.textContent = path.title;
+      tab.setAttribute("role", "tab");
+      tab.setAttribute("aria-selected", String(path.id === active.id));
+      tab.classList.toggle("active", path.id === active.id);
+      tab.addEventListener("click", () => {
+        activeLearningPath = path.id;
+        renderLearningLadder();
+      });
+    });
+
+    active.stages.forEach((stage, index) => {
+      const stageEl = el("article", "path-stage path-" + stage.kind, timeline);
+      const stageTop = el("div", "path-stage-top", stageEl);
+      const number = el("span", "path-stage-number", stageTop); number.textContent = String(index + 1).padStart(2, "0");
+      const level = el("span", "path-stage-level", stageTop); level.textContent = stage.level;
+      const note = el("p", "path-stage-note", stageEl); note.textContent = stage.note;
+      const labs = el("div", "path-labs", stageEl);
+      stage.ids.forEach(id => makePathLab(labs, id));
+    });
+  }
+
+  function makeExperimentPathStep(parent, label, target, current) {
+    const step = el(current ? "div" : "button", "exp-path-step" + (current ? " current" : ""), parent);
+    if (!current) step.type = "button";
+    const labelEl = el("span", "exp-path-label", step); labelEl.textContent = label;
+    const titleEl = el("strong", "exp-path-title", step); titleEl.textContent = target.exp.title;
+    if (!current) {
+      step.setAttribute("aria-label", "前往" + label + "：" + target.exp.title);
+      step.addEventListener("click", () => location.hash = "#" + target.exp.id);
+    }
+  }
+
+  function renderExperimentLearningPath(id) {
+    const root = $("#exp-learning-path");
+    if (!root) return;
+    const context = getPathContext(id);
+    root.innerHTML = "";
+    root.hidden = !context;
+    if (!context) return;
+
+    const heading = el("div", "exp-path-heading", root);
+    const eyebrow = el("span", "exp-path-eyebrow", heading); eyebrow.textContent = "銜接路徑 · " + context.path.title;
+    const summary = el("span", "exp-path-summary", heading);
+    summary.textContent = context.current.stage.level + " · 第 " + (context.current.indexInStage + 1) + " 步";
+
+    const steps = el("div", "exp-path-steps", root);
+    const previous = context.sequence[context.index - 1];
+    const next = context.sequence[context.index + 1];
+    if (previous && byId[previous.id]) makeExperimentPathStep(steps, "前一步", byId[previous.id], false);
+    makeExperimentPathStep(steps, "目前", byId[id], true);
+    if (next && byId[next.id]) makeExperimentPathStep(steps, "下一步", byId[next.id], false);
+  }
+
   function buildHome() {
     const heroExperimentCount = $("#hero-exp-count");
     if (heroExperimentCount) heroExperimentCount.textContent = C.totalExperiments;
@@ -111,6 +206,7 @@
         location.hash = "#" + first.id;
       });
     });
+    renderLearningLadder();
     // 統計數字
     $("#stat-mod").textContent = C.totalModules;
     $("#stat-exp").textContent = C.totalExperiments;
@@ -145,6 +241,7 @@
       "第 " + (f.indexInMod + 1) + " 個實驗";
     $("#exp-title").textContent = exp.title;
     $("#exp-lead").textContent = exp.concept;
+    renderExperimentLearningPath(id);
 
     // 模擬工作區
     const simRoot = $("#sim-root");

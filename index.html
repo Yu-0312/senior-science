@@ -115,7 +115,7 @@
           <div class="hero">
             <div class="hero-badge"><span class="dot"></span>依教育部 108 課綱設計 · 全繁體原創</div>
             <h1 class="hero-title">看得見的物理，<br />可以動手玩的實驗室</h1>
-            <p class="hero-sub">12 個學習模組、<span id="hero-exp-count">0</span> 個持續擴充的國中到高中物理實驗，每一個都附即時互動模擬。調整參數、觀察現象、對照公式，把課本裡的物理變成手邊的實驗。</p>
+            <p class="hero-sub">12 個學習模組、<span id="hero-exp-count">0</span> 個持續擴充的國中到高中物理實驗，並提供大學入門延伸。每一個都附即時互動模擬。調整參數、觀察現象、對照公式，把課本裡的物理變成手邊的實驗。</p>
             <div class="hero-actions">
               <button class="btn-hero" id="hero-start">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg>
@@ -129,6 +129,13 @@
               <div><div class="hstat-n b3" id="stat-int">0</div><div class="hstat-l">互動模擬</div></div>
             </div>
           </div>
+
+          <section class="learning-ladder" id="learning-ladder" aria-labelledby="learning-ladder-title">
+            <div class="section-label" id="learning-ladder-title">銜接學習路徑</div>
+            <p class="learning-ladder-intro">選一個主題，從國中現象出發，經過高中模型與量測，再進入大學延伸；每一步都能直接開啟對應實驗。</p>
+            <div class="path-tabs" id="path-tabs" role="tablist" aria-label="選擇銜接主題"></div>
+            <div class="path-timeline" id="path-timeline"></div>
+          </section>
 
           <div class="section-label">課程模組</div>
           <div class="module-grid" id="module-grid"></div>
@@ -144,6 +151,7 @@
             <div class="exp-crumb" id="exp-crumb"></div>
             <h2 id="exp-title"></h2>
             <p class="lead" id="exp-lead"></p>
+            <div class="exp-learning-path" id="exp-learning-path" hidden></div>
           </div>
 
           <div class="content-grid">
@@ -182,7 +190,7 @@
   <script src="js/advanced-curriculum.js?v=20260724-2"></script>
   <script src="js/comprehensive-curriculum.js?v=20260724-4"></script>
   <script src="js/extension-registry.js?v=20260725-1"></script>
-  <script src="js/open-curriculum.js?v=20260725-2"></script>
+  <script src="js/open-curriculum.js?v=20260725-3"></script>
   <script src="js/sim-core.js"></script>
 
   <!-- 互動模擬（依模組拆檔） -->
@@ -204,6 +212,6 @@
   <script src="js/experiments/open-labs.js?v=20260725-2"></script>
 
   <!-- 應用外殼 -->
-  <script src="js/app.js?v=20260725-1"></script>
+  <script src="js/app.js?v=20260725-2"></script>
 </body>
 </html>
