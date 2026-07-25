@@ -1,12 +1,12 @@
 /* sw.js — Service Worker（離線快取）
  * 更新任何檔案後，請調高 CACHE 版本號以觸發更新。 */
-const CACHE = "physics-lab-v15";
+const CACHE = "physics-lab-v16";
 const ASSETS = [
   "./",
   "index.html",
   "manifest.json",
   "css/style.css?v=20260724-3",
-  "js/curriculum.js?v=20260725-2",
+  "js/curriculum.js?v=20260725-3",
   "js/advanced-curriculum.js?v=20260724-2",
   "js/comprehensive-curriculum.js?v=20260724-4",
   "js/sim-core.js",
@@ -17,10 +17,10 @@ const ASSETS = [
   "js/experiments/energy.js",
   "js/experiments/gravity.js",
   "js/experiments/shm.js",
-  "js/experiments/thermal.js",
+  "js/experiments/thermal.js?v=20260725-1",
   "js/experiments/waves.js",
-  "js/experiments/optics.js",
-  "js/experiments/electric.js",
+  "js/experiments/optics.js?v=20260725-1",
+  "js/experiments/electric.js?v=20260725-1",
   "js/experiments/magnetism.js",
   "js/experiments/modern.js",
   "js/experiments/extended.js",

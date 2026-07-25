@@ -132,6 +132,84 @@
     return { stop() { cv.destroy(); }, rerender: draw };
   }});
 
+  /* 凸透鏡位移法：固定物屏距，找出兩個清晰成像位置 */
+  PL.register("lens-displacement", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.58);
+    let recorded = [], feedback = "將透鏡移到光屏成像最清晰的位置，再記錄位置。";
+    PL.ui.section(L.controls, "物屏與透鏡");
+    const sD = PL.ui.slider(L.controls, { label: "物體到光屏距離 D", min: 160, max: 320, step: 10, value: 240, unit: "cm", digits: 0, onInput: () => { recorded = []; feedback = "物屏距已改變，請重新尋找兩個清晰像。"; draw(); } });
+    const sF = PL.ui.slider(L.controls, { label: "實際焦距 f", min: 20, max: 55, step: 1, value: 40, unit: "cm", digits: 0, onInput: () => { recorded = []; feedback = "透鏡已更換，請重新量測。"; draw(); } });
+    const sX = PL.ui.slider(L.controls, { label: "透鏡位置 x/D", min: 0.05, max: 0.95, step: 0.005, value: 0.28, unit: "", digits: 3, onInput: draw });
+    const posRow = PL.ui.buttonRow(L.controls);
+    PL.ui.button(posRow, "定位近端像", () => setToSolution(0));
+    PL.ui.button(posRow, "定位遠端像", () => setToSolution(1));
+    const actionRow = PL.ui.buttonRow(L.controls);
+    PL.ui.button(actionRow, "記錄清晰像位置", () => {
+      const s = state();
+      if (!s.valid) { feedback = "此物屏距未滿足 D > 4f，無法取得兩個清晰像。"; draw(); return; }
+      if (s.blur > 0.05) { feedback = "目前光屏上的像仍不夠清晰，請繼續調整透鏡位置。"; draw(); return; }
+      if (recorded.some(v => Math.abs(v - s.x) < 0.5)) { feedback = "這個位置已記錄。請移到另一個清晰像位置。"; draw(); return; }
+      recorded.push(s.x); recorded.sort((a, b) => a - b);
+      feedback = "已記錄 x=" + PL.fmt(s.x, 1) + " cm。";
+      draw();
+    }, { primary: true });
+    PL.ui.button(actionRow, "清除紀錄", () => { recorded = []; feedback = "量測紀錄已清除。"; draw(); });
+    const rX = PL.ui.readout(L.readouts, { label: "目前透鏡位置 x", unit: "cm" });
+    const rFocus = PL.ui.readout(L.readouts, { label: "光屏成像", unit: "" });
+    const rD = PL.ui.readout(L.readouts, { label: "兩位置距離 d", unit: "cm" });
+    const rF = PL.ui.readout(L.readouts, { label: "位移法測得 f", unit: "cm" });
+    const rN = PL.ui.readout(L.readouts, { label: "已記錄位置", unit: "個" });
+    const note = PL.ui.note(L.controls, feedback);
+    const chart = PL.ui.chart(PL.ui.charts(root), { title: "光屏清晰度與透鏡位置", cap: "當透鏡位於兩個共軛位置時，像剛好落在光屏上；兩個低谷的位置可用來量焦距。" });
+    function state() {
+      const Dcm = sD.get(), f = sF.get(), x = sX.get() * Dcm, valid = Dcm > 4 * f;
+      const q = x > f ? f * x / (x - f) : -999;
+      const blur = valid && q > 0 ? Math.abs(Dcm - x - q) / Dcm : 1;
+      const gap = valid ? Math.sqrt(Dcm * Dcm - 4 * Dcm * f) : 0;
+      return { Dcm, f, x, valid, q, blur, solutions: valid ? [(Dcm - gap) / 2, (Dcm + gap) / 2] : [] };
+    }
+    function setToSolution(n) {
+      const s = state();
+      if (!s.valid) { feedback = "請先將 D 調整為大於 4f。"; draw(); return; }
+      sX.set(s.solutions[n] / s.Dcm); feedback = "已定位到" + (n === 0 ? "近端" : "遠端") + "清晰像，可記錄讀值。"; draw();
+    }
+    function draw() {
+      const { ctx, W, H } = cv, s = state(); cv.clear(); D.bg(cv);
+      const objectX = 58, screenX = W - 54, baseY = H - 38, cy = H * 0.5, span = screenX - objectX;
+      const lensX = objectX + s.x / s.Dcm * span, focalPx = s.f / s.Dcm * span;
+      D.line(ctx, objectX, baseY, screenX, baseY, PL.col("text-faint"), 2);
+      for (let i = 0; i <= 6; i++) { const xx = objectX + span * i / 6; D.line(ctx, xx, baseY - 4, xx, baseY + 4, PL.col("text-faint"), 1); }
+      D.arrow(ctx, objectX, cy + 48, objectX, cy - 35, { color: PL.col("warn"), width: 3, label: "物體" });
+      D.line(ctx, screenX, 24, screenX, baseY, PL.col("accent-2"), 3); D.text(ctx, "光屏", screenX, 20, { color: PL.col("accent-2"), size: 11, align: "center" });
+      ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(lensX, 38); ctx.quadraticCurveTo(lensX - 14, cy, lensX, H - 56); ctx.quadraticCurveTo(lensX + 14, cy, lensX, 38); ctx.stroke(); ctx.restore();
+      [lensX - focalPx, lensX + focalPx].forEach(xx => { if (xx > objectX && xx < screenX) { D.line(ctx, xx, cy - 5, xx, cy + 5, MC(), 1); D.text(ctx, "F", xx, cy + 20, { color: MC(), size: 10, align: "center" }); } });
+      if (s.valid && s.x > s.f) {
+        const imageX = lensX + s.q / s.Dcm * span, imageH = -70 * s.q / s.x;
+        const rayY = cy - 35;
+        D.line(ctx, objectX, rayY, lensX, rayY, "rgba(255,224,138,0.75)", 1.8); D.line(ctx, lensX, rayY, imageX, cy, "rgba(255,224,138,0.75)", 1.8);
+        D.line(ctx, objectX, rayY, lensX, cy, "rgba(255,255,255,0.35)", 1.4); D.line(ctx, lensX, cy, imageX, cy - imageH, "rgba(255,255,255,0.35)", 1.4);
+        const clarity = PL.clamp(1 - s.blur * 18, 0, 1), displayH = imageH * clarity;
+        D.arrow(ctx, screenX, cy, screenX, cy - displayH, { color: clarity > 0.85 ? MC() : PL.col("text-faint"), width: 2.5, label: clarity > 0.85 ? "清晰像" : "模糊像" });
+        if (s.blur > 0.05) D.ring(ctx, screenX, cy - displayH, 7 + s.blur * 80, "rgba(240,98,146,0.45)", 1.5);
+      }
+      D.text(ctx, "D=" + s.Dcm + " cm", (objectX + screenX) / 2, baseY + 23, { color: PL.col("text-dim"), size: 11, align: "center" });
+      rX.set(s.x, 1); rFocus.set(s.valid ? (s.blur <= 0.05 ? "清晰" : "尚未清晰") : "D ≤ 4f"); rN.set(recorded.length, 0); note.textContent = feedback;
+      const separation = recorded.length === 2 ? Math.abs(recorded[1] - recorded[0]) : 0;
+      const measured = recorded.length === 2 ? (s.Dcm * s.Dcm - separation * separation) / (4 * s.Dcm) : 0;
+      rD.set(recorded.length === 2 ? separation : "待記錄", recorded.length === 2 ? 1 : undefined);
+      rF.set(recorded.length === 2 ? measured : "待量測", recorded.length === 2 ? 1 : undefined);
+      chart.clear();
+      const g = PL.graph(chart, { x: 42, y: 16, w: chart.W - 58, h: chart.H - 40 }, { x0: 0, x1: s.Dcm, y0: 0, y1: 1 });
+      g.frame({ xlabel: "透鏡位置 x (cm)", ylabel: "模糊程度" }); g.grid(6, 4);
+      if (s.valid) g.fn(x => { const q = x > s.f ? s.f * x / (x - s.f) : -999; return q > 0 ? PL.clamp(Math.abs(s.Dcm - x - q) / s.Dcm, 0, 1) : 1; }, { color: MC(), width: 2.1 });
+      recorded.forEach(x => g.dot(x, 0, { color: PL.col("accent-2"), glow: PL.col("accent-2") }));
+      g.dot(s.x, PL.clamp(s.blur, 0, 1), { color: PL.col("warn"), glow: PL.col("warn") });
+    }
+    cv.onResize(draw); chart.onResize(draw); draw();
+    return { stop() { cv.destroy(); chart.destroy(); }, rerender: draw };
+  }});
+
   /* 雙縫干涉 — 光具座 · 單光子累積 */
   PL.register("double-slit", { build(root) {
     const L = PL.ui.layout(root);

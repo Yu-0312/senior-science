@@ -133,6 +133,93 @@
     return { stop() { anim.stop(); cv.destroy(); cc.destroy(); }, rerender: draw };
   }});
 
+  /* 伏安法量電阻：安培計串聯、電壓計並聯，記錄 U-I 資料 */
+  PL.register("iv-measurement", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.58);
+    let records = [], feedback = "調整可變電阻後，記錄一組電壓計與安培計讀值。";
+    PL.ui.section(L.controls, "量測電路");
+    const sE = PL.ui.slider(L.controls, { label: "電源電壓 E", min: 3, max: 12, step: 0.5, value: 9, unit: "V", digits: 1, onInput: draw });
+    const sR = PL.ui.slider(L.controls, { label: "被測電阻 R", min: 2, max: 20, step: 1, value: 8, unit: "Ω", digits: 0, onInput: () => { records = []; feedback = "被測電阻已更換，請重新量測。"; draw(); } });
+    const sRv = PL.ui.slider(L.controls, { label: "可變電阻 Rᵥ", min: 1, max: 40, step: 1, value: 10, unit: "Ω", digits: 0, onInput: draw });
+    PL.ui.note(L.controls, "量測接線：安培計 A 與被測電阻串聯；電壓計 V 並聯在被測電阻兩端。");
+    const actions = PL.ui.buttonRow(L.controls);
+    PL.ui.button(actions, "記錄讀值", () => {
+      const s = state();
+      if (records.some(p => Math.abs(p.Rv - s.Rv) < 1e-8)) { feedback = "這個可變電阻位置已記錄，請先調整 Rᵥ。"; draw(); return; }
+      records.push({ I: s.I, U: s.U, Rv: s.Rv });
+      if (records.length > 9) records.shift();
+      feedback = "已記錄第 " + records.length + " 組資料：U=" + PL.fmt(s.U, 2) + " V、I=" + PL.fmt(s.I, 3) + " A。";
+      draw();
+    }, { primary: true });
+    PL.ui.button(actions, "清空資料", () => { records = []; feedback = "量測資料已清空。"; draw(); });
+    const rI = PL.ui.readout(L.readouts, { label: "安培計 I", unit: "A" });
+    const rU = PL.ui.readout(L.readouts, { label: "電壓計 U", unit: "V" });
+    const rNowR = PL.ui.readout(L.readouts, { label: "目前 U/I", unit: "Ω" });
+    const rFit = PL.ui.readout(L.readouts, { label: "作圖斜率 R", unit: "Ω" });
+    const rN = PL.ui.readout(L.readouts, { label: "已記錄資料", unit: "組" });
+    const note = PL.ui.note(L.controls, feedback);
+    const chart = PL.ui.chart(PL.ui.charts(root), { title: "U-I 量測圖", cap: "水平軸為電流 I、垂直軸為電壓 U；直線斜率即被測電阻 R。" });
+    function state() {
+      const E = sE.get(), R = sR.get(), Rv = sRv.get(), I = E / (R + Rv);
+      return { E, R, Rv, I, U: I * R };
+    }
+    function fittedSlope() {
+      if (records.length < 2) return null;
+      let sx = 0, sy = 0, sxx = 0, sxy = 0;
+      records.forEach(p => { sx += p.I; sy += p.U; sxx += p.I * p.I; sxy += p.I * p.U; });
+      const den = records.length * sxx - sx * sx;
+      return Math.abs(den) < 1e-10 ? null : (records.length * sxy - sx * sy) / den;
+    }
+    function meter(x, y, value, max, label, unit, color) {
+      const { ctx } = cv;
+      D.disc(ctx, x, y, 31, { fill: PL.col("panel-2"), stroke: color, width: 2, glow: color, glowSize: 7 });
+      D.ring(ctx, x, y, 22, PL.col("border"), 1);
+      const a = Math.PI * (1.15 + 0.7 * PL.clamp(value / max, 0, 1));
+      D.line(ctx, x, y, x + Math.cos(a) * 18, y + Math.sin(a) * 18, PL.col("warn"), 2);
+      D.text(ctx, label, x, y - 40, { color, size: 12, align: "center", weight: "700" });
+      D.text(ctx, PL.fmt(value, value < 1 ? 3 : 2) + " " + unit, x, y + 48, { color: PL.col("text-dim"), size: 10, align: "center" });
+    }
+    function draw() {
+      const { ctx, W, H } = cv, s = state(); cv.clear(); D.bg(cv);
+      const top = 58, bot = H - 42, left = 48, right = W - 46, mid = (top + bot) / 2;
+      const wire = "rgba(237,245,250,0.78)", active = MC();
+      D.line(ctx, left, top, right, top, wire, 2); D.line(ctx, left, bot, right, bot, wire, 2);
+      D.line(ctx, left, top, left, bot, wire, 2); D.line(ctx, right, top, right, bot, wire, 2);
+      D.line(ctx, left - 7, mid - 18, left - 7, mid + 18, "#fff", 3); D.line(ctx, left + 7, mid - 11, left + 7, mid + 11, "#fff", 2);
+      D.text(ctx, s.E + " V", left - 18, mid + 34, { color: PL.col("text-dim"), size: 11, align: "center" });
+      meter(W * 0.47, top, s.I, 1.5, "A", "A", MC());
+      const rvx = right - 54;
+      ctx.save(); ctx.strokeStyle = active; ctx.lineWidth = 2.2; ctx.beginPath();
+      for (let i = 0; i < 7; i++) ctx.lineTo(rvx - 28 + i * 9, top + (i % 2 ? 8 : -8));
+      ctx.stroke(); ctx.restore(); D.line(ctx, rvx, top - 26, rvx + 16, top - 7, PL.col("warn"), 1.8);
+      D.text(ctx, "Rᵥ=" + s.Rv + "Ω", rvx, top - 37, { color: active, size: 11, align: "center" });
+      const rx = W * 0.48;
+      ctx.save(); ctx.strokeStyle = active; ctx.lineWidth = 2.4; ctx.beginPath();
+      for (let i = 0; i < 7; i++) ctx.lineTo(rx - 30 + i * 10, bot + (i % 2 ? 8 : -8));
+      ctx.stroke(); ctx.restore();
+      D.text(ctx, "被測 R=" + s.R + "Ω", rx, bot + 27, { color: active, size: 11, align: "center" });
+      const vx = W * 0.76, vy = mid;
+      D.line(ctx, rx - 36, bot, rx - 36, vy, wire, 1.5); D.line(ctx, rx - 36, vy, vx - 31, vy, wire, 1.5);
+      D.line(ctx, rx + 36, bot, rx + 36, vy, wire, 1.5); D.line(ctx, rx + 36, vy, vx + 31, vy, wire, 1.5);
+      meter(vx, vy, s.U, 12, "V", "V", PL.col("accent-2"));
+      D.text(ctx, "A 串聯", W * 0.47, 20, { color: PL.col("text-faint"), size: 10, align: "center" });
+      D.text(ctx, "V 並聯於被測電阻兩端", vx, H - 13, { color: PL.col("text-faint"), size: 10, align: "center" });
+      rI.set(s.I, 3); rU.set(s.U, 2); rNowR.set(s.U / s.I, 2); rN.set(records.length, 0); note.textContent = feedback;
+      chart.clear();
+      const xmax = Math.max(1.3, ...records.map(p => p.I * 1.15), s.I * 1.15), ymax = Math.max(10, ...records.map(p => p.U * 1.15), s.U * 1.15);
+      const g = PL.graph(chart, { x: 42, y: 16, w: chart.W - 58, h: chart.H - 40 }, { x0: 0, x1: xmax, y0: 0, y1: ymax });
+      g.frame({ xlabel: "I (A)", ylabel: "U (V)" }); g.grid(5, 5);
+      g.fn(i => s.R * i, { color: MC(), width: 2.1 });
+      records.forEach(p => g.dot(p.I, p.U, { color: PL.col("accent-2"), glow: PL.col("accent-2") }));
+      g.dot(s.I, s.U, { color: PL.col("warn"), glow: PL.col("warn") });
+      const slope = fittedSlope();
+      rFit.set(slope == null ? "待量測" : slope, slope == null ? undefined : 2);
+    }
+    cv.onResize(draw); chart.onResize(draw); draw();
+    return { stop() { cv.destroy(); chart.destroy(); }, rerender: draw };
+  }});
+
   /* 閉合電路：伏安法、安阻法、伏阻法與內電阻量測 */
   PL.register("closed-circuit-emf", { build(root) {
     const L = PL.ui.layout(root);

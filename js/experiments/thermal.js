@@ -41,6 +41,63 @@
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
 
+  /* 彈簧秤示重差量浮力 */
+  PL.register("spring-scale-buoyancy", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.62);
+    PL.ui.section(L.controls, "浸入量測");
+    const sRho = PL.ui.slider(L.controls, { label: "物體密度 ρ物", min: 1200, max: 8000, step: 100, value: 2700, unit: "kg/m³", digits: 0, onInput: draw });
+    const sVol = PL.ui.slider(L.controls, { label: "物體體積 V", min: 100, max: 800, step: 25, value: 300, unit: "cm³", digits: 0, onInput: draw });
+    const sSub = PL.ui.slider(L.controls, { label: "浸入比例", min: 0, max: 100, step: 5, value: 0, unit: "%", digits: 0, onInput: draw });
+    const sFluid = PL.ui.select(L.controls, { label: "液體", value: "1000", options: [{ value: "1000", label: "水（1000 kg/m³）" }, { value: "800", label: "酒精（800 kg/m³）" }, { value: "1260", label: "鹽水（1260 kg/m³）" }], onChange: draw });
+    PL.ui.note(L.controls, "先讀取空氣中的示數，再逐漸浸入液體；兩次彈簧秤示數之差就是浮力。");
+    const rW = PL.ui.readout(L.readouts, { label: "空氣中重量 W", unit: "N" });
+    const rT = PL.ui.readout(L.readouts, { label: "彈簧秤示數 T", unit: "N" });
+    const rFb = PL.ui.readout(L.readouts, { label: "示數差／浮力 F_b", unit: "N" });
+    const rVd = PL.ui.readout(L.readouts, { label: "排開液體體積", unit: "cm³" });
+    const chart = PL.ui.chart(PL.ui.charts(root), { title: "彈簧秤示數與浸入比例", cap: "物體尚未完全浸沒時，排水量增加，浮力增加，彈簧秤示數線性下降；完全浸沒後示數維持不變。" });
+    function data() {
+      const rho = sRho.get(), volCm = sVol.get(), frac = sSub.get() / 100, rhoL = Number(sFluid.get()), vol = volCm * 1e-6;
+      const W = rho * vol * 9.8, Fb = rhoL * vol * frac * 9.8;
+      return { rho, volCm, frac, rhoL, W, Fb: Math.min(Fb, W), T: Math.max(0, W - Fb) };
+    }
+    function drawScale(x, y, tension) {
+      const { ctx } = cv;
+      D.rect(ctx, x - 28, y - 42, 56, 84, { fill: PL.col("panel-2"), stroke: PL.col("border"), width: 2, r: 5 });
+      D.ring(ctx, x, y - 7, 20, MC(), 2);
+      const a = Math.PI * (1.1 + 0.8 * PL.clamp(tension / 20, 0, 1));
+      D.line(ctx, x, y - 7, x + Math.cos(a) * 16, y - 7 + Math.sin(a) * 16, PL.col("warn"), 2);
+      D.text(ctx, "彈簧秤", x, y - 29, { color: PL.col("text-dim"), size: 10, align: "center" });
+      D.text(ctx, PL.fmt(tension, 2) + " N", x, y + 34, { color: MC(), size: 11, align: "center", weight: "700" });
+    }
+    function draw() {
+      const { ctx, W, H } = cv, s = data(); cv.clear(); D.bg(cv);
+      const tankL = W * 0.45, tankR = W - 36, surface = H * 0.31, floor = H - 28;
+      D.rect(ctx, tankL, surface, tankR - tankL, floor - surface, { fill: "rgba(90,162,255,0.15)", stroke: "rgba(90,162,255,0.45)", width: 1.5 });
+      D.line(ctx, tankL, surface, tankR, surface, PL.col("accent-2"), 2);
+      D.text(ctx, s.rhoL + " kg/m³", tankL + 12, surface + 19, { color: PL.col("accent-2"), size: 11 });
+      const sx = W * 0.22, sy = H * 0.25, boxW = 72, boxH = 56;
+      drawScale(sx, sy, s.T);
+      const top = surface - boxH * (1 - s.frac), cx = W * 0.7;
+      D.line(ctx, sx, sy + 42, cx, top - 4, PL.col("text-faint"), 1.4);
+      D.rect(ctx, cx - boxW / 2, top, boxW, boxH, { fill: MC(), stroke: "rgba(255,255,255,0.45)", width: 1.4, r: 5 });
+      D.text(ctx, "金屬塊", cx, top + 33, { color: "#fff", size: 11, align: "center", weight: "700" });
+      const mid = top + boxH / 2;
+      D.arrow(ctx, cx - 32, mid, cx - 32, mid + 42, { color: PL.col("warn"), width: 2.2, label: "W" });
+      D.arrow(ctx, cx + 32, mid, cx + 32, mid - 42 * (s.Fb / Math.max(s.W, 0.01)), { color: PL.col("accent-2"), width: 2.2, label: "F_b" });
+      D.arrow(ctx, cx, top, cx, top - 34 * (s.T / Math.max(s.W, 0.01)), { color: MC(), width: 2, label: "T" });
+      D.text(ctx, "浸入 " + PL.fmt(s.frac * 100, 0) + "%", cx, floor - 9, { color: PL.col("text-dim"), size: 11, align: "center" });
+      rW.set(s.W, 2); rT.set(s.T, 2); rFb.set(s.Fb, 2); rVd.set(s.volCm * s.frac, 0);
+      chart.clear();
+      const g = PL.graph(chart, { x: 42, y: 16, w: chart.W - 58, h: chart.H - 40 }, { x0: 0, x1: 100, y0: 0, y1: Math.max(1, s.W * 1.15) });
+      g.frame({ xlabel: "浸入比例 (%)", ylabel: "T (N)" }); g.grid(5, 4);
+      g.fn(p => Math.max(0, s.W - s.rhoL * s.volCm * 1e-6 * 9.8 * p / 100), { color: MC(), width: 2.1 });
+      g.dot(s.frac * 100, s.T, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+    }
+    cv.onResize(draw); chart.onResize(draw); draw();
+    return { stop() { cv.destroy(); chart.destroy(); }, rerender: draw };
+  }});
+
   /* 白努利原理 */
   PL.register("bernoulli", { build(root) {
     const L = PL.ui.layout(root);
