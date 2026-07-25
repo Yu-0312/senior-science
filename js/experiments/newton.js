@@ -593,4 +593,123 @@
     cv.onResize(draw); cc.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); cc.destroy(); }, rerender: draw };
   }});
+  /* 段考題型：沿斜面外力改變時的摩擦力方向 */
+  PL.register("incline-applied-force", { build(root) {
+    const L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.61);
+    let forceDirection = "up";
+    PL.ui.section(L.controls, "斜面與外力");
+    const sM = PL.ui.slider(L.controls, { label: "物體質量 m", min: 0.5, max: 5, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: draw });
+    const sAngle = PL.ui.slider(L.controls, { label: "斜面角度 θ", min: 5, max: 55, step: 1, value: 30, unit: "°", digits: 0, onInput: draw });
+    const sForce = PL.ui.slider(L.controls, { label: "沿斜面外力 F", min: 0, max: 55, step: 1, value: 12, unit: "N", digits: 0, onInput: draw });
+    const sMs = PL.ui.slider(L.controls, { label: "靜摩擦係數 μₛ", min: 0.1, max: 0.9, step: 0.02, value: 0.5, unit: "", digits: 2, onInput: draw });
+    const sMk = PL.ui.slider(L.controls, { label: "動摩擦係數 μₖ", min: 0.05, max: 0.7, step: 0.02, value: 0.35, unit: "", digits: 2, onInput: draw });
+    PL.ui.section(L.controls, "外力方向");
+    PL.ui.chipGroup(L.controls, { value: forceDirection, options: [{ value: "up", label: "沿斜面向上拉" }, { value: "down", label: "沿斜面向下推" }], onChange: value => { forceDirection = value; draw(); } });
+    PL.ui.note(L.controls, "先判斷若沒有摩擦時物體想往哪裡滑；靜摩擦力必定朝<b>相反方向</b>。 ");
+    const rN = PL.ui.readout(L.readouts, { label: "正向力 N", unit: "N" });
+    const rF = PL.ui.readout(L.readouts, { label: "實際摩擦力", unit: "N" });
+    const rMax = PL.ui.readout(L.readouts, { label: "最大靜摩擦", unit: "N" });
+    const rState = PL.ui.readout(L.readouts, { label: "受力判讀" });
+    const cc = PL.ui.chart(PL.ui.charts(root), { title: "外力與沿斜面滑動趨勢", cap: "正值代表物體傾向下滑、負值代表傾向上滑；兩條虛線之間可由靜摩擦力維持靜止。" });
+    function model(force) {
+      const m = sM.get(), th = sAngle.get() * Math.PI / 180, F = force == null ? sForce.get() : force, N = m * 9.8 * Math.cos(th);
+      const drive = m * 9.8 * Math.sin(th) + (forceDirection === "down" ? F : -F), fsMax = sMs.get() * N;
+      const staticHold = Math.abs(drive) <= fsMax + 1e-9, muK = Math.min(sMs.get(), sMk.get());
+      const friction = staticHold ? -drive : -Math.sign(drive || 1) * muK * N;
+      const acceleration = staticHold ? 0 : (drive + friction) / m;
+      return { m, th, F, N, drive, fsMax, staticHold, friction, acceleration };
+    }
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const q = model(), floorY = H - 42, baseX = 42, slopeLength = Math.min(W * 0.63, H * 1.05 / Math.sin(q.th));
+      const top = { x: baseX + slopeLength * Math.cos(q.th), y: floorY - slopeLength * Math.sin(q.th) };
+      ctx.save(); ctx.beginPath(); ctx.moveTo(baseX, floorY); ctx.lineTo(top.x, top.y); ctx.lineTo(top.x, floorY); ctx.closePath(); ctx.fillStyle = "rgba(90,162,255,0.08)"; ctx.fill(); ctx.strokeStyle = PL.col("text-faint"); ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
+      const down = { x: -Math.cos(q.th), y: Math.sin(q.th) }, normal = { x: -Math.sin(q.th), y: -Math.cos(q.th) };
+      const point = { x: top.x + down.x * slopeLength * 0.48, y: top.y + down.y * slopeLength * 0.48 };
+      ctx.save(); ctx.translate(point.x, point.y); ctx.rotate(-q.th); D.rect(ctx, -25, -32, 50, 28, { fill: MC(), stroke: "rgba(255,255,255,0.46)", width: 1.5, r: 5 }); ctx.restore();
+      const c = { x: point.x + normal.x * 13, y: point.y + normal.y * 13 }, scale = 3.1;
+      D.arrow(ctx, c.x, c.y, c.x, c.y + 50, { color: PL.col("warn"), width: 2.2, label: "mg" });
+      D.arrow(ctx, c.x, c.y, c.x + normal.x * 42, c.y + normal.y * 42, { color: "#8db7ff", width: 2.2, label: "N" });
+      const appSign = forceDirection === "down" ? 1 : -1, appLen = Math.min(62, q.F * scale);
+      D.arrow(ctx, c.x, c.y, c.x + down.x * appSign * appLen, c.y + down.y * appSign * appLen, { color: PL.col("accent-2"), width: 2.5, label: "F" });
+      const fSign = Math.sign(q.friction || 0), fLen = Math.min(58, Math.abs(q.friction) * scale);
+      if (fLen > 0.5) D.arrow(ctx, c.x, c.y, c.x + down.x * fSign * fLen, c.y + down.y * fSign * fLen, { color: q.staticHold ? "#7ee0c0" : PL.col("danger"), width: 2.4, label: q.staticHold ? "fₛ" : "fₖ" });
+      const trend = q.drive > 0 ? "若無摩擦，物體傾向下滑" : q.drive < 0 ? "若無摩擦，物體傾向上滑" : "外力與重力分量剛好平衡";
+      D.text(ctx, trend, 24, 30, { color: q.staticHold ? "#7ee0c0" : PL.col("danger"), size: 12 });
+      D.text(ctx, q.staticHold ? "靜摩擦足夠，物體靜止" : "超過最大靜摩擦，開始" + (q.acceleration > 0 ? "下滑" : "上滑"), 24, 50, { color: PL.col("text-dim"), size: 11 });
+      rN.set(q.N, 2); rF.set(Math.abs(q.friction), 2); rMax.set(q.fsMax, 2); rState.set(q.staticHold ? "靜止" : q.acceleration > 0 ? "向下滑動" : "向上滑動");
+      cc.clear();
+      const forceLimit = 55, range = Math.max(20, Math.abs(model(0).drive) + q.fsMax + 10);
+      const g = PL.graph(cc, { x: 42, y: 16, w: cc.W - 56, h: cc.H - 40 }, { x0: 0, x1: forceLimit, y0: -range, y1: range });
+      g.frame({ xlabel: "外力 F (N)", ylabel: "沿斜面趨勢 (N)" }); g.grid(5, 4);
+      g.fn(F => model(F).drive, { color: MC(), width: 2.2 });
+      g.hline(q.fsMax, { color: "rgba(126,224,192,0.65)", dash: [4, 3], width: 1.2 }); g.hline(-q.fsMax, { color: "rgba(126,224,192,0.65)", dash: [4, 3], width: 1.2 });
+      g.dot(q.F, q.drive, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+    }
+    cv.onResize(draw); cc.onResize(draw); draw();
+    return { stop() { cv.destroy(); cc.destroy(); }, rerender: draw };
+  }});
+
+  /* 段考題型：桌面物體與懸掛物的連接體 */
+  PL.register("table-hanger", { build(root) {
+    const L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.62);
+    let y = 0, v = 0, released = false;
+    PL.ui.section(L.controls, "連接體參數");
+    const sTable = PL.ui.slider(L.controls, { label: "桌上物體 mₜ", min: 0.5, max: 6, step: 0.5, value: 3, unit: "kg", digits: 1, onInput: reset });
+    const sHang = PL.ui.slider(L.controls, { label: "懸掛物 mₕ", min: 0.5, max: 5, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: reset });
+    const sMs = PL.ui.slider(L.controls, { label: "靜摩擦係數 μₛ", min: 0.05, max: 0.8, step: 0.02, value: 0.35, unit: "", digits: 2, onInput: reset });
+    const sMk = PL.ui.slider(L.controls, { label: "動摩擦係數 μₖ", min: 0.05, max: 0.7, step: 0.02, value: 0.25, unit: "", digits: 2, onInput: reset });
+    const row = PL.ui.buttonRow(L.controls); PL.ui.button(row, "釋放", () => { reset(); released = true; if (!model().staticHold) anim.start(); else draw(); }, { primary: true }); PL.ui.button(row, "重設", reset);
+    PL.ui.note(L.controls, "懸掛物的重力要先克服桌上物體的最大靜摩擦力；運動後再換成動摩擦力計算加速度。 ");
+    const rA = PL.ui.readout(L.readouts, { label: "系統加速度 a", unit: "m/s²" });
+    const rT = PL.ui.readout(L.readouts, { label: "繩張力 T", unit: "N" });
+    const rF = PL.ui.readout(L.readouts, { label: "桌面摩擦力", unit: "N" });
+    const rState = PL.ui.readout(L.readouts, { label: "運動判讀" });
+    const cc = PL.ui.chart(PL.ui.charts(root), { title: "懸掛質量與系統加速度", cap: "臨界前加速度為零；超過最大靜摩擦後，以動摩擦力計算加速度。" });
+    function model(hangMass) {
+      const mt = sTable.get(), mh = hangMass == null ? sHang.get() : hangMass, fsMax = sMs.get() * mt * 9.8, pull = mh * 9.8, staticHold = pull <= fsMax + 1e-9;
+      const fk = Math.min(sMk.get(), sMs.get()) * mt * 9.8, a = staticHold ? 0 : Math.max(0, (pull - fk) / (mt + mh));
+      const f = staticHold ? pull : fk, T = staticHold ? pull : mt * a + fk;
+      return { mt, mh, fsMax, pull, staticHold, f, a, T };
+    }
+    function reset() { y = 0; v = 0; released = false; draw(); }
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv); const q = model(), tableY = H * 0.43, edge = W * 0.70, blockX = edge - 105 + y * 12, ropeY = tableY - 26;
+      D.rect(ctx, 30, tableY, edge - 30, 16, { fill: "rgba(150,174,201,0.24)", stroke: PL.col("text-faint"), width: 1.5, r: 4 }); D.line(ctx, edge, tableY, edge, H - 32, PL.col("text-faint"), 4);
+      D.ring(ctx, edge, ropeY, 18, "rgba(255,255,255,0.58)", 3); D.line(ctx, blockX + 26, ropeY, edge, ropeY, "#c9d3e0", 2); D.line(ctx, edge + 18, ropeY, edge + 18, ropeY + 64 + y * 18, "#c9d3e0", 2);
+      D.rect(ctx, blockX - 30, tableY - 34, 60, 30, { fill: MC(), stroke: "rgba(255,255,255,0.45)", width: 1.5, r: 5 }); D.text(ctx, "mₜ", blockX, tableY - 14, { color: "#04121a", size: 12, align: "center", weight: "700" });
+      const hy = ropeY + 64 + y * 18; D.rect(ctx, edge - 8, hy, 52, 31, { fill: "#ffab80", stroke: "rgba(255,255,255,0.45)", width: 1.5, r: 5 }); D.text(ctx, "mₕ", edge + 18, hy + 20, { color: "#24110a", size: 12, align: "center", weight: "700" });
+      D.arrow(ctx, blockX, tableY - 45, blockX + Math.min(60, q.T * 2.2), tableY - 45, { color: PL.col("accent-2"), width: 2.4, label: "T" }); if (q.f) D.arrow(ctx, blockX, tableY - 56, blockX - Math.min(58, q.f * 1.3), tableY - 56, { color: q.staticHold ? "#7ee0c0" : PL.col("danger"), width: 2.2, label: "f" });
+      D.arrow(ctx, edge + 43, hy + 14, edge + 43, hy + 58, { color: PL.col("warn"), width: 2.3, label: "mₕg" }); D.text(ctx, q.staticHold ? "最大靜摩擦足夠：系統靜止" : "懸掛物下降，兩物體共同加速", 24, 30, { color: q.staticHold ? "#7ee0c0" : PL.col("danger"), size: 12 });
+      rA.set(q.a, 2); rT.set(q.T, 2); rF.set(q.f, 2); rState.set(q.staticHold ? "保持靜止" : "mₕ 向下運動");
+      cc.clear(); const g = PL.graph(cc, { x: 42, y: 16, w: cc.W - 56, h: cc.H - 40 }, { x0: 0.5, x1: 5, y0: 0, y1: 9 }); g.frame({ xlabel: "懸掛質量 mₕ (kg)", ylabel: "a (m/s²)" }); g.grid(5, 4); g.fn(mh => model(mh).a, { color: MC(), width: 2.3 }); g.dot(q.mh, q.a, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+    }
+    const anim = PL.loop(dt => { if (dt && released) { const q = model(); if (!q.staticHold) { v += q.a * dt; y += v * dt; if (y > 9) { y = 9; v = 0; anim.stop(); } } } draw(); });
+    cv.onResize(draw); cc.onResize(draw); draw(); return { stop() { anim.stop(); cv.destroy(); cc.destroy(); }, rerender: draw };
+  }});
+
+  /* 段考題型：均勻繩跨過光滑桌邊 */
+  PL.register("rope-over-edge", { build(root) {
+    const L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.60);
+    let portion = 0.25, v = 0, elapsed = 0, released = false;
+    PL.ui.section(L.controls, "均勻繩條件");
+    const sPortion = PL.ui.slider(L.controls, { label: "初始垂落比例 x / L", min: 0.05, max: 0.85, step: 0.01, value: 0.25, unit: "", digits: 2, onInput: reset });
+    const sLength = PL.ui.slider(L.controls, { label: "繩總長 L", min: 1, max: 10, step: 0.5, value: 5, unit: "m", digits: 1, onInput: reset });
+    const row = PL.ui.buttonRow(L.controls); PL.ui.button(row, "釋放繩子", () => { reset(); released = true; anim.start(); }, { primary: true }); PL.ui.button(row, "重設", reset);
+    PL.ui.note(L.controls, "只有垂落部分的重量拉動系統，但整條繩都要一起加速，因此 <b>a = (x/L)g</b>。 ");
+    const rA = PL.ui.readout(L.readouts, { label: "瞬時加速度 a", unit: "m/s²" }); const rX = PL.ui.readout(L.readouts, { label: "垂落長度 x", unit: "m" }); const rV = PL.ui.readout(L.readouts, { label: "繩速率 v", unit: "m/s" }); const rState = PL.ui.readout(L.readouts, { label: "受力判讀" });
+    const cc = PL.ui.chart(PL.ui.charts(root), { title: "垂落比例與加速度", cap: "在光滑桌面上，繩子的總長與總質量會約掉；加速度只由當下垂落比例決定。" });
+    function reset() { portion = sPortion.get(); v = 0; elapsed = 0; released = false; draw(); }
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv); const length = sLength.get(), a = portion * 9.8, tableY = H * 0.43, edge = W * 0.70, ropeTopStart = 56, topLength = Math.max(80, (1 - portion) * (edge - ropeTopStart)); const hangLength = Math.max(34, portion * (H - tableY - 54));
+      D.rect(ctx, 30, tableY, edge - 30, 16, { fill: "rgba(150,174,201,0.24)", stroke: PL.col("text-faint"), width: 1.5, r: 4 }); D.line(ctx, edge, tableY, edge, H - 30, PL.col("text-faint"), 4);
+      D.line(ctx, edge - topLength, tableY - 10, edge, tableY - 10, PL.col("warn"), 7); D.ring(ctx, edge, tableY - 2, 12, PL.col("warn"), 5); D.line(ctx, edge + 11, tableY - 2, edge + 11, tableY + hangLength, PL.col("warn"), 7);
+      D.arrow(ctx, edge + 32, tableY + hangLength * 0.48, edge + 32, tableY + hangLength * 0.48 + Math.min(50, portion * 70), { color: PL.col("danger"), width: 2.3, label: "垂落部分重力" }); D.arrow(ctx, edge - topLength * 0.52, tableY - 32, edge - topLength * 0.52 + Math.min(50, v * 6), tableY - 32, { color: PL.col("accent-2"), width: 2.2, label: "v" });
+      D.text(ctx, "垂落比例 x/L = " + PL.fmt(portion, 2), 24, 30, { color: PL.col("text-dim"), size: 12 }); D.text(ctx, released ? "垂落越多，拉力與加速度越大" : "設定初始垂落比例後釋放繩子", 24, 50, { color: PL.col("text-faint"), size: 11 });
+      rA.set(a, 2); rX.set(portion * length, 2); rV.set(v, 2); rState.set("整條繩共同加速");
+      cc.clear(); const g = PL.graph(cc, { x: 42, y: 16, w: cc.W - 56, h: cc.H - 40 }, { x0: 0, x1: 1, y0: 0, y1: 9.8 }); g.frame({ xlabel: "垂落比例 x / L", ylabel: "a (m/s²)" }); g.grid(5, 4); g.fn(p => p * 9.8, { color: MC(), width: 2.3 }); g.dot(portion, a, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+    }
+    const anim = PL.loop(dt => { if (dt && released) { const a = portion * 9.8; v += a * dt; portion += (v / Math.max(1, sLength.get())) * dt; elapsed += dt; if (portion >= 0.93) { portion = 0.93; v = 0; anim.stop(); } } draw(); });
+    cv.onResize(draw); cc.onResize(draw); draw(); return { stop() { anim.stop(); cv.destroy(); cc.destroy(); }, rerender: draw };
+  }});
 })();
