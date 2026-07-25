@@ -1,6 +1,6 @@
 /* sw.js — Service Worker（離線快取）
  * 更新任何檔案後，請調高 CACHE 版本號以觸發更新。 */
-const CACHE = "physics-lab-v17";
+const CACHE = "physics-lab-v18";
 const ASSETS = [
   "./",
   "index.html",
@@ -10,7 +10,7 @@ const ASSETS = [
   "js/advanced-curriculum.js?v=20260724-2",
   "js/comprehensive-curriculum.js?v=20260724-4",
   "js/extension-registry.js?v=20260725-1",
-  "js/open-curriculum.js?v=20260725-1",
+  "js/open-curriculum.js?v=20260725-2",
   "js/sim-core.js",
   "js/app.js?v=20260725-1",
   "js/experiments/kinematics.js",
@@ -28,7 +28,7 @@ const ASSETS = [
   "js/experiments/extended.js",
   "js/experiments/advanced.js?v=20260724-2",
   "js/experiments/comprehensive.js?v=20260724-4",
-  "js/experiments/open-labs.js?v=20260725-1",
+  "js/experiments/open-labs.js?v=20260725-2",
   "icons/icon.svg",
   "icons/icon-192.png",
   "icons/icon-512.png"

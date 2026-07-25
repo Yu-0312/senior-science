@@ -1,4 +1,4 @@
-/* 第五批：資料驅動的跨領域題型庫。可由後續檔案無上限追加。 */
+/* 第五、六批：資料驅動的跨領域與大學先修題型庫，可由後續檔案無上限追加。 */
 (function () {
   "use strict";
   const C = window.PhysicsLabCurriculum;
@@ -35,6 +35,36 @@
       { id: "geiger-statistics", title: "蓋革計數與隨機誤差", interactive: I, concept: "放射性衰變是隨機事件；固定時間內的計數會上下波動，標準差約為計數平方根。", formula: R`\( \sigma_N\approx\sqrt{N} \)`, points: ["衰變無法預測單一原子何時發生", "計數越多相對誤差越小", "背景計數要扣除", "可用重複量測判讀統計波動"] },
       { id: "nuclear-energy-release", title: "核反應的質量虧損與能量", interactive: I, concept: "核反應前後的靜止質量差會依質能互換轉為動能與輻射能，是核能釋放的來源。", formula: R`\( E=\Delta mc^2 \)`, points: ["極小質量可對應巨大能量", "需比較反應前後總質量", "束縛能差決定是否釋能", "核反應需遵守守恆定律"] },
       { id: "gps-relativity", title: "GPS 的相對論時間校正", interactive: I, concept: "衛星的高速運動使時鐘變慢，而較弱重力又使時鐘變快；GPS 必須同時校正兩種效應。", formula: R`\( \Delta t_v\approx-\dfrac{v^2}{2c^2}t \)`, points: ["速度效應使衛星鐘變慢", "重力效應使衛星鐘變快", "兩種效應量級不同", "未校正會累積成定位誤差"] }
+    ]
+  });
+
+  C.extendCatalog("university-bridge-labs-2026-07", {
+    newton: [
+      { id: "lagrangian-pendulum", title: "拉格朗日量與單擺方程式", interactive: I, concept: "以拉格朗日量把單擺的動能與位能寫成一個函數，再由變分原理得到運動方程式；這是大學力學常用的建模語言。", formula: R`\( \dfrac{d}{dt}\dfrac{\partial L}{\partial \dot\theta}-\dfrac{\partial L}{\partial\theta}=0 \)`, points: ["拉格朗日量 L=T-V", "廣義座標可取擺角 θ", "小角度下恢復為簡諧運動", "此方法可推廣到多自由度系統"] }
+    ],
+    gravity: [
+      { id: "two-body-barycenter", title: "二體問題與質心座標", interactive: I, concept: "兩個天體都繞共同質心運動。調整質量比與距離，觀察較重天體的軌道半徑如何縮小。", formula: R`\( r_1=\dfrac{m_2}{m_1+m_2}d \)`, points: ["兩個天體共享同一個質心", "質心位置由質量加權決定", "較重天體距質心較近", "系外行星可藉母恆星微小擺動被發現"] }
+    ],
+    shm: [
+      { id: "phase-space-oscillator", title: "簡諧振子的相空間", interactive: I, concept: "在位置—速度平面中，無阻尼簡諧振子的狀態沿封閉橢圓運行。相圖將時間演化濃縮成一條幾何軌跡。", formula: R`\( \left(\dfrac{x}{A}\right)^2+\left(\dfrac{v}{\omega A}\right)^2=1 \)`, points: ["相空間座標是位置與速度", "無阻尼時軌跡為封閉曲線", "振幅改變橢圓的寬度", "阻尼會使軌跡向原點螺旋"] }
+    ],
+    thermal: [
+      { id: "entropy-mixing", title: "熱混合與熵增加", interactive: I, concept: "兩個不同溫度但熱容量相同的系統接觸後達到平衡；雖然能量守恆，總熵卻增加，反映不可逆方向。", formula: R`\( \Delta S=C\ln\dfrac{T_f}{T_h}+C\ln\dfrac{T_f}{T_c} \)`, points: ["溫度計算熵時必須使用絕對溫度", "孤立系統總熵不減", "熱由高溫流向低溫", "熵不是能量，而是狀態函數"] }
+    ],
+    waves: [
+      { id: "fourier-spectrum", title: "傅立葉級數與波形頻譜", interactive: I, concept: "複雜週期波可分解成多個正弦諧波的疊加。調整保留的諧波數，觀察方波近似與頻譜範圍。", formula: R`\( f(t)=\sum_n A_n\sin(n\omega t+\phi_n) \)`, points: ["週期波可拆成頻率成分", "諧波數越多，波形細節越完整", "頻譜呈現振幅與頻率的關係", "訊號處理與樂器音色都使用傅立葉分析"] }
+    ],
+    optics: [
+      { id: "fresnel-diffraction", title: "菲涅耳繞射與菲涅耳數", interactive: I, concept: "當光屏距離不遠時，繞射圖樣由近場的菲涅耳區控制。改變孔徑與傳播距離，可觀察近場與遠場的過渡。", formula: R`\( N_F=\dfrac{a^2}{\lambda z} \)`, points: ["菲涅耳數比較孔徑與傳播距離", "N_F 大時屬於近場繞射", "N_F 很小時趨近夫朗和斐繞射", "繞射決定成像系統的解析度極限"] }
+    ],
+    electric: [
+      { id: "bode-low-pass", title: "RC 低通濾波器的頻率響應", interactive: I, concept: "RC 低通濾波器會保留低頻、衰減高頻。掃描輸入頻率可觀察增益曲線，並連結電路設計與訊號處理的波德圖概念。", formula: R`\( |H(f)|=\dfrac{1}{\sqrt{1+(f/f_c)^2}} \)`, points: ["截止頻率是增益降為 -3 dB 的位置", "低頻近似完整通過", "高頻增益約隨頻率反比下降", "波德圖通常使用對數頻率軸"] }
+    ],
+    magnetism: [
+      { id: "biot-savart-axis", title: "畢奧－沙伐定律與圓線圈軸線磁場", interactive: I, concept: "圓形線圈上每一小段電流都對軸線點貢獻磁場，疊加後可得到軸向磁場分布。", formula: R`\( B(z)=\dfrac{\mu_0NIR^2}{2(R^2+z^2)^{3/2}} \)`, points: ["磁場由電流元疊加而成", "線圈中心的磁場最大", "離開中心後磁場快速減弱", "是亥姆霍茲線圈與磁場校正的基礎"] }
+    ],
+    modern: [
+      { id: "infinite-square-well", title: "無限深方形位阱與量子能階", interactive: I, concept: "受限在一維位阱中的粒子只能具有離散能量。改變阱寬與量子數，觀察能階如何依 n² 與 1/L² 改變。", formula: R`\( E_n=\dfrac{n^2h^2}{8mL^2} \)`, points: ["受限邊界造成能量量子化", "量子數 n 從 1 開始", "阱越窄，能階間距越大", "波函數節點數隨 n 增加"] }
     ]
   });
 })();
