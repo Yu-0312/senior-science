@@ -4,6 +4,7 @@
 
 **線上網站：** [https://yu-0312.github.io/senior-science/](https://yu-0312.github.io/senior-science/)  
 **GitHub Repository：** [https://github.com/Yu-0312/senior-science](https://github.com/Yu-0312/senior-science)
+**使用授權：** [免費教育使用與推廣授權](https://yu-0312.github.io/senior-science/license.html)
 
 ---
 
@@ -23,6 +24,12 @@
 - **深色/淺色主題**：預設精緻深色實驗室風，支援一鍵切換淺色主題。
 - **PWA 支援**：可安裝到桌面或手機，並透過 Service Worker 快取主要資源。
 - **靜態網站部署**：不需要後端、資料庫或登入系統，可直接部署到 GitHub Pages。
+
+## 使用授權
+
+原創教學內容與視覺素材採用 **CC BY-NC-SA 4.0**：可用於非商業教學、分享與改編，但須標示來源、連結授權並以相同方式分享。另提供科普推廣特別許可，老師、學生社團與創作者可以在公開文章、社群或含廣告分潤的平台中，以截圖、錄影與連結介紹本網站；不得把本站內容、鏡像站或改作包裝成付費服務。
+
+完整條款與建議標示格式請見 [免費教育使用與推廣授權](https://yu-0312.github.io/senior-science/license.html) 與 [LICENSE.md](LICENSE.md)。
 
 ---
 
