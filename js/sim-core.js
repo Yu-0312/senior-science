@@ -55,6 +55,45 @@
     return Object.assign({ id: id || "", moduleId: module && module.id, moduleNo: module && module.no, moduleTitle: module && module.title }, stage);
   }
 
+  function experimentFor(profile) {
+    const modules = window.PhysicsLabCurriculum && window.PhysicsLabCurriculum.modules || [];
+    for (const module of modules) {
+      const experiment = module.experiments.find(item => item.id === profile.id);
+      if (experiment) return experiment;
+    }
+    return null;
+  }
+
+  function actionFor(profile) {
+    const actions = {
+      mechanics: "先調整一個初始條件或外力，再啟動模型；每次只改變一個變因。",
+      orbital: "先設定速度或距離，再比較軌跡與指向圓心的量。",
+      thermal: "先選定系統邊界，再只改變一個狀態量，追蹤熱量與溫度。",
+      waves: "先固定介質條件，再改變頻率、振幅或相位，鎖定一個觀測點。",
+      optics: "先固定光源與元件位置，再改變一個幾何量，對照光路或條紋。",
+      circuit: "先確認電路連接，再改變一個元件或電源參數，同時讀取電壓與電流。",
+      magnetism: "先預測方向，再切換電流、磁場或運動方向，核對向量與儀表。",
+      modern: "先改變一個微觀條件，再從門檻、離散值或統計分布找出規律。"
+    };
+    return actions[profile.family] || "先調整一個參數，觀察變化後再回到公式判讀。";
+  }
+
+  function learningBriefFor(profile) {
+    const experiment = experimentFor(profile);
+    const points = experiment && Array.isArray(experiment.points) ? experiment.points : [];
+    return {
+      goal: experiment && experiment.concept || "用可控制的變因與即時讀數，建立現象和物理模型的關係。",
+      action: actionFor(profile),
+      observe: points[0] || "把畫面中的現象和下方量測讀數一起看。",
+      conclude: points[1] || "用讀數或圖形的變化，說明哪一個物理量造成差異。"
+    };
+  }
+
+  function markGuideStep(node, step) {
+    const simRoot = node && node.closest && node.closest(".lab-sim");
+    if (simRoot && typeof simRoot._labSetProcedureStep === "function") simRoot._labSetProcedureStep(step);
+  }
+
   function workflowFor(profile) {
     const subject = profile.moduleTitle || "這個主題";
     const steps = {
@@ -86,6 +125,7 @@
     if (root.dataset) { root.dataset.labFamily = profile.family; root.dataset.labCode = profile.code; }
     root._labReadouts = [];
     const workflow = workflowFor(profile);
+    const brief = learningBriefFor(profile);
     const commandBar = el("div", "sim-command-bar", root);
     const commandTitle = el("div", "sim-command-title", commandBar);
     const stageLabel = el("span", "sim-command-stage", commandTitle); stageLabel.textContent = profile.stage;
@@ -97,6 +137,18 @@
     const exportBtn = el("button", "sim-command", commandTools); exportBtn.type = "button"; exportBtn.textContent = "匯出讀數";
     const screenBtn = el("button", "sim-command", commandTools); screenBtn.type = "button"; screenBtn.textContent = "截取主畫面";
     const fullBtn = el("button", "sim-command", commandTools); fullBtn.type = "button"; fullBtn.textContent = "全螢幕";
+
+    const learningBrief = el("section", "sim-learning-brief", root);
+    const briefHead = el("div", "sim-learning-brief-head", learningBrief);
+    const briefKicker = el("span", "sim-learning-brief-kicker", briefHead); briefKicker.textContent = "任務導讀";
+    const briefTitle = el("span", "sim-learning-brief-title", briefHead); briefTitle.textContent = "先知道要看什麼，再開始操作";
+    const goal = el("p", "sim-learning-goal", learningBrief); goal.textContent = brief.goal;
+    const briefSteps = el("dl", "sim-learning-steps", learningBrief);
+    [["怎麼做", brief.action], ["盯住什麼", brief.observe], ["做完能說", brief.conclude]].forEach(([label, text]) => {
+      const item = el("div", "sim-learning-step", briefSteps);
+      const term = el("dt", null, item); term.textContent = label;
+      const desc = el("dd", null, item); desc.textContent = text;
+    });
 
     const procedure = el("section", "sim-procedure", root);
     const procedureHead = el("div", "sim-procedure-head", procedure);
@@ -114,16 +166,21 @@
       });
       procedureState.textContent = activeStep < 0 ? "準備中" : "第 " + (activeStep + 1) + " / " + workflow.length + " 步";
     };
+    const setProcedureStep = step => {
+      activeStep = Math.max(0, Math.min(workflow.length - 1, step));
+      paintSteps();
+    };
+    root._labSetProcedureStep = setProcedureStep;
     paintSteps();
 
     guideBtn.addEventListener("click", () => {
       const visible = root.classList.toggle("show-procedure");
       guideBtn.setAttribute("aria-expanded", String(visible));
-      if (visible && activeStep < 0) { activeStep = 0; paintSteps(); }
+      if (visible && activeStep < 0) setProcedureStep(0);
     });
     stepBtn.addEventListener("click", () => {
       root.classList.add("show-procedure"); guideBtn.setAttribute("aria-expanded", "true");
-      activeStep = (activeStep + 1) % workflow.length; paintSteps();
+      setProcedureStep((activeStep + 1) % workflow.length);
       procedure.scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
     focusBtn.addEventListener("click", () => {
@@ -165,7 +222,7 @@
     const readoutTitle = el("span", "sim-panel-title", readoutHead); readoutTitle.textContent = "量測讀數";
     const readoutHint = el("span", "sim-panel-hint", readoutHead); readoutHint.textContent = "模型計算";
     const readouts = el("div", "sim-readouts", readoutPanel);
-    return { root, profile, workflow, commandBar, procedure, stage, visual, canvasWrap, instrumentStrip, controlDeck, controls, readoutPanel, readouts };
+    return { root, profile, workflow, brief, learningBrief, commandBar, procedure, setProcedureStep, stage, visual, canvasWrap, instrumentStrip, controlDeck, controls, readoutPanel, readouts };
   }
 
   /* --------------------------- 響應式畫布 --------------------------- */
@@ -271,7 +328,7 @@
     const f = o.fmt || (v => fmt(v, o.digits == null ? 1 : o.digits));
     const show = v => { val.textContent = f(v) + (o.unit ? " " + o.unit : ""); };
     show(+input.value);
-    input.addEventListener("input", () => { show(+input.value); o.onInput && o.onInput(+input.value); });
+    input.addEventListener("input", () => { show(+input.value); o.onInput && o.onInput(+input.value); markGuideStep(wrap, 0); });
     return { el: input, get: () => +input.value, set: v => { input.value = v; show(v); }, label: lab, valueEl: val, showUnit: show };
   }
 
@@ -285,7 +342,7 @@
       oe.value = op.value; oe.textContent = op.label;
     });
     if (o.value != null) sel.value = o.value;
-    sel.addEventListener("change", () => o.onChange && o.onChange(sel.value));
+    sel.addEventListener("change", () => { o.onChange && o.onChange(sel.value); markGuideStep(wrap, 0); });
     return { el: sel, get: () => sel.value, set: v => sel.value = v };
   }
 
@@ -293,7 +350,7 @@
     const wrap = el("label", "ctrl-check", parent);
     const input = el("input", null, wrap); input.type = "checkbox"; input.checked = !!o.checked;
     const span = el("span", null, wrap); span.textContent = o.label;
-    input.addEventListener("change", () => o.onChange && o.onChange(input.checked));
+    input.addEventListener("change", () => { o.onChange && o.onChange(input.checked); markGuideStep(wrap, 0); });
     return { el: input, get: () => input.checked, set: v => input.checked = v };
   }
 
@@ -302,7 +359,7 @@
     o = o || {};
     const b = el("button", "btn" + (o.primary ? " btn-primary" : ""), row);
     b.type = "button"; b.textContent = label;
-    b.addEventListener("click", onClick);
+    b.addEventListener("click", () => { onClick(); if (o.primary) markGuideStep(row, 1); });
     return b;
   }
 
@@ -341,7 +398,7 @@
     const step = o.step == null ? 1 : o.step, dg = o.digits == null ? 0 : o.digits;
     let v = o.value;
     const show = () => { val.textContent = typeof o.format === "function" ? o.format(v) : (+v).toFixed(dg); };
-    const set = (nv, fire) => { v = clamp(Math.round(nv / step) * step, o.min, o.max); show(); if (fire !== false && o.onInput) o.onInput(v); };
+    const set = (nv, fire) => { v = clamp(Math.round(nv / step) * step, o.min, o.max); show(); if (fire !== false && o.onInput) o.onInput(v); if (fire !== false) markGuideStep(wrap, 0); };
     dec.addEventListener("click", () => set(v - step));
     inc.addEventListener("click", () => set(v + step));
     show();
@@ -363,6 +420,7 @@
         else value = op.value;
         chips.forEach(x => x.paint());
         if (o.onChange) o.onChange(multi ? [...value] : value, op.value);
+        markGuideStep(row, 0);
       });
       chips.push({ paint }); paint();
     });
