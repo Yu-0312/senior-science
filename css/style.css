@@ -688,15 +688,21 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .points li { position: relative; padding-left: 22px; font-size: 13.4px; color: var(--text-dim); margin: 9px 0; line-height: 1.55; }
 .points li::before { content: ""; position: absolute; left: 4px; top: 7px; width: 7px; height: 7px; border-radius: 2px; transform: rotate(45deg); background: var(--m-color, var(--accent)); box-shadow: 0 0 8px var(--m-color, var(--accent)); }
 .practice-panel { padding-top: 16px; border-top: 1px dashed var(--border); }
-.practice-list { display: grid; gap: 10px; }
+.practice-list { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; width: 100%; gap: 10px; }
 .practice-item {
-  min-width: 0; padding: 12px; border: 1px solid var(--border-soft); border-radius: 8px;
+  width: 100%; max-width: 100%; min-width: 0; min-inline-size: 0; padding: 12px; border: 1px solid var(--border-soft); border-radius: 8px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--panel-2) 88%, var(--m-color, var(--accent)) 12%), var(--panel-solid));
 }
 .practice-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 7px; }
 .practice-type { color: var(--m-color, var(--accent)); font-size: 10.5px; font-weight: 800; letter-spacing: 0.8px; white-space: nowrap; }
 .practice-status { color: var(--text-faint); font-size: 10.5px; white-space: nowrap; }
-.practice-question { margin: 0; color: var(--text); font-size: 13px; line-height: 1.6; }
+.practice-question { min-width: 0; margin: 0; color: var(--text); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.practice-formula {
+  display: block; max-width: 100%; margin: 8px 0; padding: 7px 9px; overflow-x: auto;
+  border-left: 2px solid var(--m-color, var(--accent)); background: color-mix(in srgb, var(--m-color, var(--accent)) 7%, var(--panel-2)); color: var(--text); white-space: nowrap;
+}
+.practice-formula mjx-container { margin: 0 !important; }
+.practice-formula mjx-container svg { max-width: none; }
 .practice-options { display: grid; gap: 8px; margin-top: 11px; }
 .practice-option {
   display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 9px; width: 100%; min-height: 44px; padding: 9px 11px;

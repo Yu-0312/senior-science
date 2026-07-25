@@ -381,11 +381,23 @@
   }
 
   /* ------------------------------- 實驗頁 ------------------------------- */
+  const pendingTypeset = new Set();
+
   function typeset(node) {
+    if (!node) return;
     if (window.MathJax && MathJax.typesetPromise) {
       MathJax.typesetPromise([node]).catch(() => {});
+    } else {
+      pendingTypeset.add(node);
     }
   }
+
+  window.addEventListener("mathjax-ready", () => {
+    if (!window.MathJax || !MathJax.typesetPromise || !pendingTypeset.size) return;
+    const nodes = [...pendingTypeset];
+    pendingTypeset.clear();
+    MathJax.typesetPromise(nodes).catch(() => {});
+  });
 
   function compactText(text, fallback, limit) {
     const raw = String(text || fallback || "").replace(/<[^>]*>/g, "").replace(/\\[()[\]]/g, "").replace(/\s+/g, " ").trim();
@@ -425,7 +437,6 @@
     const points = Array.isArray(exp.points) && exp.points.length ? exp.points : [exp.concept || exp.title];
     const core = compactText(points[0], exp.title, 72);
     const support = compactText(points[1] || exp.concept, exp.title, 72);
-    const formula = compactText(exp.formula, "本實驗的關鍵公式", 86);
     const bridge = TEXTBOOK_BRIDGES[mod.id] || {};
     const conceptChoices = makeChoices(
       core,
@@ -465,7 +476,8 @@
       },
       {
         type: "單選題 · 解題步驟",
-        prompt: "面對公式「" + formula + "」時，下列哪個解題流程最合理？",
+        prompt: "面對下列公式時，下列哪個解題流程最合理？",
+        formula: exp.formula,
         options: formulaChoices.options,
         correct: formulaChoices.correct,
         hint: "先圈出公式中的每個符號，確認單位一致，再決定要代入、比例比較，還是看圖讀值。",
@@ -497,7 +509,14 @@
       const solved = savedAnswer === q.correct || done.has(id);
       const selectedAnswer = savedAnswer === q.correct ? savedAnswer : (solved ? q.correct : null);
       const status = el("span", "practice-status", head); status.textContent = solved ? "答對" : "待作答";
-      const prompt = el("p", "practice-question", item); prompt.textContent = q.prompt;
+      const prompt = el("p", "practice-question", item);
+      if (q.formula) {
+        prompt.append(document.createTextNode("面對下列公式："));
+        const formula = el("span", "practice-formula", prompt); formula.innerHTML = q.formula;
+        prompt.append(document.createTextNode("下列哪個解題流程最合理？"));
+      } else {
+        prompt.textContent = q.prompt;
+      }
       const choices = el("div", "practice-options", item);
       choices.setAttribute("role", "radiogroup");
       choices.setAttribute("aria-label", "第 " + (index + 1) + " 題選項");
@@ -562,6 +581,7 @@
         setPracticeDone(id, true);
       }));
     });
+    typeset(root);
   }
 
   /* ------------------------------- 學習存檔與計劃 ------------------------------- */
