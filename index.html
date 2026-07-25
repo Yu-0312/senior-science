@@ -24,7 +24,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="物理實驗室" />
 
-  <link rel="stylesheet" href="css/style.css?v=20260725-4" />
+  <link rel="stylesheet" href="css/style.css?v=20260725-5" />
 
   <!-- MathJax（LaTeX 公式排版） -->
   <script>
@@ -107,6 +107,11 @@
         </div>
         <div id="module-list"></div>
         <div class="sidebar-foot">
+          <div class="save-actions" aria-label="學習存檔">
+            <button class="btn-save-action" id="btn-export-save" type="button">匯出學習存檔</button>
+            <button class="btn-save-action" id="btn-import-save" type="button">匯入學習存檔</button>
+            <input id="import-save-file" type="file" accept="application/json,.json" hidden />
+          </div>
           <button class="btn-reset-progress" id="btn-reset">重設學習進度</button>
         </div>
       </aside>
@@ -133,6 +138,72 @@
               <div><div class="hstat-n b3" id="stat-int">0</div><div class="hstat-l">互動模擬</div></div>
             </div>
           </div>
+
+          <section class="study-center" aria-labelledby="study-center-title">
+            <div class="study-center-head">
+              <div>
+                <div class="section-label compact" id="study-center-title">學習中心</div>
+                <p class="study-center-intro">建立自己的讀書節奏，保存進度、安排每日實驗，回來時接著上次的位置繼續。</p>
+              </div>
+              <div class="save-status" id="save-status" aria-live="polite">存檔在這台裝置</div>
+            </div>
+            <div class="study-grid">
+              <article class="study-card save-card">
+                <div class="study-card-kicker">學習存檔</div>
+                <h3>備份與恢復你的進度</h3>
+                <p>包含已看實驗、題目練習、章節檢核、學習反思與計劃設定。</p>
+                <div class="study-card-actions">
+                  <button class="study-btn primary" id="home-export-save" type="button">匯出存檔</button>
+                  <button class="study-btn" id="home-import-save" type="button">匯入存檔</button>
+                </div>
+              </article>
+              <article class="study-card plan-card">
+                <div class="study-card-kicker">學習計劃設計</div>
+                <h3>產生每日實驗任務</h3>
+                <div class="plan-controls">
+                  <label>
+                    <span>計劃天數</span>
+                    <select id="plan-days">
+                      <option value="7">7 天衝刺</option>
+                      <option value="14">14 天穩定複習</option>
+                      <option value="30" selected>30 天完整學習</option>
+                      <option value="custom">自訂</option>
+                    </select>
+                  </label>
+                  <label id="custom-days-wrap" hidden>
+                    <span>自訂天數</span>
+                    <input id="custom-days" type="number" min="3" max="120" value="21" />
+                  </label>
+                  <label>
+                    <span>每日分鐘</span>
+                    <input id="plan-minutes" type="number" min="10" max="180" step="5" value="35" />
+                  </label>
+                </div>
+                <div class="study-card-actions">
+                  <button class="study-btn primary" id="btn-create-plan" type="button">建立學習計劃</button>
+                  <button class="study-btn" id="btn-clear-plan" type="button">清除計劃</button>
+                </div>
+              </article>
+              <article class="study-card today-card" id="today-plan-card">
+                <div class="study-card-kicker">今日任務</div>
+                <h3 id="today-plan-title">尚未建立計劃</h3>
+                <p id="today-plan-summary">選擇天數後，系統會把尚未完成的實驗平均分配到每日任務。</p>
+                <div class="today-progress">
+                  <div class="today-progress-label"><span id="today-progress-text">0 / 0</span><span id="today-progress-percent">0%</span></div>
+                  <div class="today-progress-bar"><div id="today-progress-fill"></div></div>
+                </div>
+                <div class="study-card-actions compact-actions">
+                  <button class="study-btn primary" id="btn-resume-study" type="button">繼續上次學習</button>
+                  <button class="study-btn" id="btn-next-unseen" type="button">下一個未完成</button>
+                </div>
+                <div class="today-task-list" id="today-task-list"></div>
+                <div class="review-focus">
+                  <div class="review-focus-title">複習優先</div>
+                  <div class="review-focus-list" id="review-focus-list"></div>
+                </div>
+              </article>
+            </div>
+          </section>
 
           <section class="learning-ladder" id="learning-ladder" aria-labelledby="learning-ladder-title">
             <div class="section-label" id="learning-ladder-title">銜接學習路徑</div>
@@ -229,6 +300,6 @@
   <script src="js/experiments/open-labs.js?v=20260725-2"></script>
 
   <!-- 應用外殼 -->
-  <script src="js/app.js?v=20260725-5"></script>
+  <script src="js/app.js?v=20260725-6"></script>
 </body>
 </html>

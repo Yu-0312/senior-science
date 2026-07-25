@@ -139,6 +139,7 @@
     get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   };
+  const STUDY_PLAN_KEY = "pl-study-plan";
 
   let viewed = new Set(store.get("pl-progress", []));
   let currentSim = null;
@@ -146,6 +147,20 @@
   let checkpointState = null;
   let pendingChapterTarget = null;
   let initialized = false;
+
+  function todayKey(date) {
+    const d = date ? new Date(date) : new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+  }
+
+  function dayDiff(start, end) {
+    const a = new Date(start + "T00:00:00");
+    const b = new Date((end || todayKey()) + "T00:00:00");
+    return Math.floor((b - a) / 86400000);
+  }
   const ACCESS_HASH = "faf16b5c720233e537cc50efe380a2170b2a2fd339ae6f9f3f74465cef67e8cd";
 
   /* ------------------------------- 主題 ------------------------------- */
@@ -456,6 +471,224 @@
     });
   }
 
+  /* ------------------------------- 學習存檔與計劃 ------------------------------- */
+  function showSaveStatus(message, tone) {
+    const status = $("#save-status");
+    if (!status) return;
+    status.textContent = message;
+    status.classList.remove("ok", "warn");
+    if (tone) status.classList.add(tone);
+  }
+
+  function collectLearningSave() {
+    const data = {};
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("pl-")) data[key] = localStorage.getItem(key);
+    }
+    return {
+      app: "senior-science",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      totalExperiments: C.totalExperiments,
+      data
+    };
+  }
+
+  function exportLearningSave() {
+    const save = collectLearningSave();
+    const blob = new Blob([JSON.stringify(save, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "senior-science-save-" + todayKey() + ".json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showSaveStatus("已匯出學習存檔", "ok");
+  }
+
+  function importLearningSave(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const save = JSON.parse(String(reader.result || ""));
+        if (!save || save.app !== "senior-science" || !save.data || typeof save.data !== "object") {
+          showSaveStatus("存檔格式不正確", "warn");
+          return;
+        }
+        const oldKeys = [];
+        for (let i = 0; i < localStorage.length; i += 1) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith("pl-")) oldKeys.push(key);
+        }
+        oldKeys.forEach(key => localStorage.removeItem(key));
+        Object.entries(save.data).forEach(([key, value]) => {
+          if (key.startsWith("pl-") && typeof value === "string") localStorage.setItem(key, value);
+        });
+        viewed = new Set(store.get("pl-progress", []));
+        applyTheme(store.get("pl-theme", "dark"));
+        refreshViewedMarks();
+        renderStudyCenter();
+        route();
+        showSaveStatus("已匯入學習存檔", "ok");
+      } catch (e) {
+        showSaveStatus("讀取存檔失敗", "warn");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function getPlanDaysValue() {
+    const select = $("#plan-days");
+    const custom = $("#custom-days");
+    const raw = select && select.value === "custom" ? Number(custom && custom.value) : Number(select && select.value);
+    return Math.max(3, Math.min(120, Number.isFinite(raw) ? Math.round(raw) : 30));
+  }
+
+  function getPlanMinutesValue() {
+    const input = $("#plan-minutes");
+    const raw = Number(input && input.value);
+    return Math.max(10, Math.min(180, Number.isFinite(raw) ? Math.round(raw) : 35));
+  }
+
+  function distributePlan(ids, days) {
+    const schedule = Array.from({ length: days }, (_, i) => ({ day: i + 1, ids: [] }));
+    ids.forEach((id, index) => schedule[index % days].ids.push(id));
+    return schedule;
+  }
+
+  function createStudyPlan() {
+    const days = getPlanDaysValue();
+    const minutes = getPlanMinutesValue();
+    const unseen = FLAT.map(f => f.exp.id).filter(id => !viewed.has(id));
+    const fallback = FLAT.map(f => f.exp.id);
+    const ids = unseen.length ? unseen : fallback;
+    const plan = {
+      version: 1,
+      createdAt: new Date().toISOString(),
+      startDate: todayKey(),
+      days,
+      minutes,
+      totalTasks: ids.length,
+      schedule: distributePlan(ids, days)
+    };
+    store.set(STUDY_PLAN_KEY, plan);
+    renderStudyCenter();
+    showSaveStatus("已建立 " + days + " 天學習計劃", "ok");
+  }
+
+  function goResumeStudy() {
+    const last = store.get("pl-last-viewed", "");
+    if (last && byId[last]) { location.hash = "#" + last; return; }
+    goNextUnseen();
+  }
+
+  function goNextUnseen() {
+    const target = FLAT.find(f => !viewed.has(f.exp.id)) || FLAT[0];
+    if (target) location.hash = "#" + target.exp.id;
+  }
+
+  function clearStudyPlan() {
+    localStorage.removeItem(STUDY_PLAN_KEY);
+    renderStudyCenter();
+    showSaveStatus("已清除學習計劃", "warn");
+  }
+
+  function syncPlanControls(plan) {
+    const select = $("#plan-days");
+    const customWrap = $("#custom-days-wrap");
+    const custom = $("#custom-days");
+    const minutes = $("#plan-minutes");
+    if (!select) return;
+    const days = plan ? plan.days : getPlanDaysValue();
+    const preset = ["7", "14", "30"].includes(String(days));
+    select.value = preset ? String(days) : "custom";
+    if (customWrap) customWrap.hidden = select.value !== "custom";
+    if (custom && !preset) custom.value = days;
+    if (minutes) minutes.value = plan ? plan.minutes : minutes.value;
+  }
+
+  function renderTodayTasks(plan, dayIndex) {
+    const list = $("#today-task-list");
+    if (!list) return;
+    list.innerHTML = "";
+    if (!plan || dayIndex < 0 || dayIndex >= plan.schedule.length) return;
+    const today = plan.schedule[dayIndex];
+    const visible = today.ids.slice(0, 7);
+    visible.forEach((id, index) => {
+      const f = byId[id];
+      if (!f) return;
+      const task = el("button", "today-task" + (viewed.has(id) ? " done" : ""), list);
+      task.type = "button";
+      const no = el("span", "today-task-index", task); no.textContent = String(index + 1).padStart(2, "0");
+      const name = el("span", "today-task-name", task); name.textContent = f.exp.title;
+      if (viewed.has(id)) { const check = el("span", "today-task-check", task); check.textContent = "完成"; }
+      task.addEventListener("click", () => location.hash = "#" + id);
+    });
+    if (today.ids.length > visible.length) {
+      const more = el("div", "today-task more", list);
+      const name = el("span", "today-task-name", more); name.textContent = "另外還有 " + (today.ids.length - visible.length) + " 個實驗，完成上方任務後可從側邊目錄繼續。";
+    }
+  }
+
+  function renderReviewFocus() {
+    const root = $("#review-focus-list");
+    if (!root) return;
+    root.innerHTML = "";
+    const modules = C.modules.map(mod => {
+      const done = mod.experiments.filter(exp => viewed.has(exp.id)).length;
+      const total = mod.experiments.length || 1;
+      return { mod, done, total, pct: done / total };
+    }).sort((a, b) => a.pct - b.pct || a.mod.no - b.mod.no).slice(0, 3);
+    modules.forEach(item => {
+      const row = el("button", "review-focus-item", root);
+      row.type = "button";
+      row.style.setProperty("--m-color", item.mod.color);
+      const name = el("span", "review-focus-name", row); name.textContent = "模組 " + item.mod.no + " · " + item.mod.title;
+      const meta = el("span", "review-focus-meta", row); meta.textContent = item.done + " / " + item.total;
+      const firstUnseen = item.mod.experiments.find(exp => !viewed.has(exp.id)) || item.mod.experiments[0];
+      row.addEventListener("click", () => { if (firstUnseen) location.hash = "#" + firstUnseen.id; });
+    });
+  }
+
+  function renderStudyCenter() {
+    const title = $("#today-plan-title");
+    const summary = $("#today-plan-summary");
+    if (!title || !summary) return;
+    const plan = store.get(STUDY_PLAN_KEY, null);
+    syncPlanControls(plan);
+    const allPlanned = plan ? plan.schedule.flatMap(day => day.ids).filter(id => byId[id]) : [];
+    const allDone = allPlanned.filter(id => viewed.has(id)).length;
+    const currentIndex = plan ? dayDiff(plan.startDate) : -1;
+    const today = plan && currentIndex >= 0 && currentIndex < plan.schedule.length ? plan.schedule[currentIndex] : null;
+    const todayTotal = today ? today.ids.length : 0;
+    const todayDone = today ? today.ids.filter(id => viewed.has(id)).length : 0;
+    const pct = todayTotal ? Math.round(todayDone / todayTotal * 100) : 0;
+    const fill = $("#today-progress-fill"); if (fill) fill.style.width = pct + "%";
+    const progressText = $("#today-progress-text"); if (progressText) progressText.textContent = todayDone + " / " + todayTotal;
+    const progressPct = $("#today-progress-percent"); if (progressPct) progressPct.textContent = pct + "%";
+    renderReviewFocus();
+
+    if (!plan) {
+      title.textContent = "尚未建立計劃";
+      summary.textContent = "選擇天數後，系統會把尚未完成的實驗平均分配到每日任務。";
+      renderTodayTasks(null, -1);
+      return;
+    }
+    if (currentIndex >= plan.schedule.length) {
+      title.textContent = "計劃已走完";
+      summary.textContent = "這份 " + plan.days + " 天計劃共安排 " + plan.totalTasks + " 個實驗，目前已完成 " + allDone + " 個。可以重新建立下一輪複習。";
+      renderTodayTasks(null, -1);
+      return;
+    }
+    title.textContent = "第 " + (currentIndex + 1) + " 天 · " + plan.minutes + " 分鐘";
+    summary.textContent = "今日安排 " + todayTotal + " 個實驗；整份計劃已完成 " + allDone + " / " + allPlanned.length + " 個。";
+    renderTodayTasks(plan, currentIndex);
+  }
+
   function openExp(id) {
     const f = byId[id];
     if (!f) { location.hash = ""; return; }
@@ -534,6 +767,7 @@
 
   /* ------------------------------- 進度 ------------------------------- */
   function markViewed(id) {
+    store.set("pl-last-viewed", id);
     if (!viewed.has(id)) { viewed.add(id); store.set("pl-progress", [...viewed]); }
     refreshViewedMarks();
   }
@@ -544,9 +778,10 @@
     const pct = Math.round(viewed.size / C.totalExperiments * 100);
     const fill = $("#progress-fill"); if (fill) fill.style.width = pct + "%";
     const lab = $("#progress-count"); if (lab) lab.textContent = viewed.size + " / " + C.totalExperiments;
+    renderStudyCenter();
   }
   function resetProgress() {
-    viewed = new Set(); store.set("pl-progress", []); refreshViewedMarks();
+    viewed = new Set(); store.set("pl-progress", []); localStorage.removeItem("pl-last-viewed"); refreshViewedMarks();
   }
 
   /* ------------------------------- 搜尋 ------------------------------- */
@@ -767,6 +1002,7 @@
     auditCheckpointBank();
     buildSidebar();
     buildHome();
+    renderStudyCenter();
     applyTheme(store.get("pl-theme", "dark"));
 
     $("#theme-toggle").addEventListener("click", () => {
@@ -779,6 +1015,19 @@
     $("#hero-start").addEventListener("click", () => location.hash = "#" + FLAT[0].exp.id);
     $("#hero-browse").addEventListener("click", () => $("#module-grid").scrollIntoView({ behavior: "smooth" }));
     $("#btn-reset").addEventListener("click", resetProgress);
+    $("#btn-export-save").addEventListener("click", exportLearningSave);
+    $("#home-export-save").addEventListener("click", exportLearningSave);
+    $("#btn-import-save").addEventListener("click", () => $("#import-save-file").click());
+    $("#home-import-save").addEventListener("click", () => $("#import-save-file").click());
+    $("#import-save-file").addEventListener("change", event => {
+      importLearningSave(event.target.files && event.target.files[0]);
+      event.target.value = "";
+    });
+    $("#plan-days").addEventListener("change", () => syncPlanControls(store.get(STUDY_PLAN_KEY, null)));
+    $("#btn-create-plan").addEventListener("click", createStudyPlan);
+    $("#btn-clear-plan").addEventListener("click", clearStudyPlan);
+    $("#btn-resume-study").addEventListener("click", goResumeStudy);
+    $("#btn-next-unseen").addEventListener("click", goNextUnseen);
 
     const search = $("#search-input");
     search.addEventListener("input", () => runSearch(search.value));
