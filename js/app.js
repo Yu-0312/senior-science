@@ -372,6 +372,90 @@
     }
   }
 
+  function compactText(text, fallback, limit) {
+    const raw = String(text || fallback || "").replace(/<[^>]*>/g, "").replace(/\\[()[\]]/g, "").replace(/\s+/g, " ").trim();
+    return raw.length > limit ? raw.slice(0, limit - 1) + "…" : raw;
+  }
+
+  function getPracticeDone() {
+    return new Set(store.get("pl-practice-done", []));
+  }
+
+  function setPracticeDone(id, done) {
+    const state = getPracticeDone();
+    if (done) state.add(id); else state.delete(id);
+    store.set("pl-practice-done", [...state]);
+  }
+
+  function buildPracticeQuestions(f) {
+    const { exp, mod } = f;
+    const points = Array.isArray(exp.points) && exp.points.length ? exp.points : [exp.concept || exp.title];
+    const core = compactText(points[0], exp.title, 72);
+    const support = compactText(points[1] || exp.concept, exp.title, 72);
+    const formula = compactText(exp.formula, "本實驗的關鍵公式", 86);
+    const bridge = TEXTBOOK_BRIDGES[mod.id] || {};
+    return [
+      {
+        type: "觀念判斷",
+        prompt: "先不看解析：在「" + exp.title + "」中，若只改變一個主要參數，你預期最明顯改變的物理量是什麼？請用「" + core + "」說明理由。",
+        hint: "操作模擬時一次只動一個滑桿，先看讀數，再看圖形的斜率、面積或峰值是否同步改變。",
+        answer: "重點是把參數變化連回核心概念：" + core + "。若觀察結果不同，通常代表還有另一個條件沒有固定。"
+      },
+      {
+        type: "公式練習",
+        prompt: "把公式「" + formula + "」改寫成解題步驟：已知量先列哪幾個？未知量要從哪個關係式求出？",
+        hint: "先圈出公式中的每個符號，確認單位一致，再決定要代入、比例比較，還是看圖讀值。",
+        answer: "可先列出已知量與目標量，再固定其他量做比例推論；本題可連到：" + support + "。"
+      },
+      {
+        type: "操作挑戰",
+        prompt: "用模擬做一次小實驗：選兩組不同設定，記錄讀數差異，並寫一句話說明哪一組更符合「" + (bridge.exam || "先選模型再代入條件") + "」。",
+        hint: "建議用 A/B 對照：A 組維持預設，B 組只改一個參數；最後比較兩組讀數或圖形形狀。",
+        answer: "理想答案要包含三件事：改了哪個量、讀數如何變、這個變化如何支持本實驗的模型。"
+      }
+    ];
+  }
+
+  function renderPractice(f) {
+    const root = $("#practice-list");
+    if (!root) return;
+    const done = getPracticeDone();
+    root.innerHTML = "";
+    buildPracticeQuestions(f).forEach((q, index) => {
+      const id = f.exp.id + "-q" + index;
+      const item = el("article", "practice-item", root);
+      const head = el("div", "practice-head", item);
+      const type = el("span", "practice-type", head); type.textContent = "Q" + (index + 1) + " · " + q.type;
+      const status = el("span", "practice-status", head); status.textContent = done.has(id) ? "已完成" : "待練習";
+      const prompt = el("p", "practice-question", item); prompt.textContent = q.prompt;
+      const actions = el("div", "practice-actions", item);
+      const hintBtn = el("button", "practice-btn", actions); hintBtn.type = "button"; hintBtn.textContent = "看提示"; hintBtn.setAttribute("aria-expanded", "false");
+      const answerBtn = el("button", "practice-btn", actions); answerBtn.type = "button"; answerBtn.textContent = "看解析"; answerBtn.setAttribute("aria-expanded", "false");
+      const doneBtn = el("button", "practice-btn done" + (done.has(id) ? " is-complete" : ""), actions); doneBtn.type = "button"; doneBtn.textContent = done.has(id) ? "已完成" : "標記完成";
+      const hint = el("div", "practice-detail", item); hint.hidden = true;
+      const hintLabel = el("strong", null, hint); hintLabel.textContent = "提示：";
+      hint.append(document.createTextNode(q.hint));
+      const answer = el("div", "practice-detail", item); answer.hidden = true;
+      const answerLabel = el("strong", null, answer); answerLabel.textContent = "解析：";
+      answer.append(document.createTextNode(q.answer));
+      hintBtn.addEventListener("click", () => {
+        hint.hidden = !hint.hidden;
+        hintBtn.setAttribute("aria-expanded", String(!hint.hidden));
+      });
+      answerBtn.addEventListener("click", () => {
+        answer.hidden = !answer.hidden;
+        answerBtn.setAttribute("aria-expanded", String(!answer.hidden));
+      });
+      doneBtn.addEventListener("click", () => {
+        const nextDone = !doneBtn.classList.contains("is-complete");
+        doneBtn.classList.toggle("is-complete", nextDone);
+        doneBtn.textContent = nextDone ? "已完成" : "標記完成";
+        status.textContent = nextDone ? "已完成" : "待練習";
+        setPracticeDone(id, nextDone);
+      });
+    });
+  }
+
   function openExp(id) {
     const f = byId[id];
     if (!f) { location.hash = ""; return; }
@@ -413,6 +497,7 @@
     $("#guide-formula").innerHTML = exp.formula;
     const ul = $("#guide-points"); ul.innerHTML = "";
     exp.points.forEach(p => { const li = el("li", null, ul); li.textContent = p; });
+    renderPractice(f);
     typeset($("#guide-formula"));
 
     // 上一個 / 下一個
