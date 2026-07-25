@@ -17,6 +17,20 @@
   FLAT.forEach((f, i) => { f.order = i; byId[f.exp.id] = f; });
   const LEARNING_PATHS = Array.isArray(C.learningPaths) ? C.learningPaths : [];
   let activeLearningPath = LEARNING_PATHS[0] ? LEARNING_PATHS[0].id : "";
+  const TEXTBOOK_BRIDGES = {
+    kinematics: { junior: "國中自然：速率、平均速度與運動記錄", senior: "高中物理：直線運動、向量與運動圖像", next: "大學普通物理：運動的微分與積分描述", observe: "固定其他條件，只改變一個初始量，對照位置、速度、加速度與圖形。", exam: "遇到題目先選定參考方向，再用圖形的斜率或面積把文字情境翻成物理量。" },
+    newton: { junior: "國中自然：力、摩擦力與生活中的運動", senior: "高中物理：牛頓運動定律、受力圖與平衡", next: "大學力學：多自由度系統與拉格朗日建模", observe: "先辨認每一個力的方向，再改變外力、質量或摩擦力，觀察加速度與平衡如何改變。", exam: "遇到題目先畫受力圖，選座標軸後才列合力方程；摩擦力方向要看相對滑動趨勢。" },
+    momentum: { junior: "國中自然：碰撞、反作用與安全緩衝", senior: "高中物理：動量、衝量與碰撞守恆", next: "大學力學：質心系與多維碰撞", observe: "比較作用前後的速度與方向，先圈出系統邊界，再看總量是否改變。", exam: "先判斷碰撞時間內外力衝量是否可忽略；能守恆的是系統總動量，不一定是每個物體的動量。" },
+    energy: { junior: "國中自然：能量轉換、功與簡單機械", senior: "高中物理：功能定理、位能與力學能守恆", next: "大學力學：保守力、勢能函數與廣義能量", observe: "追蹤同一時刻的動能、位能與耗散能，並比較總量是否維持不變。", exam: "先選系統與參考面，再判斷摩擦、外力或彈力是否讓你能直接使用能量守恆。" },
+    gravity: { junior: "國中自然：重力、重量與天體觀察", senior: "高中物理：圓周運動、萬有引力與衛星", next: "大學力學：軌道、角動量與二體問題", observe: "分開看速度方向、加速度方向與向心力來源，再調整半徑或速率比較關係。", exam: "不要把向心力當成新的一種力；先找出是哪一個真實力提供指向圓心的合力。" },
+    shm: { junior: "國中自然：週期運動、擺與彈簧", senior: "高中物理：簡諧運動、週期、相位與共振", next: "大學物理：微分方程、相空間與受迫振動", observe: "改變振幅、質量或勁度後，同時看位置、速度、能量與時間圖形的相位關係。", exam: "先辨認平衡位置與恢復力方向，再從週期、振幅或相位讀出題目要求的量。" },
+    thermal: { junior: "國中自然：溫度、熱傳遞與物態變化", senior: "高中物理：熱力學、氣體、流體與熱機", next: "大學熱學：狀態方程、熵與不可逆過程", observe: "先分清系統吸熱或放熱，再改變一個狀態量，對照溫度、壓力、體積與能量。", exam: "先寫出系統邊界與能量流向；熱、溫度與內能不是同一個量，單位與守恆條件也不同。" },
+    waves: { junior: "國中自然：波、聲音與振動現象", senior: "高中物理：波速、疊加、干涉、駐波與都卜勒效應", next: "大學物理：傅立葉分析、波動方程與頻譜", observe: "固定介質條件後改變頻率、振幅或相位，觀察波長、節點與合成波如何變化。", exam: "先寫 v=fλ，再依題意判斷哪一個量由波源決定、哪一個量由介質決定。" },
+    optics: { junior: "國中自然：光的直進、反射、折射與色光", senior: "高中物理：幾何光學、干涉、繞射與偏振", next: "大學光學：波前、近場繞射與光譜", observe: "改變光源、元件位置或波長，對照光路、像的位置、條紋或光強分布。", exam: "先畫光路或幾何圖，標出已知距離與角度；再決定應使用成像、折射或波動關係。" },
+    electric: { junior: "國中自然：電流、電壓、電阻與生活電路", senior: "高中物理：電場、直流電路、電容與交流電路", next: "大學電磁學：微分方程、頻率響應與訊號處理", observe: "每次只改一個元件或電源參數，同時讀取電壓、電流與圖形，找出因果關係。", exam: "先標示電流方向、節點與量測位置；串並聯、基爾霍夫定律與能量觀點要依電路結構選用。" },
+    magnetism: { junior: "國中自然：磁鐵、磁場與電流磁效應", senior: "高中物理：安培力、電磁感應、馬達與發電機", next: "大學電磁學：場的疊加、畢奧－沙伐定律與感應方程", observe: "切換電流、磁場或運動方向，先預測再核對向量、指針與感應電壓的方向。", exam: "方向題先用右手定則或楞次定律，大小題再代入向量夾角與有效長度。" },
+    modern: { junior: "國中自然：原子、輻射、光譜與宇宙觀察", senior: "高中物理：光電效應、原子模型、核物理與相對論", next: "大學現代物理：量子態、能階與統計詮釋", observe: "改變能量尺度、波長或量子數，觀察量測值是否呈現門檻、離散或統計分布。", exam: "先辨認題目是守恆、量子化、相對論或統計問題；不要把微觀事件的隨機性當成公式失效。" }
+  };
 
   function auditCurriculum() {
     const ids = FLAT.map(f => f.exp.id);
@@ -186,6 +200,60 @@
     if (next && byId[next.id]) makeExperimentPathStep(steps, "下一步", byId[next.id], false);
   }
 
+  function renderLearningOutput(f) {
+    const root = $("#learning-output");
+    if (!root) return;
+    const { exp, mod } = f;
+    const bridge = TEXTBOOK_BRIDGES[mod.id] || {
+      junior: "國中自然：以生活現象建立直覺", senior: "高中物理：以模型、圖像與量測建立關係", next: "大學入門：以更一般的數學模型延伸", observe: "每次只改變一個條件，對照讀數、圖像與現象。", exam: "先把題目的情境翻成物理量與關係式，再選擇合適模型。"
+    };
+    root.innerHTML = "";
+
+    const heading = el("div", "learning-output-heading", root);
+    const eyebrow = el("span", "learning-output-eyebrow", heading); eyebrow.textContent = "學習閉環 · 本次實驗";
+    const title = el("h3", "learning-output-title", heading); title.textContent = "玩完後，你要能帶走什麼？";
+    const intro = el("p", "learning-output-intro", heading); intro.textContent = "不是只看到現象，而是把操作、課本概念與解題方法連成一條線。";
+
+    const grid = el("div", "learning-output-grid", root);
+    const observe = el("article", "learning-output-step observe", grid);
+    const observeNo = el("span", "learning-output-no", observe); observeNo.textContent = "01 · 操作時先看";
+    const observeCopy = el("p", "learning-output-copy", observe); observeCopy.textContent = bridge.observe;
+
+    const textbook = el("article", "learning-output-step textbook", grid);
+    const textbookNo = el("span", "learning-output-no", textbook); textbookNo.textContent = "02 · 課本接在哪裡";
+    const textbookList = el("dl", "textbook-bridge", textbook);
+    [["國中打底", bridge.junior], ["高中課本", bridge.senior], ["大學延伸", bridge.next]].forEach(([label, text]) => {
+      const row = el("div", "textbook-bridge-row", textbookList);
+      const term = el("dt", null, row); term.textContent = label;
+      const desc = el("dd", null, row); desc.textContent = text;
+    });
+
+    const takeaway = el("article", "learning-output-step takeaway", grid);
+    const takeawayNo = el("span", "learning-output-no", takeaway); takeawayNo.textContent = "03 · 玩完能帶走";
+    const points = el("ul", "learning-takeaways", takeaway);
+    exp.points.slice(0, 3).forEach(point => { const item = el("li", null, points); item.textContent = point; });
+
+    const transfer = el("div", "learning-transfer", root);
+    const transferLabel = el("span", "learning-transfer-label", transfer); transferLabel.textContent = "解題轉換";
+    const transferCopy = el("p", "learning-transfer-copy", transfer); transferCopy.textContent = bridge.exam;
+
+    const reflection = el("div", "learning-reflection", root);
+    const reflectionHead = el("div", "learning-reflection-head", reflection);
+    const label = el("label", "learning-reflection-label", reflectionHead); label.htmlFor = "learning-reflection-input"; label.textContent = "一句話結論";
+    const prompt = el("p", "learning-reflection-prompt", reflectionHead);
+    prompt.textContent = "改變一個參數後，請用「" + (exp.points[0] || exp.title) + "」解釋讀數或圖形為什麼改變。";
+    const input = el("textarea", "learning-reflection-input", reflection); input.id = "learning-reflection-input"; input.maxLength = 240;
+    input.placeholder = "寫下你的觀察與原因…";
+    input.value = store.get("pl-reflection-" + exp.id, "");
+    const actions = el("div", "learning-reflection-actions", reflection);
+    const saved = el("span", "learning-reflection-saved", actions); saved.textContent = input.value ? "已儲存於這台裝置" : "";
+    const save = el("button", "learning-reflection-save", actions); save.type = "button"; save.textContent = "儲存結論";
+    save.addEventListener("click", () => {
+      store.set("pl-reflection-" + exp.id, input.value.trim());
+      saved.textContent = input.value.trim() ? "已儲存於這台裝置" : "已清除這則結論";
+    });
+  }
+
   function buildHome() {
     const heroExperimentCount = $("#hero-exp-count");
     if (heroExperimentCount) heroExperimentCount.textContent = C.totalExperiments;
@@ -242,6 +310,7 @@
     $("#exp-title").textContent = exp.title;
     $("#exp-lead").textContent = exp.concept;
     renderExperimentLearningPath(id);
+    renderLearningOutput(f);
 
     // 模擬工作區
     const simRoot = $("#sim-root");

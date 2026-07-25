@@ -365,6 +365,38 @@ button.exp-path-step:hover { border-color: var(--m-color, var(--accent)); backgr
 .exp-path-label { display: block; color: var(--text-faint); font-size: 10px; letter-spacing: 0.6px; }
 .exp-path-title { display: block; margin-top: 2px; overflow-wrap: anywhere; color: inherit; font-size: 12px; line-height: 1.45; }
 
+/* 將操作、課本與解題轉成每次實驗都能帶走的學習輸出。 */
+.learning-output { margin: 0 0 22px; padding: 17px 0 15px; border-top: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); }
+.learning-output-heading { max-width: 780px; }
+.learning-output-eyebrow { color: var(--m-color, var(--accent)); font-size: 10.5px; font-weight: 800; letter-spacing: 1.3px; }
+.learning-output-title { margin: 3px 0 0; color: var(--text); font-size: 19px; letter-spacing: 0; }
+.learning-output-intro { margin: 5px 0 0; color: var(--text-dim); font-size: 12.5px; line-height: 1.65; }
+.learning-output-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-top: 16px; }
+.learning-output-step { min-width: 0; padding: 0 18px; border-left: 1px solid var(--border-soft); }
+.learning-output-step:first-child { padding-left: 0; border-left: 0; }
+.learning-output-no { display: block; color: var(--m-color, var(--accent)); font-size: 10.5px; font-weight: 800; letter-spacing: 1px; }
+.learning-output-copy { margin: 7px 0 0; color: var(--text); font-size: 12.5px; line-height: 1.7; }
+.textbook-bridge { display: grid; gap: 5px; margin: 7px 0 0; }
+.textbook-bridge-row { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 7px; }
+.textbook-bridge dt { color: var(--text-faint); font-size: 10.5px; font-weight: 700; }
+.textbook-bridge dd { min-width: 0; margin: 0; color: var(--text); font-size: 11.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.learning-takeaways { display: grid; gap: 5px; margin: 7px 0 0; padding: 0; list-style: none; }
+.learning-takeaways li { position: relative; padding-left: 16px; color: var(--text); font-size: 12px; line-height: 1.55; }
+.learning-takeaways li::before { content: ""; position: absolute; left: 3px; top: 7px; width: 6px; height: 6px; border: 1px solid var(--m-color, var(--accent)); border-radius: 50%; }
+.learning-transfer { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 11px; align-items: baseline; margin-top: 16px; padding: 10px 12px; border-left: 2px solid var(--m-color, var(--accent)); background: color-mix(in srgb, var(--m-color, var(--accent)) 7%, transparent); }
+.learning-transfer-label { color: var(--m-color, var(--accent)); font-size: 11px; font-weight: 800; letter-spacing: 0.7px; }
+.learning-transfer-copy { margin: 0; color: var(--text); font-size: 12.5px; line-height: 1.65; }
+.learning-reflection { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border); }
+.learning-reflection-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+.learning-reflection-label { color: var(--text); font-size: 13px; font-weight: 750; }
+.learning-reflection-prompt { flex: 1; margin: 0; color: var(--text-dim); font-size: 11.5px; line-height: 1.55; text-align: right; }
+.learning-reflection-input { width: 100%; min-height: 62px; margin-top: 8px; padding: 9px 10px; resize: vertical; border: 1px solid var(--border); border-radius: 6px; outline: none; background: var(--panel-2); color: var(--text); font: inherit; font-size: 12.5px; line-height: 1.55; }
+.learning-reflection-input:focus { border-color: var(--m-color, var(--accent)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--m-color, var(--accent)) 12%, transparent); }
+.learning-reflection-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 7px; }
+.learning-reflection-saved { color: var(--text-faint); font-size: 10.5px; }
+.learning-reflection-save { min-height: 30px; padding: 0 10px; border: 1px solid var(--m-color, var(--accent)); border-radius: 6px; cursor: pointer; background: transparent; color: var(--m-color, var(--accent)); font: inherit; font-size: 11.5px; font-weight: 750; }
+.learning-reflection-save:hover { background: color-mix(in srgb, var(--m-color, var(--accent)) 10%, transparent); }
+
 .content-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
 
 .card {
@@ -698,6 +730,13 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   .exp-path-heading { align-items: flex-start; flex-direction: column; gap: 2px; }
   .exp-path-summary { white-space: normal; }
   .exp-path-steps { grid-template-columns: 1fr; }
+  .learning-output { margin-bottom: 18px; }
+  .learning-output-grid { grid-template-columns: 1fr; gap: 14px; }
+  .learning-output-step { padding: 0; border-left: 0; }
+  .learning-output-step + .learning-output-step { padding-top: 14px; border-top: 1px solid var(--border-soft); }
+  .learning-reflection-head { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .learning-reflection-prompt { text-align: left; }
+  .learning-transfer { grid-template-columns: 1fr; gap: 3px; }
   .license-topbar { padding: 15px 18px; }
   .license-page { width: min(100% - 28px, 980px); margin-top: 30px; }
   .license-page h1 { font-size: 29px; }
