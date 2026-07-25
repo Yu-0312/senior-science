@@ -215,30 +215,63 @@
   /* 大霹靂與哈伯定律 */
   PL.register("hubble", { build(root) {
     const L = PL.ui.layout(root);
-    const cv = PL.canvas.create(L.canvasWrap, 0.6);
-    let galaxies = [], t = 0;
-    const sH = PL.ui.slider(L.controls, { label: "哈伯常數 H₀", min: 40, max: 100, step: 5, value: 70, unit: "km/s/Mpc", digits: 0, onInput: draw });
-    PL.ui.note(L.controls, "越遠的星系退行越快：v = H₀ d。這是宇宙整體膨脹的證據，遠方星系呈現紅移。");
-    const rV = PL.ui.readout(L.readouts, { label: "最遠星系退行速度", unit: "km/s" });
-    for (let i = 0; i < 7; i++) galaxies.push({ d: 20 + i * 55 + Math.random() * 10, y: 0 });
+    const cv = PL.canvas.create(L.canvasWrap, 0.68, 920);
+    const distances = [12, 28, 47, 76, 108, 145, 190, 248, 312];
+    let galaxies = [];
+    const sH = PL.ui.slider(L.controls, { label: "假設的哈伯常數 H₀", min: 55, max: 85, step: 1, value: 70, unit: "km/s/Mpc", digits: 0, onInput: draw });
+    const sNoise = PL.ui.slider(L.controls, { label: "觀測雜訊 σ", min: 0, max: 280, step: 10, value: 120, unit: "km/s", digits: 0, onInput: draw });
+    const sGalaxy = PL.ui.select(L.controls, { label: "觀測星系", value: "4", options: distances.map((distance, index) => ({ value: String(index), label: "星系 " + (index + 1) + " · " + distance + " Mpc" })), onChange: draw });
+    const row = PL.ui.buttonRow(L.controls);
+    PL.ui.button(row, "重新觀測樣本", () => { makeGalaxies(); draw(); }, { primary: true });
+    PL.ui.note(L.controls, "先選一個星系，讀出譜線向紅端位移的紅移 z；再看下方所有星系的距離—退行速度散點圖。最佳擬合線的斜率就是 H₀。單一資料點有雜訊，趨勢要用一組資料判讀。");
+    const rD = PL.ui.readout(L.readouts, { label: "選取星系距離 d", unit: "Mpc" });
+    const rV = PL.ui.readout(L.readouts, { label: "量得退行速度 v", unit: "km/s" });
+    const rZ = PL.ui.readout(L.readouts, { label: "紅移 z", unit: "×10⁻³" });
+    const rFit = PL.ui.readout(L.readouts, { label: "資料擬合 H₀", unit: "km/s/Mpc" });
+    function normal() {
+      const u = Math.max(1e-8, Math.random()), v = Math.max(1e-8, Math.random());
+      return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v);
+    }
+    function makeGalaxies() { galaxies = distances.map(d => ({ d, residual: normal() })); }
+    function velocity(galaxy) { return Math.max(0, sH.get() * galaxy.d + galaxy.residual * sNoise.get()); }
+    function fittedH0() {
+      let sumDV = 0, sumD2 = 0;
+      galaxies.forEach(galaxy => { const v = velocity(galaxy); sumDV += galaxy.d * v; sumD2 += galaxy.d * galaxy.d; });
+      return sumDV / sumD2;
+    }
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const H0 = sH.get(), oy = H * 0.4, ox = 40;
-      // 我方星系
-      D.disc(ctx, ox, oy, 8, { fill: "#fff", glow: "#fff", glowSize: 8 }); D.text(ctx, "銀河系", ox, oy + 22, { color: PL.col("text-dim"), size: 10, align: "center" });
-      galaxies.forEach((g, i) => { const x = ox + g.d, v = H0 * (g.d / 55); if (x < W - 20) { const z = PL.clamp(v / 700, 0, 1); D.disc(ctx, x, oy, 6, { fill: `rgb(${Math.round(160 + 90 * z)},${Math.round(140 - 80 * z)},${Math.round(160 - 60 * z)})`, glow: MC(), glowSize: 5 }); D.arrow(ctx, x, oy, x + v * 0.05, oy, { color: PL.col("danger"), width: 1.6 }); } });
-      // v–d 圖
-      const bx = 40, by = H * 0.55, bw = W - 80, bh = H * 0.36;
-      const g2 = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: 8, y0: 0, y1: H0 * 8 * 1.1 });
-      g2.frame({ title: "退行速度 – 距離（哈伯定律 v = H₀d）", xlabel: "距離 (相對)", ylabel: "v" }); g2.grid(4, 4);
-      g2.fn(d => H0 * d, { color: MC(), width: 2.2 });
-      galaxies.forEach(g => g2.dot(g.d / 55, H0 * (g.d / 55), { color: PL.col("accent-2") }));
-      rV.set(H0 * (galaxies[galaxies.length - 1].d / 55), 0);
+      const selected = galaxies[PL.clamp(+sGalaxy.get(), 0, galaxies.length - 1)], v = velocity(selected), z = v / 300000, fit = fittedH0();
+      const sx = 36, sy = 38, sw = W - 72, sh = H * 0.31;
+      D.rect(ctx, sx, sy, sw, sh, { fill: "rgba(5,10,18,0.5)", stroke: "rgba(255,255,255,0.18)", width: 1, r: 7 });
+      D.text(ctx, "光譜儀：以吸收譜線的位移量測紅移", sx + 16, sy + 20, { color: PL.col("text"), size: 12, weight: "700" });
+      D.text(ctx, "示意比例放大", sx + sw - 16, sy + 20, { color: PL.col("text-faint"), size: 9, align: "right" });
+      const start = sx + 66, end = sx + sw - 34, spectrumY = sy + sh * 0.53;
+      const wavelengthToX = wavelength => start + (wavelength - 400) / 320 * (end - start);
+      const shift = Math.min(sw * 0.25, z * sw * 3.4);
+      D.line(ctx, start, spectrumY - 21, end, spectrumY - 21, "rgba(210,222,240,0.58)", 6);
+      D.line(ctx, start, spectrumY + 29, end, spectrumY + 29, "rgba(255,110,112,0.55)", 6);
+      [430, 486, 517, 656].forEach(wavelength => {
+        const x = wavelengthToX(wavelength);
+        D.line(ctx, x, spectrumY - 30, x, spectrumY - 12, "#111827", 3);
+        D.line(ctx, x + shift, spectrumY + 20, x + shift, spectrumY + 38, "#111827", 3);
+      });
+      D.text(ctx, "實驗室參考譜線 λ₀", sx + 18, spectrumY - 15, { color: PL.col("text-faint"), size: 9 });
+      D.text(ctx, "星系 " + (+sGalaxy.get() + 1) + " 觀測譜線 λ", sx + 18, spectrumY + 35, { color: PL.col("danger"), size: 9 });
+      D.arrow(ctx, wavelengthToX(517), spectrumY + 53, wavelengthToX(517) + shift, spectrumY + 53, { color: MC(), width: 1.8, label: "Δλ" });
+      D.text(ctx, "z = Δλ / λ₀ = " + PL.fmt(z * 1000, 2) + " ×10⁻³", sx + sw * 0.7, sy + sh - 15, { color: MC(), size: 10.5, align: "center", weight: "700" });
+
+      const bx = 50, by = H * 0.49, bw = W - 100, bh = H * 0.41;
+      const ymax = Math.max(500, ...galaxies.map(velocity)) * 1.16;
+      const graph = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: 350, y0: 0, y1: ymax });
+      graph.frame({ title: "星系觀測資料：v–d 散點圖", xlabel: "距離 d (Mpc)", ylabel: "退行速度 v (km/s)" }); graph.grid(7, 5);
+      graph.fn(distance => fit * distance, { color: MC(), width: 2.4 });
+      galaxies.forEach((galaxy, index) => graph.dot(galaxy.d, velocity(galaxy), { color: index === +sGalaxy.get() ? PL.col("warn") : PL.col("accent-2"), glow: index === +sGalaxy.get() ? PL.col("warn") : undefined, r: index === +sGalaxy.get() ? 5 : 3.8 }));
+      graph.label(205, fit * 205 + ymax * 0.05, "最佳擬合斜率 = " + PL.fmt(fit, 1) + " km/s/Mpc", { color: MC(), size: 10 });
+      rD.set(selected.d, 0); rV.set(v, 0); rZ.set(z * 1000, 2); rFit.set(fit, 1);
     }
-    const anim = PL.loop(dt => { if (dt) { t += dt; galaxies.forEach(g => { g.d += sH.get() * (g.d / 55) * dt * 0.05; if (ox_off(g)) g.d = 20 + Math.random() * 20; }); } draw(); });
-    function ox_off(g) { return 40 + g.d > cv.W - 20; }
-    cv.onResize(draw); anim.start();
-    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+    makeGalaxies(); cv.onResize(draw); draw();
+    return { stop() { cv.destroy(); }, rerender: draw };
   }});
 
   /* 密立根油滴實驗 */

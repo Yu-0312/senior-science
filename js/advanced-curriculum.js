@@ -11,7 +11,7 @@
       { id: "terminal-velocity", title: "空氣阻力與終端速度", interactive: I, concept: "落體速度提高後空氣阻力增大；當阻力與重力平衡，合力為零，物體便以終端速度等速下落。", formula: R`\( mg = bv_t^2,\quad v_t=\sqrt{mg/b} \)`, points: ["阻力方向永遠反向速度", "終端速度時加速度為零", "面積大或介質稠密時終端速度較小", "雨滴與降落傘都是實例"] },
       { id: "regression-lab", title: "最小平方法與殘差分析", interactive: I, concept: "對含有量測雜訊的資料做線性擬合，利用斜率、截距與殘差判讀模型是否合理。", formula: R`\( y=mx+b,\quad \text{SSE}=\sum_i(y_i-\hat y_i)^2 \)`, points: ["擬合線不必通過每個資料點", "殘差顯示偏離模型的程度", "斜率連結物理常數", "隨機雜訊與系統誤差不同"] },
       { id: "experimental-design", title: "實驗設計與變因控制", interactive: I, concept: "先選擇自變因、量測應變因並固定控制變因，才能讓資料回答單一明確的物理問題。", formula: R`\( y=f(x)\quad(\text{其他條件固定}) \)`, points: ["一次只改變主要自變因", "控制變因讓比較公平", "重複量測提高可靠度", "需先寫出可檢驗的預測"] },
-      { id: "error-propagation", title: "不確定度傳遞", interactive: I, concept: "由多個量測值計算的新物理量也會帶有不確定度；比較不同儀器精度對結果的影響。", formula: R`\( \frac{\Delta Q}{Q}\approx\frac{\Delta A}{A}+\frac{\Delta B}{B} \)`, points: ["相對不確定度適合乘除關係", "小量測誤差會傳到最終結果", "先改善最大的誤差來源", "報告結果需帶不確定度"] },
+      { id: "error-propagation", title: "不確定度傳遞", interactive: I, concept: "先把正方形邊長 L 的量測範圍畫出來，再比較最小、名義與最大面積；平方關係會使面積的相對不確定度約為邊長的兩倍。", formula: R`\( A=L^2,\quad \frac{\Delta A}{A}\approx2\frac{\Delta L}{L} \)`, points: ["先畫出原始量的可能範圍", "平方關係會放大相對不確定度", "結果應同時呈現數值與範圍", "優先改善占比最大的誤差來源"] },
       { id: "dimensional-analysis", title: "量綱分析與公式檢核", interactive: I, concept: "以基本量綱 M、L、T 檢查公式兩邊是否一致，並用量綱推測未知關係的形式。", formula: R`\( [F]=MLT^{-2},\quad [E]=ML^2T^{-2} \)`, points: ["等式兩側量綱必須相同", "量綱不能決定無量綱常數", "可快速排除錯誤公式", "單位換算需保持量綱一致"] }
     ],
     newton: [

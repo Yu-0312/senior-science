@@ -122,12 +122,52 @@
       if (cfg.kind === "magnetic") { for (let i = 0; i < 7; i++) D.ring(ctx, W * 0.5, cy, 24 + i * 8, "rgba(201,140,255,0.18)", 1); D.arrow(ctx, W * 0.5, cy, W * 0.5 + 45, cy, { color: PL.col("accent-2"), width: 2, label: "B" }); }
       if (cfg.kind === "field") { for (let y = top + 24; y < bottom; y += 25) D.arrow(ctx, left + 46, y, right - 46, y, { color: PL.col("accent-2"), width: 1 }); }
       fillPill(ctx, W - 154, 20, "儀表讀數", PL.fmt(value, 2), 132, c);
+    } else if (cfg.kind === "nuclear") {
+      const sourceX = W * 0.14, targetX = W * 0.51, detectorX = W * 0.84;
+      D.rect(ctx, sourceX - 24, cy - 32, 48, 64, { fill: "rgba(255,183,77,0.12)", stroke: PL.col("warn"), width: 2, r: 5 });
+      D.text(ctx, "粒子束", sourceX, cy + 5, { color: PL.col("warn"), size: 11, align: "center", weight: "700" });
+      for (let i = 0; i < 4; i++) D.arrow(ctx, sourceX + 32, cy - 24 + i * 16, targetX - 34, cy - 12 + i * 8, { color: PL.col("accent-2"), width: 1.5 });
+      D.disc(ctx, targetX, cy, 28, { fill: "rgba(255,107,107,0.18)", stroke: PL.col("danger"), width: 2, glow: PL.col("danger"), glowSize: 9 });
+      D.text(ctx, "靶核", targetX, cy + 5, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
+      D.disc(ctx, targetX + 50, cy - 28, 8, { fill: c, glow: c, glowSize: 8 }); D.disc(ctx, targetX + 66, cy + 24, 6, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 7 });
+      D.arrow(ctx, targetX + 28, cy - 10, detectorX - 34, cy - 42, { color: c, width: 2, label: "產物" });
+      D.arrow(ctx, targetX + 28, cy + 10, detectorX - 34, cy + 42, { color: PL.col("warn"), width: 2, label: "能量" });
+      D.rect(ctx, detectorX - 34, cy - 56, 68, 112, { fill: "rgba(90,162,255,0.11)", stroke: PL.col("accent-2"), width: 2, r: 5 });
+      D.text(ctx, "偵測器", detectorX, cy - 34, { color: PL.col("accent-2"), size: 10, align: "center", weight: "700" });
+      D.text(ctx, "由質量虧損", detectorX, cy + 3, { color: PL.col("text-faint"), size: 8.5, align: "center" });
+      D.text(ctx, "轉成釋放能量", detectorX, cy + 18, { color: PL.col("text-faint"), size: 8.5, align: "center" });
+      fillPill(ctx, 18, 18, "核反應量測", PL.fmt(value, 1), 130, c);
+    } else if (cfg.kind === "cosmos") {
+      if (cfg.output === "觀測波長") {
+        const z = a / 300000, sx = 58, ex = W - 46, baseY = cy;
+        const wavelengthToX = wavelength => sx + (wavelength - 350) / 420 * (ex - sx);
+        const shift = Math.min((ex - sx) * 0.22, z * (ex - sx) * 2.8);
+        D.text(ctx, "以譜線位移讀出紅移", sx, 38, { color: PL.col("text"), size: 12, weight: "700" });
+        D.line(ctx, sx, baseY - 24, ex, baseY - 24, "rgba(210,222,240,0.56)", 7);
+        D.line(ctx, sx, baseY + 31, ex, baseY + 31, "rgba(255,107,107,0.58)", 7);
+        [410, b, 620].forEach(wavelength => { const x = wavelengthToX(wavelength); D.line(ctx, x, baseY - 35, x, baseY - 13, "#101722", 3); D.line(ctx, x + shift, baseY + 20, x + shift, baseY + 42, "#101722", 3); });
+        D.text(ctx, "實驗室參考光譜 λ₀", sx, baseY - 43, { color: PL.col("text-faint"), size: 9 });
+        D.text(ctx, "遠方星系觀測光譜 λ", sx, baseY + 56, { color: PL.col("danger"), size: 9 });
+        D.arrow(ctx, wavelengthToX(b), baseY + 77, wavelengthToX(b) + shift, baseY + 77, { color: c, width: 2, label: "Δλ" });
+        D.text(ctx, "z ≈ v/c = " + PL.fmt(z * 1000, 2) + " ×10⁻³", W * 0.68, H - 38, { color: c, size: 11, align: "center", weight: "700" });
+      } else {
+        const starX = W * 0.28, starY = cy, temperature = a, starColor = temperature < 4200 ? "#ff8a65" : temperature < 7000 ? "#ffe08a" : "#9dccff";
+        D.disc(ctx, starX, starY, 36 + b * 3, { fill: starColor, glow: starColor, glowSize: 26 });
+        D.text(ctx, "恆星表面", starX, starY + 5, { color: "#172033", size: 10, align: "center", weight: "700" });
+        const gx = W * 0.49, gy = H * 0.73, gw = W * 0.43, gh = H * 0.48;
+        const g = PL.graph(cv, { x: gx, y: gy - gh, w: gw, h: gh }, { x0: 200, x1: 1600, y0: 0, y1: 1.1 });
+        g.frame({ title: "黑體光譜（形狀示意）", xlabel: "波長 λ (nm)", ylabel: "相對強度" }); g.grid(5, 4);
+        const peak = 2898000 / temperature;
+        g.fn(lambda => Math.exp(-0.5 * ((lambda - peak) / Math.max(90, peak * 0.34)) ** 2), { color: c, width: 2.4 });
+        g.vline(peak, { color: PL.col("warn"), dash: [4, 4] }); g.label(peak, 0.94, "λmax", { color: PL.col("warn"), size: 10 });
+        D.text(ctx, "溫度越高，峰值往短波長移動", W * 0.68, H - 22, { color: PL.col("text-faint"), size: 9.5, align: "center" });
+      }
+      fillPill(ctx, 18, 18, cfg.output === "觀測波長" ? "紅移觀測" : "黑體輻射", PL.fmt(value, 1), 124, c);
     } else {
-      const cx = W * 0.48, rr = 42 + a * 3;
-      D.disc(ctx, cx, cy, rr, { fill: "rgba(255,183,77,0.12)", stroke: c, width: 2, glow: c, glowSize: 10 });
-      for (let i = 0; i < 16; i++) { const ang = i / 16 * TAU + t * 0.35; D.disc(ctx, cx + Math.cos(ang) * rr * 1.45, cy + Math.sin(ang) * rr * 0.75, 3, { fill: i % 2 ? c : PL.col("accent-2") }); }
-      D.text(ctx, "微觀 / 宇宙觀測", cx, cy + 5, { color: PL.col("text"), size: 12, align: "center", weight: "700" });
-      fillPill(ctx, 18, 18, "探測讀值", PL.fmt(value, 2), 118, c);
+      const tableX = W * 0.18, tableY = H * 0.26, tableW = W * 0.64, rowH = 38;
+      D.rect(ctx, tableX, tableY, tableW, rowH * 4, { fill: "rgba(7,11,17,0.4)", stroke: "rgba(255,255,255,0.18)", r: 6 });
+      ["調整參數", "觀察量測值", "比對關係圖"].forEach((label, index) => { const y = tableY + 30 + index * rowH; D.text(ctx, String(index + 1), tableX + 20, y, { color: c, size: 12, align: "center", weight: "700" }); D.text(ctx, label, tableX + 44, y, { color: PL.col("text"), size: 11 }); if (index < 2) D.line(ctx, tableX + 12, y + 17, tableX + tableW - 12, y + 17, "rgba(255,255,255,0.1)", 1); });
+      fillPill(ctx, 18, 18, "資料量測", PL.fmt(value, 2), 118, c);
     }
     D.text(ctx, "互動模型：調整左側參數，讀取右側資料與曲線", W / 2, H - 25, { color: PL.col("text-faint"), size: 9.5, align: "center" });
   }
@@ -168,4 +208,166 @@
       return { stop() { anim.stop(); cv.destroy(); chart.destroy(); }, rerender: render };
     }});
   });
+
+  /* 不確定度不能只用一個公式表示：把同一物件的每次讀值直接攤開。 */
+  PL.register("measurement-error", { build(root) {
+    const L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.7, 900);
+    const trueLength = 100;
+    let readings = [];
+    PL.ui.section(L.controls, "量測設定");
+    const sCount = PL.ui.slider(L.controls, { label: "重複量測次數 N", min: 3, max: 24, step: 1, value: 8, unit: "次", digits: 0, onInput: resample });
+    const sResolution = PL.ui.slider(L.controls, { label: "尺的解析度 r", min: 0.1, max: 5, step: 0.1, value: 1, unit: "mm", digits: 1, onInput: resample });
+    const sBias = PL.ui.slider(L.controls, { label: "零點偏移 b", min: -2, max: 2, step: 0.1, value: 0, unit: "mm", digits: 1, onInput: resample });
+    const row = PL.ui.buttonRow(L.controls);
+    PL.ui.button(row, "重新量測", resample, { primary: true });
+    PL.ui.button(row, "清除零點偏移", () => { sBias.set(0); resample(); });
+    PL.ui.note(L.controls, "綠點是每一次讀值，虛線是真實長度，藍線是平均值。提高量測次數會讓平均值更穩定；但零點偏移是系統誤差，重複量測也不會自動消失。");
+    const rMean = PL.ui.readout(L.readouts, { label: "平均值 x̄", unit: "mm" });
+    const rSpread = PL.ui.readout(L.readouts, { label: "讀值離散 s", unit: "mm" });
+    const rUncertainty = PL.ui.readout(L.readouts, { label: "合成不確定度 u", unit: "mm" });
+    const rDifference = PL.ui.readout(L.readouts, { label: "平均值與真值差", unit: "mm" });
+    const rReport = PL.ui.readout(L.readouts, { label: "建議報告結果" });
+
+    function normal() {
+      const u = Math.max(1e-8, Math.random()), v = Math.max(1e-8, Math.random());
+      return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v);
+    }
+    function stats() {
+      const mean = readings.reduce((sum, value) => sum + value, 0) / readings.length;
+      const variance = readings.length > 1 ? readings.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (readings.length - 1) : 0;
+      return { mean, spread: Math.sqrt(variance) };
+    }
+    function resample() {
+      const count = Math.round(sCount.get()), resolution = sResolution.get(), bias = sBias.get();
+      readings = Array.from({ length: count }, () => Math.round((trueLength + bias + normal() * resolution * 0.72) / resolution) * resolution);
+      draw();
+    }
+    function draw() {
+      if (!readings.length) return;
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const resolution = sResolution.get(), bias = sBias.get(), result = stats();
+      const standardError = result.spread / Math.sqrt(readings.length);
+      const instrumentUncertainty = resolution / Math.sqrt(12);
+      const uncertainty = Math.sqrt(standardError * standardError + instrumentUncertainty * instrumentUncertainty);
+      const halfRange = Math.max(4, ...readings.map(value => Math.abs(value - trueLength) + resolution * 1.5));
+      const min = trueLength - halfRange, max = trueLength + halfRange;
+      const x0 = 60, x1 = W - 42, mapX = value => x0 + (value - min) / (max - min) * (x1 - x0);
+
+      D.text(ctx, "同一支金屬棒：每次用尺讀到的長度", x0, 25, { color: PL.col("text"), size: 12, weight: "700" });
+      D.text(ctx, "真實長度僅供本模擬對照", x1, 25, { color: PL.col("text-faint"), size: 9, align: "right" });
+      D.rect(ctx, x0, 42, x1 - x0, 34, { fill: "rgba(255,255,255,0.05)", stroke: "rgba(255,255,255,0.2)", r: 4 });
+      for (let value = Math.ceil(min); value <= Math.floor(max); value++) {
+        const x = mapX(value), major = value % 2 === 0;
+        D.line(ctx, x, 42, x, 42 + (major ? 18 : 10), "rgba(255,255,255,0.36)", 1);
+        if (major) D.text(ctx, String(value), x, 72, { color: PL.col("text-faint"), size: 8.5, align: "center" });
+      }
+      D.rect(ctx, mapX(trueLength - 1.7), 48, Math.max(10, mapX(trueLength + 1.7) - mapX(trueLength - 1.7)), 14, { fill: "rgba(255,204,102,0.55)", stroke: PL.col("warn"), r: 3 });
+      D.text(ctx, "待測金屬棒", mapX(trueLength), 58, { color: "#151b27", size: 8.5, align: "center", weight: "700" });
+
+      const scatterTop = H * 0.28, scatterBottom = H * 0.51;
+      D.rect(ctx, x0, scatterTop, x1 - x0, scatterBottom - scatterTop, { fill: "rgba(7,11,17,0.35)", stroke: "rgba(255,255,255,0.15)", r: 5 });
+      D.text(ctx, "每次讀值", x0 + 10, scatterTop + 17, { color: PL.col("text-faint"), size: 9 });
+      D.line(ctx, mapX(trueLength), scatterTop + 25, mapX(trueLength), scatterBottom - 12, PL.col("warn"), 1.8, [4, 4]);
+      D.line(ctx, mapX(result.mean), scatterTop + 25, mapX(result.mean), scatterBottom - 12, PL.col("accent-2"), 2);
+      readings.forEach((value, index) => {
+        const rowIndex = index % 4, y = scatterTop + 48 + rowIndex * ((scatterBottom - scatterTop - 68) / 3);
+        D.disc(ctx, mapX(value), y, 5, { fill: color(), glow: color(), glowSize: 7 });
+        D.text(ctx, String(index + 1), mapX(value), y - 9, { color: PL.col("text-faint"), size: 8, align: "center" });
+      });
+      D.text(ctx, "真值", mapX(trueLength), scatterBottom - 2, { color: PL.col("warn"), size: 9, align: "center" });
+      D.text(ctx, "平均值", mapX(result.mean), scatterTop + 19, { color: PL.col("accent-2"), size: 9, align: "center" });
+
+      const histTop = H * 0.64, histBottom = H - 42, binCount = 10, binWidth = (max - min) / binCount;
+      const bins = Array.from({ length: binCount }, () => 0);
+      readings.forEach(value => { const bin = PL.clamp(Math.floor((value - min) / binWidth), 0, binCount - 1); bins[bin] += 1; });
+      const maxBin = Math.max(1, ...bins), barWidth = (x1 - x0) / binCount;
+      D.text(ctx, "讀值分布：點越集中，隨機誤差越小", x0, histTop - 14, { color: PL.col("text"), size: 11, weight: "700" });
+      D.line(ctx, x0, histBottom, x1, histBottom, "rgba(255,255,255,0.42)", 1);
+      bins.forEach((count, index) => {
+        const height = (histBottom - histTop) * count / maxBin;
+        D.rect(ctx, x0 + index * barWidth + 3, histBottom - height, Math.max(3, barWidth - 6), height, { fill: "rgba(53,224,207,0.52)", stroke: color(), r: 2 });
+      });
+      D.line(ctx, mapX(trueLength), histTop, mapX(trueLength), histBottom, PL.col("warn"), 1.5, [4, 4]);
+      D.line(ctx, mapX(result.mean), histTop, mapX(result.mean), histBottom, PL.col("accent-2"), 2);
+      const biasText = Math.abs(bias) < 0.05 ? "零點已校正：重複量測主要處理隨機誤差" : "零點偏移 " + PL.fmt(bias, 1) + " mm：平均值整體偏移，重複量測無法消除";
+      D.text(ctx, biasText, W / 2, H - 16, { color: Math.abs(bias) < 0.05 ? PL.col("text-faint") : PL.col("danger"), size: 9.5, align: "center" });
+
+      rMean.set(result.mean, 2); rSpread.set(result.spread, 2); rUncertainty.set(uncertainty, 2); rDifference.set(result.mean - trueLength, 2);
+      rReport.set(PL.fmt(result.mean, 1) + " ± " + PL.fmt(uncertainty, 1) + " mm");
+    }
+    cv.onResize(draw); resample();
+    return { stop() { cv.destroy(); }, rerender: draw };
+  }});
+
+  /* 路程與位移要把起點、折返點和終點留在同一張圖，不能只讓物體循環移動。 */
+  PL.register("distance-displacement", { build(root) {
+    const L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.63, 900);
+    let progress = 1, playing = false, anim;
+    PL.ui.section(L.controls, "路徑設定");
+    const sOutward = PL.ui.slider(L.controls, { label: "去程距離 L", min: 4, max: 30, step: 1, value: 14, unit: "m", digits: 0, onInput: draw });
+    const sReturn = PL.ui.slider(L.controls, { label: "回程比例 r", min: 0, max: 1, step: 0.05, value: 0.45, unit: "", digits: 2, onInput: draw });
+    const sProgress = PL.ui.slider(L.controls, { label: "觀察路徑進度", min: 0, max: 100, step: 1, value: 100, unit: "%", digits: 0, onInput: value => { progress = value / 100; draw(); } });
+    const row = PL.ui.buttonRow(L.controls);
+    const play = PL.ui.button(row, "播放整段路徑", () => { progress = 0; sProgress.set(0); playing = true; anim.start(); draw(); }, { primary: true });
+    PL.ui.button(row, "回到終點判讀", () => { playing = false; anim.stop(); progress = 1; sProgress.set(100); draw(); });
+    PL.ui.note(L.controls, "先從起點走到折返點，再往回走一段。路程只把走過的每一段相加；位移只比較終點與起點的位置，並保留方向。拖曳進度可在任何時刻停下判讀。");
+    const rRoute = PL.ui.readout(L.readouts, { label: "總路程 s", unit: "m" });
+    const rDisplacement = PL.ui.readout(L.readouts, { label: "終點位移 Δx", unit: "m" });
+    const rPosition = PL.ui.readout(L.readouts, { label: "目前位置 x", unit: "m" });
+    const rStage = PL.ui.readout(L.readouts, { label: "目前路段" });
+    function values() {
+      const outward = sOutward.get(), returned = outward * sReturn.get(), route = outward + returned;
+      const fractionOut = outward / route;
+      const current = progress <= fractionOut ? outward * progress / fractionOut : outward - returned * (progress - fractionOut) / (1 - fractionOut || 1);
+      const travelled = route * progress;
+      return { outward, returned, route, fractionOut, final: outward - returned, current, travelled };
+    }
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const data = values(), x0 = 72, x1 = W - 64, trackY = H * 0.57;
+      const mapX = position => x0 + position / data.outward * (x1 - x0);
+      const finishX = mapX(data.final), currentX = mapX(data.current);
+      D.text(ctx, "一趟有折返的直線步行", x0, 31, { color: PL.col("text"), size: 13, weight: "700" });
+      D.text(ctx, "以起點為 x = 0，向右為正方向", x1, 31, { color: PL.col("text-faint"), size: 9.5, align: "right" });
+      D.line(ctx, x0, trackY, x1, trackY, "rgba(255,255,255,0.28)", 6);
+      for (let step = 0; step <= 10; step++) {
+        const x = x0 + step / 10 * (x1 - x0);
+        D.line(ctx, x, trackY - 10, x, trackY + 10, "rgba(255,255,255,0.2)", 1);
+      }
+      D.line(ctx, x0, trackY - 78, x1, trackY - 78, "rgba(53,224,207,0.22)", 2, [4, 4]);
+      D.arrow(ctx, x0 + 8, trackY - 78, x1 - 10, trackY - 78, { color: color(), width: 2.5, label: "去程 L = " + PL.fmt(data.outward, 1) + " m" });
+      D.line(ctx, finishX, trackY + 84, x1, trackY + 84, "rgba(255,183,77,0.22)", 2, [4, 4]);
+      D.arrow(ctx, x1 - 8, trackY + 84, finishX + 8, trackY + 84, { color: PL.col("warn"), width: 2.5, label: "回程 rL = " + PL.fmt(data.returned, 1) + " m" });
+      [
+        [x0, "起點", "x = 0"],
+        [x1, "折返點", "x = " + PL.fmt(data.outward, 1) + " m"],
+        [finishX, "終點", "x = " + PL.fmt(data.final, 1) + " m"]
+      ].forEach(([x, title, detail], index) => {
+        D.line(ctx, x, trackY - 22, x, trackY + 26, index === 2 ? PL.col("warn") : "rgba(255,255,255,0.54)", 2);
+        D.disc(ctx, x, trackY, index === 2 ? 7 : 5, { fill: index === 2 ? PL.col("warn") : PL.col("panel-3"), stroke: index === 2 ? PL.col("warn") : "rgba(255,255,255,0.6)", width: 1.5 });
+        D.text(ctx, title, x, trackY + 45, { color: index === 2 ? PL.col("warn") : PL.col("text"), size: 10, align: "center", weight: "700" });
+        D.text(ctx, detail, x, trackY + 60, { color: PL.col("text-faint"), size: 8.5, align: "center" });
+      });
+      D.rect(ctx, currentX - 18, trackY - 45, 36, 24, { fill: color(), stroke: "rgba(255,255,255,0.75)", width: 1.4, r: 5 });
+      D.disc(ctx, currentX - 11, trackY - 18, 4, { fill: PL.col("panel-3") }); D.disc(ctx, currentX + 11, trackY - 18, 4, { fill: PL.col("panel-3") });
+      D.arrow(ctx, currentX, trackY - 56, currentX + (progress <= data.fractionOut ? 38 : -38), trackY - 56, { color: progress <= data.fractionOut ? color() : PL.col("warn"), width: 2, label: progress <= data.fractionOut ? "向右" : "向左" });
+
+      const panelY = H * 0.79, panelW = (W - 112) / 2;
+      D.rect(ctx, 56, panelY, panelW, 62, { fill: "rgba(53,224,207,0.08)", stroke: color(), r: 6 });
+      D.text(ctx, "路程 s = 去程 + 回程", 70, panelY + 20, { color: PL.col("text-faint"), size: 9.5 });
+      D.text(ctx, PL.fmt(data.outward, 1) + " + " + PL.fmt(data.returned, 1) + " = " + PL.fmt(data.route, 1) + " m", 70, panelY + 43, { color: color(), size: 13, weight: "700" });
+      D.rect(ctx, 56 + panelW + 16, panelY, panelW, 62, { fill: "rgba(255,183,77,0.08)", stroke: PL.col("warn"), r: 6 });
+      D.text(ctx, "位移 Δx = 終點 − 起點", 70 + panelW + 16, panelY + 20, { color: PL.col("text-faint"), size: 9.5 });
+      D.text(ctx, PL.fmt(data.final, 1) + " − 0 = +" + PL.fmt(data.final, 1) + " m", 70 + panelW + 16, panelY + 43, { color: PL.col("warn"), size: 13, weight: "700" });
+      rRoute.set(data.route, 2); rDisplacement.set(data.final, 2); rPosition.set(data.current, 2); rStage.set(progress < data.fractionOut ? "去程：遠離起點" : progress < 1 ? "回程：朝起點" : "已到終點，可比較路程與位移");
+    }
+    anim = PL.loop(dt => {
+      if (!playing || !dt) return;
+      progress = Math.min(1, progress + dt * 0.24); sProgress.set(progress * 100);
+      if (progress >= 1) { playing = false; anim.stop(); play.textContent = "再播放一次"; }
+      draw();
+    });
+    cv.onResize(draw); draw();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
 })();

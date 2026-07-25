@@ -447,9 +447,9 @@
           formula: R`\( N = N_0\left(\tfrac{1}{2}\right)^{t/T_{1/2}} \)`,
           points: ["三種放射線性質不同", "半衰期為統計特性", "每半衰期數量減半", "碳-14 定年法"] },
         { id: "hubble", title: "大霹靂與哈伯定律", interactive: I,
-          concept: "宇宙起源於大霹靂並持續膨脹，遠方星系退行速度與距離成正比。調整哈伯常數，觀察星系退行與紅移。",
-          formula: R`\( v = H_0 d,\quad H_0 \approx 70\ \mathrm{km/s/Mpc} \)`,
-          points: ["宇宙膨脹", "退行速度與距離成正比", "紅移現象", "宇宙微波背景輻射"] },
+          concept: "從多個星系的距離與譜線紅移取得退行速度，繪成 v–d 散點圖；通過資料趨勢的最佳擬合線斜率就是哈伯常數 H₀。",
+          formula: R`\( v = H_0 d,\quad z\approx\frac{v}{c} \)`,
+          points: ["每一個散點代表一個星系的距離與退行速度", "最佳擬合線斜率就是哈伯常數 H₀", "距離較遠的星系通常有較大的紅移", "單筆資料有雜訊，需用多筆觀測看趨勢"] },
         { id: "millikan", title: "密立根油滴實驗", interactive: I,
           concept: "帶電油滴懸浮在平行板電場中，向上電力與向下重力平衡時油滴靜止。調整電壓使油滴懸浮即可求電量，且測得電量都是基本電荷 e 的整數倍——證明電荷量子化。",
           formula: R`\( qE = mg,\quad q = \dfrac{mgd}{V},\quad q = n e \)`,
@@ -466,8 +466,8 @@
   const EXTENDED_EXPERIMENTS = {
     kinematics: [
       { id: "vector-components", title: "位移與速度的向量分解", interactive: I, concept: "將斜向位移或速度分解為互相垂直的分量；改變大小與方向，觀察分量如何決定合向量。", formula: R`\( A_x=A\cos\theta,\quad A_y=A\sin\theta \)`, points: ["向量有大小與方向", "正交分量可獨立處理", "合量由畢氏定理求得", "拋體運動可分方向分析"] },
-      { id: "distance-displacement", title: "路程、位移與平均速度", interactive: I, concept: "沿不同路線移動時，路程是實際走過的總長，位移只看起點到終點的向量。", formula: R`\( \bar v=\Delta x/\Delta t,\quad \text{速率}=\text{路程}/\Delta t \)`, points: ["路程為純量", "位移為向量", "回到原點位移為零", "平均速度與平均速率不同"] },
-      { id: "measurement-error", title: "量測、不確定度與有效數字", interactive: I, concept: "調整儀器解析度與重複量測次數，觀察平均值、離散程度與報告有效數字的關係。", formula: R`\( \bar x=\frac{1}{n}\sum x_i,\quad \%\,\text{誤差}=\frac{|x-x_0|}{x_0}\times100\% \)`, points: ["重複量測降低隨機誤差", "解析度限制讀值", "平均值代表最佳估計", "結果需附單位與有效數字"] }
+      { id: "distance-displacement", title: "路程、位移與平均速度", interactive: I, concept: "沿直線先走到折返點再往回走；路程把去程與回程的長度相加，位移只比較終點相對起點的位置與方向。", formula: R`\( s=L+rL,\quad \Delta x=x_{\text{終}}-x_{\text{起}} \)`, points: ["路程為實際走過的總長，永遠不為負", "位移是起點指向終點的有向量", "回到原點時位移為零，但路程不為零", "平均速度與平均速率分別使用位移與路程"] },
+      { id: "measurement-error", title: "量測、不確定度與有效數字", interactive: I, concept: "用同一把尺反覆量測固定長度；每筆讀值會因讀取雜訊、儀器解析度與零點偏移略有不同，從讀值分布建立平均值與不確定度。", formula: R`\( \bar x=\frac{1}{n}\sum x_i,\quad u(\bar x)\sim\frac{s}{\sqrt n} \)`, points: ["每一個點是一筆獨立讀值，散開不等於做錯", "解析度決定讀值可分辨到多細", "重複量測讓平均值更穩定，但不會消除系統誤差", "結果可寫成平均值 ± 不確定度，並附單位"] }
     ],
     newton: [
       { id: "force-components", title: "力的分解與正交合成", interactive: I, concept: "把一個斜向拉力分解為水平與鉛直分量，觀察角度改變如何影響物體的受力平衡。", formula: R`\( F_x=F\cos\theta,\quad F_y=F\sin\theta \)`, points: ["先選座標軸", "分量可分別列方程", "合力由分量相加", "常用於斜面與拉繩題"] },

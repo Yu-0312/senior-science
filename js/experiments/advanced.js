@@ -24,7 +24,7 @@
     "terminal-velocity": cfg("fall", ["物體質量 m", 0.02, 5, 0.35, "kg"], ["阻力係數 b", 0.01, 2, 0.22, "kg/m"], "終端速度 vₜ", "m/s", (m, b) => Math.sqrt(m * 9.8 / b), (m, b, v) => "阻力 = 重力；以 " + PL.fmt(v, 2) + " m/s 等速下落", (x, b) => Math.sqrt(x * 9.8 / b)),
     "regression-lab": cfg("regression", ["量測雜訊 σ", 0, 2, 0.65, ""], ["真實斜率 k", 0.2, 4, 1.8, ""], "擬合斜率 k̂", "", (noise, slope) => slope + noise * 0.12, (noise, slope, value) => "殘差 RMS = " + PL.fmt(noise * 0.72, 2) + "；擬合斜率接近 " + PL.fmt(value, 2), (x, slope) => slope * x),
     "experimental-design": cfg("design", ["自變因 x", 0, 10, 5, ""], ["控制變因 c", 0, 5, 2, ""], "應變因 y", "", (x, c) => 0.65 * x * x + c, (x, c, y) => "僅改變 x；控制變因固定為 " + PL.fmt(c, 1), (x, c) => 0.65 * x * x + c),
-    "error-propagation": cfg("error", ["長度 L", 0.1, 5, 1.2, "m"], ["相對不確定度", 0.1, 12, 3.2, "%"], "面積相對不確定度", "%", (l, u) => 2 * u, (l, u, v) => "A=L²；兩倍的相對不確定度約為 " + PL.fmt(v, 1) + "%", (x, u) => 2 * u),
+    "error-propagation": cfg("error", ["邊長 L", 0.1, 5, 1.2, "m"], ["邊長相對不確定度", 0.1, 12, 3.2, "%"], "面積相對不確定度", "%", (l, u) => 2 * u, (l, u, v) => "A=L²；邊長的 " + PL.fmt(u, 1) + "% 範圍會使面積約有 " + PL.fmt(v, 1) + "% 的範圍", (x, u) => 2 * u),
     "dimensional-analysis": cfg("dimension", ["長度指數 L", -3, 4, 1, ""], ["時間指數 T", -4, 3, -2, ""], "量綱指標", "", (l, t) => Math.sqrt(l * l + t * t), (l, t) => "候選量綱：L^" + PL.fmt(l, 0) + " T^" + PL.fmt(t, 0), (x, t) => Math.sqrt(x * x + t * t)),
     "rolling-motion": cfg("rolling", ["轉動慣量係數 β", 0, 1, 0.4, ""], ["斜面角 θ", 3, 40, 19, "°"], "下滑加速度 a", "m/s²", (beta, theta) => 9.8 * Math.sin(deg(theta)) / (1 + beta), (beta, theta, a) => "平動與轉動共同分配能量；a = " + PL.fmt(a, 2) + " m/s²", (x, theta) => 9.8 * Math.sin(deg(theta)) / (1 + x)),
     "multistage-rocket": cfg("rocket", ["排氣速度 vₑ", 1200, 4600, 3100, "m/s"], ["每級質量比", 1.2, 6, 2.8, ""], "兩級 Δv", "m/s", (ve, ratio) => 2 * ve * Math.log(ratio), (ve, ratio, v) => "一級分離後降低結構質量，總增速 " + PL.fmt(v, 0) + " m/s", (x, ratio) => 2 * x * Math.log(ratio)),
@@ -69,7 +69,31 @@
     const { ctx, W, H } = cv, c = accent(), cx = W * 0.5, cy = H * 0.52, p = 0.5 + 0.5 * Math.sin(time * 2.2);
     cv.clear(); D.bg(cv);
     const railY = H - 48;
-    if (["fall", "error", "dimension"].includes(config.kind)) {
+    if (config.kind === "error") {
+      const deltaL = a * b / 100, minL = Math.max(0.02, a - deltaL), maxL = a + deltaL;
+      const minArea = minL * minL, area = a * a, maxArea = maxL * maxL;
+      const panelX = 38, panelY = 44, panelW = W * 0.48, panelH = H - 104;
+      D.rect(ctx, panelX, panelY, panelW, panelH, { fill: "rgba(7,11,17,0.34)", stroke: "rgba(255,255,255,0.16)", r: 7 });
+      D.text(ctx, "把邊長的不確定範圍畫出來", panelX + 16, panelY + 20, { color: PL.col("text"), size: 11, weight: "700" });
+      const scale = Math.min((panelW - 68) / maxL, (panelH - 74) / maxL), baseX = panelX + 34, baseY = panelY + panelH - 28;
+      D.rect(ctx, baseX, baseY - maxL * scale, maxL * scale, maxL * scale, { fill: "rgba(255,183,77,0.12)", stroke: PL.col("warn"), width: 1.5, r: 2 });
+      D.rect(ctx, baseX, baseY - a * scale, a * scale, a * scale, { fill: "rgba(53,224,207,0.18)", stroke: c, width: 2.2, r: 2 });
+      D.rect(ctx, baseX, baseY - minL * scale, minL * scale, minL * scale, { fill: "rgba(90,162,255,0.16)", stroke: PL.col("accent-2"), width: 1.4, r: 2 });
+      D.line(ctx, baseX, baseY + 10, baseX + a * scale, baseY + 10, c, 1.8);
+      D.text(ctx, "L = " + PL.fmt(a, 2) + " m", baseX + a * scale / 2, baseY + 23, { color: c, size: 10, align: "center" });
+      D.text(ctx, "L ± ΔL", baseX + maxL * scale + 8, baseY - maxL * scale + 10, { color: PL.col("warn"), size: 9 });
+      const chartX = W * 0.62, chartY = 70, chartW = W * 0.3, chartH = H * 0.58;
+      D.rect(ctx, chartX, chartY, chartW, chartH, { fill: "rgba(7,11,17,0.34)", stroke: "rgba(255,255,255,0.16)", r: 7 });
+      D.text(ctx, "面積 A = L² 的可能範圍", chartX + 12, chartY + 20, { color: PL.col("text"), size: 10.5, weight: "700" });
+      const barY = chartY + chartH * 0.54, barX = chartX + 20, barW = chartW - 40;
+      D.line(ctx, barX, barY, barX + barW, barY, "rgba(255,255,255,0.35)", 3);
+      D.line(ctx, barX, barY, barX + barW, barY, "rgba(255,183,77,0.76)", 7);
+      D.disc(ctx, barX + barW * (area - minArea) / Math.max(1e-8, maxArea - minArea), barY, 6, { fill: c, glow: c, glowSize: 9 });
+      D.text(ctx, "Amin " + PL.fmt(minArea, 3) + " m²", barX, barY + 28, { color: PL.col("accent-2"), size: 9 });
+      D.text(ctx, "Amax " + PL.fmt(maxArea, 3) + " m²", barX + barW, barY + 28, { color: PL.col("warn"), size: 9, align: "right" });
+      D.text(ctx, "名義面積 A = " + PL.fmt(area, 3) + " m²", chartX + chartW / 2, chartY + chartH - 30, { color: c, size: 10, align: "center", weight: "700" });
+      label(ctx, 20, 18, "範圍傳遞", "邊長誤差會被平方放大", 148, c);
+    } else if (["fall", "dimension"].includes(config.kind)) {
       D.line(ctx, W * 0.5, 30, W * 0.5, railY, "rgba(255,255,255,0.18)", 2);
       for (let y = 42; y < railY; y += 28) D.line(ctx, W * 0.5 - 8, y, W * 0.5 + 8, y, "rgba(255,255,255,0.18)", 1);
       const y = 60 + ((time * 60) % Math.max(100, railY - 85));
