@@ -92,6 +92,8 @@
 
   /* ------------------------------- 首頁 ------------------------------- */
   function buildHome() {
+    const heroExperimentCount = $("#hero-exp-count");
+    if (heroExperimentCount) heroExperimentCount.textContent = C.totalExperiments;
     const grid = $("#module-grid");
     grid.innerHTML = "";
     C.modules.forEach(m => {
