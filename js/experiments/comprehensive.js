@@ -162,12 +162,16 @@
       const decimal = param => param[6] == null ? 2 : param[6];
       const step = param => param[5] == null ? (param[2] - param[1]) / 100 : param[5];
       PL.ui.section(L.controls, "操作條件");
-      const a = PL.ui.slider(L.controls, { label: config.a[0], min: config.a[1], max: config.a[2], value: config.a[3], step: step(config.a), unit: config.a[4], digits: decimal(config.a) });
-      const b = PL.ui.slider(L.controls, { label: config.b[0], min: config.b[1], max: config.b[2], value: config.b[3], step: step(config.b), unit: config.b[4], digits: decimal(config.b) });
+      const a = PL.ui.slider(L.controls, { label: config.a[0], min: config.a[1], max: config.a[2], value: config.a[3], step: step(config.a), unit: config.a[4], digits: decimal(config.a), onInput: () => render() });
+      const b = PL.ui.slider(L.controls, { label: config.b[0], min: config.b[1], max: config.b[2], value: config.b[3], step: step(config.b), unit: config.b[4], digits: decimal(config.b), onInput: () => render() });
       PL.ui.note(L.controls, "調整兩項參數，觀察裝置中的動態現象、即時讀值與下方關係圖。每項讀值都可直接匯出。 ");
-      const buttons = PL.ui.buttonRow(L.controls); let playing = true;
-      const play = PL.ui.button(buttons, "暫停", () => { playing = !playing; play.textContent = playing ? "暫停" : "播放"; }, { primary: true });
-      PL.ui.button(buttons, "重設", () => { a.set(config.a[3]); b.set(config.b[3]); });
+      const buttons = PL.ui.buttonRow(L.controls); let playing = true, animation;
+      const play = PL.ui.button(buttons, "暫停", () => {
+        playing = !playing; play.textContent = playing ? "暫停" : "播放";
+        if (playing) animation.start(); else animation.stop();
+        render();
+      }, { primary: true });
+      PL.ui.button(buttons, "重設", () => { a.set(config.a[3]); b.set(config.b[3]); render(); });
       const reading = PL.ui.readout(L.readouts, { label: config.output, unit: config.unit });
       const parameter = PL.ui.readout(L.readouts, { label: config.b[0], unit: config.b[4] });
       const conclusion = PL.ui.readout(L.readouts, { label: "模型判讀" });
@@ -184,8 +188,8 @@
         const graph = PL.graph(chart, { x: 45, y: 18, w: chart.W - 60, h: chart.H - 47 }, { x0: config.a[1], x1: config.a[2], y0: lo, y1: hi });
         graph.frame({ xlabel: config.a[0], ylabel: config.output }); graph.grid(5, 4); graph.area(points, { fill: "rgba(53,224,207,0.12)" }); graph.curve(points, { color: accent(), width: 2.3 }); graph.dot(av, result, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
       }
-      const animation = PL.loop(dt => { if (playing && dt) elapsed += dt; render(); });
-      cv.onResize(render); chart.onResize(render); animation.start();
+      animation = PL.loop(dt => { if (dt) elapsed += dt; render(); });
+      cv.onResize(render); chart.onResize(render); render(); animation.start();
       return { stop() { animation.stop(); cv.destroy(); chart.destroy(); }, rerender: render };
     }});
   });

@@ -66,12 +66,12 @@
   function buildSidebar() {
     const wrap = $("#module-list");
     wrap.innerHTML = "";
-    C.modules.forEach(m => {
+    C.modules.forEach((m, moduleIndex) => {
       const mod = el("div", "module", wrap);
       mod.style.setProperty("--m-color", m.color);
       mod.dataset.mod = m.id;
       const head = el("div", "module-head", mod);
-      const no = el("div", "module-no", head); no.textContent = m.no;
+      const no = el("div", "module-no", head); no.textContent = String(moduleIndex + 1).padStart(2, "0");
       const t = el("div", "module-title", head); t.innerHTML = m.title + '<span class="track">' + m.track + "</span>";
       const car = el("div", "module-caret", head); car.textContent = "▶";
       head.addEventListener("click", () => mod.classList.toggle("open"));

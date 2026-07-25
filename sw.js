@@ -1,6 +1,6 @@
 /* sw.js — Service Worker（離線快取）
  * 更新任何檔案後，請調高 CACHE 版本號以觸發更新。 */
-const CACHE = "physics-lab-v12";
+const CACHE = "physics-lab-v13";
 const ASSETS = [
   "./",
   "index.html",
@@ -48,6 +48,16 @@ self.addEventListener("fetch", e => {
   // MathJax 等跨網域資源：網路優先，失敗再看快取
   if (url.origin !== location.origin) {
     e.respondWith(fetch(req).catch(() => caches.match(req)));
+    return;
+  }
+  // HTML 必須優先取得最新版本，否則 GitHub Pages 更新後仍可能先開到舊首頁。
+  if (req.mode === "navigate" || req.destination === "document") {
+    e.respondWith(
+      fetch(req).then(res => {
+        if (res && res.status === 200) caches.open(CACHE).then(c => c.put(req, res.clone()));
+        return res;
+      }).catch(() => caches.match(req).then(cached => cached || caches.match("./")))
+    );
     return;
   }
   // 同網域：快取優先，並在背景更新

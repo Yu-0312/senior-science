@@ -136,13 +136,17 @@
     PL.register(id, { build(root) {
       const cfg = T[id], L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.58, 860);
       PL.ui.section(L.controls, "實驗條件");
-      const sa = PL.ui.slider(L.controls, { label: cfg.a[0], min: cfg.a[1], max: cfg.a[2], value: cfg.a[3], step: (cfg.a[2] - cfg.a[1]) / 100, unit: cfg.a[4], digits: cfg.a[4] === "" ? 2 : 1 });
-      const sb = PL.ui.slider(L.controls, { label: cfg.b[0], min: cfg.b[1], max: cfg.b[2], value: cfg.b[3], step: (cfg.b[2] - cfg.b[1]) / 100, unit: cfg.b[4], digits: cfg.b[4] === "" ? 2 : 1 });
+      const sa = PL.ui.slider(L.controls, { label: cfg.a[0], min: cfg.a[1], max: cfg.a[2], value: cfg.a[3], step: (cfg.a[2] - cfg.a[1]) / 100, unit: cfg.a[4], digits: cfg.a[4] === "" ? 2 : 1, onInput: () => render() });
+      const sb = PL.ui.slider(L.controls, { label: cfg.b[0], min: cfg.b[1], max: cfg.b[2], value: cfg.b[3], step: (cfg.b[2] - cfg.b[1]) / 100, unit: cfg.b[4], digits: cfg.b[4] === "" ? 2 : 1, onInput: () => render() });
       PL.ui.note(L.controls, "拖曳參數可同步更新儀器場景、即時讀數與關係圖。以本頁公式和讀數確認物理關係。");
       const row = PL.ui.buttonRow(L.controls);
-      let playing = true;
-      const play = PL.ui.button(row, "暫停", () => { playing = !playing; play.textContent = playing ? "暫停" : "播放"; }, { primary: true });
-      PL.ui.button(row, "重設", () => { sa.set(cfg.a[3]); sb.set(cfg.b[3]); });
+      let playing = true, anim;
+      const play = PL.ui.button(row, "暫停", () => {
+        playing = !playing; play.textContent = playing ? "暫停" : "播放";
+        if (playing) anim.start(); else anim.stop();
+        render();
+      }, { primary: true });
+      PL.ui.button(row, "重設", () => { sa.set(cfg.a[3]); sb.set(cfg.b[3]); render(); });
       const r = PL.ui.readout(L.readouts, { label: cfg.output });
       const r2 = PL.ui.readout(L.readouts, { label: cfg.b[0], unit: cfg.b[4] });
       const chart = PL.ui.chart(PL.ui.charts(root), { title: cfg.output + "關係圖", cap: "曲線以目前第二個條件為固定值；滑動任一參數可比較趨勢與當前量測點。" });
@@ -159,8 +163,8 @@
         const g = PL.graph(chart, { x: 42, y: 18, w: chart.W - 58, h: chart.H - 44 }, { x0, x1, y0: ymin, y1: ymax });
         g.frame({ xlabel: cfg.a[0], ylabel: cfg.output }); g.grid(5, 4); g.curve(pts, { color: color(), width: 2.2 }); g.dot(a, result, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
       }
-      const anim = PL.loop(dt => { if (dt && playing) time += dt; render(); });
-      cv.onResize(render); chart.onResize(render); anim.start();
+      anim = PL.loop(dt => { if (dt) time += dt; render(); });
+      cv.onResize(render); chart.onResize(render); render(); anim.start();
       return { stop() { anim.stop(); cv.destroy(); chart.destroy(); }, rerender: render };
     }});
   });

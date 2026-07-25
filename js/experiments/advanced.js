@@ -206,12 +206,16 @@
     PL.register(id, { build(root) {
       const config = LABS[id], L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.59, 920);
       PL.ui.section(L.controls, "操作條件");
-      const a = PL.ui.slider(L.controls, { label: config.a[0], min: config.a[1], max: config.a[2], value: config.a[3], step: (config.a[2] - config.a[1]) / 100, unit: config.a[4], digits: config.a[4] === "" ? 2 : 2 });
-      const b = PL.ui.slider(L.controls, { label: config.b[0], min: config.b[1], max: config.b[2], value: config.b[3], step: (config.b[2] - config.b[1]) / 100, unit: config.b[4], digits: config.b[4] === "" ? 2 : 2 });
+      const a = PL.ui.slider(L.controls, { label: config.a[0], min: config.a[1], max: config.a[2], value: config.a[3], step: (config.a[2] - config.a[1]) / 100, unit: config.a[4], digits: config.a[4] === "" ? 2 : 2, onInput: () => render() });
+      const b = PL.ui.slider(L.controls, { label: config.b[0], min: config.b[1], max: config.b[2], value: config.b[3], step: (config.b[2] - config.b[1]) / 100, unit: config.b[4], digits: config.b[4] === "" ? 2 : 2, onInput: () => render() });
       PL.ui.note(L.controls, "調整參數後，同步比較裝置中的現象、量測讀數與下方關係圖。每個畫面皆可匯出目前讀數。 ");
-      const buttons = PL.ui.buttonRow(L.controls); let playing = true;
-      const play = PL.ui.button(buttons, "暫停", () => { playing = !playing; play.textContent = playing ? "暫停" : "播放"; }, { primary: true });
-      PL.ui.button(buttons, "重設", () => { a.set(config.a[3]); b.set(config.b[3]); });
+      const buttons = PL.ui.buttonRow(L.controls); let playing = true, anim;
+      const play = PL.ui.button(buttons, "暫停", () => {
+        playing = !playing; play.textContent = playing ? "暫停" : "播放";
+        if (playing) anim.start(); else anim.stop();
+        render();
+      }, { primary: true });
+      PL.ui.button(buttons, "重設", () => { a.set(config.a[3]); b.set(config.b[3]); render(); });
       const reading = PL.ui.readout(L.readouts, { label: config.output, unit: config.unit });
       const parameter = PL.ui.readout(L.readouts, { label: config.b[0], unit: config.b[4] });
       const conclusion = PL.ui.readout(L.readouts, { label: "模型判讀" });
@@ -228,8 +232,8 @@
         const g = PL.graph(chart, { x: 45, y: 18, w: chart.W - 60, h: chart.H - 47 }, { x0: min, x1: max, y0: lo, y1: hi });
         g.frame({ xlabel: config.a[0], ylabel: config.output }); g.grid(5, 4); g.area(points, { fill: "rgba(53,224,207,0.12)" }); g.curve(points, { color: accent(), width: 2.3 }); g.dot(av, result, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
       }
-      const anim = PL.loop(dt => { if (playing && dt) time += dt; render(); });
-      cv.onResize(render); chart.onResize(render); anim.start();
+      anim = PL.loop(dt => { if (dt) time += dt; render(); });
+      cv.onResize(render); chart.onResize(render); render(); anim.start();
       return { stop() { anim.stop(); cv.destroy(); chart.destroy(); }, rerender: render };
     }});
   });

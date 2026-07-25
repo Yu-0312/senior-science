@@ -198,10 +198,9 @@ body.access-locked .access-gate { display: grid; }
 .module-head:hover { background: var(--hover); }
 .module.open .module-head::before { opacity: 0.9; }
 .module-no {
-  width: 38px; min-width: 38px; height: 32px; flex-shrink: 0; border-radius: 8px;
-  display: grid; place-items: center; padding: 0; font-size: 12px; font-weight: 700;
-  line-height: 1; letter-spacing: 0; white-space: nowrap; word-break: keep-all;
-  overflow: hidden;
+  width: 42px; min-width: 42px; height: 40px; flex-shrink: 0; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; padding: 0 4px; font-size: 11px; font-weight: 800;
+  line-height: 1; letter-spacing: 0.4px; white-space: nowrap; text-align: center; overflow: clip;
   background: color-mix(in srgb, var(--m-color, var(--accent)) 16%, transparent);
   color: var(--m-color, var(--accent));
   border: 1px solid color-mix(in srgb, var(--m-color, var(--accent)) 30%, transparent);
@@ -247,17 +246,17 @@ body.access-locked .access-gate { display: grid; }
 
 /* 首頁英雄區 */
 #home-view { max-width: 1140px; margin: 0 auto; }
-.hero { text-align: center; padding: 40px 20px 6px; max-width: 900px; margin: 0 auto; }
+.hero { width: min(100%, 900px); min-width: 0; text-align: center; padding: 40px 20px 6px; margin: 0 auto; }
 .hero-badge {
   display: inline-flex; align-items: center; gap: 8px; font-size: 12px; letter-spacing: 0.8px; color: var(--accent);
   border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent); border-radius: 999px; padding: 6px 15px;
-  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  max-width: 100%; background: color-mix(in srgb, var(--accent) 9%, transparent);
 }
 .hero-badge .dot { background: var(--accent); box-shadow: 0 0 9px var(--accent); }
 .hero-title {
   font-size: 44px; line-height: 1.16; margin: 20px 0 14px; letter-spacing: 0.5px; font-weight: 800;
   background: linear-gradient(100deg, #fff 6%, var(--accent) 42%, var(--accent-2) 74%, var(--accent-3));
-  -webkit-background-clip: text; background-clip: text; color: transparent;
+  max-width: 100%; overflow-wrap: anywhere; -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 .hero-sub { color: var(--text-dim); font-size: 15.5px; max-width: 660px; margin: 0 auto 26px; }
 .hero-actions { display: flex; gap: 13px; justify-content: center; flex-wrap: wrap; }
@@ -590,8 +589,14 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   #exp-view { max-width: 1180px; }
 }
 @media (max-width: 600px) {
-  .hero-title { font-size: 30px; } .hero { padding-top: 26px; }
-  .hero-stats { gap: 28px; }
+  .hero { width: 100%; padding: 26px 0 8px; }
+  .hero-badge { justify-content: center; padding: 6px 10px; font-size: 10.5px; letter-spacing: 0.3px; line-height: 1.45; }
+  .hero-title { font-size: 29px; line-height: 1.23; margin: 18px 0 12px; letter-spacing: 0; }
+  .hero-sub { max-width: 34ch; margin-bottom: 22px; font-size: 14px; line-height: 1.7; }
+  .hero-actions { width: 100%; gap: 10px; }
+  .btn-hero { min-height: 44px; padding: 11px 15px; font-size: 13px; }
+  .hero-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; gap: 10px; margin-top: 28px; }
+  .hstat-n { font-size: 26px; } .hstat-l { font-size: 10.5px; letter-spacing: 0; }
   .topbar { padding: 10px 14px; gap: 8px; }
   .brand { flex: 1; min-width: 0; gap: 8px; padding: 2px; }
   .brand-logo { width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0; }

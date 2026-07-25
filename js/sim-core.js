@@ -180,7 +180,8 @@
       const rect = wrap.getBoundingClientRect();
       const w = Math.max(240, Math.min(rect.width || maxW, maxW));
       const h = Math.round(w * aspect);
-      const dpr = window.devicePixelRatio || 1;
+      // 2x 已足夠清晰，避免高 DPI 手機以 3x / 4x 重繪每個即時圖表。
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
       cv.W = w; cv.H = h; cv.dpr = dpr;
       canvas.style.width = w + "px";
       canvas.style.height = h + "px";
@@ -210,18 +211,43 @@
   }
 
   /* --------------------------- 動畫迴圈 --------------------------- */
-  function loop(step) {
-    let raf = null, running = false, last = 0, t = 0;
+  function loop(step, maxFps) {
+    const frameMs = 1000 / clamp(Number(maxFps) || 45, 15, 60);
+    let raf = null, running = false, listening = false, last = 0, t = 0;
+    function onVisibilityChange() {
+      if (!document.hidden && running && !raf) {
+        last = 0;
+        raf = requestAnimationFrame(frame);
+      }
+    }
     function frame(now) {
       if (!running) return;
-      const dt = last ? Math.min(0.05, (now - last) / 1000) : 0;
+      if (document.hidden) { raf = null; last = 0; return; }
+      if (!last) {
+        last = now;
+        step(0, t);
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+      if (now - last < frameMs) { raf = requestAnimationFrame(frame); return; }
+      const dt = Math.min(0.05, (now - last) / 1000);
       last = now; t += dt;
       step(dt, t);
       raf = requestAnimationFrame(frame);
     }
     const ctrl = {
-      start() { if (running) return; running = true; last = 0; raf = requestAnimationFrame(frame); },
-      stop() { running = false; if (raf) cancelAnimationFrame(raf); raf = null; },
+      start() {
+        if (running) return;
+        running = true; last = 0;
+        if (!listening) { document.addEventListener("visibilitychange", onVisibilityChange); listening = true; }
+        if (!document.hidden) raf = requestAnimationFrame(frame);
+      },
+      stop() {
+        running = false;
+        if (raf) cancelAnimationFrame(raf);
+        raf = null;
+        if (listening) { document.removeEventListener("visibilitychange", onVisibilityChange); listening = false; }
+      },
       toggle() { running ? ctrl.stop() : ctrl.start(); },
       render() { step(0, t); },
       reset() { t = 0; last = 0; },
