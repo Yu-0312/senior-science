@@ -446,8 +446,12 @@
     const stage = el("div", "sim-stage", root);
     const visual = el("section", "sim-visual-panel", stage);
     const visualHead = el("div", "sim-panel-head", visual);
-    const visualTitle = el("span", "sim-panel-title", visualHead); visualTitle.textContent = profile.stage;
-    const visualState = el("span", "sim-live", visualHead); visualState.textContent = "LIVE MODEL";
+    const visualTitleBlock = el("div", "sim-visual-title-block", visualHead);
+    const visualEyebrow = el("span", "sim-visual-eyebrow", visualTitleBlock); visualEyebrow.textContent = "互動實驗台";
+    const visualTitle = el("span", "sim-panel-title", visualTitleBlock); visualTitle.textContent = profile.stage;
+    const visualMeta = el("div", "sim-visual-meta", visualHead);
+    const visualCode = el("span", "sim-visual-code", visualMeta); visualCode.textContent = profile.code + " / 01";
+    const visualState = el("span", "sim-live", visualMeta); visualState.textContent = "LIVE";
     const canvasWrap = el("div", "sim-canvas-wrap", visual);
     canvasWrap._labProfile = profile;
     const instrumentStrip = el("div", "sim-instrument-strip", visual);

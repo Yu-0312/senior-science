@@ -546,7 +546,10 @@ button.exp-path-step:hover { border-color: var(--m-ink, var(--m-color, var(--acc
 .card-body { padding: 18px; }
 
 /* 模擬工作區：以共用實驗台將每個主題收斂成同一套量測語言 */
-.lab-sim { --sim-edge: color-mix(in srgb, var(--m-color, var(--accent)) 28%, var(--border)); }
+.lab-sim {
+  --sim-edge: color-mix(in srgb, var(--m-color, var(--accent)) 28%, var(--border));
+  --sim-surface: color-mix(in srgb, var(--panel-solid) 86%, var(--m-color, var(--accent)) 14%);
+}
 .lab-sim[data-lab-family="mechanics"] { --lab-stage: #5aa2ff; }
 .lab-sim[data-lab-family="orbital"] { --lab-stage: #9c8cff; }
 .lab-sim[data-lab-family="thermal"] { --lab-stage: #ffb357; }
@@ -557,13 +560,14 @@ button.exp-path-step:hover { border-color: var(--m-ink, var(--m-color, var(--acc
 .lab-sim[data-lab-family="modern"] { --lab-stage: #ed8fb9; }
 .sim-stage {
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(236px, 276px); gap: 14px; align-items: start;
-  padding: 12px; border: 1px solid var(--sim-edge); border-radius: 10px; overflow: hidden; position: relative;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--sim-bg-1) 90%, var(--m-color, var(--accent)) 10%), var(--panel-solid));
-  box-shadow: inset 0 1px 0 var(--edge-hi), 0 16px 36px -30px rgba(0, 0, 0, 0.9);
+  padding: 14px; border: 1px solid var(--sim-edge); border-radius: 8px; overflow: hidden; position: relative;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--sim-bg-1) 88%, var(--m-color, var(--accent)) 12%), var(--panel-solid));
+  box-shadow: inset 0 1px 0 var(--edge-hi), 0 18px 40px -32px rgba(0, 0, 0, 0.92);
 }
 .sim-command-bar {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; padding: 9px 10px 9px 12px;
-  border: 1px solid var(--sim-edge); border-radius: 8px; background: linear-gradient(90deg, color-mix(in srgb, var(--panel-solid) 86%, var(--m-color, var(--accent)) 14%), var(--panel-solid));
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; padding: 10px 11px 10px 14px;
+  border: 1px solid var(--sim-edge); border-radius: 8px; background: linear-gradient(90deg, var(--sim-surface), var(--panel-solid));
+  box-shadow: inset 3px 0 0 var(--m-color, var(--accent));
 }
 .sim-command-title { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .sim-command-stage { color: var(--text); font-size: 12px; font-weight: 800; white-space: nowrap; }
@@ -850,18 +854,37 @@ body.is-offline .topbar { position: sticky; }
 .sim-visual-panel, .sim-control-deck, .sim-readout-panel {
   position: relative; min-width: 0; border: 1px solid var(--border-soft); background: color-mix(in srgb, var(--panel-solid) 80%, transparent);
 }
-.sim-visual-panel { border-radius: 8px; overflow: hidden; }
-.sim-control-deck { border-radius: 8px; }
+.sim-visual-panel {
+  border-color: color-mix(in srgb, var(--m-color, var(--accent)) 34%, var(--border-soft)); border-radius: 8px; overflow: hidden;
+  box-shadow: 0 14px 28px -24px rgba(0, 0, 0, 0.95), inset 0 1px 0 var(--edge-hi);
+}
+.sim-visual-panel::before {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0.38;
+  background-image: linear-gradient(90deg, var(--grid-line) 1px, transparent 1px), linear-gradient(var(--grid-line) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: linear-gradient(to bottom, #000, transparent 42%);
+}
+.sim-visual-panel > * { position: relative; z-index: 1; }
+.sim-control-deck { border-radius: 8px; box-shadow: inset 0 1px 0 var(--edge-hi); }
 .sim-panel-head {
-  min-height: 38px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px;
-  border-bottom: 1px solid var(--border-soft); background: var(--tint-1);
+  min-height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 12px;
+  border-bottom: 1px solid var(--border-soft); background: linear-gradient(90deg, var(--tint-2), transparent);
 }
 .sim-panel-title { font-size: 10.5px; font-weight: 700; letter-spacing: 1.2px; color: var(--text-dim); text-transform: uppercase; }
+.sim-visual-title-block { display: grid; min-width: 0; gap: 1px; }
+.sim-visual-eyebrow { color: var(--m-ink, var(--m-color, var(--accent))); font-size: 9px; font-weight: 800; letter-spacing: 1.2px; line-height: 1.2; }
+.sim-visual-title-block .sim-panel-title { color: var(--text); font-size: 12px; letter-spacing: 0.4px; text-transform: none; overflow-wrap: anywhere; }
+.sim-visual-meta { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+.sim-visual-code { color: var(--text-faint); font-size: 9.5px; font-weight: 750; letter-spacing: 0.8px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .sim-live { color: var(--m-ink, var(--m-color, var(--accent))); font-size: 10px; font-weight: 800; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
 .sim-live::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; vertical-align: 1px; }
 .sim-panel-hint { color: var(--text-faint); font-size: 10px; letter-spacing: 0.5px; white-space: nowrap; }
-.sim-canvas-wrap { min-width: 0; padding: 12px 12px 8px; }
-.sim-canvas { display: block; width: 100%; border-radius: 6px; background: var(--sim-bg-1); border: 1px solid var(--border); box-shadow: inset 0 0 40px var(--sim-shadow); }
+.sim-canvas-wrap { min-width: 0; padding: 12px 12px 10px; background: linear-gradient(180deg, color-mix(in srgb, var(--sim-bg-1) 76%, var(--m-color, var(--accent)) 5%), transparent); }
+.sim-canvas {
+  display: block; width: 100%; border-radius: 6px; background: var(--sim-bg-1);
+  border: 1px solid color-mix(in srgb, var(--m-color, var(--accent)) 32%, var(--border));
+  box-shadow: inset 0 0 40px var(--sim-shadow), 0 10px 24px -20px rgba(0, 0, 0, 0.98);
+}
 /* 畫面說明列：把原本畫在 canvas 上的解說長句移出來，讓畫布只留物理量標籤 */
 .sim-caption {
   margin: 0; padding: 6px 12px 2px; color: var(--text-dim); font-size: 11.5px; line-height: 1.6;
@@ -879,13 +902,13 @@ body.is-offline .topbar { position: sticky; }
 .ctrl-note-body { padding: 0 10px 9px; color: var(--text-faint); font-size: 11.5px; line-height: 1.6; }
 
 .sim-instrument-strip {
-  min-height: 30px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 12px 8px;
+  min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 12px 9px;
   border-top: 1px solid var(--tint-2); color: var(--text-faint); font-size: 9.5px; letter-spacing: 0.7px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--lab-stage, var(--m-color, var(--accent))) 8%, transparent), transparent 58%);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--lab-stage, var(--m-color, var(--accent))) 10%, transparent), transparent 58%);
 }
 .sim-instrument-code { color: var(--lab-stage, var(--m-color, var(--accent))); font-weight: 800; font-variant-numeric: tabular-nums; }
 .sim-instrument-mode { color: var(--text-faint); text-align: right; }
-.sim-controls { width: auto; min-width: 0; padding: 12px; display: flex; flex-direction: column; gap: 13px; }
+.sim-controls { width: auto; min-width: 0; padding: 13px; display: flex; flex-direction: column; gap: 13px; }
 
 .ctrl-slider .ctrl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
 .ctrl-label { font-size: 12.5px; color: var(--text-dim); flex: 1; min-width: 0; }
@@ -949,10 +972,10 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .btn-primary { background: linear-gradient(100deg, var(--accent), var(--accent-2)); color: var(--on-accent); border-color: transparent; font-weight: 700; }
 .btn-primary:hover { color: var(--on-accent); filter: brightness(1.08); box-shadow: 0 6px 18px -6px rgba(53, 224, 207, 0.6); }
 
-.sim-readout-panel { margin-top: 14px; border-radius: 8px; overflow: hidden; }
+.sim-readout-panel { margin-top: 14px; border-color: color-mix(in srgb, var(--m-color, var(--accent)) 22%, var(--border-soft)); border-radius: 8px; overflow: hidden; }
 .sim-readout-head { min-height: 36px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px; background: var(--tint-1); border-bottom: 1px solid var(--border-soft); }
 .sim-readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; margin: 0; padding: 10px 12px 12px; }
-.readout { background: linear-gradient(180deg, var(--panel-2), var(--panel-solid)); border: 1px solid var(--border-soft); border-radius: 7px; padding: 11px 12px; transition: border-color 0.16s; }
+.readout { background: linear-gradient(180deg, color-mix(in srgb, var(--panel-2) 92%, var(--m-color, var(--accent)) 8%), var(--panel-solid)); border: 1px solid var(--border-soft); border-radius: 7px; padding: 11px 12px; transition: border-color 0.16s, transform 0.16s; }
 .readout:hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
 .readout-value { font-size: 18px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: 0.2px; line-height: 1.25; overflow-wrap: anywhere; }
 .readout-label { font-size: 11px; color: var(--text-faint); margin-top: 3px; overflow-wrap: anywhere; }
@@ -1182,6 +1205,9 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   .sim-learning-step dd { font-size: 11px; }
   .sim-stage { gap: 10px; padding: 8px; border-radius: 8px; }
   .sim-canvas-wrap { padding: 8px 8px 6px; }
+  .sim-visual-panel .sim-panel-head { min-height: 48px; padding: 7px 9px; }
+  .sim-visual-meta { gap: 6px; }
+  .sim-visual-code { display: none; }
   /* 畫面說明列：把原本畫在 canvas 上的解說長句移出來，讓畫布只留物理量標籤 */
 .sim-caption {
   margin: 0; padding: 6px 12px 2px; color: var(--text-dim); font-size: 11.5px; line-height: 1.6;
