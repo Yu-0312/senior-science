@@ -439,7 +439,91 @@
     return panel;
   }
 
-  /* ---------------- 3. 關係摘要 ---------------- */
+  /* ---------------- 3.「找出無關變因」謎題 ----------------
+     PhET 的設計文件說：學生遇到看不懂的小機關，會一直玩到自己弄懂為止。
+     探測引擎已經知道「哪一個變因對某個讀數完全沒有影響」，
+     那正是一個有標準答案、又需要真的動手試才答得出來的謎題，
+     同時它練的就是控制變因——只改一個、其他固定。
+     ---------------------------------------------------------- */
+  function buildPuzzle(context, insight) {
+    const invariant = insight.invariants[0];
+    if (!invariant) return null;
+    // 只有兩個選項的話不算謎題
+    if (insight.sliders.length < 3) return null;
+
+    const storeKey = "pl-puzzle-" + context.id;
+    let solved = false;
+    try { solved = !!JSON.parse(localStorage.getItem(storeKey)); } catch (e) {}
+
+    const panel = el("section", "sim-puzzle" + (solved ? " is-solved" : ""));
+    const head = el("div", "sim-puzzle-head", panel);
+    const kicker = el("span", "sim-puzzle-kicker", head);
+    kicker.textContent = "小謎題";
+    const state = el("span", "sim-puzzle-state", head);
+    state.textContent = solved ? "已解開" : "未解開";
+
+    const question = el("p", "sim-puzzle-question", panel);
+    question.textContent = "這些參數當中，有一個不管怎麼調，「" + invariant.readout.label +
+      "」都完全不會變。是哪一個？";
+
+    const choices = el("div", "sim-puzzle-choices", panel);
+    const result = el("p", "sim-puzzle-result", panel);
+    result.hidden = !solved;
+    if (solved) {
+      result.classList.add("is-correct");
+      result.textContent = "答案是「" + invariant.slider.label + "」。" + explain(invariant);
+    }
+
+    function explain(rel) {
+      const others = insight.relations
+        .filter(r => r.readout === rel.readout && (r.direction === "up" || r.direction === "down"))
+        .slice(0, 2)
+        .map(r => "「" + r.slider.label + "」");
+      return others.length
+        ? "同一個讀數對 " + others.join("、") + " 有明顯反應，唯獨對它沒有——這代表它不在這個物理關係裡。"
+        : "在這個模型裡，它與該讀數沒有關係。";
+    }
+
+    insight.sliders.forEach(slider => {
+      const b = el("button", "sim-puzzle-choice", choices);
+      b.type = "button";
+      b.textContent = slider.label;
+      if (solved) {
+        b.disabled = true;
+        if (slider === invariant.slider) b.classList.add("is-correct");
+      }
+      b.addEventListener("click", () => {
+        if (b.disabled) return;
+        const right = slider === invariant.slider;
+        result.hidden = false;
+        result.classList.toggle("is-correct", right);
+        if (right) {
+          solved = true;
+          try { localStorage.setItem(storeKey, JSON.stringify(true)); } catch (e) {}
+          panel.classList.add("is-solved");
+          state.textContent = "已解開";
+          result.textContent = "答對了。" + explain(invariant);
+          Array.from(choices.children).forEach(x => {
+            x.disabled = true;
+            if (x.textContent === invariant.slider.label) x.classList.add("is-correct");
+          });
+          // 解開後才把答案併入關係摘要
+          if (context.revealInvariant) context.revealInvariant();
+        } else {
+          b.classList.add("is-wrong");
+          b.disabled = true;
+          result.textContent = "「" + slider.label + "」其實會影響「" + invariant.readout.label +
+            "」。動手把它從最小拉到最大，看讀數有沒有變，再回來選一次。";
+        }
+      });
+    });
+
+    context.puzzleAnswer = invariant;
+    context.puzzleSolved = () => solved;
+    return panel;
+  }
+
+  /* ---------------- 4. 關係摘要 ---------------- */
   function buildSummary(context, insight) {
     const panel = el("section", "sim-relations");
     const head = el("details", "sim-relations-details", panel);
@@ -456,10 +540,30 @@
       .sort((a, b) => (rank(b) - rank(a)) || (b.relative - a.relative))
       .slice(0, 6);
 
+    /*
+     * 謎題的答案就藏在這份摘要裡，因此在解開之前先把那一行遮住，
+     * 否則學生只要展開摘要就能直接看到答案，謎題就沒有意義了。
+     */
+    const secret = context.puzzleAnswer;
+    const rows = [];
     shown.forEach(r => {
       const li = el("li", "sim-relation" + (r.direction === "flat" ? " is-flat" : r.direction === "clamped" ? " is-clamped" : ""), list);
-      li.textContent = describeRelation(r);
+      if (secret && r === secret && !(context.puzzleSolved && context.puzzleSolved())) {
+        li.classList.add("is-hidden-answer");
+        li.textContent = "（有一個變因對「" + r.readout.label + "」沒有影響——先自己找找看，解開上面的小謎題就會顯示）";
+      } else {
+        li.textContent = describeRelation(r);
+      }
+      rows.push({ li, rel: r });
     });
+    context.revealInvariant = () => {
+      rows.forEach(({ li, rel }) => {
+        if (secret && rel === secret) {
+          li.classList.remove("is-hidden-answer");
+          li.textContent = describeRelation(rel);
+        }
+      });
+    };
 
     if (insight.invariants.length) {
       const foot = el("p", "sim-relations-foot", head);
@@ -504,6 +608,8 @@
     if (predict) host.appendChild(predict);
     const challenge = buildChallenge(context, insight);
     if (challenge) host.appendChild(challenge);
+    const puzzle = buildPuzzle(context, insight);
+    if (puzzle) host.appendChild(puzzle);
     host.appendChild(buildSummary(context, insight));
 
     // 放在任務導讀之後、實驗台之前：先知道要看什麼，再開始操作

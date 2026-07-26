@@ -98,11 +98,17 @@
   function auditCurriculum() {
     const ids = FLAT.map(f => f.exp.id);
     const duplicateIds = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
-    const registeredIds = PL.ids ? PL.ids() : [];
-    const registered = new Set(registeredIds);
+    /*
+     * 實驗程式改成延遲載入後，啟動當下註冊表是空的，不能再用它稽核。
+     * 改成比對「對應表」——它由建置腳本實際執行每個實驗檔產生，
+     * 能確保每個課程項目都真的有程式可以載入。
+     */
+    const mapped = Object.keys(EXPERIMENT_FILES);
+    const available = new Set(mapped.concat(PL.ids ? PL.ids() : []));
     const expected = new Set(ids);
-    const missingSimulations = ids.filter(id => !registered.has(id));
-    const extraSimulations = registeredIds.filter(id => !expected.has(id));
+    const missingSimulations = ids.filter(id => !available.has(id));
+    const extraSimulations = mapped.filter(id => !expected.has(id));
+    const registeredIds = mapped;
     const audit = {
       modules: C.totalModules,
       experiments: ids.length,
@@ -145,6 +151,7 @@
   let currentSim = null;
   let currentId = null;
   let checkpointState = null;
+  let openToken = 0;      // 延遲載入時用來辨識「這次開啟是否仍然有效」
   let pendingChapterTarget = null;
   let initialized = false;
 
@@ -161,7 +168,69 @@
     const b = new Date((end || todayKey()) + "T00:00:00");
     return Math.floor((b - a) / 86400000);
   }
-  const ACCESS_HASH = "faf16b5c720233e537cc50efe380a2170b2a2fd339ae6f9f3f74465cef67e8cd";
+  /* 站台設定（js/site-config.js）。合作結束後把 accessGate 改成 false 就全站公開。 */
+  const SITE = window.PhysicsLabSite || {};
+  const ACCESS_HASH = SITE.accessHash || "";
+  const ACCESS_GATE_ENABLED = SITE.accessGate !== false;
+
+  /* ---------------------------------------------------------------------
+     實驗程式的延遲載入
+
+     原本 16 個實驗檔（共 485 KB）在首頁就全部同步載入，但學生一次只會打開
+     一個實驗，其餘 244 個的程式碼完全用不到。在中階手機上，這些解析與執行
+     全部發生在畫面出現之前，是直接感受得到的卡頓。
+
+     改成開啟實驗時才載入對應的檔案。對應表由 tools/build-manifest.js 產生，
+     它是「真的把每個檔案跑一次」得到的，不受註冊寫法影響。
+     --------------------------------------------------------------------- */
+  const EXPERIMENT_FILES = window.PhysicsLabExperimentFiles || {};
+  const loadedFiles = new Map();
+
+  function loadScript(src) {
+    if (loadedFiles.has(src)) return loadedFiles.get(src);
+    const promise = new Promise((resolve, reject) => {
+      const tag = document.createElement("script");
+      tag.src = src;
+      tag.async = false;              // 保持執行順序，避免相依性問題
+      tag.onload = () => resolve(src);
+      tag.onerror = () => reject(new Error("載入失敗：" + src));
+      document.head.appendChild(tag);
+    });
+    loadedFiles.set(src, promise);
+    return promise;
+  }
+
+  /* 確保某個實驗的程式碼已經就緒 */
+  function ensureExperiment(id) {
+    if (PL.has(id)) return Promise.resolve(true);
+    const file = EXPERIMENT_FILES[id];
+    if (!file) return Promise.resolve(false);
+    const build = (window.PhysicsLabSite && window.PhysicsLabSite.build) || "";
+    return loadScript("js/experiments/" + file + (build ? "?v=" + build : ""))
+      .then(() => PL.has(id))
+      .catch(err => { console.error(err); return false; });
+  }
+
+  /*
+   * 預先載入相鄰實驗
+   * 使用者按「下一個實驗」的機率很高，在瀏覽器閒置時先把相鄰的檔案抓下來，
+   * 切換時就不會有等待。用 requestIdleCallback 確保不跟當前的操作搶資源。
+   */
+  function prefetchNeighbours(order) {
+    // 使用者開了省流量模式，或處於 2G／慢速連線時，不要偷偷多抓檔案
+    const net = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (net && (net.saveData || /2g/.test(net.effectiveType || ""))) return;
+    const idle = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
+    const build = (window.PhysicsLabSite && window.PhysicsLabSite.build) || "";
+    idle(() => {
+      [order - 1, order + 1].forEach(i => {
+        const item = FLAT[i];
+        if (!item || PL.has(item.exp.id)) return;
+        const file = EXPERIMENT_FILES[item.exp.id];
+        if (file) loadScript("js/experiments/" + file + (build ? "?v=" + build : "")).catch(() => {});
+      });
+    });
+  }
 
   /* ------------------------------- 主題 ------------------------------- */
   // 第一次造訪時沿用系統偏好，之後才以使用者的選擇為準。
@@ -667,8 +736,7 @@
       const status = el("span", "practice-status", head); status.textContent = solved ? "答對" : "待作答";
       const prompt = el("p", "practice-question", item);
       const appendFormula = () => {
-        const formula = el("span", "practice-formula", prompt);
-        formula.innerHTML = q.formula;
+        const formula = el("span", "practice-formula", prompt); formula.innerHTML = q.formula;
       };
       if (q.formula && q.formulaBeforePrompt) {
         prompt.append(document.createTextNode(q.formulaBeforePrompt));
@@ -1065,19 +1133,37 @@
     renderExperimentLearningPath(id);
     renderLearningOutput(f);
 
-    // 模擬工作區
+    /*
+     * 模擬工作區
+     * 程式碼採延遲載入，因此先顯示載入狀態，等對應的檔案就緒再建置。
+     * 期間使用者若已經切到別的實驗（openToken 改變），就放棄這次建置，
+     * 避免慢的網路下舊實驗蓋掉新實驗。
+     */
     const simRoot = $("#sim-root");
     simRoot.innerHTML = "";
-    if (PL.has(exp.id)) {
+    const token = ++openToken;
+    const loading = el("div", "sim-loading", simRoot);
+    loading.setAttribute("role", "status");
+    loading.textContent = "載入互動模擬…";
+
+    ensureExperiment(exp.id).then(ready => {
+      if (token !== openToken) return;          // 使用者已經換到別的實驗
+      simRoot.innerHTML = "";
+      if (!ready) {
+        const empty = el("div", "empty", simRoot);
+        empty.textContent = "此實驗的互動模擬尚在開發中。";
+        return;
+      }
       try {
         currentSim = PL.get(exp.id).build(simRoot) || {};
       } catch (err) {
         console.error("模擬載入失敗：" + exp.id, err);
-        simRoot.innerHTML = '<div class="empty">此模擬載入時發生問題。</div>';
+        simRoot.innerHTML = "";
+        const failed = el("div", "empty", simRoot);
+        failed.textContent = "此模擬載入時發生問題，請重新整理後再試。";
       }
-    } else {
-      simRoot.innerHTML = '<div class="empty">此實驗的互動模擬尚在開發中。</div>';
-    }
+      prefetchNeighbours(f.order);
+    });
 
     // 教材：公式與重點
     $("#guide-concept").textContent = exp.concept;
@@ -1086,6 +1172,26 @@
     exp.points.forEach(p => { const li = el("li", null, ul); li.textContent = p; });
     renderPractice(f);
     typeset($("#guide-formula"));
+
+    /*
+     * 學習單入口
+     * 競品分析的結論：老師採用一個教學網站的關鍵不是功能多寡，
+     * 而是「能不能直接印一張紙帶進教室」。PhET 有 3,600 份教師活動，
+     * 這裡至少要讓每個實驗都能一鍵取得對應的學習單。
+     */
+    const outputs = $("#learning-output");
+    if (outputs) {
+      const existing = outputs.querySelector(".worksheet-link-row");
+      if (existing) existing.remove();
+      const row = el("div", "worksheet-link-row", outputs);
+      const link = el("a", "worksheet-link", row);
+      link.href = "p/worksheet-" + encodeURIComponent(exp.id) + ".html";
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "列印這個實驗的學習單";
+      const note = el("span", "worksheet-link-note", row);
+      note.textContent = "含資料記錄表格、作圖區與由圖求值欄位，可直接發給學生";
+    }
 
     // 上一個 / 下一個
     const prev = FLAT[f.order - 1], next = FLAT[f.order + 1];
@@ -1430,6 +1536,18 @@
   }
 
   function initAccessGate() {
+    /*
+     * 閘門關閉時（合作結束後）直接進入實驗室，並把整個密碼面板從
+     * 無障礙樹與版面中移除，避免螢幕報讀器仍然唸到一個不存在的表單。
+     */
+    if (!ACCESS_GATE_ENABLED) {
+      const gate = $("#access-gate");
+      if (gate && gate.parentNode) gate.parentNode.removeChild(gate);
+      const lock = $("#lock-session");
+      if (lock && lock.parentNode) lock.parentNode.removeChild(lock);
+      unlockLab();
+      return;
+    }
     const form = $("#access-form");
     const input = $("#access-password");
     const error = $("#access-error");
@@ -1455,6 +1573,105 @@
     setTimeout(() => input.focus(), 0);
   }
 
+  /* ---------------------------------------------------------------------
+     離線與安裝
+
+     實驗程式改成延遲載入之後，Service Worker 也跟著改為「開到才快取」，
+     否則一安裝就在背景抓 485 KB，等於把省下的流量又花掉一次。
+     真正需要完整離線（例如老師要帶到沒有網路的教室）的人，
+     在這裡主動按一次即可，是否要花這個流量由使用者決定。
+     --------------------------------------------------------------------- */
+  function initOfflineCard() {
+    const status = $("#offline-status");
+    const cacheBtn = $("#btn-cache-all");
+    const installBtn = $("#btn-install");
+    const progress = $("#offline-progress");
+    const fill = $("#offline-progress-fill");
+    const progressText = $("#offline-progress-text");
+    if (!status || !cacheBtn) return;
+
+    const supported = "serviceWorker" in navigator && location.protocol.startsWith("http");
+
+    function describe() {
+      if (!supported) {
+        status.textContent = "這個瀏覽器（或以檔案方式開啟時）不支援離線功能，但所有內容仍可正常使用。";
+        cacheBtn.disabled = true;
+        return;
+      }
+      status.textContent = navigator.onLine
+        ? "基本內容已可離線使用。按下方按鈕可把全部 245 個實驗一次存起來（約 485 KB），之後沒有網路也能開。"
+        : "目前沒有網路連線。已經看過的實驗仍可正常開啟。";
+    }
+    describe();
+    window.addEventListener("online", describe);
+    window.addEventListener("offline", describe);
+
+    // 連線狀態改變時，在頂欄給一個明確的提示
+    function paintConnection() {
+      document.body.classList.toggle("is-offline", !navigator.onLine);
+    }
+    paintConnection();
+    window.addEventListener("online", paintConnection);
+    window.addEventListener("offline", paintConnection);
+
+    cacheBtn.addEventListener("click", () => {
+      if (!supported || !navigator.serviceWorker.controller) {
+        status.textContent = "離線功能尚未就緒，請重新整理後再試一次。";
+        return;
+      }
+      cacheBtn.disabled = true;
+      progress.hidden = false;
+      progressText.textContent = "開始下載…";
+      navigator.serviceWorker.controller.postMessage({ type: "cache-all-experiments" });
+    });
+
+    if (supported) {
+      navigator.serviceWorker.addEventListener("message", event => {
+        const data = event.data || {};
+        if (data.type === "cache-progress") {
+          const pct = Math.round(data.done / data.total * 100);
+          fill.style.width = pct + "%";
+          progressText.textContent = "已下載 " + data.done + " / " + data.total + " 個檔案";
+        }
+        if (data.type === "cache-complete") {
+          fill.style.width = "100%";
+          progressText.textContent = "完成，全部實驗都可以離線使用了。";
+          cacheBtn.textContent = "已下載完成";
+          try { store.set("pl-offline-cached", true); } catch (e) {}
+        }
+      });
+      if (store.get("pl-offline-cached", false)) {
+        cacheBtn.textContent = "已下載完成";
+        cacheBtn.disabled = true;
+      }
+    }
+
+    /*
+     * 安裝到主畫面
+     * 瀏覽器只在符合條件時才會觸發 beforeinstallprompt，
+     * 因此按鈕預設隱藏，等瀏覽器願意才顯示——不做假的安裝引導。
+     */
+    let deferredPrompt = null;
+    window.addEventListener("beforeinstallprompt", event => {
+      event.preventDefault();
+      deferredPrompt = event;
+      if (installBtn) installBtn.hidden = false;
+    });
+    if (installBtn) {
+      installBtn.addEventListener("click", async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        try { await deferredPrompt.userChoice; } catch (e) {}
+        deferredPrompt = null;
+        installBtn.hidden = true;
+      });
+    }
+    window.addEventListener("appinstalled", () => {
+      if (installBtn) installBtn.hidden = true;
+      status.textContent = "已安裝到主畫面，可以像 App 一樣開啟。";
+    });
+  }
+
   /* ------------------------------- 啟動 ------------------------------- */
   function init() {
     auditCurriculum();
@@ -1467,7 +1684,8 @@
     $("#theme-toggle").addEventListener("click", () => {
       applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
     });
-    $("#lock-session").addEventListener("click", lockLab);
+    const lockBtn = $("#lock-session");
+    if (lockBtn) lockBtn.addEventListener("click", lockLab);
     $("#menu-toggle").addEventListener("click", toggleSidebar);
     $("#scrim").addEventListener("click", closeSidebarMobile);
     $("#brand-home").addEventListener("click", () => location.hash = "");
@@ -1528,6 +1746,7 @@
     if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
       window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
     }
+    initOfflineCard();
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initAccessGate);

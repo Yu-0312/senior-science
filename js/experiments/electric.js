@@ -95,42 +95,262 @@
   }});
 
   /* 歐姆定律與電路 */
+  /* 歐姆定律與電路 —— 旗艦改版
+   *
+   * PhET 的設計文件說：「學生會刻意把模擬推到極端，看它會不會有合理的反應；
+   * 模擬需要以有意義的方式壞掉。」他們的電路套件裡，電阻超載時真的會冒煙。
+   *
+   * 這一版把抽象的「電壓滑桿 + 電流讀數」換成一個看得懂的實體電路：
+   *   - 燈泡會依功率改變亮度，電流大到超過額定就會燒掉（可換新的）
+   *   - 保險絲會先斷，示範它存在的理由
+   *   - 電子流的速度與電流成正比，看得見「電流大小」是什麼意思
+   *   - 可以切換串聯與並聯，直接比較總電阻與各支路電流
+   */
   PL.register("ohms", { build(root) {
     const L = PL.ui.layout(root);
-    const cv = PL.canvas.create(L.canvasWrap, 0.56);
-    let t = 0;
-    PL.ui.section(L.controls, "電路參數");
-    const sV = PL.ui.slider(L.controls, { label: "電壓 V", min: 1, max: 12, step: 0.5, value: 6, unit: "V", digits: 1 });
-    const sR = PL.ui.slider(L.controls, { label: "電阻 R", min: 1, max: 20, step: 1, value: 4, unit: "Ω", digits: 0 });
-    const rI = PL.ui.readout(L.readouts, { label: "電流 I=V/R", unit: "A" });
-    const rP = PL.ui.readout(L.readouts, { label: "功率 P=IV", unit: "W" });
-    const cc = PL.ui.chart(PL.ui.charts(root), { title: "I–V 特性曲線（歐姆定律）", cap: "定電阻下電流與電壓成正比，直線斜率為 1/R；電阻越大、線越平。" });
-    function draw() {
-      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const V = sV.get(), R = sR.get(), I = V / R;
-      const x0 = 50, x1 = W - 50, y0 = 46, y1 = H - 46;
-      ctx.save(); ctx.strokeStyle = PL.col("text-faint"); ctx.lineWidth = 2; ctx.strokeRect(x0, y0, x1 - x0, y1 - y0); ctx.restore();
-      // 電池
-      D.line(ctx, x0, (y0 + y1) / 2 - 12, x0, (y0 + y1) / 2 + 12, "#fff", 4); D.line(ctx, x0 - 6, (y0 + y1) / 2 - 6, x0 - 6, (y0 + y1) / 2 + 6, "#fff", 2);
-      D.text(ctx, V + "V", x0 - 10, (y0 + y1) / 2 + 4, { color: PL.col("text-dim"), size: 11, align: "right" });
-      // 電阻（鋸齒）
-      const rx = (x0 + x1) / 2 - 30;
-      ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(rx, y0); for (let i = 0; i < 6; i++) ctx.lineTo(rx + 5 + i * 10, y0 + (i % 2 ? 8 : -8)); ctx.lineTo(rx + 60, y0); ctx.stroke(); ctx.restore();
-      D.text(ctx, R + "Ω", (x0 + x1) / 2, y0 - 8, { color: MC(), size: 12, align: "center" });
-      // 電流動畫（電子）
-      const peri = 2 * ((x1 - x0) + (y1 - y0)); const nd = 16;
-      for (let i = 0; i < nd; i++) { let d = ((t * I * 30 + i * peri / nd) % peri + peri) % peri; let px, py; if (d < x1 - x0) { px = x0 + d; py = y0; } else if (d < (x1 - x0) + (y1 - y0)) { px = x1; py = y0 + (d - (x1 - x0)); } else if (d < 2 * (x1 - x0) + (y1 - y0)) { px = x1 - (d - (x1 - x0) - (y1 - y0)); py = y1; } else { px = x0; py = y1 - (d - 2 * (x1 - x0) - (y1 - y0)); } D.disc(ctx, px, py, 3, { fill: NEG }); }
-      rI.set(I, 2); rP.set(I * V, 1);
-      // I–V 圖
-      cc.clear();
-      const g = PL.graph(cc, { x: 34, y: 14, w: cc.W - 46, h: cc.H - 34 }, { x0: 0, x1: 12, y0: 0, y1: 12 });
-      g.frame({ xlabel: "V (V)", ylabel: "I (A)" }); g.grid(6, 6);
-      g.fn(v => v / R, { color: MC(), width: 2.2 });
-      g.dot(V, I, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+    const cv = PL.canvas.create(L.canvasWrap, 0.58, 820);
+    let t = 0, burnt = false, fuseBlown = false, burnFlash = 0;
+
+    const BULB_MAX_POWER = 12;   // 額定功率（W），超過就燒掉
+    /*
+     * 保險絲額定必須「低於」燈泡的額定電流，否則燈泡永遠先燒，
+     * 保險絲就完全沒有保護作用，這個實驗要教的東西也就不成立。
+     * 燈泡額定 12 W / 3Ω → 額定電流 √(12/3) = 2.0 A，因此保險絲取 1.5 A。
+     */
+    const FUSE_LIMIT = 1.5;      // 保險絲額定電流（A）
+
+    PL.ui.section(L.controls, "電源與元件");
+    const sV = PL.ui.slider(L.controls, { label: "電壓 V", min: 1, max: 24, step: 0.5, value: 6, unit: "V", digits: 1, onInput: onChange });
+    const sR = PL.ui.slider(L.controls, { label: "電阻 R", min: 1, max: 20, step: 0.5, value: 4, unit: "Ω", digits: 1, onInput: onChange });
+
+    PL.ui.section(L.controls, "電路接法");
+    let wiring = "single";
+    PL.ui.chipGroup(L.controls, {
+      value: "single",
+      options: [
+        { value: "single", label: "單一電阻" },
+        { value: "series", label: "串聯兩個" },
+        { value: "parallel", label: "並聯兩個" }
+      ],
+      onChange: v => { wiring = v; onChange(); }
+    });
+
+    PL.ui.section(L.controls, "保護裝置");
+    const cFuse = PL.ui.checkbox(L.controls, { label: "裝上保險絲（" + FUSE_LIMIT + " A）", checked: true, onChange: onChange });
+
+    const row = PL.ui.buttonRow(L.controls);
+    PL.ui.button(row, "換新燈泡／保險絲", () => { burnt = false; fuseBlown = false; burnFlash = 0; }, { primary: true });
+
+    PL.ui.note(L.controls,
+      "把電壓一路調高，看看會先發生什麼事——這顆燈泡的額定功率是 " + BULB_MAX_POWER + " W。" +
+      "拿掉保險絲再試一次，比較兩者的差別。接著切換串聯與並聯，注意總電阻與燈泡亮度怎麼變。");
+
+    const rI = PL.ui.readout(L.readouts, { label: "電流 I", unit: "A" });
+    const rReq = PL.ui.readout(L.readouts, { label: "總電阻", unit: "Ω" });
+    const rP = PL.ui.readout(L.readouts, { label: "燈泡功率", unit: "W" });
+    const rVb = PL.ui.readout(L.readouts, { label: "燈泡分壓", unit: "V" });
+
+    const cc = PL.ui.chart(PL.ui.charts(root), {
+      title: "I–V 特性曲線（歐姆定律）",
+      cap: "定電阻下電流與電壓成正比，直線斜率為 1/R；電阻越大線越平。紅色區域是燈泡會燒掉的範圍。"
+    });
+
+    function onChange() { /* 參數改變時保持燒毀狀態，讓學生看到後果不會自動消失 */ }
+
+    /*
+     * 電路計算
+     * 燈泡本身也有電阻（這裡取固定值，不模擬燈絲的溫度效應），
+     * 與可調電阻依接法組合出總電阻。
+     */
+    const BULB_R = 3;
+    function circuit() {
+      const V = sV.get(), R = sR.get();
+      let Rtotal, bulbShare;
+      if (wiring === "series") {
+        Rtotal = BULB_R + R + R;          // 燈泡 + 兩個電阻串聯
+        bulbShare = BULB_R / Rtotal;
+      } else if (wiring === "parallel") {
+        Rtotal = BULB_R + (R * R) / (R + R);  // 燈泡串上兩個並聯電阻
+        bulbShare = BULB_R / Rtotal;
+      } else {
+        Rtotal = BULB_R + R;
+        bulbShare = BULB_R / Rtotal;
+      }
+      const openCircuit = burnt || fuseBlown;
+      const I = openCircuit ? 0 : V / Rtotal;
+      const Vb = I * BULB_R;
+      const P = I * I * BULB_R;
+      return { V, R, Rtotal, I, Vb, P, bulbShare, openCircuit };
     }
-    const anim = PL.loop(dt => { if (dt) t += dt; draw(); });
-    cv.onResize(draw); cc.onResize(draw); anim.start();
-    return { stop() { anim.stop(); cv.destroy(); cc.destroy(); }, rerender: draw };
+
+    /* 額定判定：先斷保險絲，沒有保險絲才燒燈泡——這就是保險絲的用意 */
+    function checkLimits() {
+      if (burnt || fuseBlown) return;
+      const c = circuit();
+      if (cFuse.get() && c.I > FUSE_LIMIT) { fuseBlown = true; burnFlash = 1; return; }
+      if (c.P > BULB_MAX_POWER) { burnt = true; burnFlash = 1; }
+    }
+
+    function scene() {
+      const { ctx, W, H } = cv;
+      cv.clear(); D.bg(cv);
+      const m = MC();
+      const c = circuit();
+
+      const x0 = 58, x1 = W - 58, y0 = 52, y1 = H - 58;
+      const wireColor = c.openCircuit ? PL.col("text-faint") : m;
+
+      // 導線迴路
+      ctx.save();
+      ctx.strokeStyle = wireColor; ctx.lineWidth = 2.4; ctx.lineJoin = "round";
+      ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+      ctx.restore();
+
+      // 電池：長短線是課本的畫法，學生認得
+      const by = (y0 + y1) / 2;
+      D.rect(ctx, x0 - 13, by - 30, 26, 60, { fill: PL.theme.shade(0.35), r: 3 });
+      D.line(ctx, x0, by - 16, x0, by + 16, PL.theme.pale(0.85), 4);
+      D.line(ctx, x0 - 7, by - 8, x0 - 7, by + 8, PL.theme.pale(0.85), 2);
+      D.text(ctx, PL.fmt(c.V, 1) + " V", x0 - 18, by + 4, { color: PL.col("text-dim"), size: 12, align: "right", weight: "700" });
+
+      // 燈泡
+      const bulbX = (x0 + x1) / 2, bulbY = y0;
+      const brightness = burnt ? 0 : Math.min(1, c.P / BULB_MAX_POWER);
+      if (brightness > 0.02) {
+        ctx.save();
+        ctx.globalAlpha = 0.16 + brightness * 0.55;
+        D.disc(ctx, bulbX, bulbY, 20 + brightness * 26, { fill: "#ffd76a" });
+        ctx.restore();
+      }
+      D.disc(ctx, bulbX, bulbY, 15, {
+        fill: burnt ? "#3a3a3a" : "rgb(" + Math.round(90 + brightness * 165) + "," +
+          Math.round(85 + brightness * 140) + "," + Math.round(70 + brightness * 40) + ")",
+        stroke: PL.theme.pale(0.5), width: 1.5
+      });
+      D.rect(ctx, bulbX - 7, bulbY + 13, 14, 9, { fill: PL.theme.pale(0.42), r: 2 });
+      if (burnt) {
+        D.line(ctx, bulbX - 8, bulbY - 8, bulbX + 8, bulbY + 8, PL.col("danger"), 2.5);
+        D.line(ctx, bulbX + 8, bulbY - 8, bulbX - 8, bulbY + 8, PL.col("danger"), 2.5);
+      }
+      D.text(ctx, burnt ? "燈泡燒毀" : PL.fmt(c.P, 1) + " W", bulbX, bulbY - 30,
+        { color: burnt ? PL.col("danger") : PL.col("warn"), size: 12, align: "center", weight: "700" });
+
+      // 保險絲
+      if (cFuse.get()) {
+        const fx = x0 + (x1 - x0) * 0.24;
+        D.rect(ctx, fx - 17, y1 - 9, 34, 18, { fill: PL.theme.shade(0.4), stroke: PL.theme.pale(0.35), r: 4 });
+        if (fuseBlown) {
+          D.line(ctx, fx - 10, y1, fx - 3, y1, PL.col("danger"), 2);
+          D.line(ctx, fx + 3, y1, fx + 10, y1, PL.col("danger"), 2);
+          D.text(ctx, "保險絲斷了", fx, y1 + 26, { color: PL.col("danger"), size: 11, align: "center", weight: "700" });
+        } else {
+          D.line(ctx, fx - 11, y1, fx + 11, y1, PL.col("ok"), 2);
+          D.text(ctx, FUSE_LIMIT + " A", fx, y1 + 26, { color: PL.col("text-faint"), size: 10, align: "center" });
+        }
+      }
+
+      // 電阻：鋸齒是課本畫法
+      function resistor(cx, cy, label, vertical) {
+        const len = 54;
+        ctx.save();
+        ctx.translate(cx, cy);
+        if (vertical) ctx.rotate(Math.PI / 2);
+        ctx.strokeStyle = PL.col("accent-2"); ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.moveTo(-len / 2, 0);
+        for (let i = 0; i < 6; i += 1) ctx.lineTo(-len / 2 + 4 + i * 9, (i % 2 ? 8 : -8));
+        ctx.lineTo(len / 2, 0); ctx.stroke();
+        ctx.restore();
+        D.text(ctx, label, cx, cy - 16, { color: PL.col("accent-2"), size: 11, align: "center" });
+      }
+
+      if (wiring === "single") {
+        resistor(x1, (y0 + y1) / 2, PL.fmt(c.R, 1) + "Ω", true);
+      } else if (wiring === "series") {
+        resistor(x1, y0 + (y1 - y0) * 0.32, PL.fmt(c.R, 1) + "Ω", true);
+        resistor(x1, y0 + (y1 - y0) * 0.68, PL.fmt(c.R, 1) + "Ω", true);
+      } else {
+        // 並聯：兩條支路並排，總電阻變小、電流變大
+        const mx = x1 - 46;
+        D.line(ctx, x1, y0 + 22, mx, y0 + 22, wireColor, 2.2);
+        D.line(ctx, x1, y1 - 22, mx, y1 - 22, wireColor, 2.2);
+        D.line(ctx, mx, y0 + 22, mx, y1 - 22, wireColor, 2.2);
+        resistor(x1, (y0 + y1) / 2, PL.fmt(c.R, 1) + "Ω", true);
+        resistor(mx, (y0 + y1) / 2, PL.fmt(c.R, 1) + "Ω", true);
+        D.text(ctx, "並聯後 " + PL.fmt(c.R / 2, 1) + "Ω", mx - 8, y0 + 12,
+          { color: PL.col("accent-2"), size: 10, align: "right" });
+      }
+
+      // 電子流：速度正比於電流，「電流大小」因此看得見
+      if (!c.openCircuit && c.I > 0.001) {
+        const peri = 2 * ((x1 - x0) + (y1 - y0));
+        const count = 22;
+        for (let i = 0; i < count; i += 1) {
+          let d = ((t * c.I * 42 + i * peri / count) % peri + peri) % peri;
+          let ex, ey;
+          if (d < x1 - x0) { ex = x0 + d; ey = y0; }
+          else if (d < (x1 - x0) + (y1 - y0)) { ex = x1; ey = y0 + (d - (x1 - x0)); }
+          else if (d < 2 * (x1 - x0) + (y1 - y0)) { ex = x1 - (d - (x1 - x0) - (y1 - y0)); ey = y1; }
+          else { ex = x0; ey = y1 - (d - 2 * (x1 - x0) - (y1 - y0)); }
+          D.disc(ctx, ex, ey, 3, { fill: PL.col("accent-2") });
+        }
+      }
+
+      // 燒毀瞬間的回饋
+      if (burnFlash > 0) {
+        const target = fuseBlown ? { x: x0 + (x1 - x0) * 0.24, y: y1 } : { x: bulbX, y: bulbY };
+        ctx.save(); ctx.globalAlpha = burnFlash;
+        D.ring(ctx, target.x, target.y, (1 - burnFlash) * 46 + 10, PL.col("danger"), 3);
+        ctx.restore();
+      }
+
+      PL.ui.caption(cv,
+        fuseBlown ? "電流超過 " + FUSE_LIMIT + " A，保險絲先斷開，燈泡被保住了——這就是保險絲存在的理由。"
+          : burnt ? "功率超過額定 " + BULB_MAX_POWER + " W，燈絲燒斷。若剛才裝了保險絲，斷的會是保險絲而不是燈泡。"
+            : "電子的流動速度正比於電流；燈泡亮度正比於它消耗的功率 P = I²R。");
+      if ((burnt || fuseBlown) && circuit().V / circuit().Rtotal > FUSE_LIMIT) {
+        D.text(ctx, "換新之前先把電壓調低，否則會立刻再燒一次", W / 2, H - 22,
+          { color: PL.col("warn"), size: 11.5, align: "center" });
+      }
+
+      rI.set(c.I, 2); rReq.set(c.Rtotal, 1); rP.set(c.P, 2); rVb.set(c.Vb, 2);
+    }
+
+    function chart() {
+      cc.clear();
+      const c = circuit();
+      const gph = PL.graph(cc, { x: 40, y: 14, w: cc.W - 54, h: cc.H - 34 }, { x0: 0, x1: 24, y0: 0, y1: 5 });
+      gph.frame({ xlabel: "V (V)", ylabel: "I (A)" });
+      gph.grid(6, 5);
+      // 燒毀區：把「極限」畫出來，學生才知道自己在逼近什麼
+      const burnI = Math.sqrt(BULB_MAX_POWER / BULB_R);
+      gph.hline(burnI, { color: PL.col("danger"), dash: [4, 3], width: 1.4 });
+      gph.label(0.6, burnI + 0.22, "燈泡額定上限 " + burnI.toFixed(2) + " A",
+        { color: PL.col("danger"), size: 9.5 });
+      if (cFuse.get()) {
+        gph.hline(FUSE_LIMIT, { color: PL.col("warn"), dash: [3, 3], width: 1.2 });
+        gph.label(0.6, FUSE_LIMIT + 0.22, "保險絲 " + FUSE_LIMIT + " A", { color: PL.col("warn"), size: 9.5 });
+      }
+      gph.fn(v => v / c.Rtotal, { color: MC(), width: 2.2 });
+      if (!c.openCircuit) gph.dot(c.V, c.I, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+    }
+
+    function drawAll() { scene(); chart(); }
+
+    const anim = PL.loop(dt => {
+      if (dt) {
+        t += dt;
+        checkLimits();
+        if (burnFlash > 0) burnFlash = Math.max(0, burnFlash - dt * 1.1);
+      }
+      drawAll();
+    }, 45);
+
+    cv.onResize(scene); cc.onResize(chart);
+    drawAll(); anim.start();
+    return {
+      stop() { anim.stop(); cv.destroy(); cc.destroy(); },
+      rerender: drawAll
+    };
   }});
 
   /* 伏安法量電阻：安培計串聯、電壓計並聯，記錄 U-I 資料 */

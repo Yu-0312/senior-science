@@ -23,6 +23,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # 靜態說明頁、學習單、sitemap 與 robots 都由課程資料自動產生，
+      # 在部署前重新建置一次，內容才不會和實驗清單失去同步。
+      - name: Build experiment manifest
+        run: node tools/build-manifest.js
+      - name: Build static pages
+        run: node tools/build-static.js
+      - name: Verify build
+        run: node tools/verify-static.js
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact

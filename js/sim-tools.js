@@ -25,6 +25,20 @@
   const TAU = Math.PI * 2;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
+  /*
+   * 觸控裝置的命中範圍
+   * 量角器的量角臂與尺的端點原本用 12px 的命中半徑，那是照滑鼠游標設計的。
+   * 手指的接觸面積大得多，實測上 12px 幾乎抓不到，因此在觸控裝置放大到 24px；
+   * 碼錶的按鈕也一併加高。視覺尺寸不變，只放大看不見的判定區。
+   */
+  const COARSE = (function () {
+    try { return window.matchMedia && window.matchMedia("(pointer: coarse)").matches; }
+    catch (e) { return false; }
+  })();
+  const GRAB = COARSE ? 24 : 12;              // 把手的命中半徑
+  const BTN_H = COARSE ? 30 : 18;             // 碼錶按鈕高度
+  const BTN_GAP = COARSE ? 6 : 4;
+
   /* 依主題取得工具本身的配色（工具是介面，不是實驗內容，用固定的高對比配色） */
   function palette() {
     const light = PL.theme.isLight();
@@ -70,7 +84,7 @@
     return {
       key: "stopwatch",
       name: "碼錶",
-      x: 24, y: 24, w: 138, h: 62,
+      x: 24, y: 24, w: COARSE ? 172 : 138, h: COARSE ? 76 : 62,
       elapsed: 0,
       running: false,
       laps: [],
@@ -84,10 +98,13 @@
       },
       // 內部按鈕（相對座標）
       buttons() {
+        // 觸控裝置上按鈕加高、間距加大，避免誤觸隔壁的按鈕
+        const w1 = COARSE ? 62 : 56, w2 = COARSE ? 40 : 28, w3 = COARSE ? 42 : 30;
+        const x1 = 8, x2 = x1 + w1 + BTN_GAP, x3 = x2 + w2 + BTN_GAP;
         return [
-          { id: "toggle", x: 8, y: 36, w: 56, h: 18, text: this.running ? "停止" : "開始" },
-          { id: "lap", x: 68, y: 36, w: 28, h: 18, text: "記圈" },
-          { id: "zero", x: 100, y: 36, w: 30, h: 18, text: "歸零" }
+          { id: "toggle", x: x1, y: 36, w: w1, h: BTN_H, text: this.running ? "停止" : "開始" },
+          { id: "lap", x: x2, y: 36, w: w2, h: BTN_H, text: "記圈" },
+          { id: "zero", x: x3, y: 36, w: w3, h: BTN_H, text: "歸零" }
         ];
       },
       press(id) {
@@ -121,7 +138,7 @@
           if (b.id === "toggle" && this.running) ctx.fill();
           ctx.stroke();
           ctx.restore();
-          label(ctx, b.text, this.x + b.x + b.w / 2, this.y + b.y + 13,
+          label(ctx, b.text, this.x + b.x + b.w / 2, this.y + b.y + BTN_H / 2 + 4,
             { color: b.id === "toggle" && this.running ? "#241a00" : p.text, size: 10, align: "center", weight: "600" });
         });
 
@@ -202,8 +219,8 @@
         ctx.strokeStyle = p.accent; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(this.x, this.y); ctx.lineTo(arm.x, arm.y); ctx.stroke();
         ctx.fillStyle = p.accent;
-        ctx.beginPath(); ctx.arc(arm.x, arm.y, 6, 0, TAU); ctx.fill();
-        ctx.beginPath(); ctx.arc(this.x, this.y, 3.5, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(arm.x, arm.y, COARSE ? 10 : 6, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(this.x, this.y, COARSE ? 5 : 3.5, 0, TAU); ctx.fill();
         ctx.restore();
 
         // 讀數框
@@ -217,7 +234,7 @@
       },
       hitArm(mx, my) {
         const a = this.armPoint();
-        return Math.hypot(mx - a.x, my - a.y) <= 12;
+        return Math.hypot(mx - a.x, my - a.y) <= GRAB;
       },
       hit(mx, my) {
         const d = Math.hypot(mx - this.x, my - this.y);
@@ -282,7 +299,7 @@
         // 兩端把手
         ctx.fillStyle = p.accent;
         [[this.ax, this.ay], [this.bx, this.by]].forEach(([hx, hy]) => {
-          ctx.beginPath(); ctx.arc(hx, hy, 6, 0, TAU); ctx.fill();
+          ctx.beginPath(); ctx.arc(hx, hy, COARSE ? 10 : 6, 0, TAU); ctx.fill();
         });
         ctx.restore();
 
@@ -296,8 +313,8 @@
         label(ctx, text, mx, my - half - 12, { color: p.text, size: 11.5, align: "center", weight: "700" });
       },
       hitEnd(mx, my) {
-        if (Math.hypot(mx - this.ax, my - this.ay) <= 12) return "a";
-        if (Math.hypot(mx - this.bx, my - this.by) <= 12) return "b";
+        if (Math.hypot(mx - this.ax, my - this.ay) <= GRAB) return "a";
+        if (Math.hypot(mx - this.bx, my - this.by) <= GRAB) return "b";
         return null;
       },
       hit(mx, my) {
@@ -306,7 +323,7 @@
         const len2 = dx * dx + dy * dy || 1;
         const t = clamp(((mx - this.ax) * dx + (my - this.ay) * dy) / len2, 0, 1);
         const px = this.ax + dx * t, py = this.ay + dy * t;
-        return Math.hypot(mx - px, my - py) <= 15;
+        return Math.hypot(mx - px, my - py) <= (COARSE ? 26 : 15);
       }
     };
   }
@@ -468,7 +485,11 @@
 
     const hint = document.createElement("span");
     hint.className = "sim-tool-hint";
-    hint.textContent = cv.pxPerUnit ? "點一下加到畫面上，然後直接用滑鼠拖" : "點一下加到畫面上（此實驗未設定比例尺，故不提供尺）";
+    const dragVerb = COARSE ? "用手指拖" : "用滑鼠拖";
+    hint.textContent = (cv.pxPerUnit
+      ? "點一下加到畫面上，然後直接" + dragVerb
+      : "點一下加到畫面上（此實驗未設定比例尺，故不提供尺）")
+      + (COARSE ? "。工具啟用時畫布區域不會跟著捲動，收起工具即可恢復。" : "");
     bar.appendChild(hint);
 
     wrap.parentNode.insertBefore(bar, wrap.nextSibling);

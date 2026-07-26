@@ -104,67 +104,301 @@
   }});
 
   /* 拋體運動 */
+  /* 拋體運動 —— 旗艦改版
+   *
+   * PhET 的《Look and Feel》在「鼓勵探索」一節指出幾件事，這一版照著做：
+   *   · 用生活中認得出來的物件，卡通化但不誤導
+   *   · 學生會刻意把參數推到極端，測試模擬會不會有合理的反應
+   *   · 小謎題會讓學生自己去玩到弄懂為止
+   *   · 模擬要好玩，學生才願意一直操作
+   *
+   * 因此這裡不是「一條拋物線加兩個讀數」，而是一座可以瞄準的大砲：
+   *   - 可以選擇發射物（保齡球到氣球，質量差 140 倍）
+   *   - 有靶，打中會有明確回饋，落點會留下痕跡
+   *   - 可以開空氣阻力。開了以後軌跡不再對稱，45° 也不再是最遠角度——
+   *     而且此時「質量」突然變得有影響，這是真空版本永遠看不到的事。
+   */
   PL.register("projectile", { build(root) {
     const L = PL.ui.layout(root);
     const cv = PL.canvas.create(L.canvasWrap, 0.52, 860);
-    const g = 9.8; let t = 0, flying = false, trail = [];
+    const g = 9.8;
+
+    /* 發射物：質量差距刻意拉大，才看得出空氣阻力對輕重物體的差別 */
+    const AMMO = {
+      bowling: { label: "保齡球", mass: 7.0, radius: 0.11, drag: 0.47, color: "#4a5568", accent: "#151b24" },
+      basket: { label: "籃球", mass: 0.62, radius: 0.12, drag: 0.47, color: "#dd7b3b", accent: "#7a3a12" },
+      melon: { label: "西瓜", mass: 4.0, radius: 0.14, drag: 0.50, color: "#4f9d5a", accent: "#24512b" },
+      balloon: { label: "氣球", mass: 0.05, radius: 0.15, drag: 0.55, color: "#d9598f", accent: "#7d264c" }
+    };
+    let ammoKey = "basket";
+
+    let t = 0, flying = false, shots = [], flash = 0;
+
     PL.ui.section(L.controls, "發射參數");
-    const sV = PL.ui.stepper(L.controls, { label: "初速 v₀ (m/s)", value: 24, min: 5, max: 40, step: 1, onInput: reset });
-    const sA = PL.ui.stepper(L.controls, { label: "發射角 θ (°)", value: 45, min: 10, max: 80, step: 1, onInput: reset });
-    PL.ui.section(L.controls, "快捷角度");
-    PL.ui.chipGroup(L.controls, { value: 45, options: [{ value: 30, label: "30°" }, { value: 45, label: "45°" }, { value: 60, label: "60°" }], onChange: v => { sA.set(v); reset(); } });
+    const sV = PL.ui.stepper(L.controls, { label: "初速 v₀ (m/s)", value: 24, min: 5, max: 45, step: 1, onInput: onParam });
+    const sA = PL.ui.stepper(L.controls, { label: "發射角 θ (°)", value: 45, min: 5, max: 85, step: 1, onInput: onParam });
+    const sH = PL.ui.slider(L.controls, { label: "砲台高度 h₀", min: 0, max: 15, step: 0.5, value: 0, unit: "m", digits: 1, onInput: onParam });
+
+    PL.ui.section(L.controls, "發射物");
+    PL.ui.chipGroup(L.controls, {
+      value: ammoKey,
+      options: Object.keys(AMMO).map(k => ({ value: k, label: AMMO[k].label })),
+      onChange: v => { ammoKey = v; onParam(); }
+    });
+
+    PL.ui.section(L.controls, "條件");
+    const cDrag = PL.ui.checkbox(L.controls, { label: "加入空氣阻力", checked: false, onChange: onParam });
+    const sTarget = PL.ui.slider(L.controls, { label: "靶的距離", min: 10, max: 120, step: 1, value: 55, unit: "m", digits: 0, onInput: onParam });
+
     PL.ui.section(L.controls, "顯示");
-    const layers = PL.ui.chipGroup(L.controls, { multi: true, value: ["traj", "vcomp", "marks", "comp"], options: [
-      { value: "traj", label: "理論軌跡" }, { value: "vcomp", label: "速度分量" }, { value: "marks", label: "頂點/射程" }, { value: "comp", label: "45°對照" }
-    ] });
+    const layers = PL.ui.chipGroup(L.controls, {
+      multi: true, value: ["traj", "vcomp", "marks", "shots"],
+      options: [
+        { value: "traj", label: "預測軌跡" }, { value: "vcomp", label: "速度分量" },
+        { value: "marks", label: "頂點/射程" }, { value: "shots", label: "歷次落點" }
+      ]
+    });
+
     const row = PL.ui.buttonRow(L.controls);
-    const bP = PL.ui.button(row, "發射", () => { reset(); flying = true; }, { primary: true });
-    PL.ui.button(row, "重設", reset);
+    PL.ui.button(row, "發射", () => { t = 0; flash = 0; flying = true; }, { primary: true });
+    PL.ui.button(row, "清除落點", () => { shots = []; t = 0; flying = false; flash = 0; drawAll(); });
+
+    PL.ui.note(L.controls,
+      "先在真空下找出射程最遠的角度，再打開空氣阻力重找一次——最佳角度會往下移。" +
+      "接著換成氣球和保齡球各射一次：真空時兩者軌跡完全相同，有空氣阻力時差距會大到你以為程式壞了。");
+
     const rR = PL.ui.readout(L.readouts, { label: "射程 R", unit: "m" });
     const rHm = PL.ui.readout(L.readouts, { label: "最大高度", unit: "m" });
     const rTf = PL.ui.readout(L.readouts, { label: "飛行時間", unit: "s" });
     const rS = PL.ui.readout(L.readouts, { label: "當前速率", unit: "m/s" });
+    const rHit = PL.ui.readout(L.readouts, { label: "距靶心", unit: "m" });
+
     const charts = PL.el("div", "sim-charts", root);
-    const w1 = PL.el("div", "sim-chart", charts); PL.el("div", "chart-title", w1).textContent = "射程 R 對 發射角 θ";
-    const cvR = PL.canvas.create(w1, 0.58); PL.el("div", "cap", w1).textContent = "R = v₀²sin2θ / g，θ = 45° 時射程最遠；互餘角（如 30° 與 60°）射程相同。";
-    function reset() { t = 0; flying = false; trail = []; }
-    function params() { const v = sV.get(), th = sA.get() * Math.PI / 180; return { v, th, R: v * v * Math.sin(2 * th) / g, Hm: v * v * Math.sin(th) ** 2 / (2 * g), Tf: 2 * v * Math.sin(th) / g }; }
-    function scene() {
-      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const { v, th, R, Hm, Tf } = params(), m = MC();
-      const ox = 48, oy = H - 32, Rmax = v * v / g;
-      const sc = Math.min((W - 90) / (Rmax + 1e-3), (oy - 30) / (v * v / (2 * g) + 1e-3));
-      D.rect(ctx, 24, oy, W - 48, 6, { fill: "rgba(255,255,255,0.06)", r: 3 });
-      D.line(ctx, 24, oy, W - 24, oy, PL.col("text-faint"), 1.5);
-      const traj = (ang, style) => { ctx.save(); ctx.strokeStyle = style.c; ctx.lineWidth = style.w; if (style.dash) ctx.setLineDash(style.dash); ctx.beginPath(); const T = 2 * v * Math.sin(ang) / g; for (let i = 0; i <= 70; i++) { const tt = T * i / 70, x = v * Math.cos(ang) * tt, y = v * Math.sin(ang) * tt - 0.5 * g * tt * tt; const px = ox + x * sc, py = oy - y * sc; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.stroke(); ctx.restore(); };
-      if (layers.has("comp")) traj(Math.PI / 4, { c: "rgba(255,255,255,0.16)", w: 1.4, dash: [3, 4] });
-      if (layers.has("traj")) traj(th, { c: "rgba(77,208,225,0.35)", w: 1.6, dash: [5, 4] });
-      D.arrow(ctx, ox, oy, ox + 46 * Math.cos(th), oy - 46 * Math.sin(th), { color: PL.col("accent-2"), width: 2, label: "v₀" });
-      if (layers.has("marks")) {
-        D.line(ctx, ox + R * sc, oy - 6, ox + R * sc, oy + 6, m, 2); D.text(ctx, "R=" + PL.fmt(R, 1) + "m", ox + R * sc, oy + 18, { color: m, size: 10, align: "center" });
-        const apexX = ox + (R / 2) * sc, apexY = oy - Hm * sc; D.line(ctx, apexX, apexY, apexX, oy, "rgba(255,255,255,0.14)", 1, [3, 3]); D.text(ctx, "H=" + PL.fmt(Hm, 1) + "m", apexX + 4, apexY - 4, { color: PL.col("text-dim"), size: 10 });
+    const w1 = PL.el("div", "sim-chart", charts);
+    PL.el("div", "chart-title", w1).textContent = "射程 R 對 發射角 θ";
+    const cvR = PL.canvas.create(w1, 0.58);
+    PL.el("div", "cap", w1).textContent =
+      "真空時 R = v₀²sin2θ/g，45° 最遠、互餘角射程相同。加入空氣阻力後曲線會左傾，最佳角度降到 40° 以下，對稱性也不見了。";
+
+    /*
+     * 數值積分求軌跡
+     * 有空氣阻力時沒有簡潔的解析解，因此一律用數值積分，
+     * 讀數也從模擬出來的路徑取值，確保「畫面」與「數字」永遠一致。
+     * 阻力用 F = ½ρC_dA·v²，方向與速度相反。
+     */
+    function simulate() {
+      const ammo = AMMO[ammoKey];
+      const v0 = sV.get(), th = sA.get() * Math.PI / 180, h0 = sH.get();
+      const area = Math.PI * ammo.radius * ammo.radius;
+      const k = cDrag.get() ? 0.5 * 1.225 * ammo.drag * area / ammo.mass : 0;
+
+      const dt = 0.004;
+      let x = 0, y = h0, vx = v0 * Math.cos(th), vy = v0 * Math.sin(th);
+      const path = [[0, h0, Math.hypot(vx, vy)]];
+      let peak = h0, time = 0;
+
+      // 上限保護：極端參數下不要讓迴圈失控
+      for (let step = 0; step < 12000; step += 1) {
+        const speed = Math.hypot(vx, vy);
+        vx += -k * speed * vx * dt;
+        vy += (-g - k * speed * vy) * dt;
+        const prevX = x, prevY = y;
+        x += vx * dt; y += vy * dt;
+        time += dt;
+        if (y > peak) peak = y;
+        if (y <= 0) {
+          // 線性內插回到 y = 0 的那一刻，射程才不會受步長影響
+          const frac = prevY / (prevY - y || 1);
+          x = prevX + (x - prevX) * frac;
+          time -= dt * (1 - frac);
+          path.push([x, 0, Math.hypot(vx, vy)]);
+          break;
+        }
+        if (step % 3 === 0) path.push([x, y, speed]);
       }
-      const tt = Math.min(t, Tf), x = v * Math.cos(th) * tt, y = v * Math.sin(th) * tt - 0.5 * g * tt * tt;
-      const vx = v * Math.cos(th), vy = v * Math.sin(th) - g * tt, sp = Math.hypot(vx, vy);
-      trail.forEach(p => D.disc(ctx, ox + p[0] * sc, oy - p[1] * sc, 2.2, { fill: "rgba(255,255,255,0.25)" }));
-      const bx = ox + x * sc, by = oy - y * sc;
-      if (flying && layers.has("vcomp")) { D.arrow(ctx, bx, by, bx + vx * 1.5, by, { color: "#7ee0c0", width: 1.6 }); D.arrow(ctx, bx, by, bx, by - vy * 1.5, { color: PL.col("accent-3"), width: 1.6 }); }
-      if (flying) D.arrow(ctx, bx, by, bx + vx * 1.5, by - vy * 1.5, { color: PL.col("accent-2"), width: 1.8 });
-      D.disc(ctx, bx, by, 8, { fill: m, glow: m, glowSize: 14 });
-      rR.set(R, 1); rHm.set(Hm, 1); rTf.set(Tf, 2); rS.set(sp, 1);
+      return { path, range: x, peak, time, ammo, v0, th, h0 };
     }
+
+    let model = simulate();
+
+    function onParam() { t = 0; flying = false; flash = 0; model = simulate(); }
+
+    /* 射程對角度：有阻力時要逐點積分，才看得到最佳角度的移動 */
+    function rangeAt(angleDeg) {
+      const ammo = AMMO[ammoKey];
+      const v0 = sV.get(), h0 = sH.get(), th = angleDeg * Math.PI / 180;
+      const area = Math.PI * ammo.radius * ammo.radius;
+      const k = cDrag.get() ? 0.5 * 1.225 * ammo.drag * area / ammo.mass : 0;
+      const dt = 0.01;
+      let x = 0, y = h0, vx = v0 * Math.cos(th), vy = v0 * Math.sin(th);
+      for (let i = 0; i < 4000; i += 1) {
+        const speed = Math.hypot(vx, vy);
+        vx += -k * speed * vx * dt;
+        vy += (-g - k * speed * vy) * dt;
+        x += vx * dt; y += vy * dt;
+        if (y <= 0) break;
+      }
+      return Math.max(0, x);
+    }
+
+    function scene() {
+      const { ctx, W, H } = cv;
+      cv.clear(); D.bg(cv);
+      const m = MC();
+      const path = model.path, range = model.range, peak = model.peak, time = model.time;
+      const ammo = model.ammo, th = model.th, h0 = model.h0;
+      const target = sTarget.get();
+
+      const ox = 62, oy = H - 46;
+      const spanX = Math.max(range, target) * 1.18 + 6;
+      const spanY = Math.max(peak, h0) * 1.35 + 4;
+      const sc = Math.min((W - ox - 40) / spanX, (oy - 26) / spanY);
+      const px = xm => ox + xm * sc;
+      const py = ym => oy - ym * sc;
+      cv.calibrate(sc, "m");
+
+      // 地面與距離刻度
+      D.rect(ctx, 20, oy, W - 40, 5, { fill: PL.theme.pale(0.16), r: 2 });
+      D.line(ctx, 20, oy, W - 20, oy, PL.col("text-faint"), 1.5);
+      const gridStep = spanX > 90 ? 20 : 10;
+      for (let d = gridStep; d < spanX; d += gridStep) {
+        if (px(d) > W - 24) break;
+        D.line(ctx, px(d), oy, px(d), oy + 5, PL.theme.pale(0.22), 1);
+        D.text(ctx, String(d), px(d), oy + 17, { color: PL.col("text-faint"), size: 9, align: "center" });
+      }
+
+      // 砲台與砲管：角度看得見，就不用一直回頭確認滑桿
+      const baseY = py(h0);
+      if (h0 > 0.05) {
+        D.rect(ctx, ox - 18, baseY, 32, oy - baseY, { fill: PL.theme.pale(0.14), stroke: PL.theme.pale(0.28), r: 2 });
+      }
+      ctx.save();
+      ctx.translate(ox, baseY);
+      ctx.rotate(-th);
+      D.rect(ctx, -6, -9, 46, 18, { fill: m, stroke: PL.theme.pale(0.35), width: 1.5, r: 4 });
+      ctx.restore();
+      D.disc(ctx, ox, baseY, 13, { fill: PL.theme.pale(0.22), stroke: PL.theme.pale(0.4) });
+      D.text(ctx, sA.get() + "°", ox - 24, baseY - 16, { color: PL.col("accent-2"), size: 12, weight: "700", align: "right" });
+
+      // 靶：打中與否要一眼看得出來
+      const tx = px(target);
+      const hitDistance = Math.abs(range - target);
+      const isHit = hitDistance <= 1.5;
+      if (tx < W - 16) {
+        const tc = isHit ? PL.col("ok") : PL.col("danger");
+        D.rect(ctx, tx - 2, oy - 16, 4, 16, { fill: PL.theme.pale(0.3) });
+        [13, 8, 4].forEach((r, i) => {
+          D.disc(ctx, tx, oy - 22, r, { fill: i === 1 ? "#f2f4f7" : tc });
+        });
+        D.text(ctx, target + " m", tx, oy + 30, { color: tc, size: 10, align: "center", weight: "700" });
+      }
+
+      // 歷次落點：換條件重射時，差異會自己浮現
+      if (layers.has("shots")) {
+        shots.forEach(s => {
+          D.disc(ctx, px(s.x), oy - 3, 3, { fill: PL.theme.pale(0.34) });
+          D.text(ctx, s.label, px(s.x), oy - 11, { color: PL.col("text-faint"), size: 8.5, align: "center" });
+        });
+      }
+
+      // 預測軌跡
+      if (layers.has("traj") && path.length > 1) {
+        ctx.save();
+        ctx.strokeStyle = "rgba(120,190,220,0.42)"; ctx.lineWidth = 1.6; ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        path.forEach((p, i) => (i ? ctx.lineTo(px(p[0]), py(p[1])) : ctx.moveTo(px(p[0]), py(p[1]))));
+        ctx.stroke(); ctx.restore();
+      }
+
+      if (layers.has("marks")) {
+        D.line(ctx, px(range), oy - 7, px(range), oy + 7, m, 2);
+        D.text(ctx, "R=" + PL.fmt(range, 1) + "m", px(range), oy - 13, { color: m, size: 10, align: "center" });
+        const apex = path.reduce((best, p) => (p[1] > best[1] ? p : best), path[0]);
+        D.line(ctx, px(apex[0]), py(apex[1]), px(apex[0]), oy, PL.theme.pale(0.16), 1, [3, 3]);
+        D.text(ctx, "H=" + PL.fmt(peak, 1) + "m", px(apex[0]) + 5, py(apex[1]) - 5, { color: PL.col("text-dim"), size: 10 });
+      }
+
+      // 飛行中的發射物
+      const frac = time > 0 ? Math.min(1, t / time) : 0;
+      const idx = Math.min(path.length - 1, Math.max(0, Math.floor(frac * (path.length - 1))));
+      const now = path[idx];
+      const bx = px(now[0]), by = py(now[1]);
+      const rpx = Math.max(5, ammo.radius * sc * 2.2);
+      D.disc(ctx, bx, by, rpx, { fill: ammo.color, stroke: ammo.accent, width: 2 });
+      if (ammoKey === "basket") {
+        D.line(ctx, bx - rpx, by, bx + rpx, by, ammo.accent, 1.2);
+        D.ring(ctx, bx, by, rpx * 0.6, ammo.accent, 1.2);
+      }
+      if (ammoKey === "balloon") {
+        D.line(ctx, bx, by + rpx, bx, by + rpx + 7, ammo.accent, 1.2);
+      }
+
+      if (layers.has("vcomp") && path.length > 1) {
+        const nxt = path[Math.min(path.length - 1, idx + 1)];
+        const dx = nxt[0] - now[0], dy = nxt[1] - now[1];
+        const norm = Math.hypot(dx, dy) || 1;
+        const len = 34;
+        D.arrow(ctx, bx, by, bx + dx / norm * len, by, { color: PL.col("accent-2"), width: 2, head: 7, label: "vₓ" });
+        D.arrow(ctx, bx, by, bx, by - dy / norm * len, { color: PL.col("warn"), width: 2, head: 7, label: "v_y" });
+      }
+
+      // 落地瞬間給明確回饋——學生要知道自己有沒有打中
+      if (flash > 0) {
+        const ring = (1 - flash) * 40 + 8;
+        ctx.save(); ctx.globalAlpha = flash;
+        D.ring(ctx, px(range), oy - 12, ring, isHit ? PL.col("ok") : PL.col("danger"), 3);
+        ctx.restore();
+        D.text(ctx, isHit ? "命中！" : (range > target ? "太遠了" : "距離不夠"),
+          px(range), oy - 46, { color: isHit ? PL.col("ok") : PL.col("danger"), size: 15, align: "center", weight: "700" });
+      }
+
+      PL.ui.caption(cv, cDrag.get()
+        ? "空氣阻力已開啟：軌跡上升與下降不再對稱，質量越小受影響越大。"
+        : "目前為真空狀態：軌跡完全對稱，換任何發射物結果都一樣。");
+
+      rR.set(range, 1); rHm.set(peak, 1); rTf.set(time, 2);
+      rS.set(now[2], 1); rHit.set(hitDistance, 1);
+    }
+
     function chart() {
-      const { W, H } = cvR; cvR.clear();
-      const v = sV.get(), gg = PL.graph(cvR, { x: 34, y: 14, w: W - 46, h: H - 34 }, { x0: 0, x1: 90, y0: 0, y1: v * v / g * 1.1 });
-      gg.frame({ xlabel: "θ (°)", ylabel: "R (m)" }); gg.grid(6, 4);
-      gg.fn(a => v * v * Math.sin(2 * a * Math.PI / 180) / g, { color: MC(), width: 2.2, samples: 90 });
-      gg.vline(45, { color: "rgba(255,255,255,0.2)", dash: [3, 3] });
-      gg.dot(sA.get(), v * v * Math.sin(2 * sA.get() * Math.PI / 180) / g, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+      cvR.clear();
+      const samples = [];
+      for (let a = 5; a <= 85; a += 5) samples.push([a, rangeAt(a)]);
+      const maxR = Math.max.apply(null, samples.map(s => s[1]).concat([1]));
+      const gph = PL.graph(cvR, { x: 42, y: 14, w: cvR.W - 56, h: cvR.H - 36 }, { x0: 0, x1: 90, y0: 0, y1: maxR * 1.12 });
+      gph.frame({ xlabel: "θ (°)", ylabel: "R (m)" });
+      gph.grid(6, 4);
+      gph.curve(samples, { color: MC(), width: 2.2 });
+      // 標出最佳角度：有阻力時它會明顯離開 45°
+      const best = samples.reduce((a, b) => (b[1] > a[1] ? b : a), samples[0]);
+      gph.vline(best[0], { color: PL.col("warn"), dash: [4, 3], width: 1.4 });
+      gph.label(best[0] + 2, maxR * 0.92, "最遠 " + best[0] + "°", { color: PL.col("warn"), size: 10 });
+      gph.dot(sA.get(), rangeAt(sA.get()), { r: 4.5, color: PL.col("accent-2"), glow: PL.col("accent-2") });
     }
+
     function drawAll() { scene(); chart(); }
-    const anim = PL.loop(dt => { if (dt && flying) { t += dt; const { v, th, Tf } = params(); const y = v * Math.sin(th) * t - 0.5 * g * t * t; if (y >= 0) trail.push([v * Math.cos(th) * t, y]); if (t >= Tf) flying = false; } drawAll(); });
-    cv.onResize(drawAll); cvR.onResize(drawAll); anim.start();
-    return { stop() { anim.stop(); cv.destroy(); cvR.destroy(); }, rerender: drawAll };
+
+    const anim = PL.loop(dt => {
+      if (dt) {
+        if (flying) {
+          t += dt;
+          if (t >= model.time) {
+            t = model.time; flying = false; flash = 1;
+            shots.push({ x: model.range, label: AMMO[ammoKey].label + (cDrag.get() ? "·阻力" : "") });
+            if (shots.length > 6) shots.shift();
+          }
+        }
+        if (flash > 0) flash = Math.max(0, flash - dt * 1.2);
+      }
+      scene();
+    }, 50);
+
+    cv.onResize(scene); cvR.onResize(chart);
+    drawAll(); anim.start();
+    return {
+      stop() { anim.stop(); cv.destroy(); cvR.destroy(); },
+      rerender() { model = simulate(); drawAll(); }
+    };
   }});
 
   /* 相對運動：過河船 */

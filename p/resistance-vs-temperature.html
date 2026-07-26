@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>溫度對電阻的影響（金屬與熱敏電阻）｜物理實驗室 · 電場與電路</title>
+<meta name="description" content="同一個水浴、同一組溫度，金屬與半導體的反應完全相反：金屬升溫時晶格振動加劇、電子被散射得更厲害，電阻上升且近乎線性；半導體升溫則釋出更多載子，電阻急遽下降。這個差異正是熱敏電阻適合當溫度感測器的原因。" />
+<meta name="robots" content="noindex, nofollow" />
+<link rel="canonical" href="https://yu-0312.github.io/senior-science/p/resistance-vs-temperature.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="溫度對電阻的影響（金屬與熱敏電阻）｜物理實驗室 · 電場與電路" />
+<meta property="og:description" content="同一個水浴、同一組溫度，金屬與半導體的反應完全相反：金屬升溫時晶格振動加劇、電子被散射得更厲害，電阻上升且近乎線性；半導體升溫則釋出更多載子，電阻急遽下降。這個差異正是熱敏電阻適合當溫度感測器的原因。" />
+<meta property="og:locale" content="zh_TW" />
+<meta property="og:url" content="https://yu-0312.github.io/senior-science/p/resistance-vs-temperature.html" />
+<meta name="theme-color" content="#080b11" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<link rel="icon" type="image/svg+xml" href="../icons/icon.svg" />
+<link rel="stylesheet" href="../css/style.css?v=20260726-1" />
+<script>
+(function () {
+  try {
+    var saved = JSON.parse(localStorage.getItem("pl-theme"));
+    if (saved !== "light" && saved !== "dark") {
+      saved = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    }
+    document.documentElement.setAttribute("data-theme", saved);
+  } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+})();
+</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"LearningResource","name":"溫度對電阻的影響（金屬與熱敏電阻）","description":"同一個水浴、同一組溫度，金屬與半導體的反應完全相反：金屬升溫時晶格振動加劇、電子被散射得更厲害，電阻上升且近乎線性；半導體升溫則釋出更多載子，電阻急遽下降。這個差異正是熱敏電阻適合當溫度感測器的原因。","inLanguage":"zh-Hant","learningResourceType":"互動模擬","educationalLevel":"必修 · 選修電磁學","isAccessibleForFree":true,"license":"https://creativecommons.org/licenses/by-nc-sa/4.0/","url":"https://yu-0312.github.io/senior-science/p/resistance-vs-temperature.html"}</script>
+</head>
+<body class="static-page">
+<header class="license-topbar">
+  <a class="license-home" href="../index.html"><span class="license-home-mark" aria-hidden="true">PH</span>物理實驗室</a>
+  <div class="license-topbar-actions">
+    <a class="license-toplink" href="../experiments.html">全部實驗</a>
+    <a class="license-toplink" href="../license.html">授權</a>
+  </div>
+</header>
+<main class="license-page">
+  <p class="license-kicker">模組十 · 電場與電路</p>
+  <h1>溫度對電阻的影響（金屬與熱敏電阻）</h1>
+  <p class="license-lead">同一個水浴、同一組溫度，金屬與半導體的反應完全相反：金屬升溫時晶格振動加劇、電子被散射得更厲害，電阻上升且近乎線性；半導體升溫則釋出更多載子，電阻急遽下降。這個差異正是熱敏電阻適合當溫度感測器的原因。</p>
+  <div class="license-meta">
+    <span>必修 · 選修電磁學</span>
+    <span>互動模擬</span>
+    <span>繁體中文</span>
+  </div>
+
+  <section class="license-section">
+    <h2>關鍵公式</h2>
+    <p class="static-formula">R_金屬=R_0(1+αT), R_NTC=R_25e^B(1/T-1/298)</p>
+  </section>
+
+  <section class="license-section">
+    <h2>學習重點</h2>
+    <ul>
+      <li>金屬為正溫度係數，電阻隨溫度線性上升</li>
+      <li>NTC 熱敏電阻為負溫度係數，電阻隨溫度指數下降</li>
+      <li>由 R–T 直線的斜率與截距可求出溫度係數 α</li>
+      <li>同樣升 1 °C，熱敏電阻的變化量遠大於金屬，因此靈敏度高</li>
+    </ul>
+  </section>
+
+  <section class="license-section">
+    <h2>動手操作</h2>
+    <p>這個主題有可即時操作的模擬：調整參數、用碼錶與量角器量測、記錄資料並自動作圖求出物理量。</p>
+    <div class="license-cta">
+      <a class="static-cta" href="../index.html#resistance-vs-temperature">開啟「溫度對電阻的影響（金屬與熱敏電阻）」互動模擬</a>
+      <a href="worksheet-resistance-vs-temperature.html">列印學習單</a>
+    </div>
+  </section>
+
+  <nav class="license-section static-nav">
+    <a href="wire-resistivity.html">← 導線電阻與長度、截面積（電阻率）</a>
+    <a href="current-field.html">載流導線的磁場 →</a>
+  </nav>
+</main>
+</body>
+</html>

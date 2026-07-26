@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RC 計時與延遲電路｜物理實驗室 · 電場與電路</title>
+<meta name="description" content="電容透過電阻充電時電壓呈指數上升。調整 R、C 可設計不同的延遲與計時時間。" />
+<meta name="robots" content="noindex, nofollow" />
+<link rel="canonical" href="https://yu-0312.github.io/senior-science/p/rc-timer.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="RC 計時與延遲電路｜物理實驗室 · 電場與電路" />
+<meta property="og:description" content="電容透過電阻充電時電壓呈指數上升。調整 R、C 可設計不同的延遲與計時時間。" />
+<meta property="og:locale" content="zh_TW" />
+<meta property="og:url" content="https://yu-0312.github.io/senior-science/p/rc-timer.html" />
+<meta name="theme-color" content="#080b11" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<link rel="icon" type="image/svg+xml" href="../icons/icon.svg" />
+<link rel="stylesheet" href="../css/style.css?v=20260726-1" />
+<script>
+(function () {
+  try {
+    var saved = JSON.parse(localStorage.getItem("pl-theme"));
+    if (saved !== "light" && saved !== "dark") {
+      saved = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    }
+    document.documentElement.setAttribute("data-theme", saved);
+  } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+})();
+</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"LearningResource","name":"RC 計時與延遲電路","description":"電容透過電阻充電時電壓呈指數上升。調整 R、C 可設計不同的延遲與計時時間。","inLanguage":"zh-Hant","learningResourceType":"互動模擬","educationalLevel":"必修 · 選修電磁學","isAccessibleForFree":true,"license":"https://creativecommons.org/licenses/by-nc-sa/4.0/","url":"https://yu-0312.github.io/senior-science/p/rc-timer.html"}</script>
+</head>
+<body class="static-page">
+<header class="license-topbar">
+  <a class="license-home" href="../index.html"><span class="license-home-mark" aria-hidden="true">PH</span>物理實驗室</a>
+  <div class="license-topbar-actions">
+    <a class="license-toplink" href="../experiments.html">全部實驗</a>
+    <a class="license-toplink" href="../license.html">授權</a>
+  </div>
+</header>
+<main class="license-page">
+  <p class="license-kicker">模組十 · 電場與電路</p>
+  <h1>RC 計時與延遲電路</h1>
+  <p class="license-lead">電容透過電阻充電時電壓呈指數上升。調整 R、C 可設計不同的延遲與計時時間。</p>
+  <div class="license-meta">
+    <span>必修 · 選修電磁學</span>
+    <span>互動模擬</span>
+    <span>繁體中文</span>
+  </div>
+
+  <section class="license-section">
+    <h2>關鍵公式</h2>
+    <p class="static-formula">V_C=E(1-e^-t/RC)</p>
+  </section>
+
+  <section class="license-section">
+    <h2>學習重點</h2>
+    <ul>
+      <li>時間常數為 RC</li>
+      <li>經過一個時間常數約充到 63%</li>
+      <li>R 或 C 增加會使反應變慢</li>
+      <li>可用於閃爍與延遲電路</li>
+    </ul>
+  </section>
+
+  <section class="license-section">
+    <h2>動手操作</h2>
+    <p>這個主題有可即時操作的模擬：調整參數、用碼錶與量角器量測、記錄資料並自動作圖求出物理量。</p>
+    <div class="license-cta">
+      <a class="static-cta" href="../index.html#rc-timer">開啟「RC 計時與延遲電路」互動模擬</a>
+      <a href="worksheet-rc-timer.html">列印學習單</a>
+    </div>
+  </section>
+
+  <nav class="license-section static-nav">
+    <a href="voltage-divider.html">← 分壓器與感測器讀值</a>
+    <a href="electrolysis.html">電解與法拉第定律 →</a>
+  </nav>
+</main>
+</body>
+</html>

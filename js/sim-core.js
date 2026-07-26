@@ -479,7 +479,17 @@
     function fit() {
       const rect = wrap.getBoundingClientRect();
       const w = Math.max(240, Math.min(rect.width || maxW, maxW));
-      const h = Math.round(w * aspect);
+      /*
+       * 高度上限
+       * 橫向手機的可視高度只剩約 380px，照原本的長寬比算出來的畫布會比整個
+       * 螢幕還高，使用者看不到下方的讀數。這裡限制畫布不超過視窗高度的 68%，
+       * 讓「畫布 + 讀數」能同時出現。在桌機上這個上限幾乎不會生效。
+       * 不用 CSS 的 max-height 是因為那只會把已經畫好的內容壓扁；
+       * 在這裡改尺寸，實驗的繪圖程式會依新的 W／H 重新排版。
+       */
+      const viewportCap = typeof window !== "undefined" && window.innerHeight
+        ? Math.max(200, window.innerHeight * 0.68) : Infinity;
+      const h = Math.round(Math.min(w * aspect, viewportCap));
       // 2x 已足夠清晰，避免高 DPI 手機以 3x / 4x 重繪每個即時圖表。
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       cv.W = w; cv.H = h; cv.dpr = dpr;

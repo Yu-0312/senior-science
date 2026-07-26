@@ -39,7 +39,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="物理實驗室" />
 
-  <link rel="stylesheet" href="css/style.css?v=20260725-9" />
+  <link rel="stylesheet" href="css/style.css?v=20260726-1" />
 
   <!-- MathJax（LaTeX 公式排版） -->
   <script>
@@ -59,6 +59,7 @@
 </head>
 
 <body class="access-locked">
+  <a class="skip-link" href="#main-content">跳至主要內容</a>
   <section class="access-gate" id="access-gate" role="dialog" aria-modal="true" aria-labelledby="access-title">
     <div class="access-gate-panel">
       <div class="access-mark" aria-hidden="true">PHYS</div>
@@ -76,7 +77,7 @@
       <div class="access-note">重新整理或另開分頁時，需要再次輸入密碼。<a href="license.html">查看免費教育使用授權</a></div>
     </div>
   </section>
-  <div class="aurora"><i></i></div>
+  <div class="aurora" aria-hidden="true"><i></i></div>
 
   <div class="app">
     <!-- 頂欄 -->
@@ -99,7 +100,7 @@
         </div>
       </div>
       <div class="spacer"></div>
-      <div class="pill"><span class="dot"></span><span class="ver">v1.0</span> · <span id="clock">--:--:--</span></div>
+      <div class="pill"><span class="dot" aria-hidden="true"></span><span class="ver">v1.0</span> · <span id="clock">--:--:--</span></div>
       <a class="icon-btn license-link" href="license.html" aria-label="查看使用授權" title="查看使用授權">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l3 3v17H6z"/><path d="M15 2v4h4M9 11h6M9 15h6M9 19h4"/></svg>
         <span>授權</span>
@@ -110,7 +111,7 @@
 
     <div class="layout">
       <!-- 側邊課程目錄 -->
-      <aside class="sidebar" id="sidebar">
+      <aside class="sidebar" id="sidebar" aria-label="課程目錄">
         <div class="sidebar-head">
           <div class="title">課程目錄</div>
           <div class="stat">
@@ -126,7 +127,7 @@
           <div class="progress-label"><span>學習進度</span><span id="progress-count">0 / 0</span></div>
           <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
         </div>
-        <div id="module-list"></div>
+        <nav id="module-list" aria-label="全部實驗"></nav>
         <div class="sidebar-foot">
           <div class="save-actions" aria-label="學習存檔">
             <button class="btn-save-action" id="btn-export-save" type="button">匯出學習存檔</button>
@@ -136,16 +137,17 @@
           <button class="btn-reset-progress" id="btn-reset">重設學習進度</button>
         </div>
       </aside>
-      <div class="scrim" id="scrim"></div>
+      <div class="scrim" id="scrim" aria-hidden="true"></div>
 
       <!-- 主內容 -->
-      <main class="main">
+      <main class="main" id="main-content" tabindex="-1">
         <!-- 首頁 -->
         <section id="home-view">
           <div class="hero">
-            <div class="hero-badge"><span class="dot"></span>依教育部 108 課綱設計 · 全繁體原創</div>
+            <div class="hero-badge"><span class="dot" aria-hidden="true"></span>依教育部 108 課綱設計 · 全繁體原創</div>
             <h1 class="hero-title">看得見的物理，<br />可以動手玩的實驗室</h1>
-            <p class="hero-sub">12 個學習模組、<span id="hero-exp-count">0</span> 個持續擴充的國中到高中物理實驗，並提供大學入門延伸。每一個都附即時互動模擬。調整參數、觀察現象、對照公式，把課本裡的物理變成手邊的實驗。</p>
+            <p class="hero-sub">12 個學習模組、<span id="hero-exp-count">0</span> 個持續擴充的國中到高中物理實驗，並提供大學入門延伸。每一個都附即時互動模擬、可拖曳的碼錶與量角器，以及可列印的學習單。</p>
+            <p class="hero-highlight"><b>模擬會自己說出物理關係。</b>單擺會告訴你 T ∝ √L、而且振幅完全不影響週期；雙狹縫會得出 Δx ∝ λL/d。這些不是寫死的答案，是程式實際掃描模型量出來的。</p>
             <div class="hero-actions">
               <button class="btn-hero" id="hero-start">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg>
@@ -205,6 +207,20 @@
                   <button class="study-btn" id="btn-clear-plan" type="button">清除計劃</button>
                 </div>
               </article>
+              <article class="study-card offline-card">
+                <div class="study-card-kicker">離線與安裝</div>
+                <h3 id="offline-title">帶著走，沒網路也能用</h3>
+                <p id="offline-status">正在檢查離線狀態…</p>
+                <div class="study-card-actions">
+                  <button class="study-btn primary" id="btn-install" type="button" hidden>安裝到主畫面</button>
+                  <button class="study-btn" id="btn-cache-all" type="button">下載全部實驗</button>
+                </div>
+                <div class="offline-progress" id="offline-progress" hidden>
+                  <div class="offline-progress-bar"><div id="offline-progress-fill"></div></div>
+                  <span id="offline-progress-text">準備中…</span>
+                </div>
+              </article>
+
               <article class="study-card today-card" id="today-plan-card">
                 <div class="study-card-kicker">今日任務</div>
                 <h3 id="today-plan-title">尚未建立計劃</h3>
@@ -236,6 +252,29 @@
           <div class="section-label">課程模組</div>
           <div class="module-grid" id="module-grid"></div>
 
+          <section class="openness" aria-labelledby="openness-title">
+            <div class="section-label" id="openness-title">關於這個專案</div>
+            <div class="openness-grid">
+              <article class="openness-card">
+                <h3>完全免費，而且會一直是</h3>
+                <p>採 CC BY-NC-SA 4.0 授權，教學、社團、自學與非營利推廣都可以自由使用、分享與改編，只要標示來源即可。</p>
+              </article>
+              <article class="openness-card">
+                <h3>原始碼公開，不會因為我消失而消失</h3>
+                <p>全部程式碼在 GitHub 上公開。這是一個純靜態網站，沒有後端也沒有資料庫，任何人都可以下載後自行架設，或直接接手維護。</p>
+                <p class="openness-links">
+                  <a href="https://github.com/Yu-0312/senior-science" target="_blank" rel="noopener">GitHub 原始碼</a>
+                  <a href="license.html">授權條款</a>
+                  <a href="experiments.html">全部實驗一覽</a>
+                </p>
+              </article>
+              <article class="openness-card">
+                <h3>給老師的資源</h3>
+                <p>每個實驗都有可列印的學習單，含實驗目的、資料記錄表格、作圖區與由圖求值欄位，可以直接印出來發給學生。歡迎回報教學使用情境與需求。</p>
+              </article>
+            </div>
+          </section>
+
           <div class="disclaimer">
             本站為配合台灣 108 課綱自製之開放教學工具，所有模擬程式與文字內容皆為原創。物理模型為教學簡化版，數值以概念示範為主，僅供教學與學習用途。
           </div>
@@ -261,11 +300,11 @@
             <div class="card guide">
               <div class="card-title"><span class="accent-bar"></span>概念 · 公式 · 重點</div>
               <div class="card-body">
-                <div><h4>核心概念</h4><p id="guide-concept"></p></div>
-                <div><h4>關鍵公式</h4><div class="formula-box" id="guide-formula"></div></div>
-                <div><h4>學習重點</h4><ul class="points" id="guide-points"></ul></div>
+                <div><h3>核心概念</h3><p id="guide-concept"></p></div>
+                <div><h3>關鍵公式</h3><div class="formula-box" id="guide-formula"></div></div>
+                <div><h3>學習重點</h3><ul class="points" id="guide-points"></ul></div>
                 <div class="practice-panel" aria-label="題目練習">
-                  <h4>題目練習</h4>
+                  <h3>題目練習</h3>
                   <div class="practice-list" id="practice-list"></div>
                 </div>
               </div>
@@ -279,7 +318,7 @@
         </section>
 
         <!-- 搜尋結果 -->
-        <section id="search-results" style="display:none">
+        <section id="search-results" style="display:none" aria-label="搜尋結果" aria-live="polite">
           <div class="section-label">搜尋結果 · 共 <span id="sr-count" style="margin:0 4px">0</span> 筆</div>
           <div class="sr-list" id="sr-list"></div>
         </section>
@@ -295,37 +334,24 @@
   </section>
 
   <!-- 核心 -->
-  <script src="js/curriculum.js?v=20260725-9"></script>
-  <script src="js/advanced-curriculum.js?v=20260725-9"></script>
-  <script src="js/comprehensive-curriculum.js?v=20260725-9"></script>
-  <script src="js/extension-registry.js?v=20260725-9"></script>
-  <script src="js/open-curriculum.js?v=20260725-9"></script>
-  <script src="js/school-curriculum.js?v=20260725-9"></script>
-  <script src="js/question-bank.js?v=20260725-9"></script>
-  <script src="js/sim-core.js?v=20260725-9"></script>
-  <script src="js/sim-tools.js?v=20260725-9"></script>
-  <script src="js/sim-insight.js?v=20260725-9"></script>
+  <script src="js/site-config.js?v=20260726-1"></script>
+  <script src="js/curriculum.js?v=20260726-1"></script>
+  <script src="js/advanced-curriculum.js?v=20260726-1"></script>
+  <script src="js/comprehensive-curriculum.js?v=20260726-1"></script>
+  <script src="js/extension-registry.js?v=20260726-1"></script>
+  <script src="js/open-curriculum.js?v=20260726-1"></script>
+  <script src="js/school-curriculum.js?v=20260726-1"></script>
+  <script src="js/question-bank.js?v=20260726-1"></script>
+  <script src="js/sim-core.js?v=20260726-1"></script>
+  <script src="js/sim-tools.js?v=20260726-1"></script>
+  <script src="js/sim-insight.js?v=20260726-1"></script>
+  <script src="js/sim-a11y.js?v=20260726-1"></script>
 
-  <!-- 互動模擬（依模組拆檔） -->
-  <script src="js/experiments/kinematics.js?v=20260725-9"></script>
-  <script src="js/experiments/newton.js?v=20260725-9"></script>
-  <script src="js/experiments/momentum.js?v=20260725-9"></script>
-  <script src="js/experiments/energy.js?v=20260725-9"></script>
-  <script src="js/experiments/gravity.js?v=20260725-9"></script>
-  <script src="js/experiments/shm.js?v=20260725-9"></script>
-  <script src="js/experiments/thermal.js?v=20260725-9"></script>
-  <script src="js/experiments/waves.js?v=20260725-9"></script>
-  <script src="js/experiments/optics.js?v=20260725-9"></script>
-  <script src="js/experiments/electric.js?v=20260725-9"></script>
-  <script src="js/experiments/magnetism.js?v=20260725-9"></script>
-  <script src="js/experiments/modern.js?v=20260725-9"></script>
-  <script src="js/experiments/extended.js?v=20260725-9"></script>
-  <script src="js/experiments/advanced.js?v=20260725-9"></script>
-  <script src="js/experiments/comprehensive.js?v=20260725-9"></script>
-  <script src="js/experiments/open-labs.js?v=20260725-9"></script>
-  <script src="js/experiments/school-labs.js?v=20260725-9"></script>
+  <!-- 實驗程式改為延遲載入：只掛對應表，開啟實驗時才抓對應的檔案 -->
+  <script src="js/experiment-manifest.js?v=20260726-1"></script>
+
 
   <!-- 應用外殼 -->
-  <script src="js/app.js?v=20260725-9"></script>
+  <script src="js/app.js?v=20260726-1"></script>
 </body>
 </html>

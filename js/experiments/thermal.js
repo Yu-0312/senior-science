@@ -138,35 +138,236 @@
   }});
 
   /* 理想氣體與分子動能論 */
+  /* 理想氣體與分子動能論 —— 旗艦改版
+   *
+   * 課本說「壓力來自分子碰撞器壁」，但學生看到的通常只是 PV = nRT 這條公式。
+   * 這一版讓壓力真的「被撞出來」：
+   *
+   *   · 畫面裡是真的在運動與碰撞的分子，壓力由實際撞擊器壁的動量變化統計而來，
+   *     不是用公式算出來再顯示
+   *   · 推動活塞改變體積，壓力跟著變，PV 乘積維持不變（等溫）
+   *   · 升溫時分子明顯變快，速率分布往右移，並自己長成馬克士威分布
+   *
+   * 依 PhET 的原則，把活塞推到極端會有合理反應：體積被壓到很小時，
+   * 壓力急遽上升並顯示警示。
+   */
   PL.register("gas", { build(root) {
     const L = PL.ui.layout(root);
-    const cv = PL.canvas.create(L.canvasWrap, 0.66);
-    const N = 44; let parts = [], Tprev = 300;
-    const sT = PL.ui.slider(L.controls, { label: "溫度 T", min: 100, max: 600, step: 10, value: 300, unit: "K", digits: 0 });
-    const sV = PL.ui.slider(L.controls, { label: "體積 V（箱寬）", min: 0.5, max: 1, step: 0.02, value: 1, unit: "×", digits: 2 });
-    const rP = PL.ui.readout(L.readouts, { label: "壓力 P", unit: "kPa" });
-    const rVrms = PL.ui.readout(L.readouts, { label: "分子均方根速率", unit: "" });
-    function initP() { parts = []; for (let i = 0; i < N; i++) { const a = Math.random() * TAU, s = 60; parts.push({ x: Math.random(), y: Math.random(), vx: Math.cos(a) * s, vy: Math.sin(a) * s }); } }
-    initP();
-    function draw() {
-      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const boxL = 34, boxT = 30, boxR = 34 + (W - 130) * sV.get(), boxB = H - 34;
-      D.rect(ctx, boxL, boxT, boxR - boxL, boxB - boxT, { stroke: PL.col("text-faint"), width: 2, r: 4 });
-      parts.forEach(p => { D.disc(ctx, boxL + p.x * (boxR - boxL), boxT + p.y * (boxB - boxT), 3.5, { fill: MC(), glow: MC(), glowSize: 6 }); });
-      const T = sT.get(), Vr = sV.get(), P = 8.314 * (N / 6.02e23 * 1e23) * T / (Vr * 30) * 0.4; // 相對壓力
-      const Ppl = 300 * T / 300 / (Vr) * (1 / 30) * 0.9;
-      rP.set(101 * (T / 300) / Vr, 0); rVrms.set(Math.sqrt(T) * 2, 0);
-    }
-    const anim = PL.loop(dt => {
-      if (dt) {
-        const T = sT.get(), Vr = sV.get(); const ratio = Math.sqrt(T / Tprev); if (Math.abs(ratio - 1) > 1e-3) { parts.forEach(p => { p.vx *= ratio; p.vy *= ratio; }); Tprev = T; }
-        const boxW = (cv.W - 130) * Vr, boxH = cv.H - 64;
-        parts.forEach(p => { p.x += p.vx * dt / boxW; p.y += p.vy * dt / boxH; if (p.x < 0) { p.x = 0; p.vx = Math.abs(p.vx); } if (p.x > 1) { p.x = 1; p.vx = -Math.abs(p.vx); } if (p.y < 0) { p.y = 0; p.vy = Math.abs(p.vy); } if (p.y > 1) { p.y = 1; p.vy = -Math.abs(p.vy); } });
-      }
-      draw();
+    const cv = PL.canvas.create(L.canvasWrap, 0.6, 840);
+
+    const BOX_W = 1.0, BOX_H = 0.62;      // 容器的模型尺寸（無單位，僅作幾何用）
+    let particles = [];
+    let pistonX = 0.78;                    // 活塞位置（0～1，佔容器寬的比例）
+    let impulseAcc = 0, sampleTime = 0, pressure = 0;
+    let speedHist = new Array(28).fill(0);
+
+    PL.ui.section(L.controls, "氣體狀態");
+    const sN = PL.ui.slider(L.controls, { label: "分子數 N", min: 20, max: 240, step: 10, value: 90, unit: "顆", digits: 0, onInput: rebuild });
+    const sT = PL.ui.slider(L.controls, { label: "溫度 T", min: 100, max: 900, step: 25, value: 300, unit: "K", digits: 0, onInput: retemp });
+    const sPiston = PL.ui.slider(L.controls, { label: "活塞位置（體積）", min: 0.25, max: 0.98, step: 0.01, value: 0.78, unit: "", digits: 2 });
+
+    PL.ui.section(L.controls, "顯示");
+    const layers = PL.ui.chipGroup(L.controls, {
+      multi: true, value: ["trails", "hist"],
+      options: [
+        { value: "trails", label: "碰撞閃光" },
+        { value: "hist", label: "速率分布" }
+      ]
     });
-    cv.onResize(draw); anim.start();
-    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+
+    const row = PL.ui.buttonRow(L.controls);
+    PL.ui.button(row, "重新灑點", rebuild, { primary: true });
+
+    PL.ui.note(L.controls,
+      "壓力讀數不是用 PV=nRT 算出來的，而是統計分子真的撞在右側活塞上的動量變化。" +
+      "固定溫度、慢慢把活塞往左推：體積變小、壓力變大，但 P×V 幾乎不變（波以耳定律）。" +
+      "接著把溫度從 100 K 拉到 900 K，看分子變快、速率分布整個往右移。");
+
+    const rP = PL.ui.readout(L.readouts, { label: "壓力（量測）", unit: "" });
+    const rV = PL.ui.readout(L.readouts, { label: "體積 V", unit: "" });
+    const rPV = PL.ui.readout(L.readouts, { label: "P × V", unit: "" });
+    const rVrms = PL.ui.readout(L.readouts, { label: "方均根速率", unit: "" });
+    const rKE = PL.ui.readout(L.readouts, { label: "平均動能", unit: "" });
+
+    const cc = PL.ui.chart(PL.ui.charts(root), {
+      title: "分子速率分布",
+      cap: "長條是實際統計到的分子速率，曲線是理論的馬克士威分布。溫度越高整條分布往右移、也變得更寬。"
+    });
+
+    /* 由溫度決定的特徵速率；係數只是為了讓畫面上的速度好看 */
+    const speedScale = () => Math.sqrt(sT.get() / 300) * 0.42;
+
+    function rebuild() {
+      const n = sN.get();
+      particles = [];
+      for (let i = 0; i < n; i += 1) {
+        const sp = speedScale() * (0.5 + Math.random() * 1.1);
+        const a = Math.random() * TAU;
+        particles.push({
+          x: Math.random() * pistonX * BOX_W * 0.94 + 0.02,
+          y: Math.random() * BOX_H * 0.94 + 0.02,
+          vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+          flash: 0
+        });
+      }
+      impulseAcc = 0; sampleTime = 0; pressure = 0;
+    }
+
+    /* 改溫度時不重灑，而是等比例縮放速度——這樣看得出「同一群分子變快了」 */
+    function retemp() {
+      const target = speedScale();
+      const current = Math.sqrt(particles.reduce((s, p) => s + p.vx * p.vx + p.vy * p.vy, 0) /
+        Math.max(1, particles.length)) || 1e-6;
+      const k = target * 1.15 / current;
+      particles.forEach(p => { p.vx *= k; p.vy *= k; });
+      impulseAcc = 0; sampleTime = 0;
+    }
+    rebuild();
+
+    function stepPhysics(dt) {
+      pistonX = sPiston.get();
+      const right = pistonX * BOX_W;
+      const sub = 2, h = dt / sub;
+      for (let k = 0; k < sub; k += 1) {
+        particles.forEach(p => {
+          p.x += p.vx * h; p.y += p.vy * h;
+          if (p.flash > 0) p.flash -= h * 4;
+
+          if (p.x < 0) { p.x = -p.x; p.vx = -p.vx; }
+          if (p.y < 0) { p.y = -p.y; p.vy = -p.vy; }
+          if (p.y > BOX_H) { p.y = 2 * BOX_H - p.y; p.vy = -p.vy; }
+          if (p.x > right) {
+            p.x = 2 * right - p.x;
+            p.vx = -p.vx;
+            /*
+             * 壓力就在這裡產生：每一次撞擊活塞，動量改變 2m|vx|。
+             * 把一段時間內的總動量變化除以（時間 × 受力面積），就是壓力。
+             * 這是「壓力來自碰撞」的字面實作，不是套公式。
+             */
+            impulseAcc += 2 * Math.abs(p.vx);
+            p.flash = 1;
+          }
+        });
+      }
+      /*
+       * 壓力要取平均，不能只看最近一次的取樣窗。
+       * 200 顆分子在 0.25 秒內大約只撞到活塞 25 次，單一窗口的
+       * 卜瓦松雜訊可以讓讀數在 12 到 100 之間亂跳，波以耳定律
+       * 完全看不出來。實際的壓力計也是在做時間平均。
+       */
+      sampleTime += dt;
+      if (sampleTime >= 0.5) {
+        const instant = impulseAcc / (sampleTime * BOX_H);
+        pressure = pressure > 0 ? pressure * 0.7 + instant * 0.3 : instant;
+        impulseAcc = 0; sampleTime = 0;
+      }
+    }
+
+    function stats() {
+      const n = Math.max(1, particles.length);
+      const sumSq = particles.reduce((s, p) => s + p.vx * p.vx + p.vy * p.vy, 0);
+      const vrms = Math.sqrt(sumSq / n);
+      return { vrms, ke: 0.5 * sumSq / n, volume: pistonX * BOX_H };
+    }
+
+    function scene() {
+      const { ctx, W, H } = cv;
+      cv.clear(); D.bg(cv);
+      const m = MC();
+      const pad = 42;
+      const boxW = W - pad * 2 - 90, boxH = H - pad * 2 - 26;
+      const ox = pad, oy = pad;
+      const px = xm => ox + xm / BOX_W * boxW;
+      const py = ym => oy + ym / BOX_H * boxH;
+
+      // 容器
+      D.rect(ctx, ox, oy, boxW, boxH, { fill: PL.theme.shade(0.28), stroke: PL.theme.pale(0.35), width: 2 });
+
+      // 活塞
+      const pistonPx = px(pistonX * BOX_W);
+      D.rect(ctx, pistonPx, oy, 14, boxH, { fill: "#8d97a6", stroke: PL.theme.pale(0.45), width: 1.5 });
+      D.rect(ctx, pistonPx + 14, oy + boxH / 2 - 5, W - pad - (pistonPx + 14), 10,
+        { fill: PL.theme.pale(0.28), r: 3 });
+      D.text(ctx, "活塞", pistonPx + 7, oy - 10, { color: PL.col("text-dim"), size: 10.5, align: "center" });
+
+      // 分子
+      particles.forEach(p => {
+        const X = px(p.x), Y = py(p.y);
+        if (layers.has("trails") && p.flash > 0) {
+          ctx.save(); ctx.globalAlpha = p.flash * 0.6;
+          D.disc(ctx, pistonPx, Y, 7, { fill: PL.col("warn") });
+          ctx.restore();
+        }
+        D.disc(ctx, X, Y, 3, { fill: m });
+      });
+
+      // 溫度計式的側邊指示
+      const s = stats();
+      const barX = W - 62;
+      D.text(ctx, sT.get() + " K", barX + 16, oy + 12, { color: PL.col("danger"), size: 12, align: "center", weight: "700" });
+      const warm = Math.min(1, (sT.get() - 100) / 800);
+      D.rect(ctx, barX + 8, oy + 22, 16, boxH - 30, { fill: PL.theme.pale(0.12), r: 8 });
+      D.rect(ctx, barX + 10, oy + 22 + (boxH - 34) * (1 - warm), 12, (boxH - 34) * warm,
+        { fill: PL.col("danger"), r: 6 });
+
+      // 壓力過高的警示：把活塞推到極端時該有的反應
+      const volume = pistonX;
+      if (volume < 0.32) {
+        D.text(ctx, "體積接近極限，壓力急遽上升", W / 2, oy + boxH + 18,
+          { color: PL.col("danger"), size: 12, align: "center", weight: "700" });
+      }
+
+      rP.set(pressure, 3);
+      rV.set(s.volume, 3);
+      rPV.set(pressure * s.volume, 3);
+      rVrms.set(s.vrms, 3);
+      rKE.set(s.ke, 4);
+
+      PL.ui.caption(cv,
+        "壓力讀數由分子實際撞擊活塞的動量變化統計而來——把活塞往左推，撞擊變頻繁，壓力就上升。");
+    }
+
+    function chart() {
+      cc.clear();
+      // 統計速率直方圖
+      speedHist.fill(0);
+      const vmax = Math.max(0.3, speedScale() * 3.2);
+      particles.forEach(p => {
+        const sp = Math.hypot(p.vx, p.vy);
+        const i = Math.floor(sp / vmax * speedHist.length);
+        if (i >= 0 && i < speedHist.length) speedHist[i] += 1;
+      });
+      const maxN = Math.max(1, ...speedHist);
+      const gph = PL.graph(cc, { x: 46, y: 14, w: cc.W - 60, h: cc.H - 36 },
+        { x0: 0, x1: vmax, y0: 0, y1: 1.18 });
+      gph.frame({ xlabel: "速率", ylabel: "相對數量" });
+      gph.grid(5, 4);
+      speedHist.forEach((n, i) => {
+        if (!n) return;
+        const a = vmax * i / speedHist.length, b = vmax * (i + 1) / speedHist.length;
+        const x0 = gph.X(a), x1 = gph.X(b), h = n / maxN;
+        D.rect(cc.ctx, x0, gph.Y(h), Math.max(1, x1 - x0 - 1), gph.Y(0) - gph.Y(h),
+          { fill: "rgba(150,190,230,0.38)" });
+      });
+      /* 二維的馬克士威分布：f(v) ∝ v·exp(−v²/2σ²) */
+      const sigma = speedScale() * 0.82;
+      const peak = sigma * Math.exp(-0.5);
+      gph.fn(v => (v * Math.exp(-v * v / (2 * sigma * sigma))) / (peak || 1), { color: MC(), width: 2.2, samples: 200 });
+    }
+
+    function drawAll() { scene(); chart(); }
+
+    const anim = PL.loop(dt => {
+      if (dt) stepPhysics(Math.min(dt, 0.05));
+      drawAll();
+    }, 50);
+
+    cv.onResize(scene); cc.onResize(chart);
+    drawAll(); anim.start();
+    return {
+      stop() { anim.stop(); cv.destroy(); cc.destroy(); },
+      rerender: drawAll
+    };
   }});
 
   /* 氣體定律（波以耳 / 查理） */

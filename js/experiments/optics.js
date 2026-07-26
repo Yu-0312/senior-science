@@ -211,146 +211,306 @@
   }});
 
   /* 雙縫干涉 — 光具座 · 單光子累積 */
+  /* 雙狹縫干涉 —— 旗艦改版
+   *
+   * 這個實驗的重點不是把條紋畫得漂亮，而是三件課本只寫一句話的事：
+   *
+   *   1. 一次只發射一顆光子，前幾顆看起來完全隨機，
+   *      累積到幾百顆之後條紋卻自己浮現——單一光子也會干涉。
+   *   2. 兩條單縫圖樣相加，不等於雙縫圖樣。差別就是干涉。
+   *   3. 只要在縫上裝偵測器去看光子走哪一條，條紋立刻消失。
+   *
+   * 依 PhET《Look and Feel》：學生會刻意測試極端狀況，
+   * 因此「把光子速率降到 1」與「打開偵測器」都必須有立即、明確的反應。
+   */
   PL.register("double-slit", { build(root) {
     const L = PL.ui.layout(root);
-    const cv = PL.canvas.create(L.canvasWrap, 0.54, 900);
-    // 控制項
-    PL.ui.section(L.controls, "光源與幾何");
-    const stLam = PL.ui.stepper(L.controls, { label: "波長 λ (nm)", value: 600, min: 400, max: 700, step: 10, onInput: reset });
-    const stD = PL.ui.stepper(L.controls, { label: "縫間距 d (mm)", value: 0.2, min: 0.1, max: 0.6, step: 0.05, digits: 2, onInput: reset });
-    const stL = PL.ui.stepper(L.controls, { label: "屏距 L (m)", value: 1, min: 0.5, max: 2.5, step: 0.1, digits: 1, onInput: reset });
-    const stN = PL.ui.stepper(L.controls, { label: "測量跨度 ±N 條", value: 5, min: 2, max: 8, step: 1, onInput: reset });
-    PL.ui.section(L.controls, "快捷波長 · nm");
-    const preset = PL.ui.chipGroup(L.controls, { value: 0, options: [
-      { value: 650, label: '<span class="dotc"></span>紅 650', color: "#ff5b5b" },
-      { value: 532, label: '<span class="dotc"></span>綠 532', color: "#54d15a" },
-      { value: 450, label: '<span class="dotc"></span>藍 450', color: "#5b8dff" }
-    ], onChange: v => { stLam.set(v); reset(); } });
-    PL.ui.section(L.controls, "顯示與播放");
-    const layers = PL.ui.chipGroup(L.controls, { multi: true, value: ["wave", "order", "bracket"], options: [
-      { value: "wave", label: "波前" }, { value: "path", label: "路程差 r₂−r₁" }, { value: "order", label: "條紋級次" }, { value: "bracket", label: "測量括號" }
-    ] });
-    const row = PL.ui.buttonRow(L.controls);
-    const bP = PL.ui.button(row, "暫停", () => { anim.toggle(); bP.textContent = anim.running ? "暫停" : "播放"; }, { primary: true });
-    let speed = 1; const bS = PL.ui.button(row, "速率×1", () => { speed = speed >= 4 ? 1 : speed * 2; bS.textContent = "速率×" + speed; });
-    const row2 = PL.ui.buttonRow(L.controls);
-    PL.ui.button(row2, "清屏", () => { hits = []; photons = []; count = 0; hist.fill(0); });
-    PL.ui.button(row2, "重置", () => { stLam.set(600); stD.set(0.2); stL.set(1); stN.set(5); reset(); });
-    // 讀數
-    const rDx = PL.ui.readout(L.readouts, { label: "條紋間距 Δx=λL/d", unit: "mm" });
-    const rLam = PL.ui.readout(L.readouts, { label: "波長 λ", unit: "nm" });
-    const rFr = PL.ui.readout(L.readouts, { label: "屏內可見亮紋", unit: "條" });
-    const rCnt = PL.ui.readout(L.readouts, { label: "已到達光子", unit: "個" });
-    // 附屬圖表
-    const charts = PL.el("div", "sim-charts", root);
-    const w1 = PL.el("div", "sim-chart", charts); PL.el("div", "chart-title", w1).textContent = "光強分布 I(y)";
-    const cvI = PL.canvas.create(w1, 0.6); PL.el("div", "cap", w1).textContent = "各級亮紋等間距、亮度相同：相鄰亮紋間距 Δx=λL/d，亮紋處 I=I₀、暗紋處為 0。";
-    const w2 = PL.el("div", "sim-chart", charts); PL.el("div", "chart-title", w2).textContent = "單光子累積直方圖";
-    const cvH = PL.canvas.create(w2, 0.6); PL.el("div", "cap", w2).textContent = "光子逐個隨機到達（落點機率 ∝ 光強），少量時看似雜亂，累積越多越逼近 cos² 條紋——波粒二象性。";
+    const cv = PL.canvas.create(L.canvasWrap, 0.56, 880);
 
-    const BINS = 141; let hist = new Array(BINS).fill(0), photons = [], hits = [], count = 0, phase = 0;
-    const dxMM = () => stLam.get() * 1e-3 * stL.get() / stD.get();
-    const Mrange = () => stN.get() + 2.4;
-    const yMaxMM = () => Mrange() * dxMM();
-    const Iy = yMM => Math.cos(Math.PI * yMM / dxMM()) ** 2;
-    function reset() { hits = []; photons = []; count = 0; hist.fill(0); }
-    function sampleY() { const ym = yMaxMM(); for (let i = 0; i < 48; i++) { const y = (Math.random() * 2 - 1) * ym; if (Math.random() < Iy(y)) return y; } return 0; }
+    let hits = [];            // 螢幕上累積的光子落點（單位：mm，以中心為 0）
+    let flying = [];          // 飛行中的光子，用來呈現「一顆一顆」
+    let emitTimer = 0;
+    let paused = false;
+
+    PL.ui.section(L.controls, "光源與幾何");
+    const sLam = PL.ui.slider(L.controls, { label: "波長 λ", min: 400, max: 700, step: 10, value: 550, unit: "nm", digits: 0, onInput: clear });
+    const sD = PL.ui.slider(L.controls, { label: "縫間距 d", min: 0.10, max: 0.60, step: 0.02, value: 0.24, unit: "mm", digits: 2, onInput: clear });
+    const sW = PL.ui.slider(L.controls, { label: "單縫寬 a", min: 0.02, max: 0.14, step: 0.01, value: 0.06, unit: "mm", digits: 2, onInput: clear });
+    const sL = PL.ui.slider(L.controls, { label: "屏距 L", min: 0.5, max: 3.0, step: 0.1, value: 1.5, unit: "m", digits: 1, onInput: clear });
+
+    PL.ui.section(L.controls, "狹縫");
+    let mode = "double";
+    PL.ui.chipGroup(L.controls, {
+      value: "double",
+      options: [
+        { value: "double", label: "雙縫" },
+        { value: "single", label: "單縫" },
+        { value: "sum", label: "兩單縫相加" }
+      ],
+      onChange: v => { mode = v; clear(); }
+    });
+
+    PL.ui.section(L.controls, "發射方式");
+    const sRate = PL.ui.slider(L.controls, { label: "每秒光子數", min: 1, max: 400, step: 1, value: 1, unit: "顆/s", digits: 0 });
+    const cDetect = PL.ui.checkbox(L.controls, { label: "在縫上裝偵測器（測量走哪條縫）", checked: false, onChange: clear });
+
+    const row = PL.ui.buttonRow(L.controls);
+    const bPause = PL.ui.button(row, "暫停發射", () => { paused = !paused; bPause.textContent = paused ? "繼續發射" : "暫停發射"; }, { primary: true });
+    PL.ui.button(row, "清除螢幕", clear);
+    PL.ui.button(row, "一次打 500 顆", () => { for (let i = 0; i < 500; i += 1) land(); });
+
+    PL.ui.note(L.controls,
+      "把「每秒光子數」設成 1，耐心看前 20 顆——完全看不出規律。" +
+      "接著按「一次打 500 顆」，條紋會自己長出來：干涉不是光子之間互相作用，單一光子就會。" +
+      "然後打開偵測器，條紋立刻消失；關掉又回來。最後比較「雙縫」與「兩單縫相加」，差的就是干涉項。");
+
+    const rDx = PL.ui.readout(L.readouts, { label: "條紋間距 Δx", unit: "mm" });
+    const rCount = PL.ui.readout(L.readouts, { label: "累積光子", unit: "顆" });
+    const rVis = PL.ui.readout(L.readouts, { label: "條紋對比度", unit: "" });
+    const rMode = PL.ui.readout(L.readouts, { label: "干涉狀態" });
+
+    const cc = PL.ui.chart(PL.ui.charts(root), {
+      title: "螢幕上的光強分布",
+      cap: "曲線是理論強度，長條是實際累積到的光子數。光子越多，長條越貼近曲線——機率分布是這樣被「打」出來的。"
+    });
+
+    function clear() { hits = []; flying = []; }
+
+    /* 螢幕的半寬（mm）：讓主要條紋大致填滿畫面 */
+    function halfWidth() {
+      const dx = fringeSpacing();
+      return Math.max(6, dx * 6);
+    }
+    function fringeSpacing() {
+      // Δx = λL/d，λ 由 nm 轉 m、d 由 mm 轉 m，結果再轉回 mm
+      return (sLam.get() * 1e-9) * sL.get() / (sD.get() * 1e-3) * 1000;
+    }
+
+    /*
+     * 螢幕位置 y（mm）處的相對強度
+     *   單縫繞射包絡： sinc²(πa sinθ/λ)
+     *   雙縫干涉條紋： cos²(πd sinθ/λ)
+     * 裝了偵測器（知道走哪條縫）時，干涉項消失，只剩兩個單縫圖樣相加。
+     */
+    function intensity(yMm) {
+      const lam = sLam.get() * 1e-9;
+      const d = sD.get() * 1e-3;
+      const a = sW.get() * 1e-3;
+      const Lm = sL.get();
+      const sinT = (yMm * 1e-3) / Math.sqrt(Lm * Lm + Math.pow(yMm * 1e-3, 2));
+
+      const beta = Math.PI * a * sinT / lam;
+      const env = beta === 0 ? 1 : Math.pow(Math.sin(beta) / beta, 2);
+
+      if (mode === "single") return env;
+      if (mode === "sum" || cDetect.get()) {
+        // 沒有干涉：兩條縫各自的繞射圖樣直接相加（強度相加，不是振幅相加）
+        return 2 * env;
+      }
+      const alpha = Math.PI * d * sinT / lam;
+      return env * 4 * Math.pow(Math.cos(alpha), 2);
+    }
+
+    /* 以拒絕採樣從強度分布抽出一顆光子的落點 */
+    function sampleY() {
+      const half = halfWidth();
+      const peak = mode === "single" ? 1 : 4;
+      for (let i = 0; i < 200; i += 1) {
+        const y = (Math.random() * 2 - 1) * half;
+        if (Math.random() * peak <= intensity(y)) return y;
+      }
+      return (Math.random() * 2 - 1) * half * 0.2;
+    }
+
+    function land() {
+      hits.push(sampleY());
+      if (hits.length > 20000) hits.shift();
+    }
+
+    /*
+     * 條紋對比度 (Imax − Imin)/(Imax + Imin)
+     *
+     * 取樣範圍必須只涵蓋「一個條紋間距」的一半，不能掃過整個螢幕。
+     * 因為單縫繞射的包絡本身就會由中央往外遞減，掃太寬的話，
+     * 即使完全沒有干涉也會量到 0.46 的假對比度——那是包絡的起伏，
+     * 不是條紋。限制在 ±Δx/2 之內，包絡幾乎是平的，量到的才是干涉條紋本身。
+     */
+    function visibility() {
+      const window = fringeSpacing() / 2;
+      let lo = Infinity, hi = -Infinity;
+      for (let i = 0; i <= 200; i += 1) {
+        const y = -window + (2 * window) * i / 200;
+        const v = intensity(y);
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+      return hi + lo > 0 ? (hi - lo) / (hi + lo) : 0;
+    }
 
     function scene() {
-      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const col = nmColor(stLam.get()), cy = H * 0.46, benchY = H - 20, laserX = 68, slitX = W * 0.4, scrX = W - 104, half = Math.min(H * 0.37, (H - 56) / 2);
-      const yPx = yMM => cy + (yMM / yMaxMM()) * half, gap = 20, s1 = { x: slitX, y: cy - gap / 2 }, s2 = { x: slitX, y: cy + gap / 2 };
-      const support = (x, top, wide) => {
-        const footW = wide || 26;
-        D.rect(ctx, x - footW / 2, benchY - 4, footW, 6, { fill: "#273242", stroke: "rgba(255,255,255,0.18)", width: 1, r: 2 });
-        D.line(ctx, x, top + 8, x, benchY - 4, "#59667a", 3);
-        D.rect(ctx, x - 7, top, 14, 9, { fill: "#303b4c", stroke: "rgba(255,255,255,0.18)", width: 1, r: 2 });
-      };
-      // 光學導軌與刻度
-      D.rect(ctx, 24, benchY, W - 48, 7, { fill: "#263140", stroke: "rgba(255,255,255,0.18)", width: 1, r: 3 });
-      D.line(ctx, 30, benchY + 3.5, W - 30, benchY + 3.5, "rgba(255,255,255,0.14)", 1);
-      for (let x = 38; x < W - 34; x += 24) D.line(ctx, x, benchY + 1, x, benchY + (x % 72 === 38 ? 6 : 4), "rgba(255,255,255,0.16)", 1);
-      D.text(ctx, "示意 · 非真實比例", 16, 20, { color: PL.col("text-faint"), size: 10.5 });
-      D.text(ctx, `λ ${stLam.get()} nm   ·   d ${stD.get().toFixed(2)} mm   ·   L ${stL.get().toFixed(1)} m`, W - 16, 20, { color: PL.col("text-dim"), size: 10, align: "right" });
-      // 光束錐
-      ctx.save(); ctx.globalAlpha = 0.14; ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(laserX + 14, cy); ctx.lineTo(slitX, cy - gap * 1.5); ctx.lineTo(slitX, cy + gap * 1.5); ctx.closePath(); ctx.fill(); ctx.restore();
-      D.line(ctx, laserX + 12, cy, slitX - 3, cy, col, 1.15);
-      // 波前
-      if (layers.has("wave")) { ctx.save(); ctx.beginPath(); ctx.rect(slitX, 0, scrX - slitX, H); ctx.clip(); [s1, s2].forEach(s => { for (let n = 0; n < 26; n++) { const r = ((n * 22 + phase * 22) % ((scrX - slitX) + 22)); ctx.strokeStyle = col; ctx.globalAlpha = 0.16 * (1 - r / (scrX - slitX)); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(s.x, s.y, r, -1.2, 1.2); ctx.stroke(); } }); ctx.restore(); }
-      // 雷射光源與固定座
-      support(laserX - 4, cy + 13, 30);
-      D.rect(ctx, laserX - 35, cy - 13, 46, 26, { fill: "#293545", stroke: "rgba(255,255,255,0.27)", width: 1, r: 4 });
-      D.rect(ctx, laserX - 31, cy - 9, 10, 18, { fill: "#1a222e", stroke: "rgba(255,255,255,0.15)", width: 1, r: 2 });
-      D.rect(ctx, laserX + 7, cy - 6, 11, 12, { fill: "#435165", stroke: "rgba(255,255,255,0.2)", width: 1, r: 2 });
-      D.disc(ctx, laserX + 18, cy, 4.5, { fill: col, glow: col, glowSize: 15 });
-      D.text(ctx, "LASER", laserX - 10, cy + 3, { color: PL.col("text-faint"), size: 7.5, align: "center" });
-      // 雙縫屏障
-      const barW = 12;
-      support(slitX, cy + half + 14, 30);
-      const seg = (y0, y1) => D.rect(ctx, slitX - barW / 2, y0, barW, y1 - y0, { fill: "#161d29", stroke: "rgba(255,255,255,0.18)", width: 1, r: 3 });
-      seg(cy - half - 14, s1.y - 5); seg(s1.y + 5, s2.y - 5); seg(s2.y + 5, cy + half + 14);
-      D.disc(ctx, s1.x, s1.y, 2.5, { fill: "#fff" }); D.disc(ctx, s2.x, s2.y, 2.5, { fill: "#fff" });
-      D.text(ctx, "雙縫", slitX, cy - half - 23, { color: PL.col("text-dim"), size: 9, align: "center" });
-      // 路程差
-      if (layers.has("path")) { const fy = yPx(dxMM()); D.line(ctx, s1.x, s1.y, scrX, fy, "rgba(255,255,255,0.4)", 1, [4, 3]); D.line(ctx, s2.x, s2.y, scrX, fy, "rgba(255,255,255,0.4)", 1, [4, 3]); D.text(ctx, "r₂−r₁ = λ", (slitX + scrX) / 2 - 20, cy - 6, { color: PL.col("text-dim"), size: 11 }); }
-      // 光屏上的理論條紋與單光子累積
-      support(scrX + 10, cy + half + 14, 32);
-      D.rect(ctx, scrX, cy - half - 14, 20, 2 * half + 28, { fill: "#0a0e15", stroke: "rgba(255,255,255,0.24)", width: 1.5, r: 3 });
-      ctx.save(); ctx.beginPath(); ctx.rect(scrX + 4, cy - half - 10, 12, 2 * half + 20); ctx.clip();
-      for (let y = cy - half - 10; y <= cy + half + 10; y += 1.5) {
-        const intensity = Iy((y - cy) / half * yMaxMM());
-        ctx.globalAlpha = 0.05 + intensity * 0.36; ctx.fillStyle = col; ctx.fillRect(scrX + 4, y, 12, 1.5);
+      const { ctx, W, H } = cv;
+      cv.clear(); D.bg(cv);
+      const m = MC();
+      const laserX = 46, slitX = W * 0.42, screenX = W - 74;
+      const cy = H / 2;
+      const half = halfWidth();
+      const mmToPx = (H - 70) / (2 * half);
+      const py = yMm => cy - yMm * mmToPx;
+
+      // 光具座
+      D.rect(ctx, 24, H - 30, W - 48, 5, { fill: PL.theme.pale(0.14), r: 2 });
+
+      // 雷射
+      const lamColor = wavelengthColor(sLam.get());
+      D.rect(ctx, laserX - 24, cy - 13, 44, 26, { fill: PL.theme.shade(0.35), stroke: PL.theme.pale(0.3), r: 4 });
+      D.disc(ctx, laserX + 22, cy, 5, { fill: lamColor, glow: lamColor, glowSize: 12 });
+      D.text(ctx, sLam.get() + " nm", laserX - 2, cy + 30, { color: lamColor, size: 11, align: "center", weight: "700" });
+
+      // 光束（速率高時像連續光束，速率低時只剩一顆一顆）
+      const beamAlpha = Math.min(0.5, sRate.get() / 400 * 0.5);
+      if (beamAlpha > 0.02) {
+        ctx.save(); ctx.globalAlpha = beamAlpha;
+        D.line(ctx, laserX + 26, cy, slitX - 6, cy, lamColor, 3);
+        ctx.restore();
       }
-      ctx.restore(); ctx.globalAlpha = 1;
-      D.text(ctx, "探測屏", scrX + 10, cy - half - 24, { color: PL.col("text-dim"), size: 9, align: "center" });
-      ctx.save(); ctx.globalCompositeOperation = "lighter";
-      hits.forEach(h => { ctx.fillStyle = col; ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.arc(scrX + 4 + (h.x % 12), yPx(h.y), 1.8, 0, PL.TAU); ctx.fill(); });
-      ctx.restore(); ctx.globalAlpha = 1;
-      // 括號
-      if (layers.has("bracket")) { const N = stN.get(), y0 = yPx(N * dxMM()), y1 = yPx(-N * dxMM()), bxx = scrX - 14; ctx.strokeStyle = "#f0a24a"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(bxx + 6, y0); ctx.lineTo(bxx, y0); ctx.lineTo(bxx, y1); ctx.lineTo(bxx + 6, y1); ctx.stroke(); D.text(ctx, (2 * N) + " Δx", bxx - 4, cy + 4, { color: "#f0a24a", size: 10, align: "right" }); }
-      // 級次刻度
-      if (layers.has("order")) { const Mi = Math.floor(Mrange()); for (let m = -Mi; m <= Mi; m++) { const y = yPx(m * dxMM()); if (y > 8 && y < H - 8) { D.line(ctx, scrX + 20, y, scrX + 26, y, PL.col("text-faint"), 1); D.text(ctx, m === 0 ? "m=0" : (m > 0 ? "+" + m : "" + m), scrX + 30, y + 3, { color: m === 0 ? col : PL.col("text-faint"), size: m === 0 ? 10 : 9 }); } } }
-      // 飛行光子
-      photons.forEach(p => { const x = p.x0 + (scrX - p.x0) * p.t, y = p.y0 + (yPx(p.ty) - p.y0) * p.t; D.disc(ctx, x, y, 3, { fill: col, glow: col, glowSize: 8 }); });
-      // 讀數
-      const Mi = Math.floor(Mrange());
-      rDx.set(dxMM(), 2); rLam.set(stLam.get(), 0); rFr.set(2 * Mi + 1, 0); rCnt.set(count, 0);
+
+      // 狹縫板
+      const slitHalf = (sD.get() / 2) * mmToPx * 6;   // 視覺放大，否則看不見
+      D.rect(ctx, slitX - 5, 24, 10, H - 78, { fill: PL.theme.pale(0.3) });
+      const openings = mode === "single" ? [0] : [-slitHalf, slitHalf];
+      openings.forEach(off => {
+        D.rect(ctx, slitX - 5, cy + off - 5, 10, 10, { fill: PL.theme.shade(0.85) });
+      });
+      D.text(ctx, mode === "single" ? "單縫" : "雙縫 d=" + sD.get().toFixed(2) + "mm",
+        slitX, H - 40, { color: PL.col("text-dim"), size: 11, align: "center" });
+
+      // 偵測器：裝上去就看得到，關聯「知道路徑」與「條紋消失」
+      if (cDetect.get() && mode !== "single") {
+        openings.forEach(off => {
+          D.disc(ctx, slitX - 18, cy + off, 6, { fill: PL.col("danger") });
+        });
+        D.text(ctx, "偵測器啟用", slitX - 26, cy - slitHalf - 18,
+          { color: PL.col("danger"), size: 10.5, align: "right", weight: "700" });
+      }
+
+      // 飛行中的光子
+      flying.forEach(p => {
+        const x = laserX + 26 + p.progress * (screenX - laserX - 26);
+        let y = cy;
+        if (x > slitX) {
+          const f = (x - slitX) / (screenX - slitX);
+          y = cy + (py(p.y) - cy) * f;
+        }
+        D.disc(ctx, x, y, 2.6, { fill: lamColor, glow: lamColor, glowSize: 8 });
+      });
+
+      // 螢幕與累積的光點
+      D.rect(ctx, screenX, 24, 10, H - 78, { fill: PL.theme.pale(0.10), stroke: PL.theme.pale(0.25) });
+      hits.forEach(y => {
+        const Y = py(y);
+        if (Y < 24 || Y > H - 54) return;
+        ctx.save();
+        ctx.globalAlpha = 0.55;
+        D.disc(ctx, screenX + 5 + (Math.random() - 0.5) * 4, Y, 1.5, { fill: lamColor });
+        ctx.restore();
+      });
+
+      // 條紋位置標記
+      const dx = fringeSpacing();
+      if (mode === "double" && !cDetect.get()) {
+        for (let n = -4; n <= 4; n += 1) {
+          const Y = py(n * dx);
+          if (Y < 30 || Y > H - 56) continue;
+          D.line(ctx, screenX + 14, Y, screenX + 22, Y, m, 1.4);
+        }
+        D.text(ctx, "Δx=" + dx.toFixed(2) + "mm", screenX + 24, py(0) - 6,
+          { color: m, size: 10 });
+      }
+
+      const vis = visibility();
+      PL.ui.caption(cv, cDetect.get() && mode === "double"
+        ? "偵測器開啟：一旦知道光子走哪一條縫，干涉項消失，螢幕上只剩兩個單縫圖樣相加。"
+        : mode === "sum"
+          ? "這是兩條單縫各自圖樣的「相加」——沒有干涉。把它和雙縫比較，差的那一項就是干涉。"
+          : mode === "single"
+            ? "單縫只有繞射包絡，沒有細條紋。"
+            : "每一顆光子落在哪裡是隨機的，但累積起來就是干涉圖樣。");
+
+      rDx.set(dx, 3);
+      rCount.set(hits.length, 0);
+      rVis.set(vis, 2);
+      rMode.set(mode === "double" && !cDetect.get() ? "有干涉" : "無干涉");
     }
 
-    function chartI() {
-      const { W, H } = cvI; cvI.clear();
-      const M = Mrange(), g = PL.graph(cvI, { x: 30, y: 14, w: W - 42, h: H - 34 }, { x0: -M, x1: M, y0: 0, y1: 1.06 });
-      g.frame({ xlabel: "y / Δx" }); g.grid(Math.min(12, 2 * Math.round(M)), 4);
-      const col = nmColor(stLam.get()), pts = []; for (let i = 0; i <= 240; i++) { const x = -M + 2 * M * i / 240; pts.push([x, Math.cos(Math.PI * x) ** 2]); }
-      g.area(pts, { fill: col.replace("rgb", "rgba").replace(")", ",0.18)") }); g.curve(pts, { color: col, width: 2 });
-      D.text(cvI.ctx, "I / I₀", W - 16, 20, { color: col, size: 10, align: "right" });
+    /* 可見光波長轉近似顏色，讓「換波長」在畫面上看得出來 */
+    function wavelengthColor(nm) {
+      let r = 0, g = 0, b = 0;
+      if (nm < 440) { r = -(nm - 440) / 60; b = 1; }
+      else if (nm < 490) { g = (nm - 440) / 50; b = 1; }
+      else if (nm < 510) { g = 1; b = -(nm - 510) / 20; }
+      else if (nm < 580) { r = (nm - 510) / 70; g = 1; }
+      else if (nm < 645) { r = 1; g = -(nm - 645) / 65; }
+      else { r = 1; }
+      const f = nm > 700 ? 0.4 : nm < 420 ? 0.4 : 1;
+      return "rgb(" + Math.round(255 * r * f) + "," + Math.round(255 * g * f) + "," + Math.round(255 * b * f) + ")";
     }
-    function chartH() {
-      const { W, H } = cvH; cvH.clear();
-      const M = Mrange(), mx = Math.max(4, ...hist), g = PL.graph(cvH, { x: 30, y: 14, w: W - 42, h: H - 34 }, { x0: -M, x1: M, y0: 0, y1: mx * 1.15 });
-      g.frame({ xlabel: "y / Δx" }); g.grid(Math.min(12, 2 * Math.round(M)), 4);
-      const col = nmColor(stLam.get()), ym = yMaxMM(), dx = dxMM(), bw = (g.box.w / BINS) * 0.9;
-      for (let i = 0; i < BINS; i++) { if (!hist[i]) continue; const yc = -ym + (i + 0.5) * (2 * ym / BINS), xu = yc / dx; const px = g.X(xu), py0 = g.Y(0), py1 = g.Y(hist[i]); cvH.ctx.fillStyle = col; cvH.ctx.globalAlpha = 0.8; cvH.ctx.fillRect(px - bw / 2, py1, bw, py0 - py1); }
-      cvH.ctx.globalAlpha = 1;
-      g.fn(x => Math.cos(Math.PI * x) ** 2 * mx, { color: "rgba(255,255,255,0.55)", width: 1.5, dash: [4, 3], samples: 200 });
-      D.text(cvH.ctx, "計數", 30, 12, { color: PL.col("text-faint"), size: 10 });
+
+    function chart() {
+      cc.clear();
+      const half = halfWidth();
+      const peak = mode === "single" ? 1 : 4;
+      const gph = PL.graph(cc, { x: 44, y: 14, w: cc.W - 58, h: cc.H - 36 },
+        { x0: -half, x1: half, y0: 0, y1: 1.15 });
+      gph.frame({ xlabel: "螢幕位置 (mm)", ylabel: "相對強度" });
+      gph.grid(6, 4);
+
+      // 實際落點的直方圖：光子越多越貼近理論曲線
+      const bins = 60;
+      const counts = new Array(bins).fill(0);
+      hits.forEach(y => {
+        const i = Math.floor((y + half) / (2 * half) * bins);
+        if (i >= 0 && i < bins) counts[i] += 1;
+      });
+      const maxCount = Math.max(1, ...counts);
+      counts.forEach((n, i) => {
+        if (!n) return;
+        const y0 = -half + (2 * half) * i / bins;
+        const y1 = -half + (2 * half) * (i + 1) / bins;
+        const h = n / maxCount;
+        const x0 = gph.X(y0), x1 = gph.X(y1);
+        D.rect(cc.ctx, x0, gph.Y(h), Math.max(1, x1 - x0 - 1), gph.Y(0) - gph.Y(h),
+          { fill: "rgba(140,190,230,0.35)" });
+      });
+
+      gph.fn(y => intensity(y) / peak, { color: MC(), width: 2.2, samples: 320 });
     }
-    function drawAll() { scene(); chartI(); chartH(); }
-    cv.onResize(drawAll); cvI.onResize(drawAll); cvH.onResize(drawAll);
+
+    function drawAll() { scene(); chart(); }
 
     const anim = PL.loop(dt => {
-      if (dt) {
-        phase = (phase + dt * 0.6) % 1;
-        const nSpawn = Math.min(6, Math.round(speed * 1.6 + 0.3));
-        for (let i = 0; i < nSpawn; i++) if (photons.length < 60) { const s = Math.random() < 0.5 ? -1 : 1, cy = cv.H * 0.44; photons.push({ x0: cv.W * 0.4, y0: cy + s * 10, ty: sampleY(), t: 0 }); }
-        photons.forEach(p => p.t += dt * 3 * speed);
-        photons.filter(p => p.t >= 1).forEach(p => { hits.push({ x: (count * 7) % 12, y: p.ty }); if (hits.length > 2000) hits.shift(); count++; const bi = Math.floor((p.ty + yMaxMM()) / (2 * yMaxMM()) * BINS); if (bi >= 0 && bi < BINS) hist[bi]++; });
-        photons = photons.filter(p => p.t < 1);
+      if (dt && !paused) {
+        // 依速率發射光子；速率低時真的就是一顆一顆
+        emitTimer += dt * sRate.get();
+        while (emitTimer >= 1) {
+          emitTimer -= 1;
+          flying.push({ progress: 0, y: sampleY() });
+        }
+        flying.forEach(p => { p.progress += dt * 1.4; });
+        // 抵達螢幕就變成一個永久的光點
+        const arrived = flying.filter(p => p.progress >= 1);
+        arrived.forEach(p => hits.push(p.y));
+        if (hits.length > 20000) hits.splice(0, hits.length - 20000);
+        flying = flying.filter(p => p.progress < 1);
       }
       drawAll();
-    });
-    anim.start();
-    return { stop() { anim.stop(); cv.destroy(); cvI.destroy(); cvH.destroy(); }, rerender: drawAll };
+    }, 45);
+
+    cv.onResize(scene); cc.onResize(chart);
+    drawAll(); anim.start();
+    return {
+      stop() { anim.stop(); cv.destroy(); cc.destroy(); },
+      rerender: drawAll
+    };
   }});
 
   /* 單狹縫繞射 */
