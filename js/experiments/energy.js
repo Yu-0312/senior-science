@@ -40,7 +40,7 @@
       const fx = F * Math.cos(th), fy = F * Math.sin(th);
       D.arrow(ctx, px, gy - 15, px + fx * 5, gy - 15 - fy * 5, { color: PL.col("accent-2"), width: 2.5, label: "F" });
       D.arrow(ctx, px, gy - 15, px + fx * 5, gy - 15, { color: "#7ee0c0", width: 2, label: "F cosθ", dash: [3, 3] });
-      D.text(ctx, "只有沿移動方向的分力 F cosθ 才做功", 24, 26, { color: PL.col("text-dim"), size: 12 });
+      PL.ui.caption(cv, "只有沿移動方向的分力 F cosθ 才做功。");
       rW.set(W_, 1); rP.set(fx * sV.get(), 1); rFx.set(fx, 1);
     }
     const anim = PL.loop(dt => { if (dt) { const F = sF.get(), th = sTh.get() * Math.PI / 180, v = sV.get(); const dx = v * dt; x += dx; W_ += F * Math.cos(th) * dx; if (x > 32) reset(); } draw(); });
@@ -71,7 +71,7 @@
       D.arrow(ctx, px + 20, gy - 13, px + 20 + sF.get() * 4, gy - 13, { color: KEc, width: 2.2, label: "F" });
       if (sFr.get() > 0) D.arrow(ctx, px - 20, gy - 13, px - 20 - sFr.get() * 4, gy - 13, { color: THc, width: 2, label: "f" });
       energyBars(cv, 40, gy + 40, W - 120, [{ label: "淨功", v: Wnet, c: MC() }, { label: "動能 K", v: K, c: KEc }], Math.max(Wnet, K, 10));
-      D.text(ctx, "淨功 = 動能變化：兩條長條始終等長", 40, H - 20, { color: PL.col("text-faint"), size: 11 });
+      PL.ui.caption(cv, "淨功 = 動能變化：兩條長條始終等長");
       rWn.set(Wnet, 1); rK.set(K, 1); rV.set(v, 2);
     }
     const anim = PL.loop(dt => { if (dt) { const F = sF.get(), f = sFr.get(), m = sM.get(); const net = F - f; const a = net / m; const dx = Math.max(0, v) * dt + 0.5 * a * dt * dt; v += a * dt; x += Math.max(0, dx); Wnet += net * Math.max(0, dx); if (x > 32) reset(); } draw(); });

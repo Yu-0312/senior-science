@@ -73,6 +73,7 @@
       const h = sH.get(), g = sG.get(), m = MC();
       const tFall = Math.sqrt(2 * h / g);
       const groundY = H - 34, topY = 30, scale = (groundY - topY) / h;
+      cv.calibrate(scale, "m");   // 讓可拖曳的尺能直接量落下高度
       D.line(ctx, 40, groundY, W - 130, groundY, PL.col("text-faint"), 2);
       const fallen = 0.5 * g * t * t; const y = Math.min(h, fallen);
       const px = 130, py = topY + y * scale;

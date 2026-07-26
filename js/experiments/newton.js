@@ -94,7 +94,7 @@
       const apex = { x: A.x + Lpx * Math.cos(th), y: A.y - Lpx * Math.sin(th) };
       const foot = { x: apex.x, y: A.y };
       ctx.save(); ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(apex.x, apex.y); ctx.lineTo(foot.x, foot.y); ctx.closePath();
-      ctx.fillStyle = "rgba(255,255,255,0.05)"; ctx.fill(); ctx.strokeStyle = PL.col("text-faint"); ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
+      ctx.fillStyle = PL.theme.pale(0.05); ctx.fill(); ctx.strokeStyle = PL.col("text-faint"); ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
       D.text(ctx, sTh.get() + "°", A.x + 30, A.y - 6, { color: PL.col("text-dim"), size: 12 });
       const u = { x: -Math.cos(th), y: Math.sin(th) }; // 下坡方向
       const n = { x: -Math.sin(th), y: -Math.cos(th) }; // 外法線

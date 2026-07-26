@@ -5,13 +5,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>免費教育使用授權｜物理實驗室</title>
   <meta name="description" content="台灣中學互動物理實驗室的免費教育使用、推廣創作與內容授權說明。" />
-  <meta name="theme-color" content="#080b11" />
-  <link rel="stylesheet" href="css/style.css?v=20260725-4" />
+  <meta name="theme-color" content="#080b11" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
+  <meta name="color-scheme" content="dark light" />
+  <link rel="stylesheet" href="css/style.css?v=20260725-8" />
+  <!-- 授權頁原本沒有套用主題，從淺色模式的實驗室點進來會突然變成深色。
+       在樣式套用前先同步主題，順便避免閃爍。 -->
+  <script>
+    (function () {
+      try {
+        var saved = JSON.parse(localStorage.getItem("pl-theme"));
+        if (saved !== "light" && saved !== "dark") {
+          saved = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        }
+        document.documentElement.setAttribute("data-theme", saved);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+    })();
+  </script>
 </head>
 <body>
   <header class="license-topbar">
     <a class="license-home" href="index.html"><span class="license-home-mark" aria-hidden="true">PH</span>物理實驗室</a>
-    <a class="license-toplink" href="index.html">回到實驗室</a>
+    <div class="license-topbar-actions">
+      <button class="icon-btn" id="license-theme-toggle" type="button" aria-label="切換主題"></button>
+      <a class="license-toplink" href="index.html">回到實驗室</a>
+    </div>
   </header>
 
   <main class="license-page">
@@ -63,5 +83,25 @@
       <p class="license-legal">本頁是授權範圍的易讀說明；CC BY-NC-SA 4.0 的正式條款以 Creative Commons 公布的法律文本為準。涉及商業合作、校務採購或大量重製時，請先聯絡專案維護者取得書面許可。</p>
     </section>
   </main>
+
+  <script>
+    (function () {
+      var sun = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+      var moon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>';
+      var btn = document.getElementById("license-theme-toggle");
+      function paint() {
+        var light = document.documentElement.getAttribute("data-theme") === "light";
+        btn.innerHTML = light ? moon + "<span>深色</span>" : sun + "<span>淺色</span>";
+        btn.setAttribute("aria-pressed", String(light));
+      }
+      btn.addEventListener("click", function () {
+        var next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", next);
+        try { localStorage.setItem("pl-theme", JSON.stringify(next)); } catch (e) {}
+        paint();
+      });
+      paint();
+    })();
+  </script>
 </body>
 </html>

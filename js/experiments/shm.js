@@ -22,6 +22,7 @@
       const m = sM.get(), k = sK.get(), A = sA.get(), w = Math.sqrt(k / m);
       const x = A * Math.cos(w * t), v = -A * w * Math.sin(w * t);
       const midY = 70, wallX = 40, sc = (W - 160) / 5, eqX = wallX + 90 + 2.5 * sc * 0.5;
+      cv.calibrate(sc, "m");      // 尺可直接量振幅與位移
       // 牆
       D.rect(ctx, wallX - 8, midY - 34, 8, 68, { fill: PL.col("text-faint") });
       const mx = eqX + x * sc;

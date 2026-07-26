@@ -419,7 +419,7 @@
       // 稜鏡三角形
       const A = { x: cx, y: cy - s }, B = { x: cx - s * 0.9, y: cy + s * 0.6 }, C = { x: cx + s * 0.9, y: cy + s * 0.6 };
       ctx.save(); ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.lineTo(C.x, C.y); ctx.closePath();
-      ctx.fillStyle = "rgba(255,255,255,0.06)"; ctx.fill(); ctx.strokeStyle = PL.col("text-faint"); ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
+      ctx.fillStyle = PL.theme.pale(0.06); ctx.fill(); ctx.strokeStyle = PL.col("text-faint"); ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
       // 入射白光打在左面中點
       const P = { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 };
       const th = sTh.get() * Math.PI / 180;

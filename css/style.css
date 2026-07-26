@@ -14,7 +14,8 @@
   --border-soft: #1c2536;
   --text: #eef3fa;
   --text-dim: #9aa8bd;
-  --text-faint: #64738a;
+  /* 原本的 #64738a 疊在面板底上只有 3.3:1，所有小字級的說明與軸標都低於 AA。 */
+  --text-faint: #8593ab;
   --accent: #35e0cf;          /* 主色：青綠 */
   --accent-2: #5aa2ff;        /* 次色：藍 */
   --accent-3: #b98bff;        /* 輔色：紫（漸層用） */
@@ -29,6 +30,22 @@
   --shadow: 0 18px 44px -18px rgba(0, 0, 0, 0.75);
   --glow: 0 0 26px -4px var(--accent);
   --hover: rgba(255, 255, 255, 0.05);
+
+  /* ---------------------------------------------------------------------
+     表面色階（深／淺色主題都會被覆寫）
+     過去這些值直接寫成 rgba(255,255,255,α)，在淺色主題等於白上加白，
+     所有分隔線、格線與襯底面都會整片消失。改成語意變數後由主題統一決定。
+     --------------------------------------------------------------------- */
+  --tint-1: rgba(255, 255, 255, 0.02);    /* 最淡的襯底面 */
+  --tint-2: rgba(255, 255, 255, 0.035);   /* 面板頭、次級襯底 */
+  --tint-3: rgba(255, 255, 255, 0.06);    /* 需要看得出來的襯底 */
+  --edge-hi: rgba(255, 255, 255, 0.05);   /* 內陰影的高光邊 */
+  --grid-line: rgba(255, 255, 255, 0.025);
+  --grid-line-2: rgba(255, 255, 255, 0.02);
+  --scrim: rgba(2, 6, 12, 0.76);          /* 對話框遮罩 */
+  --on-accent: #04121a;                   /* 疊在主色按鈕上的文字色 */
+  --sim-shadow: rgba(0, 0, 0, 0.4);
+  --drawer-shadow: rgba(0, 0, 0, 0.5);
   font-synthesis: none;
 }
 
@@ -51,49 +68,49 @@ body.access-locked { overflow: hidden; }
 body.access-locked .app, body.access-locked .aurora { visibility: hidden; }
 .access-gate {
   position: fixed; inset: 0; z-index: 100; display: none; place-items: center; padding: 20px;
-  background: #080b11;
+  background: var(--bg);
 }
 body.access-locked .access-gate { display: grid; }
 .access-gate-panel {
-  width: min(100%, 430px); padding: 34px; border: 1px solid #2b4050; border-radius: 10px;
-  background: linear-gradient(145deg, #151f2b, #0c131c); box-shadow: 0 28px 80px rgba(0, 0, 0, 0.6);
+  width: min(100%, 430px); padding: 34px; border: 1px solid var(--border); border-radius: 10px;
+  background: linear-gradient(145deg, var(--panel-2), var(--panel-solid)); box-shadow: var(--shadow);
 }
 .access-mark {
-  width: 54px; height: 54px; display: grid; place-items: center; border: 1px solid rgba(53, 224, 207, 0.7); border-radius: 9px;
-  color: #35e0cf; background: rgba(53, 224, 207, 0.08); font-size: 12px; font-weight: 800; letter-spacing: 1px;
+  width: 54px; height: 54px; display: grid; place-items: center; border: 1px solid color-mix(in srgb, var(--accent) 70%, transparent); border-radius: 9px;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); font-size: 12px; font-weight: 800; letter-spacing: 1px;
 }
-.access-kicker { margin: 22px 0 5px; color: #35e0cf; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
+.access-kicker { margin: 22px 0 5px; color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
 .access-gate h1 { margin: 0; font-size: 29px; letter-spacing: 0; }
-.access-gate p { color: #9aa8bd; font-size: 13px; line-height: 1.7; }
+.access-gate p { color: var(--text-dim); font-size: 13px; line-height: 1.7; }
 .access-form { margin-top: 22px; }
-.access-form label { display: block; margin-bottom: 7px; color: #c8d4e2; font-size: 12px; font-weight: 700; }
+.access-form label { display: block; margin-bottom: 7px; color: var(--text); font-size: 12px; font-weight: 700; }
 .access-input-row { display: flex; gap: 8px; }
 .access-input-row input {
-  flex: 1; min-width: 0; height: 42px; padding: 0 12px; border: 1px solid #33435a; border-radius: 6px; outline: none;
-  color: #eef3fa; background: #0b1119; font: inherit;
+  flex: 1; min-width: 0; height: 42px; padding: 0 12px; border: 1px solid var(--border); border-radius: 6px; outline: none;
+  color: var(--text); background: var(--panel-2); font: inherit;
 }
-.access-input-row input:focus { border-color: #35e0cf; box-shadow: 0 0 0 3px rgba(53, 224, 207, 0.12); }
+.access-input-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 .access-input-row button {
-  height: 42px; padding: 0 18px; border: 0; border-radius: 6px; cursor: pointer; color: #04121a;
-  background: #35e0cf; font: inherit; font-size: 13px; font-weight: 800;
+  height: 42px; padding: 0 18px; border: 0; border-radius: 6px; cursor: pointer; color: var(--on-accent);
+  background: var(--accent); font: inherit; font-size: 13px; font-weight: 800;
 }
 .access-input-row button:disabled { cursor: wait; opacity: 0.7; }
-.access-error { min-height: 22px; margin: 7px 0 0; color: #ff9b9b !important; font-size: 12px !important; }
-.access-note { margin-top: 18px; padding-top: 14px; border-top: 1px solid #263344; color: #64738a; font-size: 11px; }
-.access-note a { margin-left: 5px; color: #82e7dc; font-weight: 700; text-decoration: none; }
+.access-error { min-height: 22px; margin: 7px 0 0; color: var(--danger) !important; font-size: 12px !important; }
+.access-note { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-soft); color: var(--text-faint); font-size: 11px; }
+.access-note a { margin-left: 5px; color: var(--accent); font-weight: 700; text-decoration: none; }
 .access-note a:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* 章節轉換時，用短題組把剛完成的概念收束成可帶走的判斷。 */
 body.checkpoint-active { overflow: hidden; }
 .chapter-checkpoint { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 22px; }
 .chapter-checkpoint[hidden] { display: none; }
-.checkpoint-backdrop { position: absolute; inset: 0; background: rgba(2, 6, 12, 0.76); backdrop-filter: blur(5px); }
+.checkpoint-backdrop { position: absolute; inset: 0; background: var(--scrim); backdrop-filter: blur(5px); }
 .checkpoint-panel {
   position: relative; width: min(100%, 680px); max-height: min(760px, calc(100vh - 44px)); overflow: auto;
   padding: 26px; border: 1px solid var(--border); border-top: 2px solid var(--checkpoint-color, var(--accent)); border-radius: 8px;
   background: var(--panel-solid); box-shadow: 0 28px 80px rgba(0, 0, 0, 0.58); outline: none;
 }
-.checkpoint-kicker { margin: 0; color: var(--checkpoint-color, var(--accent)); font-size: 10.5px; font-weight: 800; letter-spacing: 1.2px; }
+.checkpoint-kicker { margin: 0; color: var(--checkpoint-ink, var(--checkpoint-color, var(--accent))); font-size: 10.5px; font-weight: 800; letter-spacing: 1.2px; }
 .checkpoint-title { margin: 4px 0 0; color: var(--text); font-size: 24px; letter-spacing: 0; line-height: 1.25; }
 .checkpoint-intro { margin: 7px 0 0; color: var(--text-dim); font-size: 13px; line-height: 1.65; }
 .checkpoint-progress { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 22px; color: var(--text-faint); font-size: 11.5px; font-variant-numeric: tabular-nums; }
@@ -105,10 +122,10 @@ body.checkpoint-active { overflow: hidden; }
   display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; min-width: 0; min-height: 48px; padding: 9px 12px;
   border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; font: inherit; font-size: 13px; line-height: 1.45; text-align: left;
 }
-.checkpoint-choice:hover:not(:disabled) { border-color: var(--checkpoint-color, var(--accent)); background: color-mix(in srgb, var(--checkpoint-color, var(--accent)) 8%, transparent); }
+.checkpoint-choice:hover:not(:disabled) { border-color: var(--checkpoint-ink, var(--checkpoint-color, var(--accent))); background: color-mix(in srgb, var(--checkpoint-color, var(--accent)) 8%, transparent); }
 .checkpoint-choice:focus-visible { outline: 3px solid color-mix(in srgb, var(--checkpoint-color, var(--accent)) 24%, transparent); outline-offset: 2px; }
 .checkpoint-choice:disabled { cursor: default; opacity: 0.7; }
-.checkpoint-choice.selected { border-color: var(--checkpoint-color, var(--accent)); }
+.checkpoint-choice.selected { border-color: var(--checkpoint-ink, var(--checkpoint-color, var(--accent))); }
 .checkpoint-choice.correct { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--text); opacity: 1; }
 .checkpoint-choice.incorrect { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--text); opacity: 1; }
 .checkpoint-choice-index { display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid currentColor; border-radius: 50%; color: var(--text-faint); font-size: 10px; font-weight: 800; }
@@ -120,9 +137,9 @@ body.checkpoint-active { overflow: hidden; }
 .checkpoint-skip, .checkpoint-next { min-height: 38px; border-radius: 6px; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 750; }
 .checkpoint-skip { padding: 0 4px; border: 0; background: transparent; color: var(--text-faint); }
 .checkpoint-skip:hover { color: var(--text); }
-.checkpoint-next { min-width: 116px; padding: 0 14px; border: 0; background: var(--checkpoint-color, var(--accent)); color: #04121a; }
+.checkpoint-next { min-width: 116px; padding: 0 14px; border: 0; background: var(--checkpoint-color, var(--accent)); color: #08131c; }
 .checkpoint-next:focus-visible, .checkpoint-skip:focus-visible { outline: 3px solid color-mix(in srgb, var(--checkpoint-color, var(--accent)) 28%, transparent); outline-offset: 2px; }
-.checkpoint-result-score { margin: 20px 0 0; color: var(--checkpoint-color, var(--accent)); font-size: 40px; font-weight: 850; letter-spacing: 0; line-height: 1; font-variant-numeric: tabular-nums; }
+.checkpoint-result-score { margin: 20px 0 0; color: var(--checkpoint-ink, var(--checkpoint-color, var(--accent))); font-size: 40px; font-weight: 850; letter-spacing: 0; line-height: 1; font-variant-numeric: tabular-nums; }
 .checkpoint-result-score span { color: var(--text-dim); font-size: 18px; font-weight: 650; }
 .checkpoint-result-note { margin: 10px 0 0; color: var(--text-dim); font-size: 13px; line-height: 1.65; }
 .checkpoint-review { display: grid; gap: 8px; margin-top: 18px; }
@@ -184,7 +201,7 @@ body.checkpoint-active { overflow: hidden; }
   font-size: 12px; color: var(--text-dim);
   border: 1px solid var(--border); border-radius: 999px;
   padding: 5px 13px; display: inline-flex; align-items: center; gap: 7px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--tint-1);
 }
 .pill .ver { color: var(--text-faint); }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 9px var(--ok); animation: pulse 2.4s ease-in-out infinite; }
@@ -252,7 +269,7 @@ body.checkpoint-active { overflow: hidden; }
   display: flex; align-items: center; justify-content: center; padding: 0 4px; font-size: 11px; font-weight: 800;
   line-height: 1; letter-spacing: 0.4px; white-space: nowrap; text-align: center; overflow: clip;
   background: color-mix(in srgb, var(--m-color, var(--accent)) 16%, transparent);
-  color: var(--m-color, var(--accent));
+  color: var(--m-ink, var(--m-color, var(--accent)));
   border: 1px solid color-mix(in srgb, var(--m-color, var(--accent)) 30%, transparent);
 }
 .module-title { flex: 1 1 auto; min-width: 0; font-size: 13.6px; font-weight: 600; overflow-wrap: anywhere; }
@@ -268,12 +285,12 @@ body.checkpoint-active { overflow: hidden; }
   border-left: 2px solid transparent; transition: background 0.14s, color 0.14s;
 }
 .exp-item:hover { background: var(--hover); color: var(--text); }
-.exp-item.active { color: var(--text); border-left-color: var(--m-color, var(--accent)); background: color-mix(in srgb, var(--m-color, var(--accent)) 8%, transparent); }
+.exp-item.active { color: var(--text); border-left-color: var(--m-ink, var(--m-color, var(--accent))); background: color-mix(in srgb, var(--m-color, var(--accent)) 8%, transparent); }
 .exp-item .idx {
   width: 21px; height: 21px; flex-shrink: 0; border-radius: 6px; font-size: 10.5px;
   display: grid; place-items: center; background: var(--panel-2); border: 1px solid var(--border); color: var(--text-faint); font-variant-numeric: tabular-nums;
 }
-.exp-item.active .idx { background: var(--m-color, var(--accent)); color: #051016; border-color: transparent; font-weight: 700; }
+.exp-item.active .idx { background: var(--m-color, var(--accent)); color: #08131c; border-color: transparent; font-weight: 700; }
 .exp-item .exp-name { flex: 1; }
 .exp-item .check { display: none; color: var(--ok); font-size: 12px; font-weight: 800; }
 .exp-item.viewed .check { display: inline; }
@@ -318,7 +335,7 @@ body.checkpoint-active { overflow: hidden; }
 .hero-actions { display: flex; gap: 13px; justify-content: center; flex-wrap: wrap; }
 .btn-hero {
   font-family: inherit; font-size: 14.5px; font-weight: 700; padding: 13px 26px; border-radius: 12px; cursor: pointer;
-  border: 1px solid transparent; background: linear-gradient(100deg, var(--accent), var(--accent-2)); color: #04121a;
+  border: 1px solid transparent; background: linear-gradient(100deg, var(--accent), var(--accent-2)); color: var(--on-accent);
   transition: transform 0.16s, box-shadow 0.16s; display: inline-flex; align-items: center; gap: 8px;
 }
 .btn-hero:hover { transform: translateY(-2px); box-shadow: 0 14px 30px -8px rgba(53, 224, 207, 0.5); }
@@ -347,7 +364,7 @@ body.checkpoint-active { overflow: hidden; }
   padding: 7px 11px; border: 1px solid var(--border); border-radius: 7px; color: var(--text-faint); background: var(--panel-2); font-size: 11.5px; line-height: 1.4;
 }
 .save-status.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 38%, var(--border)); }
-.save-status.warn { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 44%, var(--border)); }
+.save-status.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 44%, var(--border)); }
 .study-grid { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.2fr) minmax(0, 1.15fr); gap: 14px; align-items: stretch; }
 .study-card {
   min-width: 0; padding: 16px; border: 1px solid var(--border-soft); border-radius: 8px;
@@ -362,8 +379,8 @@ body.checkpoint-active { overflow: hidden; }
   background: var(--panel-2); color: var(--text); font: inherit; font-size: 12px; font-weight: 750;
 }
 .study-btn:hover { color: var(--accent); border-color: var(--accent); }
-.study-btn.primary { color: #04121a; background: linear-gradient(100deg, var(--accent), var(--accent-2)); border-color: transparent; }
-.study-btn.primary:hover { color: #04121a; filter: brightness(1.06); }
+.study-btn.primary { color: var(--on-accent); background: linear-gradient(100deg, var(--accent), var(--accent-2)); border-color: transparent; }
+.study-btn.primary:hover { color: var(--on-accent); filter: brightness(1.06); }
 .plan-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 12px; }
 .plan-controls label { display: grid; gap: 5px; min-width: 0; color: var(--text-faint); font-size: 10.5px; font-weight: 750; letter-spacing: 0.5px; }
 .plan-controls select, .plan-controls input {
@@ -392,7 +409,7 @@ body.checkpoint-active { overflow: hidden; }
 .review-focus-list { display: grid; gap: 7px; margin-top: 8px; }
 .review-focus-item {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0;
-  padding: 8px 9px; border: 1px solid var(--border-soft); border-radius: 7px; background: rgba(255, 255, 255, 0.018);
+  padding: 8px 9px; border: 1px solid var(--border-soft); border-radius: 7px; background: var(--tint-1);
 }
 .review-focus-name { min-width: 0; color: var(--text); font-size: 12px; overflow-wrap: anywhere; }
 .review-focus-meta { color: var(--text-faint); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -418,10 +435,10 @@ body.checkpoint-active { overflow: hidden; }
 .path-stage.path-university { --path-color: #c795ff; }
 .path-stage:not(:last-child)::after {
   content: "→"; position: absolute; z-index: 1; right: -21px; top: 22px; width: 28px; height: 28px; display: grid; place-items: center;
-  color: var(--path-color); background: var(--bg); font-size: 17px; font-weight: 800;
+  color: var(--path-ink, var(--path-color)); background: var(--bg); font-size: 17px; font-weight: 800;
 }
 .path-stage-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-.path-stage-number { color: var(--path-color); font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+.path-stage-number { color: var(--path-ink, var(--path-color)); font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
 .path-stage-level { color: var(--text); font-size: 15px; font-weight: 750; }
 .path-stage-note { min-height: 42px; margin: 9px 0 11px; color: var(--text-dim); font-size: 12px; line-height: 1.6; }
 .path-labs { display: grid; gap: 4px; }
@@ -429,8 +446,8 @@ body.checkpoint-active { overflow: hidden; }
   display: flex; align-items: baseline; gap: 6px; width: 100%; min-width: 0; padding: 3px 0; border: 0; cursor: pointer; overflow-wrap: anywhere;
   background: transparent; color: var(--text); text-align: left; font: inherit; font-size: 12px; line-height: 1.45;
 }
-.path-lab::before { content: "↗"; flex: 0 0 auto; color: var(--path-color); font-size: 11px; }
-.path-lab:hover { color: var(--path-color); text-decoration: underline; text-underline-offset: 3px; }
+.path-lab::before { content: "↗"; flex: 0 0 auto; color: var(--path-ink, var(--path-color)); font-size: 11px; }
+.path-lab:hover { color: var(--path-ink, var(--path-color)); text-decoration: underline; text-underline-offset: 3px; }
 
 /* 模組卡片網格 */
 .module-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 18px; margin: 22px auto 10px; max-width: 1140px; }
@@ -446,34 +463,34 @@ body.checkpoint-active { overflow: hidden; }
 .mcard-top { display: flex; justify-content: space-between; align-items: center; }
 .mcard-no {
   min-width: 32px; height: 32px; padding: 0 8px; border-radius: 9px; display: grid; place-items: center; font-weight: 800; font-size: 13.5px;
-  background: color-mix(in srgb, var(--m-color) 16%, transparent); color: var(--m-color);
+  background: color-mix(in srgb, var(--m-color) 16%, transparent); color: var(--m-ink, var(--m-color, var(--accent)));
   border: 1px solid color-mix(in srgb, var(--m-color) 30%, transparent);
 }
 .mcard-track { font-size: 10px; color: var(--text-faint); letter-spacing: 0.3px; }
 .mcard-title { font-size: 17px; margin: 13px 0 7px; font-weight: 700; letter-spacing: 0.3px; }
 .mcard-intro { font-size: 12px; color: var(--text-dim); line-height: 1.56; height: 56px; overflow: hidden; }
 .mcard-meta { font-size: 11.5px; color: var(--text-faint); margin-top: 13px; display: flex; align-items: center; gap: 7px; }
-.mcard-meta b { color: var(--m-color); font-variant-numeric: tabular-nums; }
-.mcard-meta .chip { margin-left: auto; font-size: 10px; padding: 3px 9px; border-radius: 999px; background: color-mix(in srgb, var(--m-color) 12%, transparent); color: var(--m-color); border: 1px solid color-mix(in srgb, var(--m-color) 26%, transparent); }
+.mcard-meta b { color: var(--m-ink, var(--m-color, var(--accent))); font-variant-numeric: tabular-nums; }
+.mcard-meta .chip { margin-left: auto; font-size: 10px; padding: 3px 9px; border-radius: 999px; background: color-mix(in srgb, var(--m-color) 12%, transparent); color: var(--m-ink, var(--m-color, var(--accent))); border: 1px solid color-mix(in srgb, var(--m-color) 26%, transparent); }
 
 /* 實驗頁面 */
 #exp-view { max-width: 1520px; margin: 0 auto; }
 .exp-header { margin-bottom: 20px; }
 .exp-crumb { font-size: 12.5px; color: var(--text-faint); margin-bottom: 8px; display: flex; align-items: center; gap: 7px; }
-.exp-crumb b { color: var(--m-color, var(--accent)); font-weight: 600; }
+.exp-crumb b { color: var(--m-ink, var(--m-color, var(--accent))); font-weight: 600; }
 .exp-crumb .sep { opacity: 0.5; }
 .exp-header h2 { margin: 0 0 8px; font-size: 27px; letter-spacing: 0.4px; font-weight: 800; }
 .exp-header .lead { color: var(--text-dim); font-size: 14.5px; max-width: 760px; }
 .exp-learning-path { max-width: 980px; margin-top: 18px; padding-top: 13px; border-top: 1px solid var(--border-soft); }
 .exp-path-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin-bottom: 9px; }
-.exp-path-eyebrow { color: var(--m-color, var(--accent)); font-size: 11px; font-weight: 800; letter-spacing: 1px; }
+.exp-path-eyebrow { color: var(--m-ink, var(--m-color, var(--accent))); font-size: 11px; font-weight: 800; letter-spacing: 1px; }
 .exp-path-summary { color: var(--text-faint); font-size: 11px; white-space: nowrap; }
 .exp-path-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .exp-path-step {
   min-width: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); text-align: left; font: inherit;
 }
 button.exp-path-step { cursor: pointer; transition: border-color 0.15s, background 0.15s; }
-button.exp-path-step:hover { border-color: var(--m-color, var(--accent)); background: color-mix(in srgb, var(--m-color, var(--accent)) 8%, transparent); }
+button.exp-path-step:hover { border-color: var(--m-ink, var(--m-color, var(--accent))); background: color-mix(in srgb, var(--m-color, var(--accent)) 8%, transparent); }
 .exp-path-step.current { border-color: color-mix(in srgb, var(--m-color, var(--accent)) 60%, var(--border)); background: color-mix(in srgb, var(--m-color, var(--accent)) 10%, transparent); }
 .exp-path-label { display: block; color: var(--text-faint); font-size: 10px; letter-spacing: 0.6px; }
 .exp-path-title { display: block; margin-top: 2px; overflow-wrap: anywhere; color: inherit; font-size: 12px; line-height: 1.45; }
@@ -481,13 +498,13 @@ button.exp-path-step:hover { border-color: var(--m-color, var(--accent)); backgr
 /* 將操作、課本與解題轉成每次實驗都能帶走的學習輸出。 */
 .learning-output { margin: 0 0 22px; padding: 17px 0 15px; border-top: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); }
 .learning-output-heading { max-width: 780px; }
-.learning-output-eyebrow { color: var(--m-color, var(--accent)); font-size: 10.5px; font-weight: 800; letter-spacing: 1.3px; }
+.learning-output-eyebrow { color: var(--m-ink, var(--m-color, var(--accent))); font-size: 10.5px; font-weight: 800; letter-spacing: 1.3px; }
 .learning-output-title { margin: 3px 0 0; color: var(--text); font-size: 19px; letter-spacing: 0; }
 .learning-output-intro { margin: 5px 0 0; color: var(--text-dim); font-size: 12.5px; line-height: 1.65; }
 .learning-output-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-top: 16px; }
 .learning-output-step { min-width: 0; padding: 0 18px; border-left: 1px solid var(--border-soft); }
 .learning-output-step:first-child { padding-left: 0; border-left: 0; }
-.learning-output-no { display: block; color: var(--m-color, var(--accent)); font-size: 10.5px; font-weight: 800; letter-spacing: 1px; }
+.learning-output-no { display: block; color: var(--m-ink, var(--m-color, var(--accent))); font-size: 10.5px; font-weight: 800; letter-spacing: 1px; }
 .learning-output-copy { margin: 7px 0 0; color: var(--text); font-size: 12.5px; line-height: 1.7; }
 .textbook-bridge { display: grid; gap: 5px; margin: 7px 0 0; }
 .textbook-bridge-row { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 7px; }
@@ -497,17 +514,17 @@ button.exp-path-step:hover { border-color: var(--m-color, var(--accent)); backgr
 .learning-takeaways li { position: relative; padding-left: 16px; color: var(--text); font-size: 12px; line-height: 1.55; }
 .learning-takeaways li::before { content: ""; position: absolute; left: 3px; top: 7px; width: 6px; height: 6px; border: 1px solid var(--m-color, var(--accent)); border-radius: 50%; }
 .learning-transfer { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 11px; align-items: baseline; margin-top: 16px; padding: 10px 12px; border-left: 2px solid var(--m-color, var(--accent)); background: color-mix(in srgb, var(--m-color, var(--accent)) 7%, transparent); }
-.learning-transfer-label { color: var(--m-color, var(--accent)); font-size: 11px; font-weight: 800; letter-spacing: 0.7px; }
+.learning-transfer-label { color: var(--m-ink, var(--m-color, var(--accent))); font-size: 11px; font-weight: 800; letter-spacing: 0.7px; }
 .learning-transfer-copy { margin: 0; color: var(--text); font-size: 12.5px; line-height: 1.65; }
 .learning-reflection { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border); }
 .learning-reflection-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
 .learning-reflection-label { color: var(--text); font-size: 13px; font-weight: 750; }
 .learning-reflection-prompt { flex: 1; margin: 0; color: var(--text-dim); font-size: 11.5px; line-height: 1.55; text-align: right; }
 .learning-reflection-input { width: 100%; min-height: 62px; margin-top: 8px; padding: 9px 10px; resize: vertical; border: 1px solid var(--border); border-radius: 6px; outline: none; background: var(--panel-2); color: var(--text); font: inherit; font-size: 12.5px; line-height: 1.55; }
-.learning-reflection-input:focus { border-color: var(--m-color, var(--accent)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--m-color, var(--accent)) 12%, transparent); }
+.learning-reflection-input:focus { border-color: var(--m-ink, var(--m-color, var(--accent))); box-shadow: 0 0 0 3px color-mix(in srgb, var(--m-color, var(--accent)) 12%, transparent); }
 .learning-reflection-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 7px; }
 .learning-reflection-saved { color: var(--text-faint); font-size: 10.5px; }
-.learning-reflection-save { min-height: 30px; padding: 0 10px; border: 1px solid var(--m-color, var(--accent)); border-radius: 6px; cursor: pointer; background: transparent; color: var(--m-color, var(--accent)); font: inherit; font-size: 11.5px; font-weight: 750; }
+.learning-reflection-save { min-height: 30px; padding: 0 10px; border: 1px solid var(--m-color, var(--accent)); border-radius: 6px; cursor: pointer; background: transparent; color: var(--m-ink, var(--m-color, var(--accent))); font: inherit; font-size: 11.5px; font-weight: 750; }
 .learning-reflection-save:hover { background: color-mix(in srgb, var(--m-color, var(--accent)) 10%, transparent); }
 
 .content-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
@@ -538,7 +555,7 @@ button.exp-path-step:hover { border-color: var(--m-color, var(--accent)); backgr
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(236px, 276px); gap: 14px; align-items: start;
   padding: 12px; border: 1px solid var(--sim-edge); border-radius: 10px; overflow: hidden; position: relative;
   background: linear-gradient(135deg, color-mix(in srgb, var(--sim-bg-1) 90%, var(--m-color, var(--accent)) 10%), var(--panel-solid));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 16px 36px -30px rgba(0, 0, 0, 0.9);
+  box-shadow: inset 0 1px 0 var(--edge-hi), 0 16px 36px -30px rgba(0, 0, 0, 0.9);
 }
 .sim-command-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; padding: 9px 10px 9px 12px;
@@ -552,24 +569,179 @@ button.exp-path-step:hover { border-color: var(--m-color, var(--accent)); backgr
   min-height: 30px; padding: 0 9px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-dim); background: var(--panel-2);
   font: inherit; font-size: 11px; cursor: pointer; white-space: nowrap;
 }
-.sim-command:hover, .sim-command[aria-pressed="true"] { color: var(--m-color, var(--accent)); border-color: var(--m-color, var(--accent)); background: color-mix(in srgb, var(--m-color, var(--accent)) 10%, var(--panel-2)); }
+.sim-command:hover, .sim-command[aria-pressed="true"] { color: var(--m-ink, var(--m-color, var(--accent))); border-color: var(--m-ink, var(--m-color, var(--accent))); background: color-mix(in srgb, var(--m-color, var(--accent)) 10%, var(--panel-2)); }
+/* ---------------------------------------------------------------------------
+   學習鷹架：預測、挑戰、關係摘要
+   全部由模型自動探測產生，用來回答學生的兩個問題：
+   「這個實驗要我看什麼？」與「怎樣算做完了？」
+   --------------------------------------------------------------------------- */
+.sim-insight { display: grid; gap: 10px; margin: 0 0 12px; }
+
+/* 先預測再操作 */
+.sim-predict {
+  padding: 12px 13px; border: 1px solid var(--sim-edge); border-left: 3px solid var(--accent-2);
+  border-radius: 8px; background: color-mix(in srgb, var(--accent-2) 6%, var(--panel-solid));
+}
+.sim-predict-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.sim-predict-kicker { color: var(--accent-2); font-size: 10.5px; font-weight: 800; letter-spacing: 1px; }
+.sim-predict-note { color: var(--text-faint); font-size: 10.5px; }
+.sim-predict-question { margin: 8px 0 0; color: var(--text); font-size: 14px; font-weight: 650; line-height: 1.6; }
+.sim-predict-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 11px; }
+.sim-predict-choice {
+  min-height: 38px; padding: 0 16px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+  background: var(--panel-2); color: var(--text); font: inherit; font-size: 13px; font-weight: 650;
+}
+.sim-predict-choice:hover:not(:disabled) { border-color: var(--accent-2); color: var(--accent-2); }
+.sim-predict-choice:disabled { cursor: default; opacity: 0.75; }
+.sim-predict-choice.is-correct { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); opacity: 1; font-weight: 800; }
+.sim-predict-choice.is-wrong { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); opacity: 1; }
+.sim-predict-result {
+  margin-top: 11px; padding: 10px 11px; border-left: 2px solid var(--danger);
+  background: var(--panel-2); color: var(--text-dim); font-size: 12.5px; line-height: 1.7;
+}
+.sim-predict-result.is-correct { border-left-color: var(--ok); }
+.sim-predict-result strong { color: var(--text); margin-right: 4px; }
+.sim-predict-law {
+  display: block; margin-top: 6px; color: var(--accent-2); font-size: 13px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.sim-predict-cta { margin: 7px 0 0; color: var(--text-faint); font-size: 11.5px; }
+
+/* 可驗證的挑戰任務 */
+.sim-challenge {
+  padding: 12px 13px; border: 1px solid var(--sim-edge); border-left: 3px solid var(--warn);
+  border-radius: 8px; background: var(--panel-solid);
+}
+.sim-challenge.is-cleared { border-left-color: var(--ok); }
+.sim-challenge-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.sim-challenge-kicker { color: var(--warn); font-size: 10.5px; font-weight: 800; letter-spacing: 1px; }
+.sim-challenge.is-cleared .sim-challenge-kicker { color: var(--ok); }
+.sim-challenge-state { color: var(--text-faint); font-size: 11px; font-weight: 700; }
+.sim-challenge.is-cleared .sim-challenge-state { color: var(--ok); }
+.sim-challenge-text { margin: 7px 0 0; color: var(--text); font-size: 13px; line-height: 1.6; }
+.sim-challenge-meter { height: 6px; margin-top: 10px; border-radius: 999px; overflow: hidden; background: var(--panel-3); }
+.sim-challenge-fill { width: 0; height: 100%; border-radius: inherit; background: var(--warn); transition: width 0.2s ease; }
+.sim-challenge.is-hit .sim-challenge-fill, .sim-challenge.is-cleared .sim-challenge-fill { background: var(--ok); }
+.sim-challenge-live { margin: 7px 0 0; color: var(--text-dim); font-size: 12px; font-variant-numeric: tabular-nums; }
+.sim-challenge.is-hit .sim-challenge-live { color: var(--ok); font-weight: 700; }
+
+/* 關係摘要（預設收合，想看答案的人再展開） */
+.sim-relations-details {
+  border: 1px solid var(--border-soft); border-radius: 8px; background: var(--panel-solid);
+}
+.sim-relations-details > summary {
+  padding: 9px 12px; cursor: pointer; color: var(--text-dim); font-size: 12px; font-weight: 700; list-style: none;
+}
+.sim-relations-details > summary::-webkit-details-marker { display: none; }
+.sim-relations-details > summary::before { content: "▸ "; color: var(--text-faint); }
+.sim-relations-details[open] > summary::before { content: "▾ "; }
+.sim-relations-details > summary:hover { color: var(--m-ink, var(--m-color, var(--accent))); }
+.sim-relations-list { display: grid; gap: 6px; margin: 0; padding: 0 12px 10px 30px; }
+.sim-relation { color: var(--text-dim); font-size: 12px; line-height: 1.65; }
+.sim-relation.is-flat { color: var(--accent-3); font-weight: 650; }
+.sim-relation.is-clamped { color: var(--text-faint); }
+.sim-relations-foot { margin: 0; padding: 0 12px 11px; color: var(--text-faint); font-size: 11px; line-height: 1.6; }
+
+@media (max-width: 600px) {
+  .sim-predict-choices { display: grid; grid-template-columns: 1fr; }
+  .sim-predict-choice { width: 100%; min-height: 42px; }
+  .sim-predict-question { font-size: 13px; }
+}
+
+/* ---------------------------------------------------------------------------
+   時間控制列
+   PhET 的訪談結論是「學生不會自己找到播放／暫停鍵」，所以這一列刻意放在
+   實驗台正上方、用實心主色按鈕，而不是收進工具選單裡。
+   --------------------------------------------------------------------------- */
+.sim-transport {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 10px; padding: 8px 10px;
+  border: 1px solid var(--sim-edge); border-radius: 8px; background: var(--panel-solid);
+}
+.sim-transport[hidden] { display: none; }
+.sim-transport-play {
+  min-width: 74px; min-height: 34px; padding: 0 14px; border: 0; border-radius: 6px; cursor: pointer;
+  background: var(--m-color, var(--accent)); color: #08131c; font: inherit; font-size: 13px; font-weight: 800;
+}
+.sim-transport-play.is-playing { background: var(--warn); }
+.sim-transport-btn, .sim-transport-reset {
+  min-height: 34px; padding: 0 11px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+  background: var(--panel-2); color: var(--text); font: inherit; font-size: 12px; font-weight: 700;
+}
+.sim-transport-btn:hover:not(:disabled), .sim-transport-reset:hover { border-color: var(--m-color, var(--accent)); color: var(--m-ink, var(--m-color, var(--accent))); }
+.sim-transport-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.sim-speed { display: flex; align-items: center; gap: 4px; padding-left: 6px; border-left: 1px solid var(--border-soft); }
+.sim-speed[hidden] { display: none; }
+.sim-speed-label { color: var(--text-faint); font-size: 10.5px; margin-right: 2px; }
+.sim-speed-btn {
+  min-height: 28px; padding: 0 8px; border: 1px solid var(--border); border-radius: 5px; cursor: pointer;
+  background: transparent; color: var(--text-dim); font: inherit; font-size: 11px; font-variant-numeric: tabular-nums;
+}
+.sim-speed-btn:hover { color: var(--text); }
+.sim-speed-btn.active {
+  color: var(--m-ink, var(--m-color, var(--accent))); border-color: var(--m-color, var(--accent));
+  background: color-mix(in srgb, var(--m-color, var(--accent)) 12%, transparent); font-weight: 700;
+}
+.sim-transport-spacer { flex: 1 1 auto; min-width: 0; }
+.sim-transport-time { color: var(--text-faint); font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sim-transport-time[hidden] { display: none; }
+
+/* wiggle-me：模擬進場後停在第一格，用一次性的抖動指出「從這裡開始」。
+   PhET 的定義是「引起注意但不干擾」，所以只跑幾次就停。 */
+@keyframes labWiggle {
+  0%, 100% { transform: none; }
+  20% { transform: translateX(-3px) rotate(-1.5deg); }
+  40% { transform: translateX(3px) rotate(1.5deg); }
+  60% { transform: translateX(-2px) rotate(-1deg); }
+  80% { transform: translateX(2px) rotate(1deg); }
+}
+.sim-transport-play.wiggle {
+  animation: labWiggle 0.9s ease-in-out 3;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--m-color, var(--accent)) 32%, transparent);
+}
+
+/* ---------------------------------------------------------------------------
+   可拖曳量測工具層
+   疊在主畫布上；沒有開啟任何工具時完全不攔截指標事件。
+   --------------------------------------------------------------------------- */
+.sim-tool-host { position: absolute; inset: 0; pointer-events: none; }
+.sim-tool-layer { display: block; pointer-events: none; touch-action: none; cursor: grab; }
+.sim-tool-host.has-tools .sim-tool-layer { pointer-events: auto; }
+.sim-tool-layer:active { cursor: grabbing; }
+.sim-canvas-wrap { position: relative; }
+
+.sim-tool-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 7px;
+  padding: 7px 12px 9px; border-top: 1px solid var(--border-soft);
+}
+.sim-tool-bar-label { color: var(--text-faint); font-size: 10.5px; font-weight: 700; letter-spacing: 0.6px; }
+.sim-tool-btn {
+  min-height: 30px; padding: 0 10px; border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
+  background: var(--panel-2); color: var(--text-dim); font: inherit; font-size: 11.5px; font-weight: 650;
+}
+.sim-tool-btn:hover { color: var(--text); border-color: var(--m-color, var(--accent)); }
+.sim-tool-btn.active {
+  color: var(--m-ink, var(--m-color, var(--accent))); border-color: var(--m-color, var(--accent));
+  background: color-mix(in srgb, var(--m-color, var(--accent)) 13%, transparent);
+}
+.sim-tool-hint { flex: 1 1 220px; min-width: 0; color: var(--text-faint); font-size: 10.5px; line-height: 1.5; }
+
 .sim-learning-brief { margin: 0 0 12px; padding: 12px; border: 1px solid var(--sim-edge); border-left: 2px solid var(--m-color, var(--accent)); border-radius: 8px; background: color-mix(in srgb, var(--panel-solid) 88%, var(--m-color, var(--accent)) 12%); }
 .sim-learning-brief-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.sim-learning-brief-kicker { color: var(--m-color, var(--accent)); font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+.sim-learning-brief-kicker { color: var(--m-ink, var(--m-color, var(--accent))); font-size: 10px; font-weight: 800; letter-spacing: 1px; }
 .sim-learning-brief-title { color: var(--text-faint); font-size: 10.5px; }
 .sim-learning-goal { margin: 7px 0 0; color: var(--text); font-size: 13px; font-weight: 650; line-height: 1.62; }
 .sim-learning-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 11px 0 0; }
 .sim-learning-step { min-width: 0; padding-left: 10px; border-left: 1px solid var(--border); }
-.sim-learning-step dt { color: var(--m-color, var(--accent)); font-size: 10px; font-weight: 800; letter-spacing: 0.7px; }
+.sim-learning-step dt { color: var(--m-ink, var(--m-color, var(--accent))); font-size: 10px; font-weight: 800; letter-spacing: 0.7px; }
 .sim-learning-step dd { margin: 4px 0 0; color: var(--text-dim); font-size: 11.5px; line-height: 1.55; overflow-wrap: anywhere; }
 .sim-procedure { display: none; margin: 0 0 12px; border: 1px solid var(--sim-edge); border-radius: 8px; overflow: hidden; background: var(--panel-solid); }
 .lab-sim.show-procedure .sim-procedure { display: block; }
 .sim-procedure-head { min-height: 36px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px; border-bottom: 1px solid var(--border-soft); }
-.sim-procedure-state { color: var(--m-color, var(--accent)); font-size: 10px; font-weight: 700; }
+.sim-procedure-state { color: var(--m-ink, var(--m-color, var(--accent))); font-size: 10px; font-weight: 700; }
 .sim-procedure-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 10px 12px 6px; list-style: none; }
 .sim-procedure-step { display: flex; align-items: flex-start; gap: 8px; min-width: 0; padding: 8px; border: 1px solid var(--border-soft); border-radius: 6px; color: var(--text-faint); font-size: 11px; line-height: 1.5; }
-.sim-procedure-step.active { color: var(--text); border-color: var(--m-color, var(--accent)); background: color-mix(in srgb, var(--m-color, var(--accent)) 8%, transparent); }
-.sim-step-number { flex: 0 0 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; color: var(--m-color, var(--accent)); background: color-mix(in srgb, var(--m-color, var(--accent)) 13%, transparent); font-size: 10px; font-weight: 800; }
+.sim-procedure-step.active { color: var(--text); border-color: var(--m-ink, var(--m-color, var(--accent))); background: color-mix(in srgb, var(--m-color, var(--accent)) 8%, transparent); }
+.sim-step-number { flex: 0 0 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; color: var(--m-ink, var(--m-color, var(--accent))); background: color-mix(in srgb, var(--m-color, var(--accent)) 13%, transparent); font-size: 10px; font-weight: 800; }
 .sim-step-copy { min-width: 0; }
 .sim-procedure-note { margin: 0; padding: 0 12px 10px; color: var(--text-faint); font-size: 10.5px; }
 .lab-sim.is-focused .sim-control-deck, .lab-sim.is-focused .sim-readout-panel, .lab-sim.is-focused .sim-charts { display: none; }
@@ -578,7 +750,7 @@ button.exp-path-step:hover { border-color: var(--m-color, var(--accent)); backgr
 .lab-sim:fullscreen .sim-stage { max-width: 1600px; margin: 0 auto; }
 .sim-stage::before {
   content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.32;
-  background: repeating-linear-gradient(90deg, transparent 0 39px, rgba(255, 255, 255, 0.025) 40px), repeating-linear-gradient(0deg, transparent 0 39px, rgba(255, 255, 255, 0.02) 40px);
+  background: repeating-linear-gradient(90deg, transparent 0 39px, var(--tint-1) 40px), repeating-linear-gradient(0deg, transparent 0 39px, var(--tint-1) 40px);
 }
 .sim-visual-panel, .sim-control-deck, .sim-readout-panel {
   position: relative; min-width: 0; border: 1px solid var(--border-soft); background: color-mix(in srgb, var(--panel-solid) 80%, transparent);
@@ -587,17 +759,33 @@ button.exp-path-step:hover { border-color: var(--m-color, var(--accent)); backgr
 .sim-control-deck { border-radius: 8px; }
 .sim-panel-head {
   min-height: 38px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px;
-  border-bottom: 1px solid var(--border-soft); background: rgba(255, 255, 255, 0.018);
+  border-bottom: 1px solid var(--border-soft); background: var(--tint-1);
 }
 .sim-panel-title { font-size: 10.5px; font-weight: 700; letter-spacing: 1.2px; color: var(--text-dim); text-transform: uppercase; }
-.sim-live { color: var(--m-color, var(--accent)); font-size: 10px; font-weight: 800; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
+.sim-live { color: var(--m-ink, var(--m-color, var(--accent))); font-size: 10px; font-weight: 800; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
 .sim-live::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; vertical-align: 1px; }
 .sim-panel-hint { color: var(--text-faint); font-size: 10px; letter-spacing: 0.5px; white-space: nowrap; }
 .sim-canvas-wrap { min-width: 0; padding: 12px 12px 8px; }
-.sim-canvas { display: block; width: 100%; border-radius: 6px; background: var(--sim-bg-1); border: 1px solid var(--border); box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.4); }
+.sim-canvas { display: block; width: 100%; border-radius: 6px; background: var(--sim-bg-1); border: 1px solid var(--border); box-shadow: inset 0 0 40px var(--sim-shadow); }
+/* 畫面說明列：把原本畫在 canvas 上的解說長句移出來，讓畫布只留物理量標籤 */
+.sim-caption {
+  margin: 0; padding: 6px 12px 2px; color: var(--text-dim); font-size: 11.5px; line-height: 1.6;
+}
+
+/* 控制面板的長說明預設收合（PhET：學生只讀貼在控制項上的短文字） */
+.ctrl-note-collapsible { padding: 0; border-left-width: 2px; }
+.ctrl-note-collapsible > summary {
+  padding: 7px 10px; cursor: pointer; color: var(--text-dim); font-size: 11.5px; font-weight: 700; list-style: none;
+}
+.ctrl-note-collapsible > summary::-webkit-details-marker { display: none; }
+.ctrl-note-collapsible > summary::before { content: "▸ "; color: var(--text-faint); }
+.ctrl-note-collapsible[open] > summary::before { content: "▾ "; }
+.ctrl-note-collapsible > summary:hover { color: var(--m-ink, var(--m-color, var(--accent))); }
+.ctrl-note-body { padding: 0 10px 9px; color: var(--text-faint); font-size: 11.5px; line-height: 1.6; }
+
 .sim-instrument-strip {
   min-height: 30px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 12px 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.035); color: var(--text-faint); font-size: 9.5px; letter-spacing: 0.7px;
+  border-top: 1px solid var(--tint-2); color: var(--text-faint); font-size: 9.5px; letter-spacing: 0.7px;
   background: linear-gradient(90deg, color-mix(in srgb, var(--lab-stage, var(--m-color, var(--accent))) 8%, transparent), transparent 58%);
 }
 .sim-instrument-code { color: var(--lab-stage, var(--m-color, var(--accent))); font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -626,7 +814,7 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .ctrl-select select:focus { border-color: var(--accent); }
 .ctrl-check { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--text-dim); cursor: pointer; user-select: none; }
 .ctrl-check input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
-.ctrl-note { font-size: 11.5px; color: var(--text-faint); line-height: 1.5; padding: 8px 10px; border-left: 2px solid var(--border); background: rgba(255, 255, 255, 0.02); border-radius: 0 6px 6px 0; }
+.ctrl-note { font-size: 11.5px; color: var(--text-faint); line-height: 1.5; padding: 8px 10px; border-left: 2px solid var(--border); background: var(--tint-1); border-radius: 0 6px 6px 0; }
 
 /* 區段標題 */
 .ctrl-section { font-size: 10.5px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--text-faint); margin: 6px 0 -2px; display: flex; align-items: center; gap: 8px; }
@@ -651,7 +839,7 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 
 /* 附屬圖表列 */
 .sim-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 14px; }
-.sim-chart { min-width: 0; background: linear-gradient(180deg, var(--panel-2), var(--panel-solid)); border: 1px solid var(--border-soft); border-radius: 8px; padding: 12px 13px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035); }
+.sim-chart { min-width: 0; background: linear-gradient(180deg, var(--panel-2), var(--panel-solid)); border: 1px solid var(--border-soft); border-radius: 8px; padding: 12px 13px; box-shadow: inset 0 1px 0 var(--tint-2); }
 .sim-chart .sim-canvas { border: none; box-shadow: none; background: transparent; }
 .sim-chart .cap { font-size: 11.5px; color: var(--text-faint); margin: 8px 2px 0; line-height: 1.55; }
 .chart-title { font-size: 12px; color: var(--text-dim); letter-spacing: 0.4px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; font-weight: 600; }
@@ -663,11 +851,11 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   background: var(--panel-2); color: var(--text); border: 1px solid var(--border); transition: all 0.15s; flex: 1; white-space: nowrap;
 }
 .btn:hover { border-color: var(--accent); color: var(--accent); }
-.btn-primary { background: linear-gradient(100deg, var(--accent), var(--accent-2)); color: #04121a; border-color: transparent; font-weight: 700; }
-.btn-primary:hover { color: #04121a; filter: brightness(1.08); box-shadow: 0 6px 18px -6px rgba(53, 224, 207, 0.6); }
+.btn-primary { background: linear-gradient(100deg, var(--accent), var(--accent-2)); color: var(--on-accent); border-color: transparent; font-weight: 700; }
+.btn-primary:hover { color: var(--on-accent); filter: brightness(1.08); box-shadow: 0 6px 18px -6px rgba(53, 224, 207, 0.6); }
 
 .sim-readout-panel { margin-top: 14px; border-radius: 8px; overflow: hidden; }
-.sim-readout-head { min-height: 36px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px; background: rgba(255, 255, 255, 0.018); border-bottom: 1px solid var(--border-soft); }
+.sim-readout-head { min-height: 36px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px; background: var(--tint-1); border-bottom: 1px solid var(--border-soft); }
 .sim-readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; margin: 0; padding: 10px 12px 12px; }
 .readout { background: linear-gradient(180deg, var(--panel-2), var(--panel-solid)); border: 1px solid var(--border-soft); border-radius: 7px; padding: 11px 12px; transition: border-color 0.16s; }
 .readout:hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
@@ -681,7 +869,7 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .guide p { margin: 0; font-size: 13.8px; color: var(--text); line-height: 1.7; }
 .formula-box {
   background: linear-gradient(160deg, var(--sim-bg-1), var(--sim-bg-2)); border: 1px solid var(--border);
-  border-left: 3px solid var(--m-color, var(--accent)); border-radius: 9px; padding: 14px 16px; font-size: 15px; color: #dff6f2;
+  border-left: 3px solid var(--m-color, var(--accent)); border-radius: 9px; padding: 14px 16px; font-size: 15px; color: var(--formula-text, #dff6f2);
   font-variant-numeric: tabular-nums; line-height: 1.95; overflow-x: auto; white-space: pre-wrap;
 }
 .points { list-style: none; padding: 0; margin: 0; }
@@ -694,7 +882,7 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   background: linear-gradient(180deg, color-mix(in srgb, var(--panel-2) 88%, var(--m-color, var(--accent)) 12%), var(--panel-solid));
 }
 .practice-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 7px; }
-.practice-type { color: var(--m-color, var(--accent)); font-size: 10.5px; font-weight: 800; letter-spacing: 0.8px; white-space: nowrap; }
+.practice-type { color: var(--m-ink, var(--m-color, var(--accent))); font-size: 10.5px; font-weight: 800; letter-spacing: 0.8px; white-space: nowrap; }
 .practice-status { color: var(--text-faint); font-size: 10.5px; white-space: nowrap; }
 .practice-question { min-width: 0; margin: 0; color: var(--text); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 .practice-formula {
@@ -709,7 +897,7 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; font: inherit; font-size: 12.5px; line-height: 1.5; text-align: left;
   touch-action: manipulation; transition: border-color 0.16s, background 0.16s, color 0.16s;
 }
-.practice-option:hover:not(:disabled) { border-color: var(--m-color, var(--accent)); background: color-mix(in srgb, var(--m-color, var(--accent)) 8%, transparent); }
+.practice-option:hover:not(:disabled) { border-color: var(--m-ink, var(--m-color, var(--accent))); background: color-mix(in srgb, var(--m-color, var(--accent)) 8%, transparent); }
 .practice-option:focus-visible { outline: 3px solid color-mix(in srgb, var(--m-color, var(--accent)) 26%, transparent); outline-offset: 2px; }
 .practice-option:disabled { cursor: default; opacity: 0.76; }
 .practice-option.is-correct { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--text); opacity: 1; }
@@ -726,10 +914,27 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   background: var(--panel-2); color: var(--text-dim); font: inherit; font-size: 11.5px; font-weight: 700;
 }
 .practice-btn:hover, .practice-btn[aria-expanded="true"] {
-  color: var(--m-color, var(--accent)); border-color: var(--m-color, var(--accent));
+  color: var(--m-ink, var(--m-color, var(--accent))); border-color: var(--m-ink, var(--m-color, var(--accent)));
   background: color-mix(in srgb, var(--m-color, var(--accent)) 10%, var(--panel-2));
 }
-.practice-detail { margin: 9px 0 0; padding: 9px 10px; border-left: 2px solid var(--m-color, var(--accent)); color: var(--text-dim); background: rgba(255, 255, 255, 0.025); font-size: 12px; line-height: 1.65; }
+/* 隨機化計算題：學生要輸入自己算出的數值，不是從選項裡挑 */
+.practice-numeric { border-color: color-mix(in srgb, var(--m-color, var(--accent)) 34%, var(--border-soft)); }
+.numeric-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 11px; }
+.numeric-input {
+  flex: 1 1 150px; min-width: 0; min-height: 40px; padding: 0 11px; border: 1px solid var(--border); border-radius: 6px;
+  outline: none; background: var(--panel-2); color: var(--text); font: inherit; font-size: 14px; font-variant-numeric: tabular-nums;
+}
+.numeric-input:focus { border-color: var(--m-color, var(--accent)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--m-color, var(--accent)) 15%, transparent); }
+.numeric-unit { color: var(--text-dim); font-size: 13px; white-space: nowrap; }
+.numeric-submit {
+  min-height: 40px; padding: 0 15px; border: 0; border-radius: 6px; cursor: pointer;
+  background: var(--m-color, var(--accent)); color: #08131c; font: inherit; font-size: 12.5px; font-weight: 800;
+}
+.numeric-submit:hover { filter: brightness(1.06); }
+.numeric-steps { margin: 9px 0 0; padding: 9px 10px 9px 28px; }
+.numeric-steps li { margin: 3px 0; color: var(--text-dim); font-size: 12px; line-height: 1.7; font-variant-numeric: tabular-nums; }
+
+.practice-detail { margin: 9px 0 0; padding: 9px 10px; border-left: 2px solid var(--m-color, var(--accent)); color: var(--text-dim); background: var(--tint-1); font-size: 12px; line-height: 1.65; }
 .practice-detail strong { color: var(--text); }
 
 /* 上一個 / 下一個 導覽 */
@@ -748,6 +953,7 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 
 /* --------------------------------- 公開授權頁 --------------------------------- */
 .license-topbar { max-width: 1060px; margin: 0 auto; padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.license-topbar-actions { display: flex; align-items: center; gap: 12px; }
 .license-home { display: inline-flex; align-items: center; gap: 9px; color: var(--text); font-size: 14px; font-weight: 750; text-decoration: none; }
 .license-home-mark { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); border-radius: 7px; color: var(--accent); font-size: 13px; }
 .license-toplink { color: var(--text-dim); font-size: 12px; text-decoration: none; }
@@ -782,7 +988,7 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .sr-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-top: 18px; }
 .sr-item { background: var(--panel); border: 1px solid var(--border-soft); border-left: 3px solid var(--m-color, var(--accent)); border-radius: 11px; padding: 14px 16px; cursor: pointer; transition: transform 0.15s, border-color 0.15s; }
 .sr-item:hover { transform: translateY(-3px); border-color: var(--accent); }
-.sr-mod { font-size: 11px; color: var(--m-color, var(--accent)); }
+.sr-mod { font-size: 11px; color: var(--m-ink, var(--m-color, var(--accent))); }
 .sr-title { font-size: 15px; margin: 4px 0 5px; font-weight: 600; }
 .sr-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; max-height: 54px; overflow: hidden; }
 .empty { text-align: center; color: var(--text-faint); padding: 60px 20px; font-size: 14px; }
@@ -817,7 +1023,23 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   .sim-learning-step dd { font-size: 11px; }
   .sim-stage { gap: 10px; padding: 8px; border-radius: 8px; }
   .sim-canvas-wrap { padding: 8px 8px 6px; }
-  .sim-instrument-strip { min-height: 28px; padding: 5px 8px 7px; font-size: 8.5px; }
+  /* 畫面說明列：把原本畫在 canvas 上的解說長句移出來，讓畫布只留物理量標籤 */
+.sim-caption {
+  margin: 0; padding: 6px 12px 2px; color: var(--text-dim); font-size: 11.5px; line-height: 1.6;
+}
+
+/* 控制面板的長說明預設收合（PhET：學生只讀貼在控制項上的短文字） */
+.ctrl-note-collapsible { padding: 0; border-left-width: 2px; }
+.ctrl-note-collapsible > summary {
+  padding: 7px 10px; cursor: pointer; color: var(--text-dim); font-size: 11.5px; font-weight: 700; list-style: none;
+}
+.ctrl-note-collapsible > summary::-webkit-details-marker { display: none; }
+.ctrl-note-collapsible > summary::before { content: "▸ "; color: var(--text-faint); }
+.ctrl-note-collapsible[open] > summary::before { content: "▾ "; }
+.ctrl-note-collapsible > summary:hover { color: var(--m-ink, var(--m-color, var(--accent))); }
+.ctrl-note-body { padding: 0 10px 9px; color: var(--text-faint); font-size: 11.5px; line-height: 1.6; }
+
+.sim-instrument-strip { min-height: 28px; padding: 5px 8px 7px; font-size: 8.5px; }
   .sim-panel-head { min-height: 36px; padding: 0 9px; }
   .sim-panel-title { letter-spacing: 0.8px; }
   .sim-controls { display: flex; padding: 10px; gap: 12px; }
@@ -837,22 +1059,109 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .formula-box mjx-container { margin: 0 !important; }
 .formula-box mjx-container svg { max-width: 100%; }
 
-/* --------------------------------- 淺色主題 --------------------------------- */
+/* ---------------------------------------------------------------------------
+   模組色的「文字版本」
+   課程模組用的是 Material 300/400 亮色（#ffd54f、#4dd0e1…），在深色底上很清楚，
+   但當文字放到白底上只有 1.4:1，完全讀不到。--m-ink 在淺色主題把模組色壓深到
+   通過 AA，同時保留色相，讓模組的識別色仍然成立。
+   宣告必須跟著 --m-color 出現在同一層元素上，否則會沿用根層的顏色。
+   --------------------------------------------------------------------------- */
+:root, .module, .mcard, .sr-item, .review-focus-item, #exp-view, .chapter-checkpoint, .license-summary, .path-stage {
+  --m-ink: var(--m-color, var(--accent));
+  --checkpoint-ink: var(--checkpoint-color, var(--accent));
+  --license-ink: var(--license-color, var(--accent));
+  --path-ink: var(--path-color, var(--accent));
+}
+:root[data-theme="light"],
+[data-theme="light"] .module,
+[data-theme="light"] .mcard,
+[data-theme="light"] .sr-item,
+[data-theme="light"] .review-focus-item,
+[data-theme="light"] #exp-view,
+[data-theme="light"] .chapter-checkpoint,
+[data-theme="light"] .license-summary,
+[data-theme="light"] .path-stage {
+  --m-ink: color-mix(in srgb, var(--m-color, var(--accent)) 45%, #06182a);
+  --checkpoint-ink: color-mix(in srgb, var(--checkpoint-color, var(--accent)) 45%, #06182a);
+  --license-ink: color-mix(in srgb, var(--license-color, var(--accent)) 45%, #06182a);
+  --path-ink: color-mix(in srgb, var(--path-color, var(--accent)) 45%, #06182a);
+}
+
+/* ---------------------------------------------------------------------------
+   淺色主題
+   原本只覆寫了十來個變數，導致所有寫死的「白色系」表面、狀態色與低對比灰字
+   在白底上看不見。這裡把整組語意變數補齊：表面色階整個翻面，狀態色改用
+   在白底上仍達 WCAG AA 的深色版本，文字灰階也一併加深。
+   --------------------------------------------------------------------------- */
 [data-theme="light"] {
-  --bg: #eef2f8; --bg-2: #e6ebf4; --panel: #ffffffdd; --panel-solid: #ffffff; --panel-2: #eef2f8; --panel-3: #dbe3ef;
-  --border: #d3dcea; --border-soft: #e1e8f2; --text: #16202e; --text-dim: #465468; --text-faint: #8291a4;
-  --accent: #08a99a; --accent-2: #2f7ff0; --accent-3: #8b5cf6;
-  --sim-bg-1: #f5f8fc; --sim-bg-2: #eef3f9;
+  --bg: #eef2f8; --bg-2: #e6ebf4; --panel: #ffffffdd; --panel-solid: #ffffff; --panel-2: #f2f5fa; --panel-3: #dbe3ef;
+  --border: #c9d4e4; --border-soft: #dde5f0;
+  /* 文字灰階：原本的 #8291a4 在白底上只有 3.0:1，小字讀不清楚 */
+  --text: #16202e; --text-dim: #3d4b60; --text-faint: #5e6d82;
+  /* 主色壓深，讓「白字疊在主色按鈕上」與「主色當文字放在白底上」兩種用法都達 AA */
+  --accent: #06756b; --accent-2: #1f5fc4; --accent-3: #6d28d9;
+  /* 狀態色：亮色版在白底上幾乎無法辨識，改用深一階的同色系 */
+  --warn: #8a5a00;
+  --danger: #c62f2f;
+  --ok: #0d7a52;
+  /* 實驗台底色不用純白：留一點灰度，飽和色的線條才有東西可以襯 */
+  --sim-bg-1: #f3f7fc; --sim-bg-2: #e9f0f8;
   --hover: rgba(24, 40, 68, 0.06);
   --shadow: 0 18px 40px -20px rgba(30, 50, 90, 0.28);
+
+  /* 表面色階整組翻面：白色半透明 → 深藍墨半透明 */
+  --tint-1: rgba(24, 40, 68, 0.035);
+  --tint-2: rgba(24, 40, 68, 0.05);
+  --tint-3: rgba(24, 40, 68, 0.075);
+  --edge-hi: rgba(255, 255, 255, 0.9);
+  --grid-line: rgba(30, 50, 90, 0.05);
+  --grid-line-2: rgba(30, 50, 90, 0.04);
+  --scrim: rgba(28, 40, 60, 0.42);
+  --on-accent: #ffffff;
+  --sim-shadow: rgba(30, 50, 90, 0.07);
+  --drawer-shadow: rgba(30, 50, 90, 0.22);
+  --formula-text: #0a3d38;
+  color-scheme: light;
 }
 [data-theme="light"] body { background: var(--bg); }
-[data-theme="light"] .aurora::before { opacity: 0.28; } [data-theme="light"] .aurora::after { opacity: 0.24; } [data-theme="light"] .aurora i { opacity: 0.18; }
-[data-theme="light"] .topbar { background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.72)); }
+[data-theme="light"] .aurora::before { opacity: 0.22; } [data-theme="light"] .aurora::after { opacity: 0.18; } [data-theme="light"] .aurora i { opacity: 0.14; }
+[data-theme="light"] .topbar { background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.78)); }
 [data-theme="light"] .brand-logo { box-shadow: 0 0 18px rgba(8, 169, 154, 0.3); }
-[data-theme="light"] .formula-box { color: #08453e; }
-[data-theme="light"] .sim-canvas { box-shadow: inset 0 0 30px rgba(30, 50, 90, 0.06); }
+[data-theme="light"] .brand-logo svg { stroke: #ffffff; }
+[data-theme="light"] .brand-logo svg circle { fill: #ffffff; }
+[data-theme="light"] .sim-canvas { box-shadow: inset 0 0 30px var(--sim-shadow); }
 [data-theme="light"] .hero-title { background: linear-gradient(100deg, #16202e 6%, var(--accent) 46%, var(--accent-2) 80%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+/* 深色主題靠發光描邊分層，白底上發光反而變成髒污的暈影，一律關掉。 */
+[data-theme="light"] .dot,
+[data-theme="light"] .progress-fill,
+[data-theme="light"] .chart-title::before,
+[data-theme="light"] .card-title .accent-bar,
+[data-theme="light"] .points li::before,
+[data-theme="light"] .hero-badge .dot,
+[data-theme="light"] .license-section li::before { box-shadow: none; }
+[data-theme="light"] .sim-live::before { box-shadow: none; }
+/* 玻璃面板在白底上會糊掉，改用實心底＋清楚的邊界。 */
+[data-theme="light"] .card,
+[data-theme="light"] .mcard,
+[data-theme="light"] .sr-item,
+[data-theme="light"] .nav-btn { background: var(--panel-solid); border-color: var(--border); }
+[data-theme="light"] .card { box-shadow: 0 1px 2px rgba(30, 50, 90, 0.06), 0 8px 24px -18px rgba(30, 50, 90, 0.4); }
+[data-theme="light"] .pill { background: var(--panel-solid); }
+[data-theme="light"] .sim-stage { box-shadow: inset 0 1px 0 var(--edge-hi), 0 2px 10px -6px rgba(30, 50, 90, 0.35); }
+[data-theme="light"] .sim-canvas { border-color: var(--border); }
+[data-theme="light"] .sim-visual-panel,
+[data-theme="light"] .sim-control-deck,
+[data-theme="light"] .sim-readout-panel { background: var(--panel-solid); border-color: var(--border); }
+[data-theme="light"] .readout,
+[data-theme="light"] .sim-chart { background: var(--panel-solid); border-color: var(--border); box-shadow: none; }
+[data-theme="light"] .formula-box { border-color: var(--border); }
+/* range 滑桿在白底上的軌道要有實體感，否則像沒有東西可以拖。 */
+[data-theme="light"] input[type=range] { background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 55%, var(--panel-3)), var(--panel-3)); }
+[data-theme="light"] input[type=range]::-webkit-slider-thumb { border-color: #ffffff; box-shadow: 0 1px 4px rgba(30, 50, 90, 0.35); }
+[data-theme="light"] input[type=range]::-moz-range-thumb { border-color: #ffffff; }
+[data-theme="light"] .checkpoint-backdrop { backdrop-filter: blur(3px); }
+[data-theme="light"] .scrim { background: var(--scrim); }
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: #c2cddd; }
 
 /* --------------------------------- 響應式 --------------------------------- */
 @media (max-width: 960px) {
@@ -861,7 +1170,7 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   .today-card { grid-column: 1 / -1; }
   .sidebar {
     position: fixed; left: 0; top: 65px; bottom: 0; z-index: 35; width: 300px;
-    transform: translateX(-100%); transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1); box-shadow: 8px 0 30px rgba(0, 0, 0, 0.5); max-height: none;
+    transform: translateX(-100%); transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1); box-shadow: 8px 0 30px var(--drawer-shadow); max-height: none;
   }
   .sidebar.open { transform: translateX(0); }
   .menu-toggle { display: inline-block; }
@@ -940,9 +1249,29 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 
 /* --------------------------------- 列印 --------------------------------- */
 @media print {
-  .topbar, .sidebar, .scrim, .chapter-checkpoint, .exp-nav, .sim-command-bar, .sim-procedure, .sim-controls, .btn-row, .disclaimer, #home-view, .aurora, .menu-toggle { display: none !important; }
+  /* 之前只改了 body 的顏色，但所有子元素都吃 var(--text) 等深色主題變數，
+     列印出來會是白紙上的淺灰字。這裡直接把整組變數換成適合紙張的值。 */
+  :root, :root[data-theme="light"] {
+    --bg: #fff; --bg-2: #fff; --panel: #fff; --panel-solid: #fff; --panel-2: #fff; --panel-3: #eee;
+    --border: #bbb; --border-soft: #ddd;
+    --text: #000; --text-dim: #333; --text-faint: #555;
+    --accent: #036; --accent-2: #036; --accent-3: #036;
+    --warn: #7a4b00; --danger: #a00; --ok: #060;
+    --sim-bg-1: #fff; --sim-bg-2: #fff;
+    --tint-1: transparent; --tint-2: transparent; --tint-3: #f4f4f4;
+    --edge-hi: transparent; --hover: transparent;
+    --shadow: none; --on-accent: #fff;
+    --m-ink: #036; --checkpoint-ink: #036;
+  }
+  .topbar, .sidebar, .scrim, .chapter-checkpoint, .exp-nav, .sim-command-bar, .sim-procedure, .sim-controls,
+  .btn-row, .disclaimer, #home-view, .aurora, .menu-toggle, .access-gate, .sim-command-tools, .learning-reflection-actions { display: none !important; }
   .content-grid { grid-template-columns: 1fr; }
   body { background: #fff; color: #000; }
   .card { border: 1px solid #ccc; break-inside: avoid; box-shadow: none; }
+  .card, .mcard, .sim-stage, .practice-item, .readout { background: #fff !important; box-shadow: none !important; }
   .main { padding: 0; }
+  .sim-canvas { break-inside: avoid; }
+  .practice-item, .learning-output-step { break-inside: avoid; }
+  a[href]::after { content: " (" attr(href) ")"; font-size: 10px; color: #555; }
+  a[href^="#"]::after { content: ""; }
 }

@@ -5,8 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>物理實驗室｜台灣中學互動物理</title>
   <meta name="description" content="從台灣國中自然到高中 108 課綱的互動物理實驗室：12 個學習模組，實驗與題型持續擴充，全部附即時 Canvas 模擬、實驗流程、即時讀數與圖表。" />
-  <meta name="theme-color" content="#080b11" />
+  <meta name="theme-color" content="#080b11" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
   <meta name="color-scheme" content="dark light" />
+  <!-- 在樣式表載入前先決定主題：避免淺色使用者每次進站都閃一下深色底。 -->
+  <script>
+    (function () {
+      try {
+        var saved = JSON.parse(localStorage.getItem("pl-theme"));
+        if (saved !== "light" && saved !== "dark") {
+          saved = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        }
+        document.documentElement.setAttribute("data-theme", saved);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+    })();
+  </script>
 
   <!-- SEO / 社群分享（部署後請改成你的實際網址） -->
   <link rel="canonical" href="https://yu-0312.github.io/senior-science/" />
@@ -24,7 +39,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="物理實驗室" />
 
-  <link rel="stylesheet" href="css/style.css?v=20260725-7" />
+  <link rel="stylesheet" href="css/style.css?v=20260725-9" />
 
   <!-- MathJax（LaTeX 公式排版） -->
   <script>
@@ -280,32 +295,37 @@
   </section>
 
   <!-- 核心 -->
-  <script src="js/curriculum.js?v=20260725-4"></script>
-  <script src="js/advanced-curriculum.js?v=20260725-1"></script>
-  <script src="js/comprehensive-curriculum.js?v=20260724-4"></script>
-  <script src="js/extension-registry.js?v=20260725-1"></script>
-  <script src="js/open-curriculum.js?v=20260725-3"></script>
-  <script src="js/sim-core.js?v=20260725-1"></script>
+  <script src="js/curriculum.js?v=20260725-9"></script>
+  <script src="js/advanced-curriculum.js?v=20260725-9"></script>
+  <script src="js/comprehensive-curriculum.js?v=20260725-9"></script>
+  <script src="js/extension-registry.js?v=20260725-9"></script>
+  <script src="js/open-curriculum.js?v=20260725-9"></script>
+  <script src="js/school-curriculum.js?v=20260725-9"></script>
+  <script src="js/question-bank.js?v=20260725-9"></script>
+  <script src="js/sim-core.js?v=20260725-9"></script>
+  <script src="js/sim-tools.js?v=20260725-9"></script>
+  <script src="js/sim-insight.js?v=20260725-9"></script>
 
   <!-- 互動模擬（依模組拆檔） -->
-  <script src="js/experiments/kinematics.js"></script>
-  <script src="js/experiments/newton.js?v=20260725-2"></script>
-  <script src="js/experiments/momentum.js"></script>
-  <script src="js/experiments/energy.js"></script>
-  <script src="js/experiments/gravity.js"></script>
-  <script src="js/experiments/shm.js"></script>
-  <script src="js/experiments/thermal.js?v=20260725-1"></script>
-  <script src="js/experiments/waves.js"></script>
-  <script src="js/experiments/optics.js?v=20260725-1"></script>
-  <script src="js/experiments/electric.js?v=20260725-1"></script>
-  <script src="js/experiments/magnetism.js"></script>
-  <script src="js/experiments/modern.js?v=20260725-1"></script>
-  <script src="js/experiments/extended.js?v=20260725-3"></script>
-  <script src="js/experiments/advanced.js?v=20260725-1"></script>
-  <script src="js/experiments/comprehensive.js?v=20260724-4"></script>
-  <script src="js/experiments/open-labs.js?v=20260725-2"></script>
+  <script src="js/experiments/kinematics.js?v=20260725-9"></script>
+  <script src="js/experiments/newton.js?v=20260725-9"></script>
+  <script src="js/experiments/momentum.js?v=20260725-9"></script>
+  <script src="js/experiments/energy.js?v=20260725-9"></script>
+  <script src="js/experiments/gravity.js?v=20260725-9"></script>
+  <script src="js/experiments/shm.js?v=20260725-9"></script>
+  <script src="js/experiments/thermal.js?v=20260725-9"></script>
+  <script src="js/experiments/waves.js?v=20260725-9"></script>
+  <script src="js/experiments/optics.js?v=20260725-9"></script>
+  <script src="js/experiments/electric.js?v=20260725-9"></script>
+  <script src="js/experiments/magnetism.js?v=20260725-9"></script>
+  <script src="js/experiments/modern.js?v=20260725-9"></script>
+  <script src="js/experiments/extended.js?v=20260725-9"></script>
+  <script src="js/experiments/advanced.js?v=20260725-9"></script>
+  <script src="js/experiments/comprehensive.js?v=20260725-9"></script>
+  <script src="js/experiments/open-labs.js?v=20260725-9"></script>
+  <script src="js/experiments/school-labs.js?v=20260725-9"></script>
 
   <!-- 應用外殼 -->
-  <script src="js/app.js?v=20260725-8"></script>
+  <script src="js/app.js?v=20260725-9"></script>
 </body>
 </html>

@@ -46,7 +46,7 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       // B 進入頁面（叉叉背景）
-      ctx.save(); ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 1;
+      ctx.save(); ctx.strokeStyle = PL.theme.pale(0.1); ctx.lineWidth = 1;
       for (let x = 30; x < W - 20; x += 40) for (let y = 30; y < H - 20; y += 40) { ctx.beginPath(); ctx.moveTo(x - 3, y - 3); ctx.lineTo(x + 3, y + 3); ctx.moveTo(x - 3, y + 3); ctx.lineTo(x + 3, y - 3); ctx.stroke(); } ctx.restore();
       D.text(ctx, "B 進入頁面 ⊗", W - 24, 22, { color: PL.col("text-faint"), size: 11, align: "right" });
       const pos = sQ.get() === "pos", sgn = pos ? 1 : -1;

@@ -169,7 +169,7 @@
       ["調整參數", "觀察量測值", "比對關係圖"].forEach((label, index) => { const y = tableY + 30 + index * rowH; D.text(ctx, String(index + 1), tableX + 20, y, { color: c, size: 12, align: "center", weight: "700" }); D.text(ctx, label, tableX + 44, y, { color: PL.col("text"), size: 11 }); if (index < 2) D.line(ctx, tableX + 12, y + 17, tableX + tableW - 12, y + 17, "rgba(255,255,255,0.1)", 1); });
       fillPill(ctx, 18, 18, "資料量測", PL.fmt(value, 2), 118, c);
     }
-    D.text(ctx, "互動模型：調整左側參數，讀取右側資料與曲線", W / 2, H - 25, { color: PL.col("text-faint"), size: 9.5, align: "center" });
+      PL.ui.caption(cv, "互動模型：調整左側參數，讀取右側資料與曲線");
   }
 
   Object.keys(T).forEach(id => {

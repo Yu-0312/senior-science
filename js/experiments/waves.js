@@ -78,7 +78,7 @@
       const n = sN.get(), x0 = 40, x1 = W - 40, Ls = x1 - x0, midY = H / 2, A = H * 0.3;
       const k = n * Math.PI / Ls, w = 4;
       // 包絡
-      ctx.save(); ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+      ctx.save(); ctx.strokeStyle = PL.theme.pale(0.12); ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
       ctx.beginPath(); for (let x = x0; x <= x1; x += 2) ctx.lineTo(x, midY - A * Math.abs(Math.sin(k * (x - x0)))); ctx.stroke();
       ctx.beginPath(); for (let x = x0; x <= x1; x += 2) ctx.lineTo(x, midY + A * Math.abs(Math.sin(k * (x - x0)))); ctx.stroke(); ctx.restore();
       ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 2.6; ctx.beginPath();
@@ -146,7 +146,7 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const f1 = sF1.get(), f2 = sF2.get(), midY = H / 2, A = H * 0.3, x0 = 30, span = W - 60;
       // 包絡
-      ctx.save(); ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+      ctx.save(); ctx.strokeStyle = PL.theme.pale(0.15); ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
       ctx.beginPath(); for (let i = 0; i <= span; i += 2) { const x = x0 + i, tt = i / span * 2 + t; const env = 2 * A * Math.abs(Math.cos(Math.PI * (f1 - f2) * tt)); ctx.lineTo(x, midY - env); } ctx.stroke();
       ctx.beginPath(); for (let i = 0; i <= span; i += 2) { const x = x0 + i, tt = i / span * 2 + t; const env = 2 * A * Math.abs(Math.cos(Math.PI * (f1 - f2) * tt)); ctx.lineTo(x, midY + env); } ctx.stroke(); ctx.restore();
       ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 2; ctx.beginPath();
@@ -180,7 +180,7 @@
         if (closed) return Math.sin((2 * n - 1) * Math.PI / 2 * u);
         return Math.sin(n * Math.PI * u);
       };
-      [1, -1].forEach(sgn => { ctx.save(); ctx.strokeStyle = "rgba(255,255,255,0.14)"; ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.beginPath(); for (let x = x0; x <= x1; x += 2) ctx.lineTo(x, midY + sgn * A * Math.abs(shape(x))); ctx.stroke(); ctx.restore(); });
+      [1, -1].forEach(sgn => { ctx.save(); ctx.strokeStyle = PL.theme.pale(0.14); ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.beginPath(); for (let x = x0; x <= x1; x += 2) ctx.lineTo(x, midY + sgn * A * Math.abs(shape(x))); ctx.stroke(); ctx.restore(); });
       ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 2.6; ctx.beginPath();
       for (let x = x0; x <= x1; x += 2) { const y = midY - A * shape(x) * Math.cos(4 * t); x === x0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
       const lam = closed ? 4 * Lm / (2 * n - 1) : 2 * Lm / n;

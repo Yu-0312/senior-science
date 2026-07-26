@@ -103,7 +103,7 @@
       label(ctx, 20, 18, "力平衡", config.kind === "fall" ? "mg = Fᵈ" : "量測模型", 112, c);
     } else if (["regression", "design"].includes(config.kind)) {
       const x0 = 64, y0 = H - 58, w = W - 112, h = H - 112;
-      D.rect(ctx, x0, 30, w, h, { fill: "rgba(8,13,20,0.56)", stroke: "rgba(255,255,255,0.16)", r: 6 });
+      D.rect(ctx, x0, 30, w, h, { fill: PL.theme.shade(0.56), stroke: "rgba(255,255,255,0.16)", r: 6 });
       D.grid(ctx, x0, 30, w, h, Math.max(24, Math.round(w / 8)), "rgba(255,255,255,0.07)");
       D.line(ctx, x0, y0, x0 + w, y0, PL.col("text-faint"), 1); D.line(ctx, x0, 30, x0, y0, PL.col("text-faint"), 1);
       for (let i = 0; i < 10; i++) { const x = x0 + 25 + i * (w - 50) / 9, ideal = y0 - (i / 9) * (h - 30) * 0.8; const n = Math.sin(i * 7.3) * a * 8; D.disc(ctx, x, ideal - n, 4, { fill: PL.col("accent-2"), glow: PL.col("accent-2"), glowSize: 5 }); }
@@ -217,7 +217,7 @@
       } else if (config.kind === "transit") {
         const starX = W * 0.56, starY = cy, r = Math.min(H, W) * 0.22, px = starX - r * 1.5 + ((time * 35) % (r * 3)); D.disc(ctx, starX, starY, r, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 22 }); D.disc(ctx, px, starY, Math.max(5, a * r), { fill: PL.col("panel-solid"), stroke: c, width: 1.5 }); D.text(ctx, "亮度下降 " + PL.fmt(out, 2) + "%", starX, starY + r + 28, { color: c, size: 11, align: "center" });
       } else if (config.kind === "hr") {
-        const x0 = 52, y0 = H - 55, w = W - 96, h = H - 104; D.rect(ctx, x0, 32, w, h, { fill: "rgba(8,13,20,0.5)", stroke: "rgba(255,255,255,0.16)", r: 6 }); D.grid(ctx, x0, 32, w, h, Math.max(24, w / 7), "rgba(255,255,255,0.07)"); ctx.save(); ctx.strokeStyle = "rgba(255,204,102,0.72)"; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x0 + w * 0.16, 50); ctx.lineTo(x0 + w * 0.78, y0 - 12); ctx.stroke(); ctx.restore(); const px = x0 + w * (1 - (a - 2500) / 27500), py = y0 - Math.min(h - 10, Math.log10(Math.max(1, out)) / 6 * h); D.disc(ctx, px, py, 7, { fill: c, glow: c, glowSize: 10 });
+        const x0 = 52, y0 = H - 55, w = W - 96, h = H - 104; D.rect(ctx, x0, 32, w, h, { fill: PL.theme.shade(0.5), stroke: "rgba(255,255,255,0.16)", r: 6 }); D.grid(ctx, x0, 32, w, h, Math.max(24, w / 7), "rgba(255,255,255,0.07)"); ctx.save(); ctx.strokeStyle = "rgba(255,204,102,0.72)"; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x0 + w * 0.16, 50); ctx.lineTo(x0 + w * 0.78, y0 - 12); ctx.stroke(); ctx.restore(); const px = x0 + w * (1 - (a - 2500) / 27500), py = y0 - Math.min(h - 10, Math.log10(Math.max(1, out)) / 6 * h); D.disc(ctx, px, py, 7, { fill: c, glow: c, glowSize: 10 });
       } else {
         const steps = ["視差", "造父", "Ia 超新星", "哈伯定律"]; steps.forEach((s, i) => { const x = 42 + i * (W - 84) / 3; D.disc(ctx, x, cy, 22, { fill: i < 3 ? "rgba(90,162,255,0.18)" : "rgba(255,204,102,0.18)", stroke: i < 3 ? c : PL.col("warn"), width: 2 }); D.text(ctx, String(i + 1), x, cy + 5, { color: c, size: 13, align: "center", weight: "700" }); D.text(ctx, s, x, cy + 48, { color: PL.col("text-dim"), size: 10, align: "center" }); if (i < 3) D.arrow(ctx, x + 25, cy, x + (W - 84) / 3 - 25, cy, { color: "rgba(255,255,255,0.35)", width: 1.5 }); });
       }

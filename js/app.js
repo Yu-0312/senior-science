@@ -164,13 +164,33 @@
   const ACCESS_HASH = "faf16b5c720233e537cc50efe380a2170b2a2fd339ae6f9f3f74465cef67e8cd";
 
   /* ------------------------------- 主題 ------------------------------- */
+  // 第一次造訪時沿用系統偏好，之後才以使用者的選擇為準。
+  function preferredTheme() {
+    const saved = store.get("pl-theme", null);
+    if (saved === "light" || saved === "dark") return saved;
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  }
+
   function applyTheme(t) {
-    document.documentElement.setAttribute("data-theme", t);
-    store.set("pl-theme", t);
+    const theme = t === "light" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", theme);
+    store.set("pl-theme", theme);
     const btn = $("#theme-toggle");
-    if (btn) btn.innerHTML = t === "light" ? moonIcon + "<span>深色</span>" : sunIcon + "<span>淺色</span>";
+    if (btn) {
+      btn.innerHTML = theme === "light" ? moonIcon + "<span>深色</span>" : sunIcon + "<span>淺色</span>";
+      btn.setAttribute("aria-pressed", String(theme === "light"));
+      btn.title = theme === "light" ? "切換為深色主題" : "切換為淺色主題";
+    }
+    // 行動裝置的網址列顏色也要跟著換，否則淺色頁面上方會頂著一條深色。
+    document.querySelectorAll('meta[name="theme-color"]').forEach(meta => meta.remove());
+    const meta = document.createElement("meta");
+    meta.name = "theme-color";
+    meta.content = theme === "light" ? "#eef2f8" : "#080b11";
+    document.head.appendChild(meta);
     // 主題切換後重繪目前模擬
-    if (currentSim && currentSim.rerender) currentSim.rerender();
+    if (currentSim && currentSim.rerender) {
+      try { currentSim.rerender(); } catch (e) { console.warn("主題切換重繪失敗", e); }
+    }
   }
   const sunIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
   const moonIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>';
@@ -432,21 +452,36 @@
     return { options, correct };
   }
 
+  /*
+   * 誘答選項的來源
+   * 樣板題原本的誘答是「只需背下名詞」這類明顯錯誤的敘述，用刪去法就能全對。
+   * 改成從「同模組其他實驗的學習重點」取材：每個選項都是真的物理敘述，
+   * 只是描述的不是這一個實驗，學生必須真的分辨概念才選得出來。
+   */
+  function neighbourDistractors(f, count) {
+    const siblings = f.mod.experiments.filter(e => e.id !== f.exp.id && Array.isArray(e.points) && e.points.length);
+    const picked = [];
+    // 以 order 當起點等距取樣，讓同一個實驗每次進來的誘答固定，方便師生討論。
+    for (let i = 0; i < siblings.length && picked.length < count; i += 1) {
+      const item = siblings[(f.order * 3 + i * 5) % siblings.length];
+      const text = compactText(item.points[(f.order + i) % item.points.length], item.title, 72);
+      if (text && !picked.includes(text)) picked.push(text);
+    }
+    while (picked.length < count) picked.push("這個現象與實驗中量測的物理量沒有直接關係。");
+    return picked;
+  }
+
   function buildPracticeQuestions(f) {
     const { exp, mod } = f;
+    // 有逐題撰寫的題目就優先使用；其餘實驗仍由樣板生成。
+    const authored = window.PhysicsLabQuestionBank && window.PhysicsLabQuestionBank[exp.id];
+    if (Array.isArray(authored) && authored.length) return authored;
+
     const points = Array.isArray(exp.points) && exp.points.length ? exp.points : [exp.concept || exp.title];
     const core = compactText(points[0], exp.title, 72);
     const support = compactText(points[1] || exp.concept, exp.title, 72);
     const bridge = TEXTBOOK_BRIDGES[mod.id] || {};
-    const conceptChoices = makeChoices(
-      core,
-      [
-        "只需背下名詞，不必對照讀數或圖形。",
-        "每次同時改變所有參數，才能最快得出結論。",
-        "只要更換單位，物理關係本身就會改變。"
-      ],
-      f.order
-    );
+    const conceptChoices = makeChoices(core, neighbourDistractors(f, 3), f.order);
     const formulaChoices = makeChoices(
       "先列出已知量與目標量，確認單位後再依關係式推論。",
       [
@@ -476,8 +511,9 @@
       },
       {
         type: "單選題 · 解題步驟",
-        prompt: "面對下列公式時，下列哪個解題流程最合理？",
+        prompt: "下列哪個解題流程最合理？",
         formula: exp.formula,
+        formulaBeforePrompt: "面對下列公式：",
         options: formulaChoices.options,
         correct: formulaChoices.correct,
         hint: "先圈出公式中的每個符號，確認單位一致，再決定要代入、比例比較，還是看圖讀值。",
@@ -494,13 +530,133 @@
     ];
   }
 
+  /*
+   * 隨機化計算題
+   * 每個學生、每一天拿到的數值都不同，必須真的算出一個數字並輸入。
+   * 種子由「實驗 id + 使用者裝置代號 + 日期」決定：同一天重新整理是同一題
+   * （不會因為想換簡單的題目就一直重整），隔天或換人才會換題。
+   */
+  function deviceSeed() {
+    let seed = store.get("pl-seed", null);
+    if (typeof seed !== "number") {
+      seed = Math.floor(Math.random() * 2147483647);
+      store.set("pl-seed", seed);
+    }
+    return seed;
+  }
+
+  function questionSeed(expId) {
+    const base = deviceSeed() + todayKey().replace(/-/g, "");
+    let hash = 2166136261;
+    const text = expId + "|" + base;
+    for (let i = 0; i < text.length; i += 1) {
+      hash ^= text.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+
+  function renderNumericQuestion(root, f, index) {
+    if (typeof window.PhysicsLabBuildNumericQuestion !== "function") return false;
+    const q = window.PhysicsLabBuildNumericQuestion(f.exp.id, questionSeed(f.exp.id));
+    if (!q) return false;
+
+    const id = f.exp.id + "-num";
+    const done = getPracticeDone();
+    const solved = done.has(id);
+
+    const item = el("article", "practice-item practice-numeric", root);
+    const head = el("div", "practice-head", item);
+    const type = el("span", "practice-type", head);
+    type.textContent = "Q" + (index + 1) + " · " + q.type;
+    const status = el("span", "practice-status", head);
+    status.textContent = solved ? "答對" : "待作答";
+
+    const prompt = el("p", "practice-question", item);
+    prompt.textContent = q.prompt;
+
+    const row = el("div", "numeric-row", item);
+    const input = el("input", "numeric-input", row);
+    input.type = "text";
+    input.inputMode = "decimal";
+    input.autocomplete = "off";
+    input.placeholder = "輸入你算出的數值";
+    input.setAttribute("aria-label", "作答欄位");
+    if (q.unit) { const unit = el("span", "numeric-unit", row); unit.textContent = q.unit; }
+    const submit = el("button", "numeric-submit", row);
+    submit.type = "button"; submit.textContent = "檢查答案";
+
+    const feedback = el("p", "practice-feedback" + (solved ? " is-correct" : ""), item);
+    feedback.hidden = !solved;
+    if (solved) feedback.textContent = "答對了。正確答案 " + PL.fmt(q.answer, 3) + (q.unit ? " " + q.unit : "");
+
+    const actions = el("div", "practice-actions", item);
+    const hintBtn = el("button", "practice-btn", actions);
+    hintBtn.type = "button"; hintBtn.textContent = "看提示"; hintBtn.setAttribute("aria-expanded", "false");
+    const stepBtn = el("button", "practice-btn", actions);
+    stepBtn.type = "button"; stepBtn.textContent = "看逐步解法"; stepBtn.setAttribute("aria-expanded", "false");
+    const newBtn = el("button", "practice-btn", actions);
+    newBtn.type = "button"; newBtn.textContent = "換一題";
+
+    const hint = el("div", "practice-detail", item); hint.hidden = true; hint.textContent = q.hint || "";
+    const steps = el("ol", "practice-detail numeric-steps", item); steps.hidden = true;
+    (q.steps || []).forEach(line => { const li = el("li", null, steps); li.textContent = line; });
+
+    const toggle = (btn, panel) => btn.addEventListener("click", () => {
+      panel.hidden = !panel.hidden;
+      btn.setAttribute("aria-expanded", String(!panel.hidden));
+    });
+    toggle(hintBtn, hint);
+    toggle(stepBtn, steps);
+
+    newBtn.addEventListener("click", () => {
+      // 換一題＝換種子；已作答狀態一併清掉
+      store.set("pl-seed", Math.floor(Math.random() * 2147483647));
+      setPracticeDone(id, false);
+      renderPractice(f);
+    });
+
+    function grade() {
+      const raw = input.value.trim().replace(/[，,\s]/g, "");
+      const value = Number(raw);
+      feedback.hidden = false;
+      if (!raw || !isFinite(value)) {
+        feedback.classList.remove("is-correct");
+        feedback.textContent = "請先輸入一個數值。";
+        return;
+      }
+      // 用相對容差，避免學生因為四捨五入位數不同被判錯
+      const tol = q.tolerance || 0.03;
+      const ok = Math.abs(value - q.answer) <= Math.abs(q.answer) * tol + 1e-9;
+      feedback.classList.toggle("is-correct", ok);
+      if (ok) {
+        feedback.textContent = "答對了。正確答案 " + PL.fmt(q.answer, 3) + (q.unit ? " " + q.unit : "") +
+          "（容差 ±" + (tol * 100).toFixed(0) + "%）";
+        status.textContent = "答對";
+        setPracticeDone(id, true);
+        steps.hidden = false;
+        stepBtn.setAttribute("aria-expanded", "true");
+      } else {
+        const off = ((value - q.answer) / q.answer) * 100;
+        feedback.textContent = "還不對。你的答案比正確值" + (off > 0 ? "大" : "小") +
+          " " + Math.abs(off).toFixed(0) + "%，先檢查單位換算與公式的移項方向。";
+        status.textContent = "再試一次";
+      }
+    }
+
+    submit.addEventListener("click", grade);
+    input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); grade(); } });
+    return true;
+  }
+
   function renderPractice(f) {
     const root = $("#practice-list");
     if (!root) return;
     const done = getPracticeDone();
     const answers = getPracticeAnswers();
     root.innerHTML = "";
-    buildPracticeQuestions(f).forEach((q, index) => {
+    const questions = buildPracticeQuestions(f);
+    questions.forEach((q, index) => {
       const id = f.exp.id + "-q" + index;
       const item = el("article", "practice-item", root);
       const head = el("div", "practice-head", item);
@@ -510,12 +666,17 @@
       const selectedAnswer = savedAnswer === q.correct ? savedAnswer : (solved ? q.correct : null);
       const status = el("span", "practice-status", head); status.textContent = solved ? "答對" : "待作答";
       const prompt = el("p", "practice-question", item);
-      if (q.formula) {
-        prompt.append(document.createTextNode("面對下列公式："));
-        const formula = el("span", "practice-formula", prompt); formula.innerHTML = q.formula;
-        prompt.append(document.createTextNode("下列哪個解題流程最合理？"));
+      const appendFormula = () => {
+        const formula = el("span", "practice-formula", prompt);
+        formula.innerHTML = q.formula;
+      };
+      if (q.formula && q.formulaBeforePrompt) {
+        prompt.append(document.createTextNode(q.formulaBeforePrompt));
+        appendFormula();
+        prompt.append(document.createTextNode(q.prompt));
       } else {
-        prompt.textContent = q.prompt;
+        prompt.append(document.createTextNode(q.prompt));
+        if (q.formula) appendFormula();
       }
       const choices = el("div", "practice-options", item);
       choices.setAttribute("role", "radiogroup");
@@ -581,6 +742,8 @@
         setPracticeDone(id, true);
       }));
     });
+    // 有隨機計算題的實驗，把它接在選擇題後面當作最後一題
+    renderNumericQuestion(root, f, questions.length);
     typeset(root);
   }
 
@@ -624,32 +787,51 @@
 
   function importLearningSave(file) {
     if (!file) return;
+    // 8 MB 以上不可能是這個網站的存檔，先擋掉避免瀏覽器卡死。
+    if (file.size > 8 * 1024 * 1024) { showSaveStatus("檔案過大，請確認是本站存檔", "warn"); return; }
     const reader = new FileReader();
+    reader.onerror = () => showSaveStatus("讀取檔案失敗", "warn");
     reader.onload = () => {
+      let entries;
       try {
         const save = JSON.parse(String(reader.result || ""));
         if (!save || save.app !== "senior-science" || !save.data || typeof save.data !== "object") {
           showSaveStatus("存檔格式不正確", "warn");
           return;
         }
-        const oldKeys = [];
-        for (let i = 0; i < localStorage.length; i += 1) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith("pl-")) oldKeys.push(key);
-        }
-        oldKeys.forEach(key => localStorage.removeItem(key));
-        Object.entries(save.data).forEach(([key, value]) => {
-          if (key.startsWith("pl-") && typeof value === "string") localStorage.setItem(key, value);
-        });
-        viewed = new Set(store.get("pl-progress", []));
-        applyTheme(store.get("pl-theme", "dark"));
-        refreshViewedMarks();
-        renderStudyCenter();
-        route();
-        showSaveStatus("已匯入學習存檔", "ok");
+        // 先把資料驗完、整理好，再動現有進度。
+        // 原本是「先清空全部 pl- 鍵，再寫入」，中途若失敗就等於把使用者的進度洗掉了。
+        entries = Object.entries(save.data).filter(([key, value]) => key.startsWith("pl-") && typeof value === "string");
+        if (!entries.length) { showSaveStatus("存檔內沒有可用的學習資料", "warn"); return; }
       } catch (e) {
-        showSaveStatus("讀取存檔失敗", "warn");
+        showSaveStatus("存檔不是有效的 JSON", "warn");
+        return;
       }
+
+      // 保留一份現況，寫入失敗就回復。
+      const backup = {};
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("pl-")) backup[key] = localStorage.getItem(key);
+      }
+      try {
+        Object.keys(backup).forEach(key => localStorage.removeItem(key));
+        entries.forEach(([key, value]) => localStorage.setItem(key, value));
+      } catch (e) {
+        Object.keys(backup).forEach(key => localStorage.removeItem(key));
+        Object.entries(backup).forEach(([key, value]) => localStorage.setItem(key, value));
+        showSaveStatus("寫入失敗，已回復原本進度", "warn");
+        return;
+      }
+
+      viewed = new Set(store.get("pl-progress", []));
+      applyTheme(preferredTheme());
+      // 側邊目錄的完成標記與展開狀態也要一起重畫，否則畫面與存檔不一致。
+      refreshViewedMarks();
+      renderStudyCenter();
+      syncPlanControls(store.get(STUDY_PLAN_KEY, null));
+      route();
+      showSaveStatus("已匯入 " + entries.length + " 筆學習資料", "ok");
     };
     reader.readAsText(file);
   }
@@ -667,9 +849,24 @@
     return Math.max(10, Math.min(180, Number.isFinite(raw) ? Math.round(raw) : 35));
   }
 
+  /*
+   * 把實驗切成每日任務
+   * 原本用 index % days 輪流發牌，第 1 天會拿到第 1、第 1+days、第 1+2days… 個實驗，
+   * 等於每天都在不同章節之間跳來跳去，完全違反課程的先後順序。
+   * 改成依課程順序切成連續區塊：同一天的實驗彼此相關，也維持章節的學習脈絡。
+   */
   function distributePlan(ids, days) {
+    const total = ids.length;
     const schedule = Array.from({ length: days }, (_, i) => ({ day: i + 1, ids: [] }));
-    ids.forEach((id, index) => schedule[index % days].ids.push(id));
+    if (!total) return schedule;
+    const base = Math.floor(total / days);
+    const extra = total % days;   // 前 extra 天各多分一個，避免最後一天暴增
+    let cursor = 0;
+    for (let day = 0; day < days; day += 1) {
+      const size = base + (day < extra ? 1 : 0);
+      schedule[day].ids = ids.slice(cursor, cursor + size);
+      cursor += size;
+    }
     return schedule;
   }
 
@@ -747,20 +944,64 @@
     }
   }
 
+  /*
+   * 複習優先清單
+   * 原本只是「完成比例最低的三個模組」，那其實是「還沒讀」而不是「需要複習」。
+   * 改成綜合三個訊號排序，並直接告訴使用者為什麼這個模組排在前面：
+   *   1. 章節檢核答錯或略過（最強訊號：已經讀過但概念沒抓穩）
+   *   2. 練習題答錯過
+   *   3. 還沒讀完的比例
+   */
+  function reviewPriority(mod) {
+    const done = mod.experiments.filter(exp => viewed.has(exp.id)).length;
+    const total = mod.experiments.length || 1;
+    const checkpoint = store.get("pl-checkpoint-" + mod.id, null);
+    const answers = getPracticeAnswers();
+    const bank = window.PhysicsLabQuestionBank || {};
+
+    let wrong = 0;
+    mod.experiments.forEach(exp => {
+      const questions = Array.isArray(bank[exp.id]) ? bank[exp.id] : null;
+      Object.keys(answers).forEach(key => {
+        if (key.indexOf(exp.id + "-q") !== 0) return;
+        const index = Number(key.slice((exp.id + "-q").length));
+        const correct = questions && questions[index] ? questions[index].correct : null;
+        // 樣板題的正解索引會隨 order 變動，這裡只用有題庫的實驗來計算答錯數。
+        if (correct != null && Number(answers[key]) !== correct) wrong += 1;
+      });
+    });
+
+    let score = (1 - done / total) * 40;                       // 未讀比例：最多 40 分
+    let reason = "尚未讀完";
+    if (checkpoint && checkpoint.skipped) { score += 45; reason = "章節檢核略過"; }
+    else if (checkpoint && checkpoint.score != null && checkpoint.total) {
+      const rate = checkpoint.score / checkpoint.total;
+      if (rate < 1) { score += (1 - rate) * 60; reason = "檢核 " + checkpoint.score + "/" + checkpoint.total; }
+    }
+    if (wrong > 0) { score += Math.min(30, wrong * 12); reason = "練習答錯 " + wrong + " 題"; }
+    return { mod, done, total, score, reason, pct: done / total };
+  }
+
   function renderReviewFocus() {
     const root = $("#review-focus-list");
     if (!root) return;
     root.innerHTML = "";
-    const modules = C.modules.map(mod => {
-      const done = mod.experiments.filter(exp => viewed.has(exp.id)).length;
-      const total = mod.experiments.length || 1;
-      return { mod, done, total, pct: done / total };
-    }).sort((a, b) => a.pct - b.pct || a.mod.no - b.mod.no).slice(0, 3);
+    const modules = C.modules.map(reviewPriority)
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score || a.mod.no - b.mod.no)
+      .slice(0, 3);
+    if (!modules.length) {
+      const row = el("div", "review-focus-item", root);
+      const name = el("span", "review-focus-name", row);
+      name.textContent = "目前沒有需要優先複習的模組，繼續往下一章前進吧。";
+      return;
+    }
     modules.forEach(item => {
       const row = el("button", "review-focus-item", root);
       row.type = "button";
       row.style.setProperty("--m-color", item.mod.color);
-      const name = el("span", "review-focus-name", row); name.textContent = "模組 " + item.mod.no + " · " + item.mod.title;
+      const name = el("span", "review-focus-name", row);
+      name.textContent = "模組 " + item.mod.no + " · " + item.mod.title + "（" + item.reason + "）";
       const meta = el("span", "review-focus-meta", row); meta.textContent = item.done + " / " + item.total;
       const firstUnseen = item.mod.experiments.find(exp => !viewed.has(exp.id)) || item.mod.experiments[0];
       row.addEventListener("click", () => { if (firstUnseen) location.hash = "#" + firstUnseen.id; });
@@ -852,7 +1093,7 @@
     setNav($("#nav-next"), next, "下一個實驗");
 
     // 進度與側邊高亮
-    markViewed(id);
+    markVisited(id);
     highlightSidebar(id, mod.id);
     $(".main").scrollTop = 0; window.scrollTo(0, 0);
     document.title = exp.title + "｜物理實驗室";
@@ -879,10 +1120,45 @@
   }
 
   /* ------------------------------- 進度 ------------------------------- */
-  function markViewed(id) {
-    store.set("pl-last-viewed", id);
-    if (!viewed.has(id)) { viewed.add(id); store.set("pl-progress", [...viewed]); }
+  /*
+   * 之前「開啟＝已完成」，用方向鍵掃過一輪就會顯示 100%，
+   * 學習進度、今日任務與複習清單全部失去意義。
+   * 改成要真的停留或動手操作過，才算完成一個實驗。
+   */
+  const DWELL_MS = 20000;
+  let dwellTimer = 0;
+  let dwellId = null;
+
+  function cancelDwell() {
+    if (dwellTimer) { clearTimeout(dwellTimer); dwellTimer = 0; }
+    dwellId = null;
+  }
+
+  function startDwell(id) {
+    cancelDwell();
+    dwellId = id;
+    dwellTimer = setTimeout(() => { if (dwellId === id) completeExperiment(id); }, DWELL_MS);
+    // 動手調整任何參數就立刻算數，不必等滿時間。
+    const simRoot = $("#sim-root");
+    if (!simRoot) return;
+    const onInteract = () => { if (dwellId === id) completeExperiment(id); };
+    ["pointerdown", "input", "change"].forEach(type =>
+      simRoot.addEventListener(type, onInteract, { once: true, passive: true })
+    );
+  }
+
+  function completeExperiment(id) {
+    cancelDwell();
+    if (viewed.has(id)) return;
+    viewed.add(id);
+    store.set("pl-progress", [...viewed]);
     refreshViewedMarks();
+  }
+
+  function markVisited(id) {
+    store.set("pl-last-viewed", id);
+    refreshViewedMarks();
+    startDwell(id);
   }
   function refreshViewedMarks() {
     document.querySelectorAll(".exp-item").forEach(it => {
@@ -894,7 +1170,8 @@
     renderStudyCenter();
   }
   function resetProgress() {
-    viewed = new Set(); store.set("pl-progress", []); localStorage.removeItem("pl-last-viewed"); refreshViewedMarks();
+    viewed = new Set(); store.set("pl-progress", []); localStorage.removeItem("pl-last-viewed");
+    cancelDwell(); refreshViewedMarks();
   }
 
   /* ------------------------------- 搜尋 ------------------------------- */
@@ -909,14 +1186,23 @@
     );
     const list = $("#sr-list"); list.innerHTML = "";
     $("#sr-count").textContent = hits.length;
-    if (!hits.length) { list.innerHTML = '<div class="empty">找不到符合「' + q + '」的實驗。</div>'; }
+    if (!hits.length) {
+      // 搜尋字串來自使用者輸入，之前直接串進 innerHTML，等於把輸入當 HTML 執行。
+      const empty = el("div", "empty", list);
+      empty.textContent = "找不到符合「" + q + "」的實驗。";
+    }
     hits.forEach(f => {
       const item = el("div", "sr-item", list);
       item.style.setProperty("--m-color", f.mod.color);
-      item.innerHTML = '<div class="sr-mod">模組' + f.mod.no + " · " + f.mod.title + '</div>' +
-        '<div class="sr-title">' + f.exp.title + '</div>' +
-        '<div class="sr-desc">' + f.exp.concept + '</div>';
+      const mod = el("div", "sr-mod", item); mod.textContent = "模組" + f.mod.no + " · " + f.mod.title;
+      const title = el("div", "sr-title", item); title.textContent = f.exp.title;
+      const desc = el("div", "sr-desc", item); desc.textContent = f.exp.concept;
+      item.setAttribute("role", "button");
+      item.setAttribute("tabindex", "0");
       item.addEventListener("click", () => location.hash = "#" + f.exp.id);
+      item.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); location.hash = "#" + f.exp.id; }
+      });
     });
     showView("search");
   }
@@ -930,6 +1216,23 @@
 
   function closeSidebarMobile() { $("#sidebar").classList.remove("open"); $("#scrim").classList.remove("show"); }
   function toggleSidebar() { $("#sidebar").classList.toggle("open"); $("#scrim").classList.toggle("show"); }
+
+  /*
+   * 對話框的鍵盤焦點鎖定
+   * 兩個 role="dialog" aria-modal="true" 的面板原本都沒有鎖住 Tab，
+   * 鍵盤使用者按幾下就會跑到後面看不見、也點不到的內容上。
+   */
+  const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+  function trapFocus(container, event) {
+    if (event.key !== "Tab" || !container) return;
+    const items = Array.from(container.querySelectorAll(FOCUSABLE))
+      .filter(node => node.offsetParent !== null || node === document.activeElement);
+    if (!items.length) return;
+    const first = items[0], last = items[items.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  }
 
   /* ------------------------------- 章節檢核 ------------------------------- */
   function showChapterCheckpoint(mod, nextMod) {
@@ -1036,6 +1339,10 @@
 
   function leaveCheckpoint() {
     const target = pendingChapterTarget;
+    // 略過也要留下記錄，否則每次跨章節都會再被同一組題目攔一次。
+    if (checkpointState && !checkpointState.completed) {
+      store.set("pl-checkpoint-" + checkpointState.mod.id, { score: null, skipped: true, completedAt: new Date().toISOString() });
+    }
     checkpointState = null;
     pendingChapterTarget = null;
     const root = $("#chapter-checkpoint");
@@ -1044,13 +1351,45 @@
     if (target && byId[target]) openExp(target);
   }
 
+  /*
+   * 章節檢核該不該跳出來
+   * 原本只要跨模組就一定攔一次：用方向鍵翻過章節交界、或回頭複習舊章節，
+   * 都會被同一組題目重複打斷。改成三個條件都成立才出現：
+   *   1. 這個模組還沒做過檢核（做過就永遠不再打擾）
+   *   2. 這個模組確實讀過一定比例，檢核才有意義
+   *   3. 是往前推進，不是回頭複習
+   */
+  const CHECKPOINT_MIN_RATIO = 0.5;
+
+  function checkpointDone(modId) {
+    return !!store.get("pl-checkpoint-" + modId, null);
+  }
+
+  function shouldShowCheckpoint(currentMod, targetMod) {
+    if (!currentMod || !targetMod || currentMod.id === targetMod.id) return false;
+    if (checkpointDone(currentMod.id)) return false;
+    if (!Array.isArray(MODULE_CHECKPOINTS[currentMod.id]) || !MODULE_CHECKPOINTS[currentMod.id].length) return false;
+    const total = currentMod.experiments.length;
+    const seen = currentMod.experiments.filter(e => viewed.has(e.id)).length;
+    if (!total || seen / total < CHECKPOINT_MIN_RATIO) return false;
+    const currentIndex = C.modules.findIndex(m => m.id === currentMod.id);
+    const targetIndex = C.modules.findIndex(m => m.id === targetMod.id);
+    return targetIndex > currentIndex;
+  }
+
   /* ------------------------------- 路由 ------------------------------- */
   function route() {
     const id = decodeURIComponent(location.hash.replace(/^#/, ""));
-    if (!id || id === "home") { showView("home"); document.title = "物理實驗室｜台灣中學互動物理"; if (currentSim && currentSim.stop) currentSim.stop(); currentSim = null; currentId = null; return; }
+    if (!id || id === "home") {
+      showView("home"); document.title = "物理實驗室｜台灣中學互動物理";
+      cancelDwell();
+      if (currentSim && currentSim.stop) { try { currentSim.stop(); } catch (e) {} }
+      currentSim = null; currentId = null; return;
+    }
     const target = byId[id];
+    if (!target) { location.hash = ""; return; }
     const current = currentId ? byId[currentId] : null;
-    if (target && current && target.mod.id !== current.mod.id) {
+    if (shouldShowCheckpoint(current && current.mod, target.mod)) {
       pendingChapterTarget = id;
       if (checkpointState && checkpointState.mod.id === current.mod.id) {
         checkpointState.nextMod = target.mod;
@@ -1066,6 +1405,9 @@
   function lockLab() {
     if (currentSim && currentSim.stop) { try { currentSim.stop(); } catch (e) {} }
     currentSim = null;
+    // 沒有清掉目前實驗，解鎖後 route() 會誤以為是跨章節切換而彈出檢核。
+    currentId = null;
+    cancelDwell();
     document.body.classList.remove("has-access");
     document.body.classList.add("access-locked");
     $("#access-password").value = "";
@@ -1106,6 +1448,10 @@
         submit.disabled = false;
       }
     });
+    // 尚未解鎖時，Tab 必須留在密碼面板內（init() 的監聽器要解鎖後才註冊）
+    document.addEventListener("keydown", e => {
+      if (document.body.classList.contains("access-locked")) trapFocus($("#access-gate"), e);
+    });
     setTimeout(() => input.focus(), 0);
   }
 
@@ -1116,7 +1462,7 @@
     buildSidebar();
     buildHome();
     renderStudyCenter();
-    applyTheme(store.get("pl-theme", "dark"));
+    applyTheme(preferredTheme());
 
     $("#theme-toggle").addEventListener("click", () => {
       applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
@@ -1142,12 +1488,21 @@
     $("#btn-resume-study").addEventListener("click", goResumeStudy);
     $("#btn-next-unseen").addEventListener("click", goNextUnseen);
 
+    // 每個按鍵都掃 237 筆實驗會讓打字卡頓，改成停手後才搜尋。
     const search = $("#search-input");
-    search.addEventListener("input", () => runSearch(search.value));
+    let searchTimer = 0;
+    search.addEventListener("input", () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => runSearch(search.value), 140);
+    });
+    search.addEventListener("keydown", e => {
+      if (e.key === "Escape") { search.value = ""; runSearch(""); search.blur(); }
+    });
 
     document.addEventListener("keydown", e => {
       if (checkpointState) {
         if (e.key === "Escape") leaveCheckpoint();
+        trapFocus($("#checkpoint-panel"), e);
         return;
       }
       if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
