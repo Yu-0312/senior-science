@@ -589,6 +589,125 @@
     }
   }
 
+  /* ---------------- 播放中的畫面內觀察提示 ---------------- */
+  function formatReading(readout) {
+    if (!readout) return "正在量測畫面中的物理量";
+    const value = readout.value == null || readout.value === "" ? "—" : readout.value;
+    return "目前讀數：" + readout.label + " = " + value + (readout.unit ? " " + readout.unit : "");
+  }
+
+  function observationMessages(context, insight) {
+    const steps = context.root.querySelectorAll(".sim-learning-step dd");
+    const conclusion = steps && steps.length >= 3 ? steps[2].textContent.trim() : "";
+    const r = insight && insight.primary;
+    if (!r) {
+      const slider = context.sliders[0];
+      const readout = context.readouts[0];
+      const action = slider ? "調整「" + slider.label + "」並觀察畫面如何回應。" : "留意畫面中正在發生的變化。";
+      const measure = readout ? "把畫面的現象和「" + readout.label + "」的數字一起比較。" : "先描述變化方向，再用讀數驗證你的判斷。";
+      return { readout, messages: [conclusion ? "知識點：" + conclusion : action, measure] };
+    }
+
+    const x = "「" + r.slider.label + "」";
+    const y = "「" + r.readout.label + "」";
+    let relation;
+    if (r.direction === "up") relation = "改變" + x + "時，留意" + y + "是否跟著增加。";
+    else if (r.direction === "down") relation = "改變" + x + "時，留意" + y + "是否往相反方向減少。";
+    else if (r.direction === "peak") relation = "慢慢改變" + x + "，找出" + y + "出現最大或最小值的時刻。";
+    else if (r.direction === "flat") relation = "改變" + x + "後，確認" + y + "是否仍幾乎維持不變。";
+    else relation = "改變" + x + "，比較畫面與" + y + "在不同設定下的差異。";
+
+    const named = r.exponent != null ? describeExponent(r.exponent) : null;
+    const law = named
+      ? "關係提示：" + r.readout.label + "與" + r.slider.label + named + "；用目前讀數驗證這個趨勢。"
+      : "把畫面中的變化和" + y + "的即時讀數對照，而不是只看單一瞬間。";
+    return { readout: r.readout, messages: [conclusion ? "知識點：" + conclusion : relation, law] };
+  }
+
+  function buildLiveObservation(context, insight) {
+    const ui = context.root._labLiveObservation;
+    if (!ui || !ui.panel) return null;
+
+    const source = observationMessages(context, insight);
+    const messages = source.messages;
+    let index = 0;
+    let messageElapsed = 0;
+    let sampleElapsed = 0;
+    let visible = false;
+    let previousValue = null;
+    let trend = "steady";
+    let shownTrend = "";
+
+    function motionMessage() {
+      if (!source.readout) return "把畫面中的每一個變化，和下方讀數一起對照。";
+      const label = "「" + source.readout.label + "」";
+      if (trend === "up") return "盯住" + label + "：它正隨時間增加，對照畫布中對應的現象。";
+      if (trend === "down") return "盯住" + label + "：它正隨時間減少，對照畫布中對應的現象。";
+      return "盯住" + label + "：讓讀數的每一次變化對應到畫布裡的當下狀態。";
+    }
+
+    function sampleReading() {
+      const value = source.readout ? numeric(source.readout.value) : null;
+      if (value != null && previousValue != null) {
+        const difference = value - previousValue;
+        const threshold = Math.max(Math.abs(value), Math.abs(previousValue), 1) * 0.002;
+        trend = difference > threshold ? "up" : difference < -threshold ? "down" : "steady";
+      }
+      if (value != null) previousValue = value;
+      ui.reading.textContent = formatReading(source.readout);
+    }
+
+    function showMessage() {
+      ui.text.textContent = index === 0 ? motionMessage() : messages[(index - 1) % messages.length];
+    }
+
+    function render() {
+      sampleReading();
+      shownTrend = trend;
+      showMessage();
+    }
+
+    function setVisible(running) {
+      if (!running) {
+        ui.panel.hidden = true;
+        visible = false;
+        return;
+      }
+      if (!visible) {
+        visible = true;
+        ui.panel.hidden = false;
+        ui.state.textContent = "播放中";
+        render();
+      }
+    }
+
+    context.root.addEventListener("lab-playback-state", event => {
+      setVisible(!!(event.detail && event.detail.running));
+    });
+
+    return {
+      tick(dt) {
+        if (!visible) return;
+        sampleElapsed += dt;
+        messageElapsed += dt;
+        // 數字每四分之一秒更新；知識點四秒輪替一次，避免閱讀時文字一直跳動。
+        if (sampleElapsed >= 0.25) {
+          sampleElapsed = 0;
+          sampleReading();
+          if (index === 0 && shownTrend !== trend) {
+            shownTrend = trend;
+            showMessage();
+          }
+        }
+        if (messageElapsed >= 4) {
+          messageElapsed = 0;
+          index = (index + 1) % (messages.length + 1);
+          showMessage();
+        }
+      }
+    };
+  }
+
   /* =======================================================================
      掛載
      ======================================================================= */
@@ -598,9 +717,18 @@
       insight = probe(context, api);
     } catch (e) {
       console.warn("學習鷹架建立失敗", e);
+    }
+    const liveObservation = buildLiveObservation(context, insight);
+    if (!insight) {
+      if (liveObservation) {
+        const previousTick = context.onTick;
+        context.onTick = (dt, t) => {
+          if (previousTick) previousTick(dt, t);
+          liveObservation.tick(dt);
+        };
+      }
       return;
     }
-    if (!insight) return;
     context.insight = insight;
 
     const host = el("div", "sim-insight");
@@ -626,6 +754,7 @@
       if (previousTick) previousTick(dt, t);
       acc += dt;
       if (acc >= 0.2) { acc = 0; if (challenge && challenge._labUpdate) challenge._labUpdate(); }
+      if (liveObservation) liveObservation.tick(dt);
     };
   });
 

@@ -885,6 +885,22 @@ body.is-offline .topbar { position: sticky; }
   border: 1px solid color-mix(in srgb, var(--m-color, var(--accent)) 32%, var(--border));
   box-shadow: inset 0 0 40px var(--sim-shadow), 0 10px 24px -20px rgba(0, 0, 0, 0.98);
 }
+/* 播放時才出現；位置鎖在畫面角落，不會擠壓畫布或控制項。 */
+.sim-live-observation {
+  position: absolute; left: 24px; bottom: 22px; z-index: 3; width: min(330px, calc(100% - 48px));
+  padding: 10px 12px 9px; border: 1px solid color-mix(in srgb, var(--m-color, var(--accent)) 42%, var(--border)); border-left: 3px solid var(--m-color, var(--accent)); border-radius: 8px;
+  pointer-events: none; color: var(--text); background: color-mix(in srgb, var(--sim-bg-1) 78%, var(--m-color, var(--accent)) 22%);
+  box-shadow: 0 12px 24px -18px rgba(0, 0, 0, 0.95), inset 0 1px 0 var(--edge-hi); backdrop-filter: blur(8px);
+  animation: labObservationIn 0.22s ease-out both;
+}
+.sim-live-observation[hidden] { display: none; }
+.sim-live-observation-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.sim-live-observation-kicker { color: var(--m-ink, var(--m-color, var(--accent))); font-size: 9.5px; font-weight: 800; letter-spacing: 1px; }
+.sim-live-observation-state { color: var(--text-faint); font-size: 9.5px; font-weight: 700; }
+.sim-live-observation-state::before { content: ""; display: inline-block; width: 5px; height: 5px; margin-right: 5px; border-radius: 50%; background: var(--m-color, var(--accent)); box-shadow: 0 0 7px var(--m-color, var(--accent)); vertical-align: 1px; }
+.sim-live-observation-text { margin: 6px 0 0; color: var(--text); font-size: 12px; font-weight: 650; line-height: 1.55; overflow-wrap: anywhere; }
+.sim-live-observation-reading { margin: 5px 0 0; color: var(--text-dim); font-size: 10.5px; font-variant-numeric: tabular-nums; line-height: 1.4; overflow-wrap: anywhere; }
+@keyframes labObservationIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 /* 畫面說明列：把原本畫在 canvas 上的解說長句移出來，讓畫布只留物理量標籤 */
 .sim-caption {
   margin: 0; padding: 6px 12px 2px; color: var(--text-dim); font-size: 11.5px; line-height: 1.6;
@@ -1205,6 +1221,8 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   .sim-learning-step dd { font-size: 11px; }
   .sim-stage { gap: 10px; padding: 8px; border-radius: 8px; }
   .sim-canvas-wrap { padding: 8px 8px 6px; }
+  .sim-live-observation { left: 16px; bottom: 16px; width: calc(100% - 32px); padding: 9px 10px 8px; }
+  .sim-live-observation-text { font-size: 11.5px; }
   .sim-visual-panel .sim-panel-head { min-height: 48px; padding: 7px 9px; }
   .sim-visual-meta { gap: 6px; }
   .sim-visual-code { display: none; }
@@ -1334,6 +1352,8 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 [data-theme="light"] .pill { background: var(--panel-solid); }
 [data-theme="light"] .sim-stage { box-shadow: inset 0 1px 0 var(--edge-hi), 0 2px 10px -6px rgba(30, 50, 90, 0.35); }
 [data-theme="light"] .sim-canvas { border-color: var(--border); }
+[data-theme="light"] .sim-live-observation { background: color-mix(in srgb, var(--panel-solid) 88%, var(--m-color, var(--accent)) 12%); box-shadow: 0 6px 14px -12px rgba(30, 50, 90, 0.55), inset 0 1px 0 #fff; }
+[data-theme="light"] .sim-live-observation-state::before { box-shadow: none; }
 [data-theme="light"] .sim-visual-panel,
 [data-theme="light"] .sim-control-deck,
 [data-theme="light"] .sim-readout-panel { background: var(--panel-solid); border-color: var(--border); }

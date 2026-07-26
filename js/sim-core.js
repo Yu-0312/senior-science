@@ -454,6 +454,18 @@
     const visualState = el("span", "sim-live", visualMeta); visualState.textContent = "LIVE";
     const canvasWrap = el("div", "sim-canvas-wrap", visual);
     canvasWrap._labProfile = profile;
+    // 播放中的觀察提示由 sim-insight.js 填入；先放在畫布層，確保不佔控制面板空間。
+    const liveObservation = el("section", "sim-live-observation", canvasWrap);
+    liveObservation.hidden = true;
+    liveObservation.setAttribute("aria-label", "播放中的即時觀察提示");
+    const liveObservationHead = el("div", "sim-live-observation-head", liveObservation);
+    const liveObservationKicker = el("span", "sim-live-observation-kicker", liveObservationHead); liveObservationKicker.textContent = "即時觀察";
+    const liveObservationState = el("span", "sim-live-observation-state", liveObservationHead); liveObservationState.textContent = "播放中";
+    const liveObservationText = el("p", "sim-live-observation-text", liveObservation);
+    liveObservationText.setAttribute("aria-live", "polite");
+    liveObservationText.setAttribute("aria-atomic", "true");
+    const liveObservationReading = el("p", "sim-live-observation-reading", liveObservation);
+    root._labLiveObservation = { panel: liveObservation, state: liveObservationState, text: liveObservationText, reading: liveObservationReading };
     const instrumentStrip = el("div", "sim-instrument-strip", visual);
     const instrumentCode = el("span", "sim-instrument-code", instrumentStrip); instrumentCode.textContent = profile.code + " · " + (profile.moduleNo ? "模組" + profile.moduleNo : "物理模型");
     const instrumentMode = el("span", "sim-instrument-mode", instrumentStrip); instrumentMode.textContent = "即時量測 / 可調參數";
@@ -469,7 +481,7 @@
     const readoutTitle = el("span", "sim-panel-title", readoutHead); readoutTitle.textContent = "量測讀數";
     const readoutHint = el("span", "sim-panel-hint", readoutHead); readoutHint.textContent = "模型計算";
     const readouts = el("div", "sim-readouts", readoutPanel);
-    return { root, profile, workflow, brief, learningBrief, commandBar, procedure, setProcedureStep, stage, visual, canvasWrap, instrumentStrip, controlDeck, controls, readoutPanel, readouts };
+    return { root, profile, workflow, brief, learningBrief, commandBar, procedure, setProcedureStep, stage, visual, canvasWrap, liveObservation, instrumentStrip, controlDeck, controls, readoutPanel, readouts };
   }
 
   /* --------------------------- 響應式畫布 --------------------------- */
@@ -1132,6 +1144,12 @@
       if (primary) ui.timeLabel.textContent = "t = " + primary.t.toFixed(2) + " s";
       const speed = primary ? primary.speed : 1;
       ui.speedBtns.forEach(b => b.classList.toggle("active", Number(b.dataset.speed) === speed));
+      // 讓疊在實驗畫面裡的學習提示能立即跟上播放、暫停與重設，不必等下一個影格。
+      if (typeof CustomEvent !== "undefined") {
+        root.dispatchEvent(new CustomEvent("lab-playback-state", {
+          detail: { running, time: primary ? primary.t : 0, animated }
+        }));
+      }
     }
 
     ui.playBtn.addEventListener("click", () => {
