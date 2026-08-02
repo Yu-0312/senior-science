@@ -353,6 +353,12 @@
     function resize() {
       dpr = Math.min(2, window.devicePixelRatio || 1);
       const w = cv.W, h = cv.H;
+      /*
+       * 對齊主畫布：.sim-canvas-wrap 有內距，畫布並不是從容器的左上角開始。
+       * 用畫布自己回報的 offset 定位，工具的座標系才會和畫布逐像素重合。
+       */
+      host.style.left = (cv.canvas.offsetLeft || 0) + "px";
+      host.style.top = (cv.canvas.offsetTop || 0) + "px";
       host.style.width = w + "px";
       host.style.height = h + "px";
       overlay.style.width = w + "px";

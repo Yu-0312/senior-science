@@ -8,8 +8,8 @@
  * 重新產生：node tools/build-manifest.js
  */
 window.PhysicsLabExperimentFiles = {
-  "terminal-velocity": "advanced.js",
   "regression-lab": "advanced.js",
+  "terminal-velocity": "advanced.js",
   "experimental-design": "advanced.js",
   "error-propagation": "advanced.js",
   "dimensional-analysis": "advanced.js",

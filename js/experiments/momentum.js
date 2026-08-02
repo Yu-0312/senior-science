@@ -218,6 +218,20 @@
       const bw = 30 + M * 1.5;
       D.rect(ctx, cx + x1 * 30 - bw / 2, gy - 30, bw, 30, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 4 }); D.text(ctx, "M", cx + x1 * 30, gy - 12, { color: "#04121a", size: 12, align: "center", weight: "700" });
       D.disc(ctx, cx + 40 + x2 * 30, gy - 15, 8 + m, { fill: CB, glow: CB, glowSize: 8 });
+      /*
+       * 「爆炸釋放（砲彈速度）」原本只在按下發射之後才影響畫面。
+       * 動量守恆的重點是「兩邊的 mv 大小相等、方向相反」，
+       * 這件事在發射前就可以先算給學生看，讓他預測再驗證。
+       */
+      if (!fired) {
+        const vp2 = sE.get(), vp1 = -m * vp2 / M;
+        D.arrow(ctx, cx, gy - 52, cx + vp1 * 6, gy - 52,
+          { color: MC(), width: 2, head: 7, label: "預期後座 " + PL.fmt(Math.abs(vp1), 2) + " m/s" });
+        D.arrow(ctx, cx + 40, gy - 52, cx + 40 + vp2 * 6, gy - 52,
+          { color: CB, width: 2, head: 7, label: "預期砲彈 " + PL.fmt(vp2, 1) + " m/s" });
+        D.text(ctx, "兩邊的動量大小相同：M·v₁ = m·v₂ = " + PL.fmt(m * vp2, 1) + " kg·m/s",
+          cx, 28, { color: PL.col("text-dim"), size: 11, align: "center" });
+      }
       if (fired) { D.arrow(ctx, cx + x1 * 30, gy - 44, cx + x1 * 30 + v1 * 6, gy - 44, { color: MC(), width: 2, label: "後座" }); D.arrow(ctx, cx + 40 + x2 * 30, gy - 40, cx + 40 + x2 * 30 + v2 * 6, gy - 40, { color: CB, width: 2, label: "砲彈" }); }
       rV1.set(Math.abs(v1), 2); rV2.set(v2, 1); rP.set(M * v1 + m * v2, 2);
     }
@@ -242,9 +256,38 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const px = W * 0.6, py = 40, Lpx = Math.min(H - 110, W * 0.4);
       D.rect(ctx, px - 40, py - 8, 80, 8, { fill: PL.col("text-faint") });
+      /*
+       * 原本木塊固定 44×40、子彈固定半徑 5、而且子彈只在飛行中才畫出來，
+       * 於是三根滑桿在按下發射之前對畫面毫無影響。
+       *
+       * 改成：木塊寬度隨 M、子彈半徑隨 m、待發射時子彈就停在槍口，
+       * 並且用一條虛線先標出「這組設定會擺到多高」——
+       * 讓學生可以先預測、再發射驗證，而不是盲目按按鈕。
+       */
+      const m = sm.get(), M = sM.get(), v0 = sv.get();
+      const bw = 30 + M * 8, bh = 26 + M * 5;      // 1kg→38×31，5kg→70×51
+      const br = 3 + m * 18;                        // 0.01kg→3.2，0.2kg→6.6
       const bxp = px + Lpx * Math.sin(th), byp = py + Lpx * Math.cos(th);
       D.line(ctx, px, py, bxp, byp, "#c9d3e0", 2);
-      D.rect(ctx, bxp - 22, byp - 20, 44, 40, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 5 });
+      D.rect(ctx, bxp - bw / 2, byp - bh / 2, bw, bh, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 5 });
+      D.text(ctx, "M = " + PL.fmt(M, 1) + " kg", bxp, byp + bh / 2 + 14,
+        { color: PL.col("text-dim"), size: 10, align: "center" });
+
+      // 這組設定的預期擺升高度：發射前就畫出來，可以先預測再驗證
+      const Vpred = m * v0 / (m + M), hPred = Vpred * Vpred / (2 * g);
+      const hPx = Math.min(Lpx * 0.92, hPred / Lp * Lpx);
+      if (phase === "ready" && hPx > 1) {
+        D.line(ctx, px - Lpx * 0.75, py + Lpx - hPx, px + Lpx * 0.5, py + Lpx - hPx,
+          PL.col("warn"), 1.4, [6, 5]);
+        D.text(ctx, "預期擺升 " + PL.fmt(hPred, 3) + " m", px - Lpx * 0.75, py + Lpx - hPx - 6,
+          { color: PL.col("warn"), size: 10.5 });
+      }
+      if (phase === "ready") {
+        // 待發射的子彈停在槍口，大小隨質量；箭頭長度隨初速
+        D.disc(ctx, 40, byp, br, { fill: "#ff6b6b", glow: "#ff6b6b", glowSize: 8 });
+        D.arrow(ctx, 40 + br, byp, 40 + br + v0 * 0.12, byp,
+          { color: "#ff6b6b", width: 2, head: 7, label: PL.fmt(m, 2) + "kg · " + v0 + "m/s" });
+      }
       if (phase === "fly") { const bulletX = 40 + bx; D.disc(ctx, bulletX, byp, 5, { fill: "#ff6b6b", glow: "#ff6b6b" }); D.arrow(ctx, bulletX, byp, bulletX + 26, byp, { color: "#ff6b6b", width: 2 }); }
       D.text(ctx, "h = " + PL.fmt(hmax, 3) + " m", px + 34, py + 18, { color: PL.col("text-dim"), size: 11 });
       rV.set(V, 2); rH.set(hmax, 3); rTh.set(Math.acos(PL.clamp(1 - hmax / Lp, -1, 1)) * 180 / Math.PI, 1);

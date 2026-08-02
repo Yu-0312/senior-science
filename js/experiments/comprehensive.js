@@ -40,7 +40,7 @@
     "echo-ultrasound": lab("echo", ["回波時間", 0.001, 0.2, 0.042, "s", 0.001, 3], ["聲速", 300, 360, 343, "m/s", 1, 0], "障礙物距離", "m", (time, speed) => time * speed / 2, (time, speed, distance) => "聲波往返，所以距離 = vt/2 = " + PL.fmt(distance, 2) + " m", (x, speed) => x * speed / 2),
     "seismic-waves": lab("seismic", ["地面振動頻率", 0.2, 8, 2.6, "Hz", 0.01, 2], ["隔震週期", 0.2, 5, 1.8, "s", 0.01, 2], "相對反應", "", (frequency, period) => 1 / Math.sqrt(0.08 + Math.pow(1 - frequency * period, 2)), (frequency, period, response) => response > 2 ? "接近共振，建築反應被放大" : "隔震已降低相對反應", (x, period) => 1 / Math.sqrt(0.08 + Math.pow(1 - x * period, 2))),
     "shadow-pinhole": lab("pinhole", ["物距", 0.2, 8, 2.5, "m", 0.1, 1], ["光屏距離", 0.05, 2, 0.45, "m", 0.01, 2], "像的倍率", "倍", (objectDistance, screenDistance) => screenDistance / objectDistance, (objectDistance, screenDistance, scale) => "針孔像倒立，倍率約 " + PL.fmt(scale, 2) + " 倍", (x, screenDistance) => screenDistance / x),
-    "rgb-color-mixing": lab("rgb", ["紅光強度 R", 0, 100, 76, "%", 1, 0], ["綠光強度 G", 0, 100, 54, "%", 1, 0], "混色亮度", "%", (red, green) => Math.min(100, (red + green + 42) / 1.7), (red, green, light) => "藍光固定 42%；目前顯示器亮度 " + PL.fmt(light, 0) + "%", (x, green) => Math.min(100, (x + green + 42) / 1.7)),
+    "rgb-color-mixing": lab("rgb", ["紅光強度 R", 0, 100, 76, "%", 1, 0], ["綠光強度 G", 0, 100, 54, "%", 1, 0], "感知亮度 Y", "%", (red, green) => 0.2126 * red + 0.7152 * green + 0.0722 * 42, (red, green, light) => "藍光固定 42%；感知亮度 " + PL.fmt(light, 0) + "%（綠光的權重最大）", (x, green) => 0.2126 * x + 0.7152 * green + 0.0722 * 42),
     "fiber-optics": lab("fiber", ["光纖長度", 1, 120, 35, "km", 1, 0], ["彎曲半徑", 1, 80, 24, "mm", 1, 0], "傳輸強度", "%", (length, radius) => 100 * Math.exp(-length * (0.006 + 0.12 / radius)), (length, radius, intensity) => intensity < 50 ? "彎曲或距離造成明顯損耗" : "全反射導光仍維持大部分強度", (x, radius) => 100 * Math.exp(-x * (0.006 + 0.12 / radius))),
     "human-eye": lab("eye", ["物距", 0.1, 8, 0.5, "m", 0.01, 2], ["水晶體焦距", 0.012, 0.08, 0.019, "m", 0.001, 3], "成像距離", "cm", (objectDistance, focal) => 100 / (1 / focal - 1 / objectDistance), (objectDistance, focal, image) => image > 0 && image < 4 ? "影像接近視網膜位置" : "需改變焦距或配鏡才能清楚成像", (x, focal) => 100 / (1 / focal - 1 / x)),
     "camera-exposure": lab("camera", ["光圈數 N", 1.4, 22, 5.6, "", 0.1, 1], ["快門時間", 0.001, 2, 0.08, "s", 0.001, 3], "相對曝光量", "", (fNumber, time) => time * 100 / (fNumber * fNumber), (fNumber, time, exposure) => exposure < 0.3 ? "曝光偏低，畫面可能太暗" : exposure > 1.4 ? "曝光偏高，亮部可能過曝" : "曝光量位於可用範圍", (x, time) => time * 100 / (x * x)),
@@ -57,7 +57,7 @@
   };
 
   function label(ctx, x, y, title, value, color) {
-    D.rect(ctx, x, y, 156, 36, { fill: "rgba(6,10,16,0.82)", stroke: color, width: 1, r: 6 });
+    D.rect(ctx, x, y, 156, 36, { fill: PL.theme.shade(0.82), stroke: color, width: 1, r: 6 });
     D.text(ctx, title, x + 10, y + 13, { color: PL.col("text-faint"), size: 9 });
     D.text(ctx, value, x + 10, y + 27, { color, size: 11, weight: "700" });
   }
@@ -78,7 +78,7 @@
       const x = 68 + ((time * out * 34) % Math.max(40, W - 150)); D.rect(ctx, x, ground - 34, 58, 24, { fill: "rgba(90,162,255,0.42)", stroke: c, width: 2, r: 6 }); D.disc(ctx, x + 12, ground - 5, 7, { fill: PL.col("text-dim") }); D.disc(ctx, x + 45, ground - 5, 7, { fill: PL.col("text-dim") });
       D.ring(ctx, 42, ground - 10, 24 + pulse * 8, "rgba(255,204,102,0.45)", 1); label(ctx, 20, 18, "位置感測", PL.fmt(out, 2) + " m/s", c);
     } else if (config.kind === "reaction") {
-      D.rect(ctx, 26, cy - 62, W - 52, 122, { fill: "rgba(37,45,62,0.48)", stroke: "rgba(255,255,255,0.14)", r: 7 });
+      D.rect(ctx, 26, cy - 62, W - 52, 122, { fill: PL.theme.shade(0.48), stroke: PL.theme.pale(0.14), r: 7 });
       for (let x = 38; x < W - 30; x += 42) D.line(ctx, x, cy + 8, x + 20, cy + 8, "rgba(255,255,255,0.55)", 2);
       const carX = 64 + (time * 60 * a / 25) % (W - 170); D.rect(ctx, carX, cy - 12, 76, 26, { fill: "rgba(255,138,101,0.55)", stroke: PL.col("warn"), width: 2, r: 8 }); D.disc(ctx, carX + 17, cy + 18, 8, { fill: "#111827" }); D.disc(ctx, carX + 59, cy + 18, 8, { fill: "#111827" });
       D.line(ctx, Math.min(W - 58, carX + out * 6), cy - 44, Math.min(W - 58, carX + out * 6), cy + 48, c, 2, [5, 4]); label(ctx, 20, 18, "反應距離", PL.fmt(out, 1) + " m", c);
@@ -124,7 +124,25 @@
       label(ctx, 20, 18, "熱流 / 流體", PL.fmt(out, 2) + " " + config.unit, c);
     } else if (["string", "sound", "echo", "seismic"].includes(config.kind)) {
       if (config.kind === "string") { D.line(ctx, 38, cy, W - 38, cy, "rgba(255,255,255,0.20)", 1); ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2.7; ctx.beginPath(); for (let x = 38; x < W - 38; x += 3) { const y = cy + Math.sin((x - 38) / 22 - time * out * 0.2) * 34; x === 38 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore(); }
-      else if (config.kind === "sound") { D.rect(ctx, 58, cy - 52, 58, 104, { fill: "rgba(90,162,255,0.22)", stroke: c, width: 2, r: 6 }); for (let r = 30; r < W * 0.35; r += 25) D.ring(ctx, 122, cy, r + pulse * 6, "rgba(255,204,102,0.24)", 1.5); D.text(ctx, "f=" + PL.fmt(a, 0) + " Hz", W - 112, cy - 30, { color: PL.col("warn"), size: 13, align: "center" }); }
+      else if (config.kind === "sound") {
+        /*
+         * 原本波前的間距寫死成 25px，「頻率 f」只印成一行字。
+         * 聲音的頻率就是波前的疏密——這件事本來就該用看的。
+         * 改成間距反比於頻率（高頻密、低頻疏），振幅則決定波前的粗細與喇叭大小。
+         */
+        const nf = (a - config.a[1]) / Math.max(1e-9, config.a[2] - config.a[1]);
+        const spacing = 46 - nf * 34;                 // 低頻 46px、高頻 12px
+        const amp = 0.3 + 0.7 * (b - config.b[1]) / Math.max(1e-9, config.b[2] - config.b[1]);
+        const spH = 60 + amp * 70;
+        D.rect(ctx, 58, cy - spH / 2, 58, spH, { fill: "rgba(90,162,255,0.22)", stroke: c, width: 2, r: 6 });
+        for (let r = 30; r < W * 0.42; r += spacing) {
+          D.ring(ctx, 122, cy, r + pulse * 6, "rgba(255,204,102,0.24)", 1 + amp * 2.2);
+        }
+        D.text(ctx, "f = " + PL.fmt(a, 0) + " Hz（波前間距 ∝ 1/f）", W - 118, cy - 30,
+          { color: PL.col("warn"), size: 12, align: "center" });
+        D.text(ctx, "振幅越大，波前畫得越粗、喇叭越大", W - 118, cy - 12,
+          { color: PL.col("text-faint"), size: 9.5, align: "center" });
+      }
       else if (config.kind === "echo") { D.rect(ctx, W - 112, 42, 28, ground - 42, { fill: "rgba(255,255,255,0.22)", stroke: "rgba(255,255,255,0.55)", r: 3 }); D.disc(ctx, 100, cy, 16, { fill: c, glow: c, glowSize: 12 }); const r = (time * b * 0.35) % (W - 210); D.ring(ctx, 100, cy, r, "rgba(255,204,102,0.42)", 2); D.line(ctx, 100, cy, W - 112, cy, "rgba(255,255,255,0.20)", 1, [4, 4]); }
       else { D.rect(ctx, 46, ground - 30, W - 92, 26, { fill: "rgba(90,162,255,0.22)", stroke: c, width: 2, r: 5 }); D.rect(ctx, cx - 65, ground - 105, 130, 75, { fill: "rgba(255,255,255,0.12)", stroke: PL.col("warn"), width: 2, r: 6 }); const sway = Math.sin(time * a) * Math.min(36, out * 14); D.line(ctx, cx, ground - 30, cx + sway, ground - 105, PL.col("danger"), 4); D.ring(ctx, cx, ground - 18, 16 + b * 5, "rgba(90,162,255,0.38)", 2); }
       label(ctx, 20, 18, "波動量測", PL.fmt(out, 2) + " " + config.unit, c);
@@ -156,6 +174,12 @@
     D.text(ctx, config.status(a, b, out), W / 2, H - 22, { color: PL.col("text-faint"), size: 9.5, align: "center" });
   }
 
+  /*
+   * sound-properties：聲級 dB 由振幅決定，與頻率無關（頻率決定的是音調）。
+   * 原本關係圖掃頻率，畫出來是一條水平線。改掃振幅，才看得到 dB 的對數關係。
+   */
+  if (LABS["sound-properties"]) LABS["sound-properties"].sweep = "b";
+
   Object.keys(LABS).forEach(id => {
     PL.register(id, { build(root) {
       const config = LABS[id], L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.59, 920);
@@ -164,7 +188,7 @@
       PL.ui.section(L.controls, "操作條件");
       const a = PL.ui.slider(L.controls, { label: config.a[0], min: config.a[1], max: config.a[2], value: config.a[3], step: step(config.a), unit: config.a[4], digits: decimal(config.a), onInput: () => render() });
       const b = PL.ui.slider(L.controls, { label: config.b[0], min: config.b[1], max: config.b[2], value: config.b[3], step: step(config.b), unit: config.b[4], digits: decimal(config.b), onInput: () => render() });
-      PL.ui.note(L.controls, "調整兩項參數，觀察裝置中的動態現象、即時讀值與下方關係圖。每項讀值都可直接匯出。 ");
+      PL.ui.note(L.controls, PL.templateGuide(id, config));
       const buttons = PL.ui.buttonRow(L.controls); let playing = true, animation;
       const play = PL.ui.button(buttons, "暫停", () => {
         playing = !playing; play.textContent = playing ? "暫停" : "播放";
@@ -181,12 +205,10 @@
         const av = a.get(), bv = b.get(), result = config.calc(av, bv);
         scene(cv, config, av, bv, elapsed, result);
         reading.set(result, Math.abs(result) >= 100 ? 1 : 3); parameter.set(bv, decimal(config.b)); conclusion.set(config.status(av, bv, result));
-        chart.clear();
-        const points = []; let hi = -Infinity, lo = Infinity;
-        for (let i = 0; i <= 120; i++) { const x = PL.lerp(config.a[1], config.a[2], i / 120), y = config.chart(x, bv); points.push([x, y]); hi = Math.max(hi, y); lo = Math.min(lo, y); }
-        const span = Math.max(1, hi - lo); hi += span * 0.12; lo -= span * 0.12;
-        const graph = PL.graph(chart, { x: 45, y: 18, w: chart.W - 60, h: chart.H - 47 }, { x0: config.a[1], x1: config.a[2], y0: lo, y1: hi });
-        graph.frame({ xlabel: config.a[0], ylabel: config.output }); graph.grid(5, 4); graph.area(points, { fill: "rgba(53,224,207,0.12)" }); graph.curve(points, { color: accent(), width: 2.3 }); graph.dot(av, result, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+        chart.setCap(PL.ui.relationChart(chart, {
+          a: config.a, b: config.b, av: av, bv: bv,
+          calc: config.calc, output: config.output, sweep: config.sweep
+        }));
       }
       animation = PL.loop(dt => { if (dt) elapsed += dt; render(); });
       cv.onResize(render); chart.onResize(render); render(); animation.start();

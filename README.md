@@ -3,6 +3,7 @@
 從國中自然的生活物理銜接到教育部 **108 課綱**自然科學領域物理的互動模擬網站。全站繁體中文，涵蓋國中基礎、必修物理與選修物理加深加廣內容，目前提供 **12 個學習模組、245 個實驗主題、245 個即時 Canvas 互動模擬**；目錄採資料驅動擴充，沒有預設的實驗或題型數量上限。
 
 **線上網站：** [https://yu-0312.github.io/senior-science/](https://yu-0312.github.io/senior-science/)  
+**GitHub Repository：** [https://github.com/Yu-0312/senior-science](https://github.com/Yu-0312/senior-science)
 **使用授權：** [免費教育使用與推廣授權](https://yu-0312.github.io/senior-science/license.html)
 
 ---

@@ -90,17 +90,41 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const A = sA.get(), T = sT.get(), w = TAU / T, ph = sPh.get() * Math.PI / 180;
-      const Tw = 2 * T, bx = 40, by = 24, bw = W - 80, bh = H - 48;
-      const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: Tw, y0: -A * w * w * 1.1, y1: A * w * w * 1.1 });
-      g.frame({ title: "位移 x、速度 v、加速度 a", xlabel: "t (s)" }); g.grid(4, 4);
+      /*
+       * 原本的座標軸是 x1 = 2T、y = ±A·ω²·1.1，兩軸都跟著參數自動縮放。
+       * 後果是拉「振幅」與「週期」時畫面**完全沒有變化**：
+       * 波形永遠佔滿整個框、永遠顯示剛好兩個週期。三根滑桿有兩根等於白放。
+       *
+       * 這是很容易犯的錯：把座標軸縮放成剛好貼合資料，
+       * 等於親手把滑桿想示範的效果 normalize 掉。
+       *
+       * 改成固定座標軸：
+       *   x 軸固定 0～10 s  → 週期變長，波就變疏，看得見
+       *   y 軸固定 ±2.3 m   → 振幅變大，波就變高，看得見
+       * 三條曲線改成除以各自的 ω 次方（v÷ω、a÷ω²），
+       * 這樣三者同單位、同大小，可以直接比較相位差，
+       * 而振幅仍然真實地反映在高度上。
+       */
+      const A_MAX = 2.3, T_SPAN = 10;
+      const bx = 40, by = 24, bw = W - 80, bh = H - 48;
+      const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: T_SPAN, y0: -A_MAX, y1: A_MAX });
+      g.frame({ title: "位移 x、速度 v÷ω、加速度 a÷ω²（三者同單位，便於比較相位）", xlabel: "t (s)" });
+      g.grid(5, 4);
       const fx = tt => A * Math.cos(w * tt + ph), fv = tt => -A * w * Math.sin(w * tt + ph), fa = tt => -A * w * w * Math.cos(w * tt + ph);
-      g.fn(tt => fx(tt) * (w * w), { color: MC(), width: 2.2 });   // 依同比例縮放以同框顯示
-      g.fn(tt => fv(tt) * w, { color: PL.col("accent-2"), width: 2.2 });
-      g.fn(fa, { color: PL.col("accent-3"), width: 2.2 });
-      g.vline(t % Tw, { color: "#fff", dash: [4, 3], width: 1 });
+      g.fn(fx, { color: MC(), width: 2.2 });
+      g.fn(tt => fv(tt) / w, { color: PL.col("accent-2"), width: 2.2 });
+      g.fn(tt => fa(tt) / (w * w), { color: PL.col("accent-3"), width: 2.2 });
+      // 振幅包絡線：讓「振幅」這根滑桿的作用一眼可辨
+      g.hline(A, { color: PL.theme.pale(0.28), dash: [5, 4], width: 1 });
+      g.hline(-A, { color: PL.theme.pale(0.28), dash: [5, 4], width: 1 });
+      g.label(0.15, A + 0.12, "A = " + PL.fmt(A, 1) + " m", { color: PL.col("text-faint"), size: 9.5 });
+      g.vline(t % T_SPAN, { color: "#fff", dash: [4, 3], width: 1 });
       D.text(ctx, "x", bx + bw - 30, by + 14, { color: MC(), size: 11 });
-      D.text(ctx, "v", bx + bw - 30, by + 28, { color: PL.col("accent-2"), size: 11 });
-      D.text(ctx, "a", bx + bw - 30, by + 42, { color: PL.col("accent-3"), size: 11 });
+      D.text(ctx, "v÷ω", bx + bw - 30, by + 28, { color: PL.col("accent-2"), size: 11 });
+      D.text(ctx, "a÷ω²", bx + bw - 30, by + 42, { color: PL.col("accent-3"), size: 11 });
+      PL.ui.caption(cv, "週期 T = " + PL.fmt(T, 1) + " s，這個畫面（10 秒）裝得下 " +
+        PL.fmt(T_SPAN / T, 1) + " 個完整週期。" +
+        "速度比位移超前 90°（位移過零時速度最大），加速度與位移永遠反相。");
       rX.set(fx(t), 2); rV.set(fv(t), 2); rAcc.set(fa(t), 2);
     }
     const anim = PL.loop(dt => { if (dt) t += dt; draw(); });
@@ -123,13 +147,21 @@
       const A = sA.get(), k = sK.get(), w = Math.sqrt(k / 1), x = A * Math.cos(w * t);
       const E = 0.5 * k * A * A, U = 0.5 * k * x * x, K = E - U;
       // 振子
-      const midY = 60, sc = (W - 120) / (2 * A), eqX = W / 2, mx = eqX + x * sc;
+      /*
+       * sc = (W−120)/(2A) 把比例尺綁在振幅上，於是不管 A 設多少，
+       * 振子永遠在同樣寬的範圍內來回，「振幅」這根滑桿看起來毫無作用。
+       * 下面的能量圖也一樣（x 軸 ±A、y 軸 E×1.1，兩軸都跟著 A 跑）。
+       * 一律改成以滑桿上限為準的固定比例尺。
+       */
+      const A_MAX = 0.5, K_MAX = 60;
+      const midY = 60, sc = (W - 120) / (2 * A_MAX), eqX = W / 2, mx = eqX + x * sc;
       D.line(ctx, eqX, midY - 26, eqX, midY + 26, "rgba(255,255,255,0.15)", 1, [3, 3]);
       D.spring(ctx, 40, midY, mx - 18, midY, 10, 10, MC());
       D.rect(ctx, mx - 18, midY - 18, 36, 36, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 5 });
       // 能量對位置 圖
       const bx = 40, by = 120, bw = W - 80, bh = H - by - 16;
-      const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: -A, x1: A, y0: 0, y1: E * 1.1 });
+      const E_MAX = 0.5 * K_MAX * A_MAX * A_MAX;
+      const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: -A_MAX, x1: A_MAX, y0: 0, y1: E_MAX * 1.05 });
       g.frame({ title: "能量對位置：K=½k(A²−x²)，U=½kx²", xlabel: "x (m)" }); g.grid(4, 4);
       g.fn(xx => 0.5 * k * xx * xx, { color: MC(), width: 2 });                 // U
       g.fn(xx => 0.5 * k * (A * A - xx * xx), { color: PL.col("accent-2"), width: 2 }); // K

@@ -300,7 +300,18 @@
 
       // 軌道本體
       ctx.save();
-      ctx.strokeStyle = PL.theme.pale(0.45); ctx.lineWidth = 4; ctx.lineCap = "round";
+      /*
+       * 「摩擦係數 μ」原本只在滑板真的開始滑之後才影響畫面（熱能長條），
+       * 學生在靜止狀態拉這根滑桿完全看不到差別。
+       * 改成軌道本身的粗糙度隨 μ 改變：μ = 0 是一條光滑細線，
+       * μ 越大線越粗、顏色越暖，並在軌道上畫出摩擦紋路。
+       */
+      const muNow = sFric.get();   // 這個實驗的摩擦滑桿叫 sFric（第一版誤用 sMu，直接丟出 ReferenceError）
+      ctx.strokeStyle = muNow > 0.001
+        ? "rgba(255,183,77," + (0.35 + muNow * 2.2) + ")"
+        : PL.theme.pale(0.45);
+      ctx.lineWidth = 4 + muNow * 26;
+      ctx.lineCap = "round";
       ctx.beginPath();
       for (let x = 0; x <= tk.length; x += 0.2) {
         const X = px(x), Y = py(tk.h(x));
@@ -352,7 +363,18 @@
           { label: "位能", value: e.U, color: PL.col("accent-2") },
           { label: "熱能", value: e.Q, color: PL.col("warn") }
         ];
-        const scale = Math.max(total, 1) / barH;
+        /*
+         * 原本是 scale = total / barH，也就是把長條正規化到「當下的總能量」。
+         * 後果是質量從 20 kg 拉到 90 kg，三根長條完全一樣高——
+         * 能量明明變成 4.5 倍，畫面卻看不出任何差別，
+         * 「質量」這根滑桿對學生來說等於沒有作用。
+         *
+         * 改用固定的參考能量（最大質量 × g × 最高起點），
+         * 於是重的滑板長條就是明顯比較高，
+         * 而「三根長條加起來的高度不變」這個守恆的重點仍然成立。
+         */
+        const REF = 90 * g * 12;
+        const scale = REF / barH;
         let cursor = barY + barH + 12;
         items.forEach((item, i) => {
           const w = barW / 3 - 6;
@@ -505,6 +527,34 @@
       // 移動點
       const idx = Math.min(pts.length - 1, Math.floor(s * (pts.length - 1)));
       D.disc(ctx, PX(pts[idx]), PY(pts[idx]), 8, { fill: MC(), glow: MC(), glowSize: 12 });
+
+      /*
+       * 摩擦係數這根滑桿原本只改變讀數上的數字，畫面完全沒反應。
+       * 這個實驗的整個重點就是「重力功與路徑無關、摩擦功與路徑長有關」，
+       * 看不到差別的話滑桿等於白放。
+       *
+       * 改成畫一組能量長條：重力功固定不動，摩擦功隨 μ 與路徑長一起長，
+       * 淨功 = 兩者相加。切換路徑時重力功那一條紋風不動，
+       * 摩擦那一條卻明顯變長——這就是「保守力」與「非保守力」的差別。
+       */
+      const bx = W - 132, by = 30, bw = 104, rowH = 17;
+      const scale = bw / Math.max(1, Math.abs(Wg) * 1.6);
+      D.text(ctx, "做功比較", bx, by - 8, { color: PL.col("text-dim"), size: 10.5, weight: "700" });
+      [["重力功 W_g", Wg, PL.col("ok")],
+       ["摩擦功 W_f", Wf, PL.col("danger")],
+       ["淨功", Wg + Wf, PL.col("accent-2")]].forEach((row, i) => {
+        const y = by + i * (rowH + 12);
+        D.text(ctx, row[0], bx, y + 8, { color: PL.col("text-faint"), size: 9.5 });
+        D.rect(ctx, bx, y + 12, bw, rowH, { fill: PL.theme.pale(0.07), r: 3 });
+        const len2 = Math.min(bw, Math.abs(row[1]) * scale);
+        D.rect(ctx, bx, y + 12, len2, rowH, { fill: row[2], r: 3 });
+        D.text(ctx, PL.fmt(row[1], 1) + " J", bx + bw + 4, y + 25, { color: row[2], size: 10 });
+      });
+
+      PL.ui.caption(cv, sMu.get() <= 0
+        ? "摩擦係數為 0：三條路徑的淨功完全相同——只有重力在做功，而重力功只看高度差。"
+        : "切換三條路徑看看：重力功那一條長度紋風不動（只看高度差），" +
+          "摩擦功那一條卻隨路徑變長——這就是保守力與非保守力的差別。");
       rWg.set(Wg, 1); rWf.set(Wf, 1); rLen.set(len, 1);
     }
     const anim = PL.loop(dt => { if (dt) { s += dt * 0.4; if (s >= 1) { s = 1; anim.stop(); } } draw(); });

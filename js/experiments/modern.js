@@ -243,7 +243,7 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const selected = galaxies[PL.clamp(+sGalaxy.get(), 0, galaxies.length - 1)], v = velocity(selected), z = v / 300000, fit = fittedH0();
       const sx = 36, sy = 38, sw = W - 72, sh = H * 0.31;
-      D.rect(ctx, sx, sy, sw, sh, { fill: "rgba(5,10,18,0.5)", stroke: "rgba(255,255,255,0.18)", width: 1, r: 7 });
+      D.rect(ctx, sx, sy, sw, sh, { fill: PL.theme.shade(0.5), stroke: PL.theme.pale(0.18), width: 1, r: 7 });
       D.text(ctx, "光譜儀：以吸收譜線的位移量測紅移", sx + 16, sy + 20, { color: PL.col("text"), size: 12, weight: "700" });
       D.text(ctx, "示意比例放大", sx + sw - 16, sy + 20, { color: PL.col("text-faint"), size: 9, align: "right" });
       const start = sx + 66, end = sx + sw - 34, spectrumY = sy + sh * 0.53;

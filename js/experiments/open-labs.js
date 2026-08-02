@@ -36,7 +36,7 @@
   };
 
   function drawLabel(ctx, x, y, title, value, color) {
-    D.rect(ctx, x, y, 180, 38, { fill: "rgba(5,10,17,0.82)", stroke: color, width: 1, r: 5 });
+    D.rect(ctx, x, y, 180, 38, { fill: PL.theme.shade(0.82), stroke: color, width: 1, r: 5 });
     D.text(ctx, title, x + 10, y + 14, { color: PL.col("text-faint"), size: 9 });
     D.text(ctx, value, x + 10, y + 29, { color, size: 11, weight: "700" });
   }
@@ -84,7 +84,7 @@
       } else if (config.family === "fourier") {
         D.line(ctx, 42, cy, W - 42, cy, "rgba(255,255,255,0.22)", 1); ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2.7; ctx.beginPath(); const modes = Math.round(a); for (let x = 42; x <= W - 42; x += 2) { const u = (x - 42) / (W - 84) * TAU; let yv = 0; for (let n = 1; n <= modes; n++) yv += Math.sin((2 * n - 1) * u) / (2 * n - 1); const y = cy - yv * 64 * 4 / Math.PI; x === 42 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore(); D.text(ctx, "N = " + modes + " 個奇次諧波", cx, 50, { color: PL.col("accent-2"), size: 13, align: "center", weight: "700" });
       } else if (config.family === "fresnel") {
-        const aperture = 14 + a * 28, screenX = W - 96; D.disc(ctx, 92, cy, 15, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 16 }); D.rect(ctx, cx - 10, cy - aperture, 20, aperture * 2, { fill: "rgba(5,10,17,0.82)", stroke: c, width: 2, r: 3 }); D.line(ctx, 108, cy, cx - 12, cy, PL.col("warn"), 2); D.line(ctx, cx + 12, cy, screenX, cy - 42, PL.col("accent-2"), 1.8); D.line(ctx, cx + 12, cy, screenX, cy + 42, PL.col("accent-2"), 1.8); D.line(ctx, screenX, cy - 85, screenX, cy + 85, "rgba(255,255,255,0.55)", 4); for (let r = 10; r < 75; r += 14) D.ring(ctx, screenX - 18, cy, r, "rgba(90,162,255,0.22)", 1); D.text(ctx, "Nᶠ=" + PL.fmt(out, 2), cx, floor - 16, { color: c, size: 13, align: "center", weight: "700" });
+        const aperture = 14 + a * 28, screenX = W - 96; D.disc(ctx, 92, cy, 15, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 16 }); D.rect(ctx, cx - 10, cy - aperture, 20, aperture * 2, { fill: PL.theme.shade(0.82), stroke: c, width: 2, r: 3 }); D.line(ctx, 108, cy, cx - 12, cy, PL.col("warn"), 2); D.line(ctx, cx + 12, cy, screenX, cy - 42, PL.col("accent-2"), 1.8); D.line(ctx, cx + 12, cy, screenX, cy + 42, PL.col("accent-2"), 1.8); D.line(ctx, screenX, cy - 85, screenX, cy + 85, "rgba(255,255,255,0.55)", 4); for (let r = 10; r < 75; r += 14) D.ring(ctx, screenX - 18, cy, r, "rgba(90,162,255,0.22)", 1); D.text(ctx, "Nᶠ=" + PL.fmt(out, 2), cx, floor - 16, { color: c, size: 13, align: "center", weight: "700" });
       } else if (config.family === "bode") {
         const top = cy - 50, bottom = cy + 50, amp = Math.max(5, Math.pow(10, out / 20) * 58); D.line(ctx, 65, top, W - 65, top, c, 2); D.line(ctx, 65, bottom, W - 65, bottom, c, 2); D.line(ctx, 65, top, 65, bottom, c, 2); D.line(ctx, W - 65, top, W - 65, bottom, c, 2); D.rect(ctx, cx - 100, top - 8, 76, 16, { fill: "rgba(255,204,102,0.28)", stroke: PL.col("warn"), width: 1, r: 3 }); D.line(ctx, cx + 54, top - 28, cx + 54, top + 28, PL.col("accent-2"), 3); D.line(ctx, cx + 72, top - 28, cx + 72, top + 28, PL.col("accent-2"), 3); D.text(ctx, "RC 低通", cx, top - 42, { color: c, size: 13, align: "center", weight: "700" }); ctx.save(); ctx.strokeStyle = PL.col("accent-2"); ctx.lineWidth = 2.5; ctx.beginPath(); for (let x = 92; x <= W - 92; x += 3) { const y = floor - 44 + Math.sin((x - 92) / 22) * amp; x === 92 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
       } else if (config.family === "biot") {
@@ -93,7 +93,7 @@
         const x0 = cx - 125, x1 = cx + 125, levelY = floor - 35 - b * 24; D.line(ctx, x0, 55, x0, floor - 22, c, 4); D.line(ctx, x1, 55, x1, floor - 22, c, 4); D.line(ctx, x0, floor - 22, x1, floor - 22, c, 3); D.line(ctx, x0 + 10, levelY, x1 - 10, levelY, PL.col("warn"), 2); ctx.save(); ctx.strokeStyle = PL.col("accent-2"); ctx.lineWidth = 2; ctx.beginPath(); for (let x = x0 + 10; x <= x1 - 10; x += 2) { const t = (x - x0 - 10) / (x1 - x0 - 20); const y = levelY - Math.sin(b * Math.PI * t) * 24; x === x0 + 10 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore(); D.text(ctx, "n = " + Math.round(b), x1 + 22, levelY + 4, { color: PL.col("warn"), size: 12 }); D.text(ctx, "∞", x0 - 18, 58, { color: c, size: 20, align: "center" }); D.text(ctx, "∞", x1 + 18, 58, { color: c, size: 20, align: "center" });
       }
     } else {
-      if (config.family === "geiger") { D.rect(ctx, cx - 80, cy - 68, 160, 136, { fill: "rgba(7,11,17,0.60)", stroke: c, width: 2, r: 8 }); for (let i = 0; i < 18; i++) { const x = cx - 62 + (i * 29 % 124), y = cy - 46 + (i * 41 % 92); D.disc(ctx, x, y, 2 + (i % 3), { fill: i % 2 ? c : PL.col("warn") }); } D.text(ctx, "N ± √N", cx, cy + 92, { color: c, size: 14, align: "center", weight: "700" }); }
+      if (config.family === "geiger") { D.rect(ctx, cx - 80, cy - 68, 160, 136, { fill: PL.theme.shade(0.60), stroke: c, width: 2, r: 8 }); for (let i = 0; i < 18; i++) { const x = cx - 62 + (i * 29 % 124), y = cy - 46 + (i * 41 % 92); D.disc(ctx, x, y, 2 + (i % 3), { fill: i % 2 ? c : PL.col("warn") }); } D.text(ctx, "N ± √N", cx, cy + 92, { color: c, size: 14, align: "center", weight: "700" }); }
       else if (config.family === "nuclear") { D.disc(ctx, cx - 66, cy, 36, { fill: "rgba(90,162,255,0.26)", stroke: c, width: 2 }); D.disc(ctx, cx + 66, cy, 30, { fill: "rgba(255,179,87,0.26)", stroke: PL.col("warn"), width: 2 }); D.arrow(ctx, cx - 20, cy, cx + 20, cy, { color: PL.col("danger"), width: 3, label: "E" }); }
       else { D.disc(ctx, cx, cy, 36, { fill: "rgba(90,162,255,0.28)", stroke: c, width: 2 }); D.ring(ctx, cx, cy, 116, "rgba(255,255,255,0.28)", 2); D.text(ctx, "GPS", cx, cy + 5, { color: "#fff", size: 13, align: "center", weight: "700" }); D.arrow(ctx, cx - 140, cy - 78, cx - 36, cy - 18, { color: PL.col("accent-2"), width: 2, label: "訊號" }); D.arrow(ctx, cx + 140, cy - 78, cx + 36, cy - 18, { color: PL.col("warn"), width: 2 }); }
     }
@@ -107,7 +107,8 @@
       const digits = param => param[6] == null ? 2 : param[6];
       const a = PL.ui.slider(L.controls, { label: config.a[0], min: config.a[1], max: config.a[2], value: config.a[3], step: config.a[5], unit: config.a[4], digits: digits(config.a), onInput: render });
       const b = PL.ui.slider(L.controls, { label: config.b[0], min: config.b[1], max: config.b[2], value: config.b[3], step: config.b[5], unit: config.b[4], digits: digits(config.b), onInput: render });
-      PL.ui.note(L.controls, "此題型可持續記錄量測點；資料筆數不設程式上限。調整參數後比對裝置、讀值與關係圖。");
+      PL.ui.note(L.controls, PL.templateGuide(id, config));
+      PL.ui.note(L.controls, "這一題可以持續記錄量測點，資料筆數不設上限；已記錄的點會以空心點畫在關係圖上。");
       const records = [];
       const actions = PL.ui.buttonRow(L.controls);
       PL.ui.button(actions, "記錄量測點", () => { records.push({ a: a.get(), b: b.get(), out: config.calc(a.get(), b.get()) }); render(); }, { primary: true });
@@ -122,14 +123,11 @@
         const av = a.get(), bv = b.get(), out = config.calc(av, bv);
         scene(cv, config, av, bv, out, elapsed);
         readout.set(out, Math.abs(out) < 10 ? 3 : 2); aReadout.set(av, digits(config.a)); bReadout.set(bv, digits(config.b)); nReadout.set(records.length, 0);
-        chart.clear();
-        const points = [], finite = [];
-        for (let i = 0; i <= 120; i++) { const x = PL.lerp(config.a[1], config.a[2], i / 120), y = config.calc(x, bv); if (Number.isFinite(y)) { points.push([x, y]); finite.push(y); } }
-        const low = Math.min(out, ...finite), high = Math.max(out, ...finite), span = Math.max(1, high - low);
-        const graph = PL.graph(chart, { x: 45, y: 18, w: chart.W - 60, h: chart.H - 47 }, { x0: config.a[1], x1: config.a[2], y0: low - span * 0.12, y1: high + span * 0.12 });
-        graph.frame({ xlabel: config.a[0], ylabel: config.output }); graph.grid(5, 4); graph.curve(points, { color: accent(), width: 2.3 });
-        records.forEach(point => graph.dot(point.a, point.out, { color: PL.col("text-dim"), r: 3 }));
-        graph.dot(av, out, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+        chart.setCap(PL.ui.relationChart(chart, {
+          a: config.a, b: config.b, av: av, bv: bv,
+          calc: config.calc, output: config.output, sweep: config.sweep,
+          extra: function (g) { records.forEach(p => g.dot(p.a, p.out, { color: PL.col("text-dim"), r: 3 })); }
+        }));
       }
       animation = PL.loop(dt => { if (dt) elapsed += dt; render(); });
       cv.onResize(render); chart.onResize(render); render(); animation.start();

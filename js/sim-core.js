@@ -27,6 +27,33 @@
     return themeName() + "|" + document.documentElement.style.getPropertyValue("--m-color");
   }
 
+  /* -------------------------------------------------------------------------
+     「主題衍生色」登記簿
+
+     墨色層存在的理由是搶救**實驗檔裡寫死的顏色**——例如某個實驗直接寫 #fff
+     畫一個標記點，深色台上很清楚，切到淺色主題就整片消失。
+
+     但 col()、theme.pale()、theme.shade() 回傳的顏色**本身就已經隨主題變化**，
+     它們是「刻意選好的表面色」，不需要也不可以被墨色層再改一次。
+     圖表底板就是最好的例子：淺色主題下它本來就該是淺的（#f3f7fc），
+     墨色層卻把它當成「淺色畫在淺背景上」翻成近黑色，
+     189 個實驗的圖表因此變成一塊黑洞。
+
+     這裡把這些顏色登記起來，讓 ink() 在「用作填色面」時直接放行。
+     文字與線條不放行——col("text") 的深色字疊在深色物件上還是會看不見，
+     那種情況仍然需要墨色層介入。
+     ------------------------------------------------------------------------- */
+  const themeSurfaces = { key: "", set: new Set() };
+  function markThemeColor(v) {
+    const key = cacheKey();
+    if (themeSurfaces.key !== key) { themeSurfaces.key = key; themeSurfaces.set.clear(); }
+    themeSurfaces.set.add(v);
+    return v;
+  }
+  function isThemeSurface(v) {
+    return themeSurfaces.key === cacheKey() && themeSurfaces.set.has(v);
+  }
+
   // 讀取目前主題色（隨深／淺色切換即時更新）
   function col(name, fallback) {
     const key = cacheKey();
@@ -36,7 +63,7 @@
       v = getComputedStyle(document.documentElement).getPropertyValue("--" + name).trim();
       themeCache.values.set(name, v);
     }
-    return v || fallback || "#34d3c4";
+    return markThemeColor(v || fallback || "#34d3c4");
   }
 
   /* -------------------------------------------------------------------------
@@ -183,7 +210,7 @@
    *   3. 飽和但偏亮的顏色（淺黃、淺橘、粉藍…）在淺背景上對比不足
    *      → 保留色相壓暗，讓能量曲線、磁力線這些「有物理意義的顏色」不會消失
    */
-  function ink(ctx, color, x, y) {
+  function ink(ctx, color, x, y, kind) {
     const rgb = parseColor(color);
     if (!rgb) return color;
     const lum = luminance(rgb);
@@ -192,11 +219,33 @@
     const dark = lum <= 0.12 && chroma <= 0.16;
     const bg = backdropLum(ctx, x, y);
 
+    /*
+     * 主題衍生色用作填色面時直接放行（見上方登記簿的說明）。
+     * 這一條必須排在所有規則之前：它表達的是「這個顏色已經是對的，別碰」。
+     */
+    if (kind === "fill" && isThemeSurface(color)) return color;
+
+    /*
+     * 淺色系畫在淺色背景上 → 換成深墨。
+     *
+     * 這條是為了搶救實驗檔裡寫死的白色（例如打點計時器紙帶上的 1667 個 #e6edf3 點，
+     * 在淺色主題下會白到看不見）。經過上面那道放行之後，
+     * 圖表底板這類「本來就該是淺色」的表面不會再被誤傷。
+     */
     if (pale && bg > 0.34) {
       // 半透明裝飾線稍微加一點不透明度才看得出來。
       return rgba(LIGHT_INK, rgb[3] < 1 ? Math.min(1, rgb[3] * 1.25) : 1);
     }
-    if (dark && bg <= 0.16) {
+    /*
+     * 深色系畫在深色背景上 → 換成亮墨。
+     *
+     * 這條規則只適用於文字與線條：深色的字寫在深色實驗台上會看不見。
+     * 但填色面（kind === "fill"）必須排除，否則會出大事——
+     * 圖表底板本來就是用 sim-bg-1（#070b11）填的，套用這條規則之後
+     * 整塊底板會被翻成近白色，深色主題的畫面中間就出現兩個刺眼的白方塊。
+     * 用深色填一塊面本來就是合理的（那是面板，不是要被看見的線條）。
+     */
+    if (dark && bg <= 0.16 && kind !== "fill") {
       return rgba(DARK_INK, rgb[3] < 1 ? Math.min(1, rgb[3] * 1.25) : 1);
     }
     // 只在真的看不清楚時才動，避免無謂地改變配色。
@@ -238,6 +287,46 @@
     magnetism: { family: "magnetism", stage: "電磁觀測台", code: "MAG" },
     modern: { family: "modern", stage: "微觀探測台", code: "QNT" }
   };
+
+  /*
+   * 課程條目查詢
+   *
+   * 每個實驗在課程地圖裡本來就寫好了 concept（這在教什麼）與 points（學習重點），
+   * 但模板實驗完全沒有用到，控制面板上印的是
+   * 「調整參數後，同步比較裝置中的現象、量測讀數與下方關係圖」——
+   * 142 個實驗全都一樣，等於什麼都沒說。
+   * 有現成的教學內容卻不顯示，是這批實驗「看不懂在教什麼」的直接原因之一。
+   */
+  function lesson(id) {
+    const C = window.PhysicsLabCurriculum;
+    if (!C || !C.modules) return null;
+    for (const m of C.modules) {
+      const e = (m.experiments || []).find(x => x.id === id);
+      if (e) return e;
+    }
+    return null;
+  }
+
+  /*
+   * 模板實驗的操作指引
+   * 由設定本身生成，因此 142 個實驗各自講的是自己的變數名稱，
+   * 而不是共用一句通用句型。
+   */
+  function templateGuide(id, cfg) {
+    const info = lesson(id);
+    const out = [];
+    if (info && info.concept) out.push("這在教什麼：" + info.concept);
+    const sweepB = cfg.sweep === "b";
+    const main = (sweepB ? cfg.b : cfg.a)[0];
+    const held = (sweepB ? cfg.a : cfg.b)[0];
+    out.push("怎麼操作：先固定「" + held + "」，只拉「" + main + "」，" +
+      "看「" + cfg.output + "」往哪個方向走；接著把「" + held + "」換一個值再拉一次，" +
+      "比較下方關係圖裡兩條虛線的高低差——那就是「" + held + "」在這個關係裡的角色。");
+    if (info && Array.isArray(info.points) && info.points.length) {
+      out.push("該看出來的重點：" + info.points.slice(0, 3).join("；") + "。");
+    }
+    return out.join("\n");
+  }
 
   function profileFor(id) {
     const modules = window.PhysicsLabCurriculum && window.PhysicsLabCurriculum.modules;
@@ -446,26 +535,10 @@
     const stage = el("div", "sim-stage", root);
     const visual = el("section", "sim-visual-panel", stage);
     const visualHead = el("div", "sim-panel-head", visual);
-    const visualTitleBlock = el("div", "sim-visual-title-block", visualHead);
-    const visualEyebrow = el("span", "sim-visual-eyebrow", visualTitleBlock); visualEyebrow.textContent = "互動實驗台";
-    const visualTitle = el("span", "sim-panel-title", visualTitleBlock); visualTitle.textContent = profile.stage;
-    const visualMeta = el("div", "sim-visual-meta", visualHead);
-    const visualCode = el("span", "sim-visual-code", visualMeta); visualCode.textContent = profile.code + " / 01";
-    const visualState = el("span", "sim-live", visualMeta); visualState.textContent = "LIVE";
+    const visualTitle = el("span", "sim-panel-title", visualHead); visualTitle.textContent = profile.stage;
+    const visualState = el("span", "sim-live", visualHead); visualState.textContent = "LIVE MODEL";
     const canvasWrap = el("div", "sim-canvas-wrap", visual);
     canvasWrap._labProfile = profile;
-    // 播放中的觀察提示由 sim-insight.js 填入；先放在畫布層，確保不佔控制面板空間。
-    const liveObservation = el("section", "sim-live-observation", canvasWrap);
-    liveObservation.hidden = true;
-    liveObservation.setAttribute("aria-label", "播放中的即時觀察提示");
-    const liveObservationHead = el("div", "sim-live-observation-head", liveObservation);
-    const liveObservationKicker = el("span", "sim-live-observation-kicker", liveObservationHead); liveObservationKicker.textContent = "即時觀察";
-    const liveObservationState = el("span", "sim-live-observation-state", liveObservationHead); liveObservationState.textContent = "播放中";
-    const liveObservationText = el("p", "sim-live-observation-text", liveObservation);
-    liveObservationText.setAttribute("aria-live", "polite");
-    liveObservationText.setAttribute("aria-atomic", "true");
-    const liveObservationReading = el("p", "sim-live-observation-reading", liveObservation);
-    root._labLiveObservation = { panel: liveObservation, state: liveObservationState, text: liveObservationText, reading: liveObservationReading };
     const instrumentStrip = el("div", "sim-instrument-strip", visual);
     const instrumentCode = el("span", "sim-instrument-code", instrumentStrip); instrumentCode.textContent = profile.code + " · " + (profile.moduleNo ? "模組" + profile.moduleNo : "物理模型");
     const instrumentMode = el("span", "sim-instrument-mode", instrumentStrip); instrumentMode.textContent = "即時量測 / 可調參數";
@@ -481,7 +554,7 @@
     const readoutTitle = el("span", "sim-panel-title", readoutHead); readoutTitle.textContent = "量測讀數";
     const readoutHint = el("span", "sim-panel-hint", readoutHead); readoutHint.textContent = "模型計算";
     const readouts = el("div", "sim-readouts", readoutPanel);
-    return { root, profile, workflow, brief, learningBrief, commandBar, procedure, setProcedureStep, stage, visual, canvasWrap, liveObservation, instrumentStrip, controlDeck, controls, readoutPanel, readouts };
+    return { root, profile, workflow, brief, learningBrief, commandBar, procedure, setProcedureStep, stage, visual, canvasWrap, instrumentStrip, controlDeck, controls, readoutPanel, readouts };
   }
 
   /* --------------------------- 響應式畫布 --------------------------- */
@@ -860,8 +933,132 @@
     const w = el("div", "sim-chart", container);
     if (o.title) { const t = el("div", "chart-title", w); t.textContent = o.title; }
     const c = createCanvas(w, o.aspect || 0.6);
-    if (o.cap) { const p = el("div", "cap", w); p.textContent = o.cap; }
+    const p = el("div", "cap", w);
+    if (o.cap) p.textContent = o.cap;
+    // 讓關係圖可以在每次重繪時改寫說明，把「這條曲線在說什麼」講成具體的話
+    c.setCap = function (text) { if (text) p.textContent = text; };
     return c;
+  }
+
+  /* =======================================================================
+     關係圖（模板實驗共用）
+
+     背景：全站 245 個實驗裡有 142 個由「兩根滑桿 + 一個讀數」的模板產生，
+     原本的關係圖只畫一條曲線加一個亮點，第二根滑桿完全看不出作用，
+     使用者的原話是「不知道實驗要表達什麼」。
+
+     這裡做三件事：
+
+     1. 曲線一律由 calc() 導出。
+        原本另外傳一個 chart() 函式重寫一次同樣的公式，兩邊可能算出不同答案
+        （regression-lab 就是這樣：讀數 1.878、曲線同點 1.170，亮點浮在曲線外）。
+        改成單一真相來源之後，「讀數與曲線對不上」這類錯誤在結構上就不可能發生。
+
+     2. 同時畫出第二個參數在最小值與最大值時的曲線（淡色）。
+        學生一眼就看得到「改變第二個參數會把整條關係往上／往下搬」，
+        而不是只看到一條孤零零的線。
+
+     3. 自動判讀曲線形狀，用中文講出來寫進圖說。
+        不再是「曲線固定第二項參數；亮點顯示目前操作條件」這種每個實驗都一樣、
+        等於沒說的句子。
+     ======================================================================= */
+  function relationChart(cc, o) {
+    const sweepB = o.sweep === "b";
+    const axis = sweepB ? o.b : o.a;          // 掃描軸（關係圖的 x）
+    const other = sweepB ? o.a : o.b;         // 固定軸（畫三條曲線比較）
+    const axisVal = sweepB ? o.bv : o.av;
+    const otherVal = sweepB ? o.av : o.bv;
+    const at = (x, ov) => sweepB ? o.calc(ov, x) : o.calc(x, ov);
+
+    const N = 120;
+    const series = [];
+    [[other[1], "min"], [otherVal, "cur"], [other[2], "max"]].forEach(([ov, tag]) => {
+      const pts = [];
+      for (let i = 0; i <= N; i++) {
+        const x = lerp(axis[1], axis[2], i / N);
+        const y = at(x, ov);
+        if (isFinite(y)) pts.push([x, y]);
+      }
+      if (pts.length > 1) series.push({ ov, tag, pts });
+    });
+    if (!series.length) return "";
+
+    const ys = series.reduce((s, g) => s.concat(g.pts.map(p => p[1])), []);
+    let lo = Math.min.apply(null, ys), hi = Math.max.apply(null, ys);
+    const span = Math.max(1e-6, hi - lo);
+    lo -= span * 0.12; hi += span * 0.12;
+
+    cc.clear();
+    const g = graph(cc, { x: 52, y: 18, w: cc.W - 68, h: cc.H - 48 },
+      { x0: axis[1], x1: axis[2], y0: lo, y1: hi });
+    g.frame({ xlabel: axis[0] + (axis[4] ? " (" + axis[4] + ")" : ""), ylabel: o.output });
+    g.grid(5, 4);
+
+    const main = col("m-color", "#35e0cf");
+    series.forEach(s => {
+      if (s.tag === "cur") return;
+      g.curve(s.pts, { color: col("text-faint"), width: 1.4, dash: [5, 4] });
+    });
+    const cur = series.find(s => s.tag === "cur");
+    if (cur) g.curve(cur.pts, { color: main, width: 2.4 });
+    const result = at(axisVal, otherVal);
+    if (isFinite(result)) g.dot(axisVal, result, { color: col("accent-2"), glow: col("accent-2") });
+
+    // 標出兩條淡曲線分別對應第二個參數的哪一端
+    const lab = (s, text) => {
+      if (!s) return;
+      const last = s.pts[s.pts.length - 1];
+      g.label(axis[1] + (axis[2] - axis[1]) * 0.02, last[1], text, { color: col("text-faint"), size: 9 });
+    };
+    lab(series.find(s => s.tag === "min"), other[0] + " = " + fmt(other[1], 2) + (other[4] || ""));
+    lab(series.find(s => s.tag === "max"), other[0] + " = " + fmt(other[2], 2) + (other[4] || ""));
+
+    return describeRelation(axis, other, at, otherVal, o.output);
+  }
+
+  /* 取樣曲線，判斷形狀與第二個參數的作用，翻成一句中文 */
+  function describeRelation(axis, other, at, otherVal, output) {
+    const sample = ov => {
+      const out = [];
+      for (let i = 0; i <= 8; i++) {
+        const x = lerp(axis[1], axis[2], i / 8);
+        out.push(at(x, ov));
+      }
+      return out.filter(isFinite);
+    };
+    const ys = sample(otherVal);
+    if (ys.length < 3) return "";
+    const y0 = ys[0], y1 = ys[ys.length - 1];
+    const range = Math.max.apply(null, ys) - Math.min.apply(null, ys);
+    const scale = Math.max(1e-9, Math.max(Math.abs(y0), Math.abs(y1)));
+
+    let shape;
+    if (range / scale < 0.01) {
+      shape = "「" + output + "」幾乎不隨「" + axis[0] + "」改變——這本身就是結論：這兩個量無關。";
+    } else {
+      const rising = y1 > y0;
+      // 用中點與兩端的連線比較，判斷是直線、還是往上／往下彎
+      const mid = ys[Math.floor(ys.length / 2)];
+      const chordMid = (y0 + y1) / 2;
+      const bend = (mid - chordMid) / (range || 1);
+      const curve = Math.abs(bend) < 0.06 ? "接近直線"
+        : (bend > 0 ? "往上凸（增加得越來越慢）" : "往下凹（增加得越來越快）");
+      shape = "「" + axis[0] + "」變大時，「" + output + "」" + (rising ? "跟著變大" : "反而變小") +
+        "，形狀" + curve + "。";
+    }
+
+    // 第二個參數的作用：比較它在最小與最大時，曲線整體高度差多少
+    const loS = sample(other[1]), hiS = sample(other[2]);
+    let effect = "";
+    if (loS.length && hiS.length) {
+      const avg = arr => arr.reduce((s, v) => s + v, 0) / arr.length;
+      const d = avg(hiS) - avg(loS);
+      const rel = Math.abs(d) / Math.max(1e-9, Math.abs(avg(loS)));
+      if (rel < 0.01) effect = "另一根滑桿「" + other[0] + "」不影響這條關係。";
+      else effect = "虛線是「" + other[0] + "」拉到兩端時的同一條關係——" +
+        "把它調大會讓整條曲線往" + (d > 0 ? "上" : "下") + "搬。";
+    }
+    return shape + effect;
   }
 
   function instrumentChrome(ctx, W, H, profile) {
@@ -947,7 +1144,7 @@
       if (o.glow) { ctx.shadowColor = o.glow; ctx.shadowBlur = o.glowSize || 16; }
       ctx.beginPath(); ctx.arc(x, y, r, 0, TAU);
       if (o.fill) {
-        const fill = ink(ctx, o.fill, x, y);
+        const fill = ink(ctx, o.fill, x, y, "fill");
         ctx.fillStyle = fill; ctx.fill();
         // 圓內接正方形，避免把角落誤標成被覆蓋
         const s = r * 1.414;
@@ -975,7 +1172,7 @@
       } else ctx.rect(x, y, w, h);
       ctx.closePath();
       if (o.fill) {
-        const fill = ink(ctx, o.fill, x + w / 2, y + h / 2);
+        const fill = ink(ctx, o.fill, x + w / 2, y + h / 2, "fill");
         ctx.fillStyle = fill; ctx.fill();
         noteFill(ctx, fill, x, y, w, h);
       }
@@ -1144,12 +1341,6 @@
       if (primary) ui.timeLabel.textContent = "t = " + primary.t.toFixed(2) + " s";
       const speed = primary ? primary.speed : 1;
       ui.speedBtns.forEach(b => b.classList.toggle("active", Number(b.dataset.speed) === speed));
-      // 讓疊在實驗畫面裡的學習提示能立即跟上播放、暫停與重設，不必等下一個影格。
-      if (typeof CustomEvent !== "undefined") {
-        root.dispatchEvent(new CustomEvent("lab-playback-state", {
-          detail: { running, time: primary ? primary.t : 0, animated }
-        }));
-      }
     }
 
     ui.playBtn.addEventListener("click", () => {
@@ -1239,12 +1430,13 @@
     has(id) { return !!registry[id]; },
     ids() { return Object.keys(registry); },
     // 對外助手
-    ui: { layout, slider, select, checkbox, buttonRow, button, readout, note, caption, section, stepper, chipGroup, charts, chart },
+    ui: { layout, slider, select, checkbox, buttonRow, button, readout, note, caption, section, stepper, chipGroup, charts, chart, relationChart },
     canvas: { create: createCanvas },
     draw: D,
     graph,
     loop,
     col, fmt, clamp, lerp, TAU, el,
+    lesson, templateGuide,
     /* 給工具層（sim-tools.js）用的內部掛鉤 */
     _hooks: {
       onStageCanvas(fn) { canvasHooks.push(fn); },
@@ -1256,15 +1448,19 @@
       name: themeName,
       isLight: () => themeName() === "light",
       ink, luminance, parseColor,
+      /* 供稽核工具判斷某個顏色是否為主題衍生（已隨主題調整、不該再被墨色層改動） */
+      isThemeSurface,
       /* 畫在實驗台背景上的中性裝飾線／面。深色主題是半透明白，淺色主題自動換成半透明深墨。 */
       pale(alpha) {
         const a = alpha == null ? 0.12 : alpha;
-        return themeName() === "light" ? rgba(LIGHT_INK, Math.min(0.9, a * 1.7)) : rgba([255, 255, 255], a);
+        return markThemeColor(themeName() === "light"
+          ? rgba(LIGHT_INK, Math.min(0.9, a * 1.7)) : rgba([255, 255, 255], a));
       },
       /* 需要「比背景更暗一階」的襯底面（例如嵌在畫面裡的小圖表底板）。 */
       shade(alpha) {
         const a = alpha == null ? 0.5 : alpha;
-        return themeName() === "light" ? "rgba(226,233,243," + Math.min(1, a + 0.4) + ")" : "rgba(8,13,20," + a + ")";
+        return markThemeColor(themeName() === "light"
+          ? "rgba(226,233,243," + Math.min(1, a + 0.4) + ")" : "rgba(8,13,20," + a + ")");
       }
     }
   };

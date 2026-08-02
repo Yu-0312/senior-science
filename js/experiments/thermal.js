@@ -433,7 +433,36 @@
       D.rect(ctx, W / 2 + 6, cy - 40, w2, 80, { fill: tcol(T2), stroke: "rgba(255,255,255,0.3)", r: 6 });
       D.text(ctx, PL.fmt(T1, 0) + "°C", W / 2 - w1 / 2 - 6, cy + 4, { color: "#fff", size: 14, align: "center", weight: "700" });
       D.text(ctx, PL.fmt(T2, 0) + "°C", W / 2 + w2 / 2 + 6, cy + 4, { color: "#fff", size: 14, align: "center", weight: "700" });
+
+      /*
+       * 溫度原本只改變方塊的顏色。顏色沒有刻度，學生無法從畫面判讀溫度高低，
+       * 更看不出「兩者往中間靠攏」的過程——量化檢查也證實這兩根滑桿
+       * 對畫面的幾何完全沒有作用。
+       *
+       * 補上兩支溫度計：水銀柱高度正比於溫度，並畫出混合後的終溫虛線。
+       * 終溫偏向質量大的那一邊，是這個實驗真正要教的事，
+       * 現在用兩支柱子與一條虛線就看得出來。
+       */
+      const thX = 46, thW = 22, thTop = cy - 92, thH = 168;
+      const tempY = T => thTop + thH * (1 - PL.clamp(T, 0, 100) / 100);
+      [[thX, T1, "物體1", MC()], [W - thX - thW, T2, "物體2", PL.col("accent-2")]].forEach(([x, T, lab, c]) => {
+        D.rect(ctx, x, thTop, thW, thH, { fill: PL.theme.shade(0.35), stroke: PL.theme.pale(0.25), r: 11 });
+        D.rect(ctx, x + 3, tempY(T), thW - 6, thTop + thH - tempY(T) - 3,
+          { fill: tcol(T), r: 8 });
+        for (let v = 0; v <= 100; v += 20) {
+          D.line(ctx, x + thW, tempY(v), x + thW + 5, tempY(v), PL.col("text-faint"), 1);
+          D.text(ctx, String(v), x + thW + 8, tempY(v) + 3, { color: PL.col("text-faint"), size: 8 });
+        }
+        D.text(ctx, lab, x + thW / 2, thTop - 8, { color: c, size: 10, align: "center", weight: "700" });
+      });
+      // 終溫：兩支溫度計最後都會停在這條線上
+      D.line(ctx, thX, tempY(Tf), W - thX, tempY(Tf), PL.col("warn"), 1.4, [6, 5]);
+      D.text(ctx, "終溫 " + PL.fmt(Tf, 1) + " °C", W / 2, tempY(Tf) - 7,
+        { color: PL.col("warn"), size: 10.5, align: "center", weight: "700" });
+
       D.text(ctx, "熱量由高溫流向低溫 →", W / 2, cy - 56, { color: PL.col("text-dim"), size: 11, align: "center" });
+      PL.ui.caption(cv, "終溫那條虛線不會落在正中間，而是偏向質量大的那一邊。" +
+        "把兩個質量調成一樣，虛線才會剛好落在兩個溫度的中點。");
       rTf.set(Tf, 1); rT1.set(T1, 1); rT2.set(T2, 1);
     }
     const anim = PL.loop(dt => {

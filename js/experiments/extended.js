@@ -47,7 +47,7 @@
   };
 
   function fillPill(ctx, x, y, label, value, w, tint) {
-    D.rect(ctx, x, y, w, 27, { fill: "rgba(7,11,17,0.72)", stroke: tint, width: 1, r: 6 });
+    D.rect(ctx, x, y, w, 27, { fill: PL.theme.shade(0.72), stroke: tint, width: 1, r: 6 });
     D.text(ctx, label, x + 9, y + 11, { color: PL.col("text-faint"), size: 8.5 });
     D.text(ctx, value, x + 9, y + 22, { color: tint, size: 10.5, weight: "700" });
   }
@@ -94,7 +94,21 @@
       D.disc(ctx, cx, cy2, 20, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 18 });
       D.ring(ctx, cx, cy2, r, "rgba(255,255,255,0.22)", 1.4);
       const p = t * 0.9, px = cx + r * Math.cos(p), py = cy2 + r * Math.sin(p) * 0.68;
-      D.disc(ctx, px, py, 9, { fill: c, glow: c, glowSize: 10 }); D.arrow(ctx, px, py, px - 25 * Math.sin(p), py + 18 * Math.cos(p), { color: PL.col("accent-2"), width: 1.7, label: "v" });
+      /*
+       * satellite-energy 的「衛星質量」原本對畫面毫無作用。
+       * 軌道速度確實與衛星質量無關——這正是要教的事——
+       * 但學生看不到任何東西改變時，只會覺得這根滑桿壞了。
+       * 改成衛星本身畫得隨質量變大，軌道半徑與速度則紋風不動，
+       * 並直接把這個結論寫在畫面上。
+       */
+      const satR = cfg.id === "satellite-energy"
+        ? 6 + 10 * (b - cfg.b[1]) / (cfg.b[2] - cfg.b[1]) : 9;
+      D.disc(ctx, px, py, satR, { fill: c, glow: c, glowSize: 10 });
+      D.arrow(ctx, px, py, px - 25 * Math.sin(p), py + 18 * Math.cos(p), { color: PL.col("accent-2"), width: 1.7, label: "v" });
+      if (cfg.id === "satellite-energy") {
+        D.text(ctx, "衛星變重了，但軌道半徑與速度完全沒變——軌道只由中心天體與半徑決定",
+          W / 2, H - 30, { color: PL.col("text-dim"), size: 10.5, align: "center" });
+      }
       fillPill(ctx, W - 154, 20, "軌道量測", PL.fmt(value, 2), 132, c);
     } else if (cfg.kind === "thermal") {
       const tankX = W * 0.23, tankY = 42, tankW = W * 0.45, tankH = H * 0.56, fillY = tankY + tankH * (0.6 - 0.18 * Math.sin(t));
@@ -104,23 +118,95 @@
       D.line(ctx, tankX + tankW + 32, tankY, tankX + tankW + 32, tankY + tankH, PL.col("text-faint"), 2); D.disc(ctx, tankX + tankW + 32, fillY + 8, 7, { fill: PL.col("danger") });
       fillPill(ctx, 18, 18, "系統讀值", PL.fmt(value, 2), 118, c);
     } else if (cfg.kind === "wave") {
-      const xStart = 28, amp = 18 + b * 2, mid = cy;
+      /*
+       * 原本振幅寫成 18 + b*2，直接吃第二根滑桿的原始數值。
+       * 對 reflection-boundary 來說第一根才是「脈衝振幅」，所以那根滑桿沒有作用；
+       * 對 air-column-resonance 來說 b 是 100~800 Hz 的頻率，
+       * 算出來的振幅會高達一千多像素，整條波直接畫到畫面外。
+       * 改成依各滑桿自己的範圍正規化：振幅取自第一根，波長取自第二根。
+       */
+      const nA = (a - cfg.a[1]) / Math.max(1e-9, cfg.a[2] - cfg.a[1]);
+      const nB = (b - cfg.b[1]) / Math.max(1e-9, cfg.b[2] - cfg.b[1]);
+      const xStart = 28, amp = 10 + nA * 34, waveLen = 18 + (1 - nB) * 34, mid = cy;
       ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2.8; ctx.beginPath();
-      for (let x = xStart; x < W - 24; x += 2) { const y = mid + Math.sin((x - xStart) / 28 - t * 4) * amp; x === xStart ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
+      for (let x = xStart; x < W - 24; x += 2) { const y = mid + Math.sin((x - xStart) / waveLen - t * 4) * amp; x === xStart ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
       D.line(ctx, xStart, mid, W - 24, mid, "rgba(255,255,255,0.14)", 1);
       fillPill(ctx, 18, 18, "波動讀值", PL.fmt(value, 2), 118, c);
     } else if (cfg.kind === "optics") {
       const sourceX = 48, lensX = W * 0.5, screenX = W - 70, lensY = cy;
       D.rect(ctx, sourceX - 14, lensY - 22, 28, 44, { fill: PL.col("panel-3"), stroke: c, r: 4 }); D.disc(ctx, sourceX, lensY, 5, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 8 });
       D.line(ctx, lensX, lensY - 64, lensX, lensY + 64, c, 4); D.line(ctx, screenX, lensY - 76, screenX, lensY + 76, "rgba(255,255,255,0.42)", 4);
-      for (const dy of [-32, 0, 32]) { D.line(ctx, sourceX + 12, lensY + dy * 0.35, lensX, lensY + dy, PL.col("warn"), 1.8); D.line(ctx, lensX, lensY + dy, screenX, lensY - dy * 0.7, c, 1.8); }
+      if (cfg.id === "critical-angle") {
+        /*
+         * 「入射角 θ」原本對畫面完全沒有作用——三條光線永遠畫在 dy = −32/0/32。
+         * 全反射的重點就是「角度超過臨界角就折不出去」，
+         * 角度看不到的話這個實驗等於沒有內容。
+         *
+         * 改成畫一條真的以 θ 入射的光線：
+         *   θ < θc → 折射出去（用 Snell 定律算折射角）
+         *   θ ≥ θc → 折射線消失，只剩全反射線
+         */
+        const n1 = a, thetaC = Math.asin(1 / n1) * 180 / Math.PI;
+        const th = b * Math.PI / 180, bx = W * 0.5, by = lensY;
+        D.line(ctx, 40, by, W - 40, by, PL.theme.pale(0.3), 2);            // 介面
+        D.line(ctx, bx, by - 90, bx, by + 90, PL.theme.pale(0.18), 1, [5, 4]);  // 法線
+        D.text(ctx, "n₁ = " + PL.fmt(n1, 2) + "（密介質）", 46, by + 24, { color: PL.col("text-faint"), size: 10 });
+        D.text(ctx, "n₂ = 1.00（空氣）", 46, by - 14, { color: PL.col("text-faint"), size: 10 });
+        // 入射線（由下方密介質射向介面）
+        const inLen = 110;
+        D.arrow(ctx, bx - inLen * Math.sin(th), by + inLen * Math.cos(th), bx, by,
+          { color: PL.col("warn"), width: 2.2, head: 7, label: "θ = " + PL.fmt(b, 0) + "°" });
+        const sinT2 = n1 * Math.sin(th);
+        if (sinT2 <= 1) {
+          const th2 = Math.asin(sinT2);
+          D.arrow(ctx, bx, by, bx + inLen * Math.sin(th2), by - inLen * Math.cos(th2),
+            { color: c, width: 2.2, head: 7, label: "折射 " + PL.fmt(th2 * 180 / Math.PI, 0) + "°" });
+          D.text(ctx, "θ 還沒超過臨界角 " + PL.fmt(thetaC, 1) + "°，光可以折射出去",
+            W / 2, H - 26, { color: PL.col("text-dim"), size: 11, align: "center" });
+        } else {
+          D.text(ctx, "全反射", bx + 96, by - 34, { color: PL.col("danger"), size: 13, weight: "700" });
+          D.text(ctx, "θ 超過臨界角 " + PL.fmt(thetaC, 1) + "°，光完全折不出去，全部反射回密介質",
+            W / 2, H - 26, { color: PL.col("danger"), size: 11, align: "center", weight: "700" });
+        }
+        // 反射線一定存在
+        D.arrow(ctx, bx, by, bx + inLen * Math.sin(th), by + inLen * Math.cos(th),
+          { color: sinT2 > 1 ? PL.col("danger") : PL.theme.pale(0.35), width: sinT2 > 1 ? 2.4 : 1.4, head: 6 });
+      } else {
+        for (const dy of [-32, 0, 32]) { D.line(ctx, sourceX + 12, lensY + dy * 0.35, lensX, lensY + dy, PL.col("warn"), 1.8); D.line(ctx, lensX, lensY + dy, screenX, lensY - dy * 0.7, c, 1.8); }
+      }
       fillPill(ctx, 18, 18, "光學量測", PL.fmt(value, 2), 118, c);
     } else if (["circuit", "field", "magnetic"].includes(cfg.kind)) {
       const left = 70, right = W - 74, top = H * 0.3, bottom = H * 0.72;
       D.line(ctx, left, top, right, top, c, 2.2); D.line(ctx, right, top, right, bottom, c, 2.2); D.line(ctx, right, bottom, left, bottom, c, 2.2); D.line(ctx, left, bottom, left, top, c, 2.2);
       D.disc(ctx, left, cy, 21, { fill: "rgba(255,204,102,0.14)", stroke: PL.col("warn"), width: 2 }); D.text(ctx, "+", left, cy + 6, { color: PL.col("warn"), size: 18, align: "center", weight: "700" });
       if (cfg.kind === "magnetic") { for (let i = 0; i < 7; i++) D.ring(ctx, W * 0.5, cy, 24 + i * 8, "rgba(201,140,255,0.18)", 1); D.arrow(ctx, W * 0.5, cy, W * 0.5 + 45, cy, { color: PL.col("accent-2"), width: 2, label: "B" }); }
-      if (cfg.kind === "field") { for (let y = top + 24; y < bottom; y += 25) D.arrow(ctx, left + 46, y, right - 46, y, { color: PL.col("accent-2"), width: 1 }); }
+      if (cfg.kind === "field") {
+        if (cfg.id === "electrostatic-shield") {
+          /*
+           * 「屏蔽厚度」原本對畫面沒有作用，外加場的箭頭一路穿過去，
+           * 看起來反而像是屏蔽沒有效果——和讀數說的「殼內場強 = 0」互相矛盾。
+           * 改成畫出真正有厚度的金屬殼：箭頭在殼外，殼內完全空白，
+           * 厚度隨滑桿改變，但殼內恆為零這件事不隨厚度改變。
+           */
+          const thick = 4 + (b - cfg.b[1]) / Math.max(1e-9, cfg.b[2] - cfg.b[1]) * 22;
+          const shellL = W * 0.38, shellR = W * 0.66;
+          const arrowLen = 14 + (a - cfg.a[1]) / Math.max(1e-9, cfg.a[2] - cfg.a[1]) * 26;
+          for (let y = top + 22; y < bottom; y += 22) {
+            D.arrow(ctx, left + 40, y, left + 40 + arrowLen, y, { color: PL.col("accent-2"), width: 1.4 });
+            D.arrow(ctx, shellR + thick + 10, y, shellR + thick + 10 + arrowLen, y, { color: PL.col("accent-2"), width: 1.4 });
+          }
+          D.rect(ctx, shellL, top + 10, thick, bottom - top - 20, { fill: "#8d97a6", stroke: PL.theme.pale(0.4), r: 2 });
+          D.rect(ctx, shellR, top + 10, thick, bottom - top - 20, { fill: "#8d97a6", stroke: PL.theme.pale(0.4), r: 2 });
+          D.text(ctx, "殼內 E = 0", (shellL + shellR + thick) / 2, cy + 4,
+            { color: PL.col("ok"), size: 13, align: "center", weight: "700" });
+          D.text(ctx, "厚度 " + PL.fmt(b, 1) + " mm", (shellL + shellR + thick) / 2, cy + 24,
+            { color: PL.col("text-faint"), size: 10, align: "center" });
+          D.text(ctx, "把厚度或外加場拉到最大，殼內仍然是零——這就是法拉第籠",
+            W / 2, bottom + 24, { color: PL.col("text-dim"), size: 10.5, align: "center" });
+        } else {
+          for (let y = top + 24; y < bottom; y += 25) D.arrow(ctx, left + 46, y, right - 46, y, { color: PL.col("accent-2"), width: 1 });
+        }
+      }
       fillPill(ctx, W - 154, 20, "儀表讀數", PL.fmt(value, 2), 132, c);
     } else if (cfg.kind === "nuclear") {
       const sourceX = W * 0.14, targetX = W * 0.51, detectorX = W * 0.84;
@@ -172,13 +258,24 @@
       PL.ui.caption(cv, "互動模型：調整左側參數，讀取右側資料與曲線");
   }
 
+  /*
+   * reflection-boundary：反射相位由「固定端／自由端」決定，與脈衝振幅無關。
+   * 原本關係圖掃振幅，畫出來是一條水平線；改掃反射端，才看得到
+   * 「固定端反相 180°、自由端同相 0°」這個本來就是重點的落差。
+   */
+  if (T["reflection-boundary"]) T["reflection-boundary"].sweep = "b";
+
+  // 同一個 kind 由多個實驗共用，但兩根滑桿的語意各不相同。
+  // 把 id 帶進設定，讓畫面可以針對特定實驗做正確的呈現。
+  Object.keys(T).forEach(id => { T[id].id = id; });
+
   Object.keys(T).forEach(id => {
     PL.register(id, { build(root) {
       const cfg = T[id], L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.58, 860);
       PL.ui.section(L.controls, "實驗條件");
       const sa = PL.ui.slider(L.controls, { label: cfg.a[0], min: cfg.a[1], max: cfg.a[2], value: cfg.a[3], step: (cfg.a[2] - cfg.a[1]) / 100, unit: cfg.a[4], digits: cfg.a[4] === "" ? 2 : 1, onInput: () => render() });
       const sb = PL.ui.slider(L.controls, { label: cfg.b[0], min: cfg.b[1], max: cfg.b[2], value: cfg.b[3], step: (cfg.b[2] - cfg.b[1]) / 100, unit: cfg.b[4], digits: cfg.b[4] === "" ? 2 : 1, onInput: () => render() });
-      PL.ui.note(L.controls, "拖曳參數可同步更新儀器場景、即時讀數與關係圖。以本頁公式和讀數確認物理關係。");
+      PL.ui.note(L.controls, PL.templateGuide(id, cfg));
       const row = PL.ui.buttonRow(L.controls);
       let playing = true, anim;
       const play = PL.ui.button(row, "暫停", () => {
@@ -195,13 +292,10 @@
         const a = sa.get(), b = sb.get(), result = cfg.calc(a, b);
         drawScene(cv, cfg, a, b, time, result);
         r.set(result, Math.abs(result) < 1 ? 3 : 2); r2.set(b, cfg.b[4] === "" ? 2 : 1);
-        chart.clear();
-        const x0 = cfg.a[1], x1 = cfg.a[2], samples = 100;
-        const pts = []; let ymax = 1;
-        for (let i = 0; i <= samples; i++) { const x = PL.lerp(x0, x1, i / samples); const y = cfg.calc(x, b); pts.push([x, y]); ymax = Math.max(ymax, Math.abs(y) * 1.15); }
-        const ymin = Math.min(0, ...pts.map(p => p[1])) * 1.15;
-        const g = PL.graph(chart, { x: 42, y: 18, w: chart.W - 58, h: chart.H - 44 }, { x0, x1, y0: ymin, y1: ymax });
-        g.frame({ xlabel: cfg.a[0], ylabel: cfg.output }); g.grid(5, 4); g.curve(pts, { color: color(), width: 2.2 }); g.dot(a, result, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+        chart.setCap(PL.ui.relationChart(chart, {
+          a: cfg.a, b: cfg.b, av: a, bv: b,
+          calc: cfg.calc, output: cfg.output, sweep: cfg.sweep
+        }));
       }
       anim = PL.loop(dt => { if (dt) time += dt; render(); });
       cv.onResize(render); chart.onResize(render); render(); anim.start();
@@ -325,7 +419,16 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const data = values(), x0 = 72, x1 = W - 64, trackY = H * 0.57;
-      const mapX = position => x0 + position / data.outward * (x1 - x0);
+      /*
+       * 原本寫成 position / data.outward，也就是把去程距離正規化成整個畫布寬度。
+       * 結果無論 L 設 4 m 還是 30 m，畫出來的路徑一模一樣長，
+       * 學生拉「去程距離」這根滑桿完全看不出差別——尺度被自己抵銷掉了。
+       *
+       * 改用固定比例尺（以滑桿上限 30 m 對應整條軌道），
+       * 短程就畫得短、長程就畫得長，L 這根滑桿才真的在說一件事。
+       */
+      const SPAN = 30;
+      const mapX = position => x0 + position / SPAN * (x1 - x0);
       const finishX = mapX(data.final), currentX = mapX(data.current);
       D.text(ctx, "一趟有折返的直線步行", x0, 31, { color: PL.col("text"), size: 13, weight: "700" });
       D.text(ctx, "以起點為 x = 0，向右為正方向", x1, 31, { color: PL.col("text-faint"), size: 9.5, align: "right" });
@@ -333,14 +436,17 @@
       for (let step = 0; step <= 10; step++) {
         const x = x0 + step / 10 * (x1 - x0);
         D.line(ctx, x, trackY - 10, x, trackY + 10, "rgba(255,255,255,0.2)", 1);
+        D.text(ctx, String(step * SPAN / 10), x, trackY + 24,
+          { color: PL.col("text-faint"), size: 8.5, align: "center" });
       }
-      D.line(ctx, x0, trackY - 78, x1, trackY - 78, "rgba(53,224,207,0.22)", 2, [4, 4]);
-      D.arrow(ctx, x0 + 8, trackY - 78, x1 - 10, trackY - 78, { color: color(), width: 2.5, label: "去程 L = " + PL.fmt(data.outward, 1) + " m" });
-      D.line(ctx, finishX, trackY + 84, x1, trackY + 84, "rgba(255,183,77,0.22)", 2, [4, 4]);
-      D.arrow(ctx, x1 - 8, trackY + 84, finishX + 8, trackY + 84, { color: PL.col("warn"), width: 2.5, label: "回程 rL = " + PL.fmt(data.returned, 1) + " m" });
+      const turnX = mapX(data.outward);
+      D.line(ctx, x0, trackY - 78, turnX, trackY - 78, "rgba(53,224,207,0.22)", 2, [4, 4]);
+      D.arrow(ctx, x0 + 8, trackY - 78, turnX - 4, trackY - 78, { color: color(), width: 2.5, label: "去程 L = " + PL.fmt(data.outward, 1) + " m" });
+      D.line(ctx, finishX, trackY + 84, turnX, trackY + 84, "rgba(255,183,77,0.22)", 2, [4, 4]);
+      D.arrow(ctx, turnX - 4, trackY + 84, finishX + 4, trackY + 84, { color: PL.col("warn"), width: 2.5, label: "回程 rL = " + PL.fmt(data.returned, 1) + " m" });
       [
         [x0, "起點", "x = 0"],
-        [x1, "折返點", "x = " + PL.fmt(data.outward, 1) + " m"],
+        [turnX, "折返點", "x = " + PL.fmt(data.outward, 1) + " m"],
         [finishX, "終點", "x = " + PL.fmt(data.final, 1) + " m"]
       ].forEach(([x, title, detail], index) => {
         D.line(ctx, x, trackY - 22, x, trackY + 26, index === 2 ? PL.col("warn") : "rgba(255,255,255,0.54)", 2);

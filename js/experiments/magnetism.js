@@ -166,10 +166,23 @@
 
       // 磁鐵：南北極用顏色與字標示
       const mx = cx + x * scale;
-      D.rect(ctx, mx - 34, cy - 13, 34, 26, { fill: "#d1495b", r: 2 });
-      D.rect(ctx, mx, cy - 13, 34, 26, { fill: "#4a6fa5", r: 2 });
-      D.text(ctx, "N", mx - 17, cy + 5, { color: "#fff", size: 13, align: "center", weight: "700" });
-      D.text(ctx, "S", mx + 17, cy + 5, { color: "#fff", size: 13, align: "center", weight: "700" });
+      /*
+       * 「磁鐵強度」原本只進到磁通量公式裡，磁鐵本身永遠畫成同樣大小，
+       * 學生拉這根滑桿時畫面上找不到任何線索。
+       * 改成磁鐵尺寸與周圍磁力線的密度都隨強度改變。
+       */
+      const strength = sStrength.get();
+      const magW = 24 + strength * 8, magH = 18 + strength * 6;
+      // 磁力線：強度越大畫得越多
+      const lines = Math.round(2 + strength * 2);
+      for (let i = 1; i <= lines; i += 1) {
+        const rr = magH * 0.7 + i * 9;
+        D.ring(ctx, mx, cy, rr, "rgba(209,73,91,0.16)", 1);
+      }
+      D.rect(ctx, mx - magW, cy - magH / 2, magW, magH, { fill: "#d1495b", r: 2 });
+      D.rect(ctx, mx, cy - magH / 2, magW, magH, { fill: "#4a6fa5", r: 2 });
+      D.text(ctx, "N", mx - magW / 2, cy + 5, { color: "#fff", size: 13, align: "center", weight: "700" });
+      D.text(ctx, "S", mx + magW / 2, cy + 5, { color: "#fff", size: 13, align: "center", weight: "700" });
 
       const phi = flux(x);
       const e = emf(x, v);

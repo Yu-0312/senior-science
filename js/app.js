@@ -221,13 +221,12 @@
     const net = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     if (net && (net.saveData || /2g/.test(net.effectiveType || ""))) return;
     const idle = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
-    const build = (window.PhysicsLabSite && window.PhysicsLabSite.build) || "";
     idle(() => {
       [order - 1, order + 1].forEach(i => {
         const item = FLAT[i];
         if (!item || PL.has(item.exp.id)) return;
         const file = EXPERIMENT_FILES[item.exp.id];
-        if (file) loadScript("js/experiments/" + file + (build ? "?v=" + build : "")).catch(() => {});
+        if (file) loadScript("js/experiments/" + file).catch(() => {});
       });
     });
   }
@@ -580,9 +579,8 @@
       },
       {
         type: "單選題 · 解題步驟",
-        prompt: "下列哪個解題流程最合理？",
+        prompt: "面對下列公式時，下列哪個解題流程最合理？",
         formula: exp.formula,
-        formulaBeforePrompt: "面對下列公式：",
         options: formulaChoices.options,
         correct: formulaChoices.correct,
         hint: "先圈出公式中的每個符號，確認單位一致，再決定要代入、比例比較，還是看圖讀值。",
@@ -735,16 +733,12 @@
       const selectedAnswer = savedAnswer === q.correct ? savedAnswer : (solved ? q.correct : null);
       const status = el("span", "practice-status", head); status.textContent = solved ? "答對" : "待作答";
       const prompt = el("p", "practice-question", item);
-      const appendFormula = () => {
+      if (q.formula) {
+        prompt.append(document.createTextNode("面對下列公式："));
         const formula = el("span", "practice-formula", prompt); formula.innerHTML = q.formula;
-      };
-      if (q.formula && q.formulaBeforePrompt) {
-        prompt.append(document.createTextNode(q.formulaBeforePrompt));
-        appendFormula();
-        prompt.append(document.createTextNode(q.prompt));
+        prompt.append(document.createTextNode("下列哪個解題流程最合理？"));
       } else {
-        prompt.append(document.createTextNode(q.prompt));
-        if (q.formula) appendFormula();
+        prompt.textContent = q.prompt;
       }
       const choices = el("div", "practice-options", item);
       choices.setAttribute("role", "radiogroup");

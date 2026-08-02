@@ -129,6 +129,9 @@ body.checkpoint-active { overflow: hidden; }
 .checkpoint-choice.correct { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--text); opacity: 1; }
 .checkpoint-choice.incorrect { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--text); opacity: 1; }
 .checkpoint-choice-index { display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid currentColor; border-radius: 50%; color: var(--text-faint); font-size: 10px; font-weight: 800; }
+/* 選項文字：公式或英文專有名詞可能是一長串不含空白的字元，
+   沒有這條規則時會撐破格線欄、把 A/B/C/D 的圓圈擠掉。 */
+.checkpoint-choice-label { min-width: 0; overflow-wrap: anywhere; }
 .checkpoint-choice.correct .checkpoint-choice-index { color: var(--ok); }
 .checkpoint-choice.incorrect .checkpoint-choice-index { color: var(--danger); }
 .checkpoint-feedback { margin: 13px 0 0; padding: 11px 12px; border-left: 2px solid var(--checkpoint-color, var(--accent)); background: var(--panel-2); color: var(--text-dim); font-size: 12.5px; line-height: 1.65; }
@@ -531,13 +534,47 @@ button.exp-path-step:hover { border-color: var(--m-ink, var(--m-color, var(--acc
 .learning-reflection-save { min-height: 30px; padding: 0 10px; border: 1px solid var(--m-color, var(--accent)); border-radius: 6px; cursor: pointer; background: transparent; color: var(--m-ink, var(--m-color, var(--accent))); font: inherit; font-size: 11.5px; font-weight: 750; }
 .learning-reflection-save:hover { background: color-mix(in srgb, var(--m-color, var(--accent)) 10%, transparent); }
 
-.content-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
+/*
+ * 學習單列
+ * 這一列原本完全沒有樣式，於是渲染成「一條藍色底線的裸連結」直接黏著一段說明文字，
+ * 中間沒有任何間距，看起來像是漏排版。改成左邊一顆有邊框的按鈕、右邊一句灰色補充。
+ */
+.worksheet-link-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin-top: 14px; padding-top: 13px; border-top: 1px dashed var(--border-soft);
+}
+.worksheet-link {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px;
+  border: 1px solid var(--m-color, var(--accent)); border-radius: 7px;
+  color: var(--m-ink, var(--m-color, var(--accent)));
+  font-size: 12px; font-weight: 750; text-decoration: none; white-space: nowrap;
+}
+.worksheet-link::before { content: "🖨"; font-size: 12px; }
+.worksheet-link:hover { background: color-mix(in srgb, var(--m-color, var(--accent)) 10%, transparent); }
+.worksheet-link:focus-visible { outline: 2px solid var(--m-color, var(--accent)); outline-offset: 2px; }
+.worksheet-link-note { color: var(--text-faint); font-size: 11.5px; line-height: 1.6; min-width: 0; }
+
+/*
+ * 左右兩欄等高
+ *
+ * 原本是 align-items: start，兩張卡片各自取自然高度：
+ * 左邊的模擬工作區約 1050px、右邊的概念與題目約 1250px，
+ * 底部差了兩百多像素，兩個框線收在不同的位置，看起來像是沒對齊的破版。
+ *
+ * 改成 stretch 之後同一列的卡片一律等高，比較矮的那張自己撐開。
+ * 撐開的空白落在 .card-body 裡（下面把 body 設成 flex: 1），
+ * 因此看起來是「這張卡片的留白比較多」，而不是「這張卡片提早結束」。
+ */
+.content-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: stretch; }
 
 .card {
   background: var(--panel); backdrop-filter: blur(8px);
   border: 1px solid var(--border-soft); border-radius: var(--radius); overflow: hidden;
   box-shadow: 0 10px 30px -22px rgba(0, 0, 0, 0.9);
+  /* 讓 card-body 能吸收等高撐出來的空間，而不是在卡片底部留一條沒有背景的縫 */
+  display: flex; flex-direction: column;
 }
+.card > .card-body { flex: 1 1 auto; }
 .card-title {
   font-size: 11.5px; letter-spacing: 1.6px; color: var(--text-dim); text-transform: uppercase;
   padding: 13px 18px; border-bottom: 1px solid var(--border-soft); display: flex; align-items: center; gap: 9px;
@@ -546,10 +583,7 @@ button.exp-path-step:hover { border-color: var(--m-ink, var(--m-color, var(--acc
 .card-body { padding: 18px; }
 
 /* 模擬工作區：以共用實驗台將每個主題收斂成同一套量測語言 */
-.lab-sim {
-  --sim-edge: color-mix(in srgb, var(--m-color, var(--accent)) 28%, var(--border));
-  --sim-surface: color-mix(in srgb, var(--panel-solid) 86%, var(--m-color, var(--accent)) 14%);
-}
+.lab-sim { --sim-edge: color-mix(in srgb, var(--m-color, var(--accent)) 28%, var(--border)); }
 .lab-sim[data-lab-family="mechanics"] { --lab-stage: #5aa2ff; }
 .lab-sim[data-lab-family="orbital"] { --lab-stage: #9c8cff; }
 .lab-sim[data-lab-family="thermal"] { --lab-stage: #ffb357; }
@@ -559,15 +593,19 @@ button.exp-path-step:hover { border-color: var(--m-ink, var(--m-color, var(--acc
 .lab-sim[data-lab-family="magnetism"] { --lab-stage: #c98cff; }
 .lab-sim[data-lab-family="modern"] { --lab-stage: #ed8fb9; }
 .sim-stage {
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(236px, 276px); gap: 14px; align-items: start;
-  padding: 14px; border: 1px solid var(--sim-edge); border-radius: 8px; overflow: hidden; position: relative;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--sim-bg-1) 88%, var(--m-color, var(--accent)) 12%), var(--panel-solid));
-  box-shadow: inset 0 1px 0 var(--edge-hi), 0 18px 40px -32px rgba(0, 0, 0, 0.92);
+  /*
+   * 實驗台內部同樣要等高：畫布面板高、參數面板矮，
+   * 兩塊面板的下緣差距在多數實驗上超過 250px，是整頁最明顯的不對齊。
+   * stretch 之後參數面板變成一根完整的側欄，控制項靠上排列。
+   */
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(236px, 276px); gap: 14px; align-items: stretch;
+  padding: 12px; border: 1px solid var(--sim-edge); border-radius: 10px; overflow: hidden; position: relative;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--sim-bg-1) 90%, var(--m-color, var(--accent)) 10%), var(--panel-solid));
+  box-shadow: inset 0 1px 0 var(--edge-hi), 0 16px 36px -30px rgba(0, 0, 0, 0.9);
 }
 .sim-command-bar {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; padding: 10px 11px 10px 14px;
-  border: 1px solid var(--sim-edge); border-radius: 8px; background: linear-gradient(90deg, var(--sim-surface), var(--panel-solid));
-  box-shadow: inset 3px 0 0 var(--m-color, var(--accent));
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; padding: 9px 10px 9px 12px;
+  border: 1px solid var(--sim-edge); border-radius: 8px; background: linear-gradient(90deg, color-mix(in srgb, var(--panel-solid) 86%, var(--m-color, var(--accent)) 14%), var(--panel-solid));
 }
 .sim-command-title { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .sim-command-stage { color: var(--text); font-size: 12px; font-weight: 800; white-space: nowrap; }
@@ -739,7 +777,15 @@ button.exp-path-step:hover { border-color: var(--m-ink, var(--m-color, var(--acc
    可拖曳量測工具層
    疊在主畫布上；沒有開啟任何工具時完全不攔截指標事件。
    --------------------------------------------------------------------------- */
-.sim-tool-host { position: absolute; inset: 0; pointer-events: none; }
+/*
+ * 量測工具的疊圖層
+ *
+ * 原本寫 inset: 0。絕對定位是相對於「內距框」，而 .sim-canvas-wrap 有 12px 內距，
+ * 畫布本身則從內容框開始——兩者差了 12px，工具因此整片往左上偏移一個內距，
+ * 尺量出來的長度是對的，但把尺對齊畫面上的物體時會差 12px。
+ * 改由 JS 依畫布實際的 offsetLeft / offsetTop 定位，內距在各斷點怎麼改都不會再錯位。
+ */
+.sim-tool-host { position: absolute; top: 0; left: 0; pointer-events: none; }
 .sim-tool-layer { display: block; pointer-events: none; touch-action: none; cursor: grab; }
 .sim-tool-host.has-tools .sim-tool-layer { pointer-events: auto; }
 .sim-tool-layer:active { cursor: grabbing; }
@@ -854,53 +900,27 @@ body.is-offline .topbar { position: sticky; }
 .sim-visual-panel, .sim-control-deck, .sim-readout-panel {
   position: relative; min-width: 0; border: 1px solid var(--border-soft); background: color-mix(in srgb, var(--panel-solid) 80%, transparent);
 }
-.sim-visual-panel {
-  border-color: color-mix(in srgb, var(--m-color, var(--accent)) 34%, var(--border-soft)); border-radius: 8px; overflow: hidden;
-  box-shadow: 0 14px 28px -24px rgba(0, 0, 0, 0.95), inset 0 1px 0 var(--edge-hi);
-}
-.sim-visual-panel::before {
-  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0.38;
-  background-image: linear-gradient(90deg, var(--grid-line) 1px, transparent 1px), linear-gradient(var(--grid-line) 1px, transparent 1px);
-  background-size: 24px 24px;
-  mask-image: linear-gradient(to bottom, #000, transparent 42%);
-}
-.sim-visual-panel > * { position: relative; z-index: 1; }
-.sim-control-deck { border-radius: 8px; box-shadow: inset 0 1px 0 var(--edge-hi); }
+/*
+ * 兩塊面板都排成直向 flex，這樣等高撐出來的空白會落在正確的地方：
+ *   · 畫布面板：空白落在畫布與底部識別列之間，識別列貼齊面板下緣
+ *   · 參數面板：空白落在控制項下方，面板下緣與畫布面板切齊
+ * 若某個實驗的控制項比畫布還高，兩者角色互換，規則一樣成立。
+ */
+.sim-visual-panel { border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
+.sim-visual-panel > .sim-canvas-wrap { flex: 1 1 auto; }
+.sim-visual-panel > .sim-instrument-strip { margin-top: auto; }
+.sim-control-deck { border-radius: 8px; display: flex; flex-direction: column; }
+.sim-control-deck > .sim-controls { flex: 1 1 auto; }
 .sim-panel-head {
-  min-height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 12px;
-  border-bottom: 1px solid var(--border-soft); background: linear-gradient(90deg, var(--tint-2), transparent);
+  min-height: 38px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px;
+  border-bottom: 1px solid var(--border-soft); background: var(--tint-1);
 }
 .sim-panel-title { font-size: 10.5px; font-weight: 700; letter-spacing: 1.2px; color: var(--text-dim); text-transform: uppercase; }
-.sim-visual-title-block { display: grid; min-width: 0; gap: 1px; }
-.sim-visual-eyebrow { color: var(--m-ink, var(--m-color, var(--accent))); font-size: 9px; font-weight: 800; letter-spacing: 1.2px; line-height: 1.2; }
-.sim-visual-title-block .sim-panel-title { color: var(--text); font-size: 12px; letter-spacing: 0.4px; text-transform: none; overflow-wrap: anywhere; }
-.sim-visual-meta { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
-.sim-visual-code { color: var(--text-faint); font-size: 9.5px; font-weight: 750; letter-spacing: 0.8px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .sim-live { color: var(--m-ink, var(--m-color, var(--accent))); font-size: 10px; font-weight: 800; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
 .sim-live::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; vertical-align: 1px; }
 .sim-panel-hint { color: var(--text-faint); font-size: 10px; letter-spacing: 0.5px; white-space: nowrap; }
-.sim-canvas-wrap { min-width: 0; padding: 12px 12px 10px; background: linear-gradient(180deg, color-mix(in srgb, var(--sim-bg-1) 76%, var(--m-color, var(--accent)) 5%), transparent); }
-.sim-canvas {
-  display: block; width: 100%; border-radius: 6px; background: var(--sim-bg-1);
-  border: 1px solid color-mix(in srgb, var(--m-color, var(--accent)) 32%, var(--border));
-  box-shadow: inset 0 0 40px var(--sim-shadow), 0 10px 24px -20px rgba(0, 0, 0, 0.98);
-}
-/* 播放時才出現；位置鎖在畫面角落，不會擠壓畫布或控制項。 */
-.sim-live-observation {
-  position: absolute; left: 24px; bottom: 22px; z-index: 3; width: min(330px, calc(100% - 48px));
-  padding: 10px 12px 9px; border: 1px solid color-mix(in srgb, var(--m-color, var(--accent)) 42%, var(--border)); border-left: 3px solid var(--m-color, var(--accent)); border-radius: 8px;
-  pointer-events: none; color: var(--text); background: color-mix(in srgb, var(--sim-bg-1) 78%, var(--m-color, var(--accent)) 22%);
-  box-shadow: 0 12px 24px -18px rgba(0, 0, 0, 0.95), inset 0 1px 0 var(--edge-hi); backdrop-filter: blur(8px);
-  animation: labObservationIn 0.22s ease-out both;
-}
-.sim-live-observation[hidden] { display: none; }
-.sim-live-observation-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.sim-live-observation-kicker { color: var(--m-ink, var(--m-color, var(--accent))); font-size: 9.5px; font-weight: 800; letter-spacing: 1px; }
-.sim-live-observation-state { color: var(--text-faint); font-size: 9.5px; font-weight: 700; }
-.sim-live-observation-state::before { content: ""; display: inline-block; width: 5px; height: 5px; margin-right: 5px; border-radius: 50%; background: var(--m-color, var(--accent)); box-shadow: 0 0 7px var(--m-color, var(--accent)); vertical-align: 1px; }
-.sim-live-observation-text { margin: 6px 0 0; color: var(--text); font-size: 12px; font-weight: 650; line-height: 1.55; overflow-wrap: anywhere; }
-.sim-live-observation-reading { margin: 5px 0 0; color: var(--text-dim); font-size: 10.5px; font-variant-numeric: tabular-nums; line-height: 1.4; overflow-wrap: anywhere; }
-@keyframes labObservationIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+.sim-canvas-wrap { min-width: 0; padding: 12px 12px 8px; }
+.sim-canvas { display: block; width: 100%; border-radius: 6px; background: var(--sim-bg-1); border: 1px solid var(--border); box-shadow: inset 0 0 40px var(--sim-shadow); }
 /* 畫面說明列：把原本畫在 canvas 上的解說長句移出來，讓畫布只留物理量標籤 */
 .sim-caption {
   margin: 0; padding: 6px 12px 2px; color: var(--text-dim); font-size: 11.5px; line-height: 1.6;
@@ -918,13 +938,13 @@ body.is-offline .topbar { position: sticky; }
 .ctrl-note-body { padding: 0 10px 9px; color: var(--text-faint); font-size: 11.5px; line-height: 1.6; }
 
 .sim-instrument-strip {
-  min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 12px 9px;
+  min-height: 30px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 12px 8px;
   border-top: 1px solid var(--tint-2); color: var(--text-faint); font-size: 9.5px; letter-spacing: 0.7px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--lab-stage, var(--m-color, var(--accent))) 10%, transparent), transparent 58%);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--lab-stage, var(--m-color, var(--accent))) 8%, transparent), transparent 58%);
 }
 .sim-instrument-code { color: var(--lab-stage, var(--m-color, var(--accent))); font-weight: 800; font-variant-numeric: tabular-nums; }
 .sim-instrument-mode { color: var(--text-faint); text-align: right; }
-.sim-controls { width: auto; min-width: 0; padding: 13px; display: flex; flex-direction: column; gap: 13px; }
+.sim-controls { width: auto; min-width: 0; padding: 12px; display: flex; flex-direction: column; gap: 13px; }
 
 .ctrl-slider .ctrl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
 .ctrl-label { font-size: 12.5px; color: var(--text-dim); flex: 1; min-width: 0; }
@@ -988,10 +1008,10 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .btn-primary { background: linear-gradient(100deg, var(--accent), var(--accent-2)); color: var(--on-accent); border-color: transparent; font-weight: 700; }
 .btn-primary:hover { color: var(--on-accent); filter: brightness(1.08); box-shadow: 0 6px 18px -6px rgba(53, 224, 207, 0.6); }
 
-.sim-readout-panel { margin-top: 14px; border-color: color-mix(in srgb, var(--m-color, var(--accent)) 22%, var(--border-soft)); border-radius: 8px; overflow: hidden; }
+.sim-readout-panel { margin-top: 14px; border-radius: 8px; overflow: hidden; }
 .sim-readout-head { min-height: 36px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px; background: var(--tint-1); border-bottom: 1px solid var(--border-soft); }
 .sim-readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; margin: 0; padding: 10px 12px 12px; }
-.readout { background: linear-gradient(180deg, color-mix(in srgb, var(--panel-2) 92%, var(--m-color, var(--accent)) 8%), var(--panel-solid)); border: 1px solid var(--border-soft); border-radius: 7px; padding: 11px 12px; transition: border-color 0.16s, transform 0.16s; }
+.readout { background: linear-gradient(180deg, var(--panel-2), var(--panel-solid)); border: 1px solid var(--border-soft); border-radius: 7px; padding: 11px 12px; transition: border-color 0.16s; }
 .readout:hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
 .readout-value { font-size: 18px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: 0.2px; line-height: 1.25; overflow-wrap: anywhere; }
 .readout-label { font-size: 11px; color: var(--text-faint); margin-top: 3px; overflow-wrap: anywhere; }
@@ -1083,6 +1103,10 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .nav-dir { font-size: 11px; color: var(--text-faint); letter-spacing: 0.4px; }
 .nav-title { font-size: 14px; color: var(--text); font-weight: 600; }
 
+.build-stamp {
+  margin: 10px 0 0; color: var(--text-faint); font-size: 10.5px;
+  letter-spacing: 0.6px; font-variant-numeric: tabular-nums; opacity: 0.75;
+}
 .disclaimer { margin-top: 42px; padding-top: 18px; border-top: 1px solid var(--border-soft); font-size: 12px; color: var(--text-faint); max-width: 820px; line-height: 1.7; }
 
 /* --------------------------------- 公開授權頁 --------------------------------- */
@@ -1221,11 +1245,6 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   .sim-learning-step dd { font-size: 11px; }
   .sim-stage { gap: 10px; padding: 8px; border-radius: 8px; }
   .sim-canvas-wrap { padding: 8px 8px 6px; }
-  .sim-live-observation { left: 16px; bottom: 16px; width: calc(100% - 32px); padding: 9px 10px 8px; }
-  .sim-live-observation-text { font-size: 11.5px; }
-  .sim-visual-panel .sim-panel-head { min-height: 48px; padding: 7px 9px; }
-  .sim-visual-meta { gap: 6px; }
-  .sim-visual-code { display: none; }
   /* 畫面說明列：把原本畫在 canvas 上的解說長句移出來，讓畫布只留物理量標籤 */
 .sim-caption {
   margin: 0; padding: 6px 12px 2px; color: var(--text-dim); font-size: 11.5px; line-height: 1.6;
@@ -1352,8 +1371,6 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 [data-theme="light"] .pill { background: var(--panel-solid); }
 [data-theme="light"] .sim-stage { box-shadow: inset 0 1px 0 var(--edge-hi), 0 2px 10px -6px rgba(30, 50, 90, 0.35); }
 [data-theme="light"] .sim-canvas { border-color: var(--border); }
-[data-theme="light"] .sim-live-observation { background: color-mix(in srgb, var(--panel-solid) 88%, var(--m-color, var(--accent)) 12%); box-shadow: 0 6px 14px -12px rgba(30, 50, 90, 0.55), inset 0 1px 0 #fff; }
-[data-theme="light"] .sim-live-observation-state::before { box-shadow: none; }
 [data-theme="light"] .sim-visual-panel,
 [data-theme="light"] .sim-control-deck,
 [data-theme="light"] .sim-readout-panel { background: var(--panel-solid); border-color: var(--border); }

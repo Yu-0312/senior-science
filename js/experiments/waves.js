@@ -76,7 +76,14 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const n = sN.get(), x0 = 40, x1 = W - 40, Ls = x1 - x0, midY = H / 2, A = H * 0.3;
-      const k = n * Math.PI / Ls, w = 4;
+      /*
+       * 原本振盪速率寫死成 w = 4，「波速 v」這根滑桿只改讀數不改畫面。
+       * 駐波的頻率 f = n·v /（2L），波速變快，弦本來就該抖得更快。
+       * 改成角頻率正比於實際頻率，波速這根滑桿就有了物理意義。
+       */
+      const vWave = sV.get(), Lm = 1.2;                 // 弦長取 1.2 m 作為畫面對應
+      const freq = n * vWave / (2 * Lm);
+      const k = n * Math.PI / Ls, w = freq * 0.12;
       // 包絡
       ctx.save(); ctx.strokeStyle = PL.theme.pale(0.12); ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
       ctx.beginPath(); for (let x = x0; x <= x1; x += 2) ctx.lineTo(x, midY - A * Math.abs(Math.sin(k * (x - x0)))); ctx.stroke();
@@ -335,7 +342,17 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const closed = sType.get() === "closed", n = sN.get(), Lm = sL.get();
-      const x0 = 50, x1 = W - 40, span = x1 - x0, midY = H / 2, A = H * 0.28;
+      /*
+       * 原本管子永遠畫滿整個畫面寬度，「管長 L」只改讀數。
+       * 共鳴管實驗的核心就是「管子多長決定哪些頻率會共鳴」，
+       * 管長看不出來的話，這個實驗就只剩一條抖動的曲線。
+       * 改成管長以滑桿上限 1 m 對應最大寬度。
+       */
+      const L_MAX = 1.0;
+      const x0 = 50, x1 = 50 + (W - 90) * (0.25 + 0.75 * Lm / L_MAX), span = x1 - x0, midY = H / 2, A = H * 0.28;
+      D.line(ctx, x0, midY + 66, x1, midY + 66, PL.col("text-faint"), 1, [4, 4]);
+      D.text(ctx, "L = " + PL.fmt(Lm, 2) + " m", (x0 + x1) / 2, midY + 80,
+        { color: PL.col("text-faint"), size: 10, align: "center" });
       // 管壁
       D.line(ctx, x0, midY - 46, x1, midY - 46, PL.col("text-faint"), 2); D.line(ctx, x0, midY + 46, x1, midY + 46, PL.col("text-faint"), 2);
       if (closed) D.line(ctx, x0, midY - 46, x0, midY + 46, PL.col("m-color", "#7986cb"), 4); // 封閉端

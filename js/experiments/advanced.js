@@ -60,7 +60,7 @@
   };
 
   function label(ctx, x, y, title, value, width, color) {
-    D.rect(ctx, x, y, width, 33, { fill: "rgba(7,11,17,0.82)", stroke: color, width: 1, r: 6 });
+    D.rect(ctx, x, y, width, 33, { fill: PL.theme.shade(0.82), stroke: color, width: 1, r: 6 });
     D.text(ctx, title, x + 9, y + 12, { color: PL.col("text-faint"), size: 8.5 });
     D.text(ctx, value, x + 9, y + 25, { color, size: 11, weight: "700" });
   }
@@ -75,7 +75,14 @@
       const panelX = 38, panelY = 44, panelW = W * 0.48, panelH = H - 104;
       D.rect(ctx, panelX, panelY, panelW, panelH, { fill: "rgba(7,11,17,0.34)", stroke: "rgba(255,255,255,0.16)", r: 7 });
       D.text(ctx, "把邊長的不確定範圍畫出來", panelX + 16, panelY + 20, { color: PL.col("text"), size: 11, weight: "700" });
-      const scale = Math.min((panelW - 68) / maxL, (panelH - 74) / maxL), baseX = panelX + 34, baseY = panelY + panelH - 28;
+      /*
+       * 原本 scale 以 maxL 為分母，正方形永遠剛好塞滿面板，
+       * 於是「邊長 L」這根滑桿完全不改變畫面——尺度被自己抵銷。
+       * 改用固定比例尺（以滑桿上限 5 m 對應面板寬度），
+       * 邊長小就畫得小、大就畫得大，同時仍看得到 ±ΔL 的三層方框。
+       */
+      const L_MAX = 5.6;
+      const scale = Math.min((panelW - 68) / L_MAX, (panelH - 74) / L_MAX), baseX = panelX + 34, baseY = panelY + panelH - 28;
       D.rect(ctx, baseX, baseY - maxL * scale, maxL * scale, maxL * scale, { fill: "rgba(255,183,77,0.12)", stroke: PL.col("warn"), width: 1.5, r: 2 });
       D.rect(ctx, baseX, baseY - a * scale, a * scale, a * scale, { fill: "rgba(53,224,207,0.18)", stroke: c, width: 2.2, r: 2 });
       D.rect(ctx, baseX, baseY - minL * scale, minL * scale, minL * scale, { fill: "rgba(90,162,255,0.16)", stroke: PL.col("accent-2"), width: 1.4, r: 2 });
@@ -183,7 +190,30 @@
       D.line(ctx, x0, y, x1, y, c, 2.4); D.line(ctx, x0, y, x0, y + 76, c, 2.4); D.line(ctx, x0, y + 76, x1, y + 76, c, 2.4); D.line(ctx, x1, y + 76, x1, y, c, 2.4);
       if (config.kind === "rl") { D.spring(ctx, W * 0.38, y, W * 0.58, y, 8, 10, PL.col("accent-3")); D.text(ctx, "L", W * 0.48, y - 16, { color: PL.col("accent-3"), size: 14, align: "center", weight: "700" }); }
       else if (config.kind === "rectifier") { D.text(ctx, "▶|", W * 0.48, y + 6, { color: PL.col("warn"), size: 20, align: "center", weight: "700" }); }
-      else if (config.kind === "led") { D.disc(ctx, W * 0.5, y, 15, { fill: "rgba(90,162,255,0.16)", stroke: c, width: 2, glow: c, glowSize: 18 }); D.arrow(ctx, W * 0.5 + 18, y - 12, W * 0.5 + 50, y - 42, { color: PL.col("warn"), width: 2, label: "hν" }); }
+      else if (config.kind === "led") {
+        /*
+         * 原本不管順向電壓多少，LED 都畫成同一顆會發光的圓——
+         * 「順向電壓」這根滑桿對畫面毫無作用，也就看不出導通門檻這件事。
+         * 改成：電壓低於能隙時 LED 是暗的、不發光、不畫光子箭頭；
+         * 跨過門檻之後才亮起來，而且越亮光暈越大。
+         */
+        const gap = b, lit = a >= gap;
+        const over = Math.max(0, a - gap);
+        D.disc(ctx, W * 0.5, y, 15, {
+          fill: lit ? "rgba(90,162,255,0.16)" : "rgba(90,162,255,0.05)",
+          stroke: lit ? c : PL.col("text-faint"), width: 2,
+          glow: lit ? c : null, glowSize: lit ? 12 + over * 22 : 0
+        });
+        if (lit) {
+          for (let i = 0; i < 3; i += 1) {
+            D.arrow(ctx, W * 0.5 + 16, y - 8 - i * 10, W * 0.5 + 40 + over * 18, y - 30 - i * 14,
+              { color: PL.col("warn"), width: 1.8, head: 6, label: i === 0 ? "hν" : "" });
+          }
+        }
+        D.text(ctx, lit ? "已導通　V − E_g = " + PL.fmt(over, 2) + " V"
+                        : "未導通　V 還差 " + PL.fmt(gap - a, 2) + " V 才到能隙",
+          W * 0.5, y + 44, { color: lit ? c : PL.col("text-faint"), size: 11, align: "center", weight: "700" });
+      }
       else { D.rect(ctx, 50, 35, W - 100, H - 100, { fill: "rgba(0,0,0,0.24)", stroke: "rgba(90,162,255,0.36)", r: 6 }); for (let x = 62; x < W - 62; x += 24) D.line(ctx, x, 40, x, H - 70, "rgba(255,255,255,0.07)", 1); for (let yy = 50; yy < H - 75; yy += 22) D.line(ctx, 56, yy, W - 56, yy, "rgba(255,255,255,0.07)", 1); ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2.4; ctx.beginPath(); for (let x = 58; x < W - 58; x += 2) { const yy = cy + Math.sin((x - 58) * 0.11 + time * 2.5) * Math.min(48, b * 10); x === 58 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy); } ctx.stroke(); ctx.restore(); }
       label(ctx, 20, 18, config.kind === "rl" ? "自感線圈" : config.kind === "rectifier" ? "橋式整流" : config.kind === "led" ? "PN 接面" : "時間掃描", PL.fmt(out, 2) + " " + config.unit, 128, c);
     } else if (["hall", "balance", "eddy", "emwave", "antenna"].includes(config.kind)) {
@@ -205,7 +235,29 @@
       label(ctx, 20, 18, config.kind === "hall" ? "霍爾電壓" : config.kind === "balance" ? "電流天平" : config.kind === "eddy" ? "渦電流煞車" : config.kind === "emwave" ? "電磁偏振" : "天線共振", PL.fmt(out, 2) + " " + config.unit, 130, c);
     } else if (["quantum", "uncertainty", "spacetime", "radiation", "binding", "transit", "hr", "ladder"].includes(config.kind)) {
       if (config.kind === "quantum") {
-        const levels = [cy + 76, cy + 30, cy - 22, cy - 72]; levels.forEach((y, i) => { D.line(ctx, W * 0.29, y, W * 0.7, y, "rgba(255,255,255,0.34)", 2); D.text(ctx, "n=" + (i + 1), W * 0.73, y + 4, { color: PL.col("text-faint"), size: 10 }); }); D.arrow(ctx, W * 0.5, levels[3] + 4, W * 0.5, levels[0] - 5, { color: c, width: 2.4, label: "hν" });
+        const levels = [cy + 76, cy + 30, cy - 22, cy - 72];
+        levels.forEach((y, i) => { D.line(ctx, W * 0.29, y, W * 0.7, y, "rgba(255,255,255,0.34)", 2); D.text(ctx, "n=" + (i + 1), W * 0.73, y + 4, { color: PL.col("text-faint"), size: 10 }); });
+        /*
+         * 「躍遷機率」原本對畫面沒有任何作用，只有一支固定粗細的箭頭。
+         * 改成用一整排躍遷事件呈現機率：機率高就多數次都發生（實心箭頭），
+         * 機率低就多數落空（虛淡的箭頭）。這才是「機率」在量子躍遷裡的意思——
+         * 不是箭頭變粗，而是「發生的次數比例」。
+         */
+        const N = 10, hit = Math.round(b * N);
+        for (let i = 0; i < N; i += 1) {
+          const ax = W * 0.31 + i * (W * 0.38) / (N - 1);
+          if (i < hit) {
+            // 發生了：電子從高能階落到低能階，放出一個光子
+            D.arrow(ctx, ax, levels[3] + 4, ax, levels[0] - 5, { color: c, width: 2.2 });
+          } else {
+            // 沒發生：只在起點畫一小截，代表「這次機會沒有躍遷」。
+            // 刻意不用「同樣長度但淡一點的箭頭」——只靠顏色深淺區分，
+            // 學生很難讀出比例，色弱的使用者更是完全分不出來。
+            D.line(ctx, ax, levels[3] + 4, ax, levels[3] + 16, PL.theme.pale(0.18), 1.4);
+          }
+        }
+        D.text(ctx, "10 次機會中發生 " + hit + " 次（機率 " + PL.fmt(b * 100, 0) + "%）",
+          W * 0.5, levels[0] + 26, { color: c, size: 11, align: "center", weight: "700" });
       } else if (config.kind === "uncertainty") {
         const width = Math.max(18, a * 32), x0 = cx - width * 2; ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2.5; ctx.beginPath(); for (let x = 38; x < W - 38; x += 2) { const g = Math.exp(-Math.pow((x - cx) / width, 2)); const y = cy + Math.sin((x - cx) * 0.38) * g * 55; x === 38 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore(); D.line(ctx, x0, cy + 80, cx + width * 2, cy + 80, PL.col("warn"), 2); D.text(ctx, "Δx", cx, cy + 96, { color: PL.col("warn"), size: 12, align: "center" });
       } else if (config.kind === "spacetime") {
@@ -215,7 +267,14 @@
       } else if (config.kind === "binding") {
         const x0 = 54, y0 = H - 58, w = W - 94, h = H - 105; D.line(ctx, x0, y0, x0 + w, y0, "rgba(255,255,255,0.45)", 1.3); D.line(ctx, x0, y0, x0, 34, "rgba(255,255,255,0.45)", 1.3); ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2.7; ctx.beginPath(); for (let i = 0; i <= 160; i++) { const x = i / 160 * 240, y = 8.8 * (1 - Math.exp(-x / 19)) * Math.exp(-Math.max(0, x - 56) / 680); const px = x0 + x / 240 * w, py = y0 - y / 9 * h; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.stroke(); ctx.restore(); D.text(ctx, "Fe", x0 + 56 / 240 * w, y0 - h * 0.93, { color: PL.col("warn"), size: 10, align: "center" });
       } else if (config.kind === "transit") {
-        const starX = W * 0.56, starY = cy, r = Math.min(H, W) * 0.22, px = starX - r * 1.5 + ((time * 35) % (r * 3)); D.disc(ctx, starX, starY, r, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 22 }); D.disc(ctx, px, starY, Math.max(5, a * r), { fill: PL.col("panel-solid"), stroke: c, width: 1.5 }); D.text(ctx, "亮度下降 " + PL.fmt(out, 2) + "%", starX, starY + r + 28, { color: c, size: 11, align: "center" });
+        /*
+         * 原本行星的移動速度寫死成 time * 35，「軌道週期 P」完全不影響畫面。
+         * 週期本來就是這個實驗的主角之一：週期短的行星跑得快、凌星頻繁。
+         * 改成掃過一圈的時間正比於 P。
+         */
+        const starX = W * 0.56, starY = cy, r = Math.min(H, W) * 0.22;
+        const sweep = Math.max(1.2, b * 0.55);                  // P=1天→1.2s，P=30天→16.5s
+        const px = starX - r * 1.5 + ((time / sweep) % 1) * (r * 3); D.disc(ctx, starX, starY, r, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 22 }); D.disc(ctx, px, starY, Math.max(5, a * r), { fill: PL.col("panel-solid"), stroke: c, width: 1.5 }); D.text(ctx, "亮度下降 " + PL.fmt(out, 2) + "%", starX, starY + r + 28, { color: c, size: 11, align: "center" });
       } else if (config.kind === "hr") {
         const x0 = 52, y0 = H - 55, w = W - 96, h = H - 104; D.rect(ctx, x0, 32, w, h, { fill: PL.theme.shade(0.5), stroke: "rgba(255,255,255,0.16)", r: 6 }); D.grid(ctx, x0, 32, w, h, Math.max(24, w / 7), "rgba(255,255,255,0.07)"); ctx.save(); ctx.strokeStyle = "rgba(255,204,102,0.72)"; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x0 + w * 0.16, 50); ctx.lineTo(x0 + w * 0.78, y0 - 12); ctx.stroke(); ctx.restore(); const px = x0 + w * (1 - (a - 2500) / 27500), py = y0 - Math.min(h - 10, Math.log10(Math.max(1, out)) / 6 * h); D.disc(ctx, px, py, 7, { fill: c, glow: c, glowSize: 10 });
       } else {
@@ -226,13 +285,215 @@
     D.text(ctx, config.status(a, b, out), W / 2, H - 23, { color: PL.col("text-faint"), size: 9.5, align: "center" });
   }
 
+  /* =====================================================================
+     最小平方法與殘差分析 —— 從泛用模板獨立出來重寫
+
+     原本的版本每一個數字都是編的：
+       · 散點的趨勢用固定斜率畫，完全不理會「真實斜率 k」這根滑桿
+       · 「雜訊」是 sin(i*7.3)*σ 這種確定性函數，不是隨機量
+       · 「擬合線」是兩個寫死的端點連起來的，沒有擬合任何東西
+       · 殘差 RMS 直接寫成 σ×0.72，擬合斜率寫成 k+σ×0.12
+     於是把 σ 調到 0 時，讀數顯示「殘差 RMS = 0」，畫面上的點卻明顯偏離直線——
+     使用者一眼就看出這裡不對。
+
+     這一版真的做最小平方：資料點由 y = kx + b + 雜訊 產生，
+     斜率與截距用正規方程解出來，殘差是資料點與擬合線的實際垂直距離。
+
+     教學重點依課綱條目安排：
+       · σ = 0 時所有點落在線上、RMS 為 0、k̂ 完全等於 k
+       · σ 變大時點散開，k̂ 在 k 附近上下跳動，但平均而言沒有偏移
+       · 加入「彎曲」後，殘差圖會出現 U 形——殘差有結構代表模型選錯了，
+         這是判斷「該不該用直線擬合」的標準方法，也是課綱說的
+         「隨機雜訊與系統誤差不同」
+     ===================================================================== */
+  PL.register("regression-lab", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.58, 900);
+
+    const N = 12;                      // 資料點數
+    const B_TRUE = 2.0;                // 真實截距
+    let seed = 20260726;
+
+    /* splitmix32：相鄰種子也能給出不相關的序列，換一組雜訊才會真的不一樣 */
+    function rng(s) {
+      return function () {
+        s |= 0; s = (s + 0x9e3779b9) | 0;
+        let t = s ^ (s >>> 16); t = Math.imul(t, 0x21f0aaad);
+        t = t ^ (t >>> 15); t = Math.imul(t, 0x735a2d97);
+        return ((t = t ^ (t >>> 15)) >>> 0) / 4294967296;
+      };
+    }
+    /* Box–Muller：把均勻亂數轉成常態分布，量測雜訊才是真的高斯雜訊 */
+    function gauss(r) {
+      const u = Math.max(1e-9, r()), v = r();
+      return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+    }
+
+    PL.ui.section(L.controls, "真實模型");
+    const sK = PL.ui.slider(L.controls, { label: "真實斜率 k", min: 0.2, max: 4, step: 0.05, value: 1.8, digits: 2, onInput: draw });
+    PL.ui.section(L.controls, "量測條件");
+    const sNoise = PL.ui.slider(L.controls, { label: "量測雜訊 σ", min: 0, max: 2, step: 0.05, value: 0.65, digits: 2, onInput: draw });
+    const sBend = PL.ui.slider(L.controls, { label: "偏離直線的彎曲 c", min: 0, max: 0.15, step: 0.005, value: 0, digits: 3, onInput: draw });
+
+    PL.ui.section(L.controls, "顯示");
+    const layers = PL.ui.chipGroup(L.controls, {
+      multi: true, value: ["resid", "true"],
+      options: [
+        { value: "resid", label: "殘差線" },
+        { value: "true", label: "真實直線" }
+      ],
+      onChange: draw
+    });
+
+    const row = PL.ui.buttonRow(L.controls);
+    PL.ui.button(row, "重新取樣", () => { seed = (seed + 7919) | 0; draw(); }, { primary: true });
+    PL.ui.button(row, "重設", () => { sK.set(1.8); sNoise.set(0.65); sBend.set(0); seed = 20260726; draw(); });
+
+    PL.ui.note(L.controls,
+      "先把「量測雜訊 σ」拉到 0：所有點會落在同一條直線上，殘差 RMS 變成 0，" +
+      "擬合斜率會剛好等於你設定的真實斜率。" +
+      "接著慢慢加大 σ，反覆按「重新取樣」——擬合斜率會在真值附近上下跳，" +
+      "但不會系統性偏高或偏低，這就是「隨機雜訊不會讓估計失準，只會讓它不精確」。" +
+      "最後把「彎曲 c」拉起來：點看起來還是很像一條線，" +
+      "但下方的殘差圖會出現明顯的 U 形——殘差一旦有規律，就代表直線這個模型本身選錯了。");
+
+    const rSlope = PL.ui.readout(L.readouts, { label: "擬合斜率 k̂" });
+    const rInt = PL.ui.readout(L.readouts, { label: "擬合截距 b̂" });
+    const rRms = PL.ui.readout(L.readouts, { label: "殘差 RMS" });
+    const rR2 = PL.ui.readout(L.readouts, { label: "決定係數 R²" });
+    const rBias = PL.ui.readout(L.readouts, { label: "k̂ 與真值的差" });
+
+    const cc = PL.ui.chart(PL.ui.charts(root), {
+      title: "殘差圖（資料點與擬合線的垂直差）",
+      cap: "殘差應該隨機散布在零線兩側、看不出規律。若出現 U 形或倒 U 形，" +
+        "表示資料本身不是直線關係，這時候再怎麼調整擬合線都沒有用，該換模型。"
+    });
+
+    /* 產生資料並解最小平方——這裡是真的在算，不是套公式湊數字 */
+    function fit() {
+      const k = sK.get(), sigma = sNoise.get(), bend = sBend.get();
+      const r = rng(seed);
+      const pts = [];
+      for (let i = 0; i < N; i += 1) {
+        const x = i + 1;
+        // 彎曲項讓資料偏離直線，但保持整體仍像一條線，只有殘差圖看得出來
+        const y = k * x + B_TRUE + bend * (x - (N + 1) / 2) * (x - (N + 1) / 2) + sigma * gauss(r);
+        pts.push([x, y]);
+      }
+      const n = pts.length;
+      const mx = pts.reduce((s, p) => s + p[0], 0) / n;
+      const my = pts.reduce((s, p) => s + p[1], 0) / n;
+      let sxy = 0, sxx = 0;
+      pts.forEach(p => { sxy += (p[0] - mx) * (p[1] - my); sxx += (p[0] - mx) * (p[0] - mx); });
+      const kHat = sxx > 0 ? sxy / sxx : 0;
+      const bHat = my - kHat * mx;
+      const resid = pts.map(p => p[1] - (kHat * p[0] + bHat));
+      const sse = resid.reduce((s, e) => s + e * e, 0);
+      const sst = pts.reduce((s, p) => s + (p[1] - my) * (p[1] - my), 0);
+      return { k, sigma, bend, pts, kHat, bHat, resid,
+        rms: Math.sqrt(sse / n), r2: sst > 0 ? 1 - sse / sst : 1 };
+    }
+
+    function scene(f) {
+      const { ctx, W, H } = cv;
+      cv.clear(); D.bg(cv);
+      const c = accent();
+      const box = { x: 54, y: 24, w: W - 96, h: H - 74 };
+
+      const xs = f.pts.map(p => p[0]), ys = f.pts.map(p => p[1]);
+      const y0 = Math.min(...ys, f.bHat), y1 = Math.max(...ys, f.kHat * N + f.bHat);
+      const pad = Math.max(0.6, (y1 - y0) * 0.14);
+      const g = PL.graph(cv, box, { x0: 0, x1: N + 1, y0: y0 - pad, y1: y1 + pad });
+      g.frame({ xlabel: "自變量 x", ylabel: "量測值 y" });
+      g.grid(6, 4);
+
+      // 真實直線：讓學生看得到「擬合線並不等於真值，只是最好的估計」
+      if (layers.has("true")) {
+        g.curve([[0, f.k * 0 + B_TRUE], [N + 1, f.k * (N + 1) + B_TRUE]],
+          { color: PL.col("text-faint"), width: 1.6, dash: [6, 5] });
+        g.label(0.4, f.k * (N + 1) + B_TRUE, "真實直線 y = kx + b",
+          { color: PL.col("text-faint"), size: 9.5 });
+      }
+
+      // 殘差線：每個點到擬合線的垂直距離，最小平方法要讓這些長度的平方和最小
+      if (layers.has("resid")) {
+        f.pts.forEach((p, i) => {
+          const yHat = f.kHat * p[0] + f.bHat;
+          D.line(ctx, g.X(p[0]), g.Y(p[1]), g.X(p[0]), g.Y(yHat),
+            f.resid[i] >= 0 ? PL.col("warn") : PL.col("danger"), 1.6);
+        });
+      }
+
+      // 擬合線
+      g.curve([[0, f.bHat], [N + 1, f.kHat * (N + 1) + f.bHat]], { color: c, width: 2.4 });
+      f.pts.forEach(p => g.dot(p[0], p[1], { color: PL.col("accent-2"), r: 4 }));
+
+      D.text(ctx, "ŷ = " + PL.fmt(f.kHat, 2) + " x + " + PL.fmt(f.bHat, 2),
+        box.x + box.w - 8, box.y + 16, { color: c, size: 12, align: "right", weight: "700" });
+
+      PL.ui.caption(cv, f.sigma === 0 && f.bend === 0
+        ? "沒有雜訊時每個點都落在同一條直線上，殘差全為零，擬合斜率剛好等於真實斜率。"
+        : f.bend > 0.02
+          ? "資料其實是彎的。直線仍然可以擬合，但殘差圖會露出馬腳——殘差有規律就代表模型不對。"
+          : "擬合線不會通過每一個點；最小平方法找的是「讓所有殘差平方和最小」的那一條。");
+    }
+
+    function residualChart(f) {
+      cc.clear();
+      const m = Math.max(0.35, Math.max(...f.resid.map(Math.abs)) * 1.35);
+      const g = PL.graph(cc, { x: 50, y: 16, w: cc.W - 66, h: cc.H - 40 },
+        { x0: 0, x1: N + 1, y0: -m, y1: m });
+      g.frame({ xlabel: "x", ylabel: "殘差" });
+      g.grid(6, 4);
+      g.hline(0, { color: PL.col("text-faint"), width: 1.4 });
+      f.resid.forEach((e, i) => {
+        const x = f.pts[i][0];
+        D.line(cc.ctx, g.X(x), g.Y(0), g.X(x), g.Y(e), e >= 0 ? PL.col("warn") : PL.col("danger"), 1.6);
+        g.dot(x, e, { color: e >= 0 ? PL.col("warn") : PL.col("danger"), r: 3.5 });
+      });
+    }
+
+    function draw() {
+      const f = fit();
+      scene(f);
+      residualChart(f);
+      rSlope.set(f.kHat, 3);
+      rInt.set(f.bHat, 3);
+      rRms.set(f.rms, 3);
+      rR2.set(f.r2, 4);
+      rBias.set(f.kHat - f.k, 3);
+    }
+
+    cv.onResize(draw); cc.onResize(draw);
+    draw();
+    return { stop() { cv.destroy(); cc.destroy(); }, rerender: draw };
+  }});
+  delete LABS["regression-lab"];        // 已由上面的專屬實作取代
+
+  /*
+   * 關係圖要掃哪一根滑桿
+   *
+   * 模板預設拿第一根滑桿當關係圖的 x 軸，但這三個實驗的輸出根本不取決於第一根：
+   *   · error-propagation  ΔA/A = 2·ΔL/L，與邊長 L 多大無關
+   *   · huygens-principle  折射角由介質速率比決定，與波長無關
+   *   · semiconductor-led  發光波長 λ = 1240/E_g，由能隙決定，與順向電壓無關
+   * 結果關係圖是一條完全水平的線，學生看不出任何關係。
+   *
+   * 這件事本身是重要的物理（「這個量跟那個量無關」），
+   * 但要看得出來，圖就得畫在真正有關係的那根滑桿上。
+   * 畫面（scene）依位置使用 a、b，因此不對調滑桿，只告訴關係圖掃哪一根。
+   */
+  ["error-propagation", "huygens-principle", "semiconductor-led"].forEach(id => {
+    if (LABS[id]) LABS[id].sweep = "b";
+  });
+
   Object.keys(LABS).forEach(id => {
     PL.register(id, { build(root) {
       const config = LABS[id], L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.59, 920);
       PL.ui.section(L.controls, "操作條件");
       const a = PL.ui.slider(L.controls, { label: config.a[0], min: config.a[1], max: config.a[2], value: config.a[3], step: (config.a[2] - config.a[1]) / 100, unit: config.a[4], digits: config.a[4] === "" ? 2 : 2, onInput: () => render() });
       const b = PL.ui.slider(L.controls, { label: config.b[0], min: config.b[1], max: config.b[2], value: config.b[3], step: (config.b[2] - config.b[1]) / 100, unit: config.b[4], digits: config.b[4] === "" ? 2 : 2, onInput: () => render() });
-      PL.ui.note(L.controls, "調整參數後，同步比較裝置中的現象、量測讀數與下方關係圖。每個畫面皆可匯出目前讀數。 ");
+      PL.ui.note(L.controls, PL.templateGuide(id, config));
       const buttons = PL.ui.buttonRow(L.controls); let playing = true, anim;
       const play = PL.ui.button(buttons, "暫停", () => {
         playing = !playing; play.textContent = playing ? "暫停" : "播放";
@@ -249,12 +510,10 @@
         const av = a.get(), bv = b.get(), result = config.calc(av, bv);
         scene(cv, config, av, bv, time, result);
         reading.set(result, Math.abs(result) >= 100 ? 1 : 3); parameter.set(bv, config.b[4] === "" ? 2 : 2); conclusion.set(config.status(av, bv, result));
-        chart.clear();
-        const min = config.a[1], max = config.a[2], points = []; let hi = 1, lo = 0;
-        for (let i = 0; i <= 120; i++) { const x = PL.lerp(min, max, i / 120), y = config.chart(x, bv); points.push([x, y]); hi = Math.max(hi, y); lo = Math.min(lo, y); }
-        const span = Math.max(1, hi - lo); hi += span * 0.12; lo -= span * 0.12;
-        const g = PL.graph(chart, { x: 45, y: 18, w: chart.W - 60, h: chart.H - 47 }, { x0: min, x1: max, y0: lo, y1: hi });
-        g.frame({ xlabel: config.a[0], ylabel: config.output }); g.grid(5, 4); g.area(points, { fill: "rgba(53,224,207,0.12)" }); g.curve(points, { color: accent(), width: 2.3 }); g.dot(av, result, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+        chart.setCap(PL.ui.relationChart(chart, {
+          a: config.a, b: config.b, av: av, bv: bv,
+          calc: config.calc, output: config.output, sweep: config.sweep
+        }));
       }
       anim = PL.loop(dt => { if (dt) time += dt; render(); });
       cv.onResize(render); chart.onResize(render); render(); anim.start();

@@ -194,6 +194,22 @@
       D.arrow(ctx, pivotX - 92, pivotY, pivotX - 92, pivotY + len, { color: PL.col("accent-2"), width: 1.5, head: 7 });
       D.text(ctx, "L = " + Lm.toFixed(2) + " m", pivotX - 88, pivotY + len / 2, { color: PL.col("accent-2"), size: 12 });
 
+      /*
+       * 「每次計時擺動次數 n」原本只影響計時何時停止，畫面上完全看不到。
+       * 這個實驗的方法重點正是「數多一點次數再除，可以把反應時間的誤差攤掉」，
+       * 因此把 n 畫成一排格子：已完成的填滿，還沒完成的留白。
+       * 學生一眼就知道「還要再擺幾次」，也看得到 n 調大時格子變多。
+       */
+      const nTarget = sN.get();
+      const gxs = 26, gys = H - 34, gw = Math.min(W - 52, nTarget * 13), cellW = gw / nTarget;
+      D.text(ctx, "計時區間：" + Math.floor(swings) + " / " + nTarget + " 次全振動",
+        gxs, gys - 8, { color: PL.col("text-dim"), size: 10.5 });
+      for (let i = 0; i < nTarget; i += 1) {
+        const done = i < Math.floor(swings);
+        D.rect(ctx, gxs + i * cellW, gys, Math.max(2, cellW - 2), 9,
+          { fill: done ? MC() : PL.theme.pale(0.10), r: 2 });
+      }
+
       // 碼錶
       const boxW = 132, boxX = W - boxW - 16, boxY = 16;
       D.rect(ctx, boxX, boxY, boxW, 54, { fill: PL.theme.shade(0.45), stroke: PL.theme.pale(0.25), r: 6 });

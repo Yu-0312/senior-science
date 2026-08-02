@@ -28,8 +28,41 @@
       for (let gx = 0; gx <= 30; gx += 5) { const px = 60 + gx * sc; if (px < W - 20) { D.line(ctx, px, gy, px, gy + 5, PL.col("text-faint"), 1); D.text(ctx, gx + "", px, gy + 17, { color: PL.col("text-faint"), size: 9, align: "center" }); } }
       const px = 60 + (x % 30) * sc;
       block(ctx, px, gy, 40, 28, MC());
-      if (v > 0.01) D.arrow(ctx, px + 22, gy - 14, px + 22 + v * 4, gy - 14, { color: PL.col("accent-2"), width: 2, label: "v" });
-      if (sMu.get() > 0 && v > 0.01) D.arrow(ctx, px - 22, gy - 14, px - 22 - sMu.get() * 80, gy - 14, { color: PL.col("danger"), width: 2, label: "f" });
+
+      /*
+       * 原本速度與摩擦力箭頭都只在 v > 0.01（也就是按下「推一下」之後）才畫，
+       * 於是兩根滑桿在推之前完全不影響畫面。
+       *
+       * 改成靜止待推時就先畫出：這一組設定的初速箭頭、摩擦力箭頭，
+       * 以及「預計會滑到哪裡」的虛線標記。
+       * μ = 0 時預計停止距離是無限遠——標記會直接指出「永遠不會停」，
+       * 這正是慣性要教的事，而且在按按鈕之前就看得到。
+       */
+      const v0 = sV.get(), mu = sMu.get();
+      const moving = v > 0.01;
+      const showV = moving ? v : v0;
+      D.arrow(ctx, px + 22, gy - 14, px + 22 + showV * 4, gy - 14,
+        { color: PL.col("accent-2"), width: 2, label: "v = " + PL.fmt(showV, 1) });
+      if (mu > 0) {
+        D.arrow(ctx, px - 22, gy - 14, px - 22 - mu * 160, gy - 14,
+          { color: PL.col("danger"), width: 2, label: "f（μ=" + PL.fmt(mu, 2) + "）" });
+      }
+      if (!moving) {
+        if (mu <= 0) {
+          D.text(ctx, "μ = 0：沒有摩擦力，滑塊會一直等速前進，永遠不會停",
+            W / 2, 30, { color: PL.col("warn"), size: 12, align: "center", weight: "700" });
+        } else {
+          // 停止距離 d = v² / (2μg)
+          const d = v0 * v0 / (2 * mu * 9.8);
+          const mx = 60 + Math.min(30, d) * sc;
+          D.line(ctx, mx, gy - 56, mx, gy + 10, PL.col("warn"), 1.4, [6, 5]);
+          D.text(ctx, d > 30 ? "預計滑行 " + PL.fmt(d, 1) + " m（超出畫面）" : "預計停在 " + PL.fmt(d, 1) + " m",
+            mx + 6, gy - 60, { color: PL.col("warn"), size: 10.5 });
+        }
+      }
+      PL.ui.caption(cv, mu <= 0
+        ? "把摩擦係數放在 0：滑塊不需要任何力就保持等速——物體本來就會維持原本的運動狀態。"
+        : "摩擦力箭頭與虛線標記會隨兩根滑桿改變。先預測它會停在哪裡，再按「推一下」驗證。");
       rV.set(v, 2); rX.set(x, 1);
     }
     const anim = PL.loop(dt => {
@@ -220,14 +253,39 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const gy = H - 46, cx = W / 2, F = sF.get();
       D.line(ctx, 20, gy, W - 20, gy, PL.col("text-faint"), 2);
-      const bx1 = cx - 34 - x1 * 30, bx2 = cx + 34 + x2 * 30;
-      block(ctx, bx1, gy, 44, 30, MC(), sm1.get() + "kg");
-      block(ctx, bx2, gy, 44, 30, "#ffab80", sm2.get() + "kg");
-      if (phase === "push") {
-        D.arrow(ctx, bx1 - 22, gy - 15, bx1 - 22 - F * 4, gy - 15, { color: PL.col("danger"), width: 2.4, label: "F" });
-        D.arrow(ctx, bx2 + 22, gy - 15, bx2 + 22 + F * 4, gy - 15, { color: PL.col("accent-2"), width: 2.4, label: "F" });
-      }
-      rA1.set(F / sm1.get(), 2); rA2.set(F / sm2.get(), 2); rF.set(F, 0);
+      /*
+       * 原本車子固定 44×30、力箭頭只在「互推中」才畫，
+       * 於是三根滑桿在按下互推之前完全不影響畫面——學生拉半天像在看靜態插圖。
+       *
+       * 改成：車身寬度隨質量、力箭頭一直都在（作用力與反作用力本來就成對存在），
+       * 並且畫出兩支長度不同的加速度箭頭。這樣「同樣的 F、質量小的加速度大」
+       * 在按下按鈕之前就已經看得出來了。
+       */
+      const m1 = sm1.get(), m2 = sm2.get();
+      const w1 = 30 + m1 * 5, w2 = 30 + m2 * 5;     // 1kg→35px，8kg→70px
+      const bx1 = cx - 12 - w1 / 2 - x1 * 30, bx2 = cx + 12 + w2 / 2 + x2 * 30;
+      block(ctx, bx1, gy, w1, 30, MC(), PL.fmt(m1, 1) + "kg");
+      block(ctx, bx2, gy, w2, 30, "#ffab80", PL.fmt(m2, 1) + "kg");
+
+      // 互推的一對力：大小永遠相等、方向相反，這是第三定律的重點
+      const fLen = F * 4;
+      D.arrow(ctx, bx1 + w1 / 2, gy - 16, bx1 + w1 / 2 - fLen, gy - 16,
+        { color: PL.col("danger"), width: 2.4, label: "F = " + F + " N" });
+      D.arrow(ctx, bx2 - w2 / 2, gy - 16, bx2 - w2 / 2 + fLen, gy - 16,
+        { color: PL.col("accent-2"), width: 2.4, label: "F = " + F + " N" });
+
+      // 加速度箭頭：同樣的力，質量小的箭頭明顯比較長
+      const a1 = F / m1, a2 = F / m2, aScale = 90 / Math.max(a1, a2);
+      D.arrow(ctx, bx1, gy - 46, bx1 - a1 * aScale, gy - 46,
+        { color: PL.col("warn"), width: 2, head: 7, label: "a₁=" + PL.fmt(a1, 1) });
+      D.arrow(ctx, bx2, gy - 46, bx2 + a2 * aScale, gy - 46,
+        { color: PL.col("warn"), width: 2, head: 7, label: "a₂=" + PL.fmt(a2, 1) });
+
+      PL.ui.caption(cv, Math.abs(m1 - m2) < 0.05
+        ? "兩車質量相同：受力相等，加速度也相等，畫面完全對稱。"
+        : "兩支紅／藍箭頭一樣長——作用力與反作用力大小永遠相等。" +
+          "但上面兩支加速度箭頭不一樣長：" + (m1 < m2 ? "左" : "右") + "車比較輕，所以加速度比較大。");
+      rA1.set(a1, 2); rA2.set(a2, 2); rF.set(F, 0);
     }
     const anim = PL.loop(dt => {
       if (dt) {
@@ -380,10 +438,31 @@
       const fLen = Math.min(60, q.f * 2.1);
       D.arrow(ctx, bx + bw / 2 - 8, by + bh / 2, bx + bw / 2 - 8, by + bh / 2 - fLen, { color: q.sliding ? PL.col("danger") : "#7ee0c0", width: 2.4, label: q.sliding ? "fₖ" : "fₛ" });
       D.text(ctx, released ? (q.sliding ? "摩擦不足：物體下滑" : "受力平衡：保持靜止") : "先調整參數，再按「釋放物體」", 24, 30, { color: q.sliding ? PL.col("danger") : "#7ee0c0", size: 12 });
-      const sx = 28, sy = H - 56, sw = Math.min(200, W * 0.42), ratio = Math.min(1, q.fsMax / q.mg);
-      D.rect(ctx, sx, sy, sw, 10, { fill: "rgba(255,255,255,0.12)", r: 5 });
-      D.rect(ctx, sx, sy, sw * ratio, 10, { fill: q.sliding ? PL.col("danger") : "#4dd0a0", r: 5 });
-      D.text(ctx, "最大靜摩擦 / 重力 = " + PL.fmt(ratio, 2), sx, sy - 8, { color: PL.col("text-dim"), size: 11 });
+      /*
+       * 「動摩擦係數 μₖ」原本只在物體真的開始下滑之後才影響畫面。
+       * 物理上沒錯，但學生在靜止狀態拉這根滑桿會以為它壞了，
+       * 也就學不到「一旦滑動，摩擦力會掉到比最大靜摩擦更小」這個重點。
+       *
+       * 改成兩條並排的對照棒：上面是最大靜摩擦 μₛN，下面是動摩擦 μₖN，
+       * 再畫一條重力的參考線。μₖ 的棒子隨滑桿即時變化，
+       * 而「動摩擦棒比靜摩擦棒短」這件事一眼就看得到。
+       */
+      const sx = 28, sy = H - 66, sw = Math.min(200, W * 0.42);
+      const ratioS = Math.min(1, q.fsMax / q.mg);
+      // 靠牆的情形，正向力就是水平推力本身（模型裡叫 q.F，不是 q.N）。
+      // 第一版誤用 q.N，算出 NaN，長條完全沒畫出來——量化稽核抓到了這個錯。
+      const ratioK = Math.min(1, (sMk.get() * q.F) / q.mg);
+      D.text(ctx, "摩擦力上限 ÷ 重力", sx, sy - 10, { color: PL.col("text-dim"), size: 11 });
+      [[0, ratioS, "最大靜摩擦 μₛN", q.sliding ? PL.col("danger") : "#4dd0a0"],
+       [16, ratioK, "動摩擦 μₖN", PL.col("warn")]].forEach(([dy, ratio, lab, cc2]) => {
+        D.rect(ctx, sx, sy + dy, sw, 10, { fill: PL.theme.pale(0.10), r: 5 });
+        D.rect(ctx, sx, sy + dy, sw * ratio, 10, { fill: cc2, r: 5 });
+        D.text(ctx, lab + " = " + PL.fmt(ratio, 2), sx + sw + 8, sy + dy + 9,
+          { color: cc2, size: 9.5 });
+      });
+      // 重力那條線：摩擦棒超過它就撐得住，沒超過就會滑
+      D.line(ctx, sx + sw, sy - 4, sx + sw, sy + 30, PL.col("text-faint"), 1.4, [3, 3]);
+      D.text(ctx, "撐住所需", sx + sw - 2, sy - 8, { color: PL.col("text-faint"), size: 8.5, align: "right" });
       rN.set(q.F, 1); rFriction.set(q.f, 1); rLimit.set(q.fsMax, 1); rState.set(q.sliding ? "向下滑動" : "靜止");
       cc.clear();
       const ymax = Math.max(q.mg * 1.35, sMs.get() * 200 * 1.05, 10);
@@ -634,6 +713,25 @@
       D.arrow(ctx, c.x, c.y, c.x + down.x * appSign * appLen, c.y + down.y * appSign * appLen, { color: PL.col("accent-2"), width: 2.5, label: "F" });
       const fSign = Math.sign(q.friction || 0), fLen = Math.min(58, Math.abs(q.friction) * scale);
       if (fLen > 0.5) D.arrow(ctx, c.x, c.y, c.x + down.x * fSign * fLen, c.y + down.y * fSign * fLen, { color: q.staticHold ? "#7ee0c0" : PL.col("danger"), width: 2.4, label: q.staticHold ? "fₛ" : "fₖ" });
+      /*
+       * μₖ 在物體靜止時同樣無法從畫面判讀。加一組對照棒：
+       * 最大靜摩擦 μₛN 與動摩擦 μₖN 並排，並標出目前的驅動力。
+       * 驅動力超過上面那條就會開始滑，滑動之後摩擦力掉到下面那條——
+       * 這是斜面題最常考、也最常被搞混的一步。
+       */
+      const gx = W - 186, gy2 = 34, gw = 150;
+      const gMax = Math.max(q.fsMax, sMk.get() * q.N, Math.abs(q.drive), 1) * 1.15;
+      D.text(ctx, "沿斜面方向的力比較（N）", gx, gy2 - 8, { color: PL.col("text-dim"), size: 10 });
+      [["最大靜摩擦 μₛN", q.fsMax, "#7ee0c0"],
+       ["動摩擦 μₖN", sMk.get() * q.N, PL.col("warn")],
+       ["驅動力（重力分量＋F）", Math.abs(q.drive), PL.col("accent-2")]].forEach((row, i) => {
+        const yy = gy2 + i * 22;
+        D.rect(ctx, gx, yy, gw, 11, { fill: PL.theme.pale(0.10), r: 5 });
+        D.rect(ctx, gx, yy, gw * Math.min(1, row[1] / gMax), 11, { fill: row[2], r: 5 });
+        D.text(ctx, row[0] + " " + PL.fmt(row[1], 1), gx, yy + 21,
+          { color: row[2], size: 9 });
+      });
+
       const trend = q.drive > 0 ? "若無摩擦，物體傾向下滑" : q.drive < 0 ? "若無摩擦，物體傾向上滑" : "外力與重力分量剛好平衡";
       D.text(ctx, trend, 24, 30, { color: q.staticHold ? "#7ee0c0" : PL.col("danger"), size: 12 });
       D.text(ctx, q.staticHold ? "靜摩擦足夠，物體靜止" : "超過最大靜摩擦，開始" + (q.acceleration > 0 ? "下滑" : "上滑"), 24, 50, { color: PL.col("text-dim"), size: 11 });
@@ -701,7 +799,17 @@
     const cc = PL.ui.chart(PL.ui.charts(root), { title: "垂落比例與加速度", cap: "在光滑桌面上，繩子的總長與總質量會約掉；加速度只由當下垂落比例決定。" });
     function reset() { portion = sPortion.get(); v = 0; elapsed = 0; released = false; draw(); }
     function draw() {
-      const { ctx, W, H } = cv; cv.clear(); D.bg(cv); const length = sLength.get(), a = portion * 9.8, tableY = H * 0.43, edge = W * 0.70, ropeTopStart = 56, topLength = Math.max(80, (1 - portion) * (edge - ropeTopStart)); const hangLength = Math.max(34, portion * (H - tableY - 54));
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv); const length = sLength.get(), a = portion * 9.8, tableY = H * 0.43, edge = W * 0.70, ropeTopStart = 56;
+      /*
+       * length（繩總長 L）原本讀出來卻沒有用在任何幾何上，畫面只跟著垂落比例變，
+       * 於是「繩總長」這根滑桿看起來壞掉了。
+       * 這一題的物理是 a = (x/L)·g，L 與 x 都是主角，兩者都該看得見：
+       * 繩子的實際長度以滑桿上限 10 m 對應可用寬度，
+       * 桌面段與垂落段再依比例分配。
+       */
+      const L_MAX = 10, ropePx = (edge - ropeTopStart) * (0.25 + 0.75 * length / L_MAX);
+      const topLength = Math.max(24, ropePx * (1 - portion));
+      const hangLength = Math.max(20, Math.min(H - tableY - 54, ropePx * portion));
       D.rect(ctx, 30, tableY, edge - 30, 16, { fill: "rgba(150,174,201,0.24)", stroke: PL.col("text-faint"), width: 1.5, r: 4 }); D.line(ctx, edge, tableY, edge, H - 30, PL.col("text-faint"), 4);
       D.line(ctx, edge - topLength, tableY - 10, edge, tableY - 10, PL.col("warn"), 7); D.ring(ctx, edge, tableY - 2, 12, PL.col("warn"), 5); D.line(ctx, edge + 11, tableY - 2, edge + 11, tableY + hangLength, PL.col("warn"), 7);
       D.arrow(ctx, edge + 32, tableY + hangLength * 0.48, edge + 32, tableY + hangLength * 0.48 + Math.min(50, portion * 70), { color: PL.col("danger"), width: 2.3, label: "垂落部分重力" }); D.arrow(ctx, edge - topLength * 0.52, tableY - 32, edge - topLength * 0.52 + Math.min(50, v * 6), tableY - 32, { color: PL.col("accent-2"), width: 2.2, label: "v" });

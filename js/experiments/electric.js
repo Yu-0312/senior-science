@@ -77,11 +77,26 @@
     const rV = PL.ui.readout(L.readouts, { label: "該處電位", unit: "V" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const V = sV.get(), d = sD.get(), topY = 40, botY = H - 40, plateL = 60, plateR = W - 60;
+      /*
+       * 原本上下板固定畫在 y = 40 與 H − 40，「板間距 d」這根滑桿
+       * 只改變讀數上的數字，畫面完全不動；電壓 V 也只改變文字。
+       * 於是 E = V/d 這個核心關係在畫面上看不到任何線索。
+       *
+       * 改成：板間距真的隨 d 改變（以滑桿上限 8 cm 對應最大間距），
+       * 電場箭頭的密度與長度隨 E = V/d 改變。
+       * 把 d 拉小或把 V 拉大，箭頭就變密變長——電場變強是看得見的。
+       */
+      const V = sV.get(), d = sD.get(), plateL = 60, plateR = W - 60;
+      const D_MAX = 8, maxGap = H - 96;
+      const gap = maxGap * (0.28 + 0.72 * d / D_MAX);
+      const topY = (H - gap) / 2, botY = topY + gap;
       D.rect(ctx, plateL, topY - 8, plateR - plateL, 8, { fill: POS }); D.text(ctx, "+" + V + "V", plateL - 6, topY - 2, { color: POS, size: 11, align: "right" });
       D.rect(ctx, plateL, botY, plateR - plateL, 8, { fill: NEG }); D.text(ctx, "0 V", plateL - 6, botY + 8, { color: NEG, size: 11, align: "right" });
       // 均勻電場線（向下）
-      for (let x = plateL + 20; x < plateR; x += 44) D.arrow(ctx, x, topY, x, botY, { color: "rgba(77,182,170,0.4)", width: 1.5 });
+      // 電場強度 E = V/d：箭頭越密代表場越強，這是課本畫電場線的標準約定
+      const Efield = V / (d / 100);                       // V/m
+      const spacing = PL.clamp(2200 / Math.sqrt(Efield), 16, 70);
+      for (let x = plateL + 12; x < plateR; x += spacing) D.arrow(ctx, x, topY, x, botY, { color: "rgba(77,182,170,0.4)", width: 1.5 });
       // 等勢線
       for (let i = 1; i < 5; i++) { const y = PL.lerp(topY, botY, i / 5); D.line(ctx, plateL, y, plateR, y, "rgba(255,255,255,0.12)", 1, [4, 4]); D.text(ctx, PL.fmt(V * (1 - i / 5), 0) + "V", plateR + 4, y + 3, { color: PL.col("text-faint"), size: 9 }); }
       // 試驗電荷
@@ -671,10 +686,23 @@
     return { stop() { cv.destroy(); fitChart.destroy(); charChart.destroy(); }, rerender: draw };
   }});
 
-  /* 電阻串並聯 */
+  /* 電阻串並聯
+   *
+   * 改版原因：原本三根滑桿（R₁、R₂、V）拉到底，畫面上只有方塊裡的數字會變，
+   * 電路圖本身完全靜止——學生看到的是一張標了數字的插圖，不是實驗。
+   *
+   * 這一版讓電路圖自己說話：
+   *   · 電阻方塊的長度正比於電阻值，串聯時「兩塊加起來」就是等效電阻
+   *   · 導線上有會跑的電流點，密度與速度正比於該段的電流
+   *     → 串聯時兩顆電阻的電流點速度一樣（電流處處相同）
+   *     → 並聯時電阻小的那條跑得快（電流大）
+   *   · 電池的高度正比於電壓
+   *   · 每顆電阻上標出它自己分到的電壓，串聯時可以直接看到分壓
+   */
   PL.register("resistors", { build(root) {
     const L = PL.ui.layout(root);
     const cv = PL.canvas.create(L.canvasWrap, 0.56);
+    let flow = 0;
     const sCfg = PL.ui.select(L.controls, { label: "接法", value: "series", options: [{ value: "series", label: "串聯" }, { value: "parallel", label: "並聯" }], onChange: draw });
     const sR1 = PL.ui.slider(L.controls, { label: "電阻 R₁", min: 1, max: 20, step: 1, value: 6, unit: "Ω", digits: 0, onInput: draw });
     const sR2 = PL.ui.slider(L.controls, { label: "電阻 R₂", min: 1, max: 20, step: 1, value: 3, unit: "Ω", digits: 0, onInput: draw });
@@ -682,32 +710,104 @@
     const rReq = PL.ui.readout(L.readouts, { label: "等效電阻", unit: "Ω" });
     const rItot = PL.ui.readout(L.readouts, { label: "總電流", unit: "A" });
     const rBranch = PL.ui.readout(L.readouts, { label: "支路電流", unit: "A" });
+    /* 電阻方塊：長度正比於電阻值，因此「哪一顆比較大」用看的就知道 */
+    function resBox(ctx, x, y, r, lab, volts, amps) {
+      const w = 26 + r * 3.4;                     // 1Ω→29px、20Ω→94px
+      D.rect(ctx, x, y - 13, w, 26, { fill: "rgba(77,182,170,0.15)", stroke: MC(), width: 1.5, r: 4 });
+      // 電阻符號的鋸齒，齒數也隨電阻增加，遠看就有「這顆比較擋」的感覺
+      const teeth = Math.max(3, Math.round(r / 2));
+      ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 1.4; ctx.beginPath();
+      for (let i = 0; i <= teeth; i += 1) {
+        const px = x + 5 + (w - 10) * i / teeth;
+        ctx.lineTo(px, y + (i % 2 ? -6 : 6));
+      }
+      ctx.stroke(); ctx.restore();
+      D.text(ctx, lab + " = " + r + " Ω", x + w / 2, y - 19, { color: MC(), size: 10.5, align: "center", weight: "700" });
+      D.text(ctx, PL.fmt(volts, 1) + " V ／ " + PL.fmt(amps, 2) + " A", x + w / 2, y + 30,
+        { color: PL.col("text-dim"), size: 10, align: "center" });
+      return w;
+    }
+
+    /* 導線上跑動的電流點：速度與密度都正比於電流，電流大小變成看得見的東西 */
+    function currentDots(ctx, x0, y0, x1, y1, amps) {
+      if (amps <= 1e-6) return;
+      const len = Math.hypot(x1 - x0, y1 - y0);
+      if (len < 6) return;
+      const gap = Math.max(14, 46 - amps * 7);        // 電流越大，點越密
+      const n = Math.floor(len / gap);
+      const phase = (flow * (0.25 + amps * 0.5)) % 1; // 電流越大，跑越快
+      for (let i = 0; i < n; i += 1) {
+        const s = ((i + phase) / n) % 1;
+        D.disc(ctx, x0 + (x1 - x0) * s, y0 + (y1 - y0) * s, 2.6,
+          { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 6 });
+      }
+    }
+
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const R1 = sR1.get(), R2 = sR2.get(), V = sV.get(), series = sCfg.get() === "series";
       const Req = series ? R1 + R2 : R1 * R2 / (R1 + R2), Itot = V / Req;
-      const resBox = (x, y, r, lab, c) => { D.rect(ctx, x, y - 12, 56, 24, { fill: "rgba(77,182,170,0.15)", stroke: MC(), width: 1.5, r: 4 }); D.text(ctx, lab + "=" + r + "Ω", x + 28, y + 4, { color: c || MC(), size: 11, align: "center" }); };
-      const x0 = 50, x1 = W - 50, cy = H / 2;
-      D.line(ctx, x0, cy, x0, cy - 40, "#fff", 2); D.text(ctx, V + "V", x0 - 8, cy - 20, { color: PL.col("text-dim"), size: 11, align: "right" });
+      const x0 = 56, x1 = W - 56, cy = H / 2 + 16, top = cy - 62;
+
+      // 電池：高度正比於電壓，長短極板是標準符號
+      const bh = 12 + V * 1.6;
+      D.line(ctx, x0, cy, x0, cy - bh * 0.5, PL.col("text-faint"), 2);
+      D.line(ctx, x0 - 13, cy - bh * 0.5, x0 + 13, cy - bh * 0.5, "#fff", 3.4);
+      D.line(ctx, x0 - 7, cy - bh * 0.5 - 7, x0 + 7, cy - bh * 0.5 - 7, "#fff", 1.8);
+      D.line(ctx, x0, cy - bh * 0.5 - 7, x0, top, PL.col("text-faint"), 2);
+      D.text(ctx, V + " V", x0 - 17, cy - bh * 0.5, { color: PL.col("text"), size: 12, align: "right", weight: "700" });
+
       if (series) {
-        D.line(ctx, x0, cy - 40, W / 2 - 70, cy - 40, PL.col("text-faint"), 2);
-        resBox(W / 2 - 70, cy - 40, R1, "R₁"); D.line(ctx, W / 2 - 14, cy - 40, W / 2 + 20, cy - 40, PL.col("text-faint"), 2);
-        resBox(W / 2 + 20, cy - 40, R2, "R₂"); D.line(ctx, W / 2 + 76, cy - 40, x1, cy - 40, PL.col("text-faint"), 2);
-        D.line(ctx, x1, cy - 40, x1, cy, PL.col("text-faint"), 2); D.line(ctx, x0, cy, x1, cy, PL.col("text-faint"), 2);
+        // 串聯：兩顆電阻首尾相接，方塊總長就是等效電阻
+        const w1 = 26 + R1 * 3.4, w2 = 26 + R2 * 3.4;
+        const startX = (W - (w1 + w2 + 30)) / 2;
+        currentDots(ctx, x0, top, startX, top, Itot);
+        D.line(ctx, x0, top, startX, top, PL.col("text-faint"), 2);
+        resBox(ctx, startX, top, R1, "R₁", Itot * R1, Itot);
+        D.line(ctx, startX + w1, top, startX + w1 + 30, top, PL.col("text-faint"), 2);
+        currentDots(ctx, startX + w1, top, startX + w1 + 30, top, Itot);
+        resBox(ctx, startX + w1 + 30, top, R2, "R₂", Itot * R2, Itot);
+        D.line(ctx, startX + w1 + 30 + w2, top, x1, top, PL.col("text-faint"), 2);
+        currentDots(ctx, startX + w1 + 30 + w2, top, x1, top, Itot);
+        D.line(ctx, x1, top, x1, cy, PL.col("text-faint"), 2);
+        D.line(ctx, x0, cy, x1, cy, PL.col("text-faint"), 2);
+        currentDots(ctx, x1, cy, x0, cy, Itot);
         rBranch.set(Itot, 2);
+        PL.ui.caption(cv, "串聯：兩顆電阻的電流點速度一模一樣——電流處處相同。" +
+          "電壓則按電阻比例分配，方塊下方就是各自分到的電壓。");
       } else {
-        D.line(ctx, x0, cy - 40, W / 2 - 40, cy - 40, PL.col("text-faint"), 2);
-        // 兩並聯支路
-        D.line(ctx, W / 2 - 40, cy - 40, W / 2 - 40, cy - 66, PL.col("text-faint"), 2); resBox(W / 2 - 28, cy - 66, R1, "R₁"); D.line(ctx, W / 2 + 28, cy - 66, W / 2 + 40, cy - 66, PL.col("text-faint"), 2); D.line(ctx, W / 2 + 40, cy - 66, W / 2 + 40, cy - 40, PL.col("text-faint"), 2);
-        D.line(ctx, W / 2 - 40, cy - 40, W / 2 - 40, cy - 14, PL.col("text-faint"), 2); resBox(W / 2 - 28, cy - 14, R2, "R₂"); D.line(ctx, W / 2 + 28, cy - 14, W / 2 + 40, cy - 14, PL.col("text-faint"), 2); D.line(ctx, W / 2 + 40, cy - 14, W / 2 + 40, cy - 40, PL.col("text-faint"), 2);
-        D.line(ctx, W / 2 + 40, cy - 40, x1, cy - 40, PL.col("text-faint"), 2);
-        D.line(ctx, x1, cy - 40, x1, cy, PL.col("text-faint"), 2); D.line(ctx, x0, cy, x1, cy, PL.col("text-faint"), 2);
-        rBranch.set(V / R1, 2);
+        // 並聯：兩條支路各自標出自己的電流，電阻小的那條點跑得明顯比較快
+        const i1 = V / R1, i2 = V / R2;
+        const w1 = 26 + R1 * 3.4, w2 = 26 + R2 * 3.4;
+        const bx = W / 2 - Math.max(w1, w2) / 2, jx = bx - 34, jx2 = bx + Math.max(w1, w2) + 34;
+        const yA = top - 26, yB = top + 34;
+        D.line(ctx, x0, top, jx, top, PL.col("text-faint"), 2);
+        currentDots(ctx, x0, top, jx, top, Itot);
+        [[yA, R1, "R₁", i1, w1], [yB, R2, "R₂", i2, w2]].forEach(([yy, rr, lab, ii, ww]) => {
+          D.line(ctx, jx, top, jx, yy, PL.col("text-faint"), 2);
+          D.line(ctx, jx, yy, bx, yy, PL.col("text-faint"), 2);
+          currentDots(ctx, jx, yy, bx, yy, ii);
+          resBox(ctx, bx, yy, rr, lab, V, ii);
+          D.line(ctx, bx + ww, yy, jx2, yy, PL.col("text-faint"), 2);
+          currentDots(ctx, bx + ww, yy, jx2, yy, ii);
+          D.line(ctx, jx2, yy, jx2, top, PL.col("text-faint"), 2);
+        });
+        D.line(ctx, jx2, top, x1, top, PL.col("text-faint"), 2);
+        currentDots(ctx, jx2, top, x1, top, Itot);
+        D.line(ctx, x1, top, x1, cy, PL.col("text-faint"), 2);
+        D.line(ctx, x0, cy, x1, cy, PL.col("text-faint"), 2);
+        currentDots(ctx, x1, cy, x0, cy, Itot);
+        rBranch.set(i1, 2);
+        PL.ui.caption(cv, "並聯：兩條支路的電壓一樣，但電阻小的那條電流點跑得明顯比較快。" +
+          "把 R₁ 拉到最小、R₂ 拉到最大，速度差距最清楚。");
       }
+      D.text(ctx, "等效電阻 " + PL.fmt(Req, 2) + " Ω　總電流 " + PL.fmt(Itot, 2) + " A",
+        W / 2, H - 14, { color: PL.col("text-dim"), size: 11, align: "center" });
       rReq.set(Req, 2); rItot.set(Itot, 2);
     }
-    cv.onResize(draw); draw();
-    return { stop() { cv.destroy(); }, rerender: draw };
+    const anim = PL.loop(dt => { if (dt) flow += dt; draw(); }, 40);
+    cv.onResize(draw); draw(); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
 
   /* 電容器充放電 */

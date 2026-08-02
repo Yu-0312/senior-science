@@ -55,12 +55,22 @@
       if (!broken) {
         bx = cx + R * Math.cos(ang); by = cy + R * Math.sin(ang);
         D.line(ctx, cx, cy, bx, by, MC(), 2);
-        D.arrow(ctx, bx, by, bx + (cx - bx) * 0.4, by + (cy - by) * 0.4, { color: PL.col("danger"), width: 2.4, label: "F_c" });
+        /*
+         * 「質量 m」原本只出現在讀數裡：球永遠畫成半徑 10，
+         * 向心力箭頭長度永遠是半徑的 0.4 倍，與 m 無關。
+         * 但 F_c = mω²r，質量本來就是這條式子的一部分。
+         * 改成箭頭長度正比於實際的向心力，質量大就明顯需要更大的力。
+         */
+        const Fc = sM.get() * w * w * r;
+        const fcLen = PL.clamp(Fc * 1.6, 18, R * 0.85);
+        const ux = (cx - bx) / R, uy = (cy - by) / R;
+        D.arrow(ctx, bx, by, bx + ux * fcLen, by + uy * fcLen,
+          { color: PL.col("danger"), width: 2.4, label: "F_c = " + PL.fmt(Fc, 1) + " N" });
         D.arrow(ctx, bx, by, bx - 40 * Math.sin(ang), by + 40 * Math.cos(ang), { color: PL.col("accent-2"), width: 2, label: "v" });
       } else {
         D.arrow(ctx, bx, by, bx + fx * 0.4, by + fy * 0.4, { color: PL.col("accent-2"), width: 2, label: "沿切線飛出" });
       }
-      D.disc(ctx, bx, by, 10, { fill: MC(), glow: MC(), glowSize: 12 });
+      D.disc(ctx, bx, by, 7 + sM.get() * 3.2, { fill: MC(), glow: MC(), glowSize: 12 });
       rF.set(sM.get() * w * w * r, 2); rV.set(w * r, 2);
     }
     const anim = PL.loop(dt => {
