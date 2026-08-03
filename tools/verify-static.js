@@ -64,5 +64,22 @@ const sitemap = fs.readFileSync(path.join(ROOT, "sitemap.xml"), "utf8");
 const urlCount = (sitemap.match(/<url>/g) || []).length;
 check("sitemap 涵蓋所有實驗頁與學習單", urlCount >= flat.length * 2, urlCount + " 筆");
 
+/*
+ * 首頁的 canonical 與 og:url 是手寫在 index.html 裡的，不會被建置腳本重新產生。
+ *
+ * 從 GitHub Pages 搬到 Vercel 之後，全站的網址都跟著 siteUrl 換了，
+ * 只有首頁這兩行留在原地，指向一個已經回 404 的位置——
+ * 而且 sitemap、robots、248 個實驗頁全部是對的，看起來一切正常。
+ * 這種「只有一個角落沒跟上」的錯，靠人工複查是抓不到的。
+ */
+{
+  const home = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
+  const base = String(site.siteUrl || "").replace(/\/+$/, "");
+  const canonical = (/<link[^>]+rel="canonical"[^>]+href="([^"]+)"/.exec(home) || [])[1] || "";
+  const ogUrl = (/<meta[^>]+property="og:url"[^>]+content="([^"]+)"/.exec(home) || [])[1] || "";
+  check("首頁 canonical 與 siteUrl 一致", canonical.replace(/\/+$/, "") === base, canonical || "（找不到）");
+  check("首頁 og:url 與 siteUrl 一致", ogUrl.replace(/\/+$/, "") === base, ogUrl || "（找不到）");
+}
+
 console.log(failed ? "\n" + failed + " 項未通過" : "\n全部通過");
 process.exit(failed ? 1 : 0);

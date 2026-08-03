@@ -235,6 +235,16 @@ body.checkpoint-active { overflow: hidden; }
   overflow-y: auto; max-height: calc(100vh - 65px);
   position: sticky; top: 65px;
 }
+
+/*
+ * 收合課程目錄，把那 306px 讓給實驗台。
+ *
+ * 用 display: none 而不是寬度動畫：目錄裡有 248 個項目，
+ * 保留在版面上（即使寬度為零）仍會參與排版計算，收合時看得到卡頓。
+ * 也因此收合後必須手動叫模擬重繪一次——canvas 的尺寸是用容器寬度算的，
+ * 容器變了但沒有觸發 ResizeObserver 的話，畫布會維持舊寬度。
+ */
+.app[data-sidebar="collapsed"] .sidebar { display: none; }
 .sidebar-head { padding: 20px 20px 6px; }
 .sidebar-head .title { font-size: 11px; color: var(--text-faint); letter-spacing: 2.5px; text-transform: uppercase; }
 .sidebar-head .stat { display: flex; gap: 20px; margin-top: 12px; }
@@ -565,7 +575,25 @@ button.exp-path-step:hover { border-color: var(--m-ink, var(--m-color, var(--acc
  * 撐開的空白落在 .card-body 裡（下面把 body 設成 flex: 1），
  * 因此看起來是「這張卡片的留白比較多」，而不是「這張卡片提早結束」。
  */
-.content-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: stretch; }
+/*
+ * 實驗台獨佔整列，概念與題目排到它下面。
+ *
+ * 舊版是「實驗台 ｜ 340px 概念欄」兩欄，加上左邊 306px 的課程目錄，
+ * 1456px 的螢幕上留給畫布的只剩約 470px——而畫布正是這個網站唯一的主角。
+ * 公式和題目改成往下滾才看得到，換來畫布寬度變成兩倍以上。
+ *
+ * align-items 保留 stretch：單欄時它不影響任何東西，
+ * 但視窗夠寬時下面的規則會把兩張卡片放回同一列，那時仍然需要等高。
+ */
+.content-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; align-items: stretch; }
+
+/*
+ * 超寬螢幕才把概念欄放回右側：此時就算讓出 340px，畫布仍有一千像素以上。
+ * 門檻取 1800px（1500 內容 + 306 目錄），低於它一律單欄。
+ */
+@media (min-width: 1800px) {
+  .content-grid { grid-template-columns: minmax(0, 1fr) 340px; }
+}
 
 .card {
   background: var(--panel); backdrop-filter: blur(8px);

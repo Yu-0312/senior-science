@@ -39,7 +39,25 @@ function decl(sel, prop) {
 }
 
 R.section("同列面板等高");
-R.ok(decl(".content-grid", "align-items") === "stretch", "外層兩欄等高");
+/*
+ * .content-grid 現在預設是單欄（實驗台獨佔整列，概念與題目排到下面），
+ * 只有 1800px 以上的螢幕才把概念欄放回右側。
+ * 因此這裡驗兩件事：預設確實是單欄，而放回兩欄時仍然等高。
+ */
+/*
+ * decl() 會把 @media 內外同名選擇器的宣告混在一起取最後一筆，
+ * 分不出「預設值」與「大螢幕的覆寫」——這裡要驗的正好是兩者的差別，
+ * 所以改成直接在 CSS 原文上比對這兩條規則。
+ */
+{
+  const base = /(^|\})\s*\.content-grid\s*\{([^}]*)\}/.exec(css);
+  const cols = base ? (/grid-template-columns\s*:([^;]+)/.exec(base[2]) || [])[1] : null;
+  R.ok(!!cols && /minmax\(0,\s*1fr\)\s*$/.test(cols.trim()),
+    "預設單欄：實驗台獨佔整列", cols ? cols.trim() : "（找不到規則）");
+  R.ok(/@media[^{]*min-width:\s*1800px[^{]*\{[\s\S]*?\.content-grid\s*\{[^}]*minmax\(0,\s*1fr\)\s+340px/.test(css),
+    "超寬螢幕才把概念欄放回右側");
+}
+R.ok(decl(".content-grid", "align-items") === "stretch", "放回兩欄時仍等高");
 R.ok(decl(".card", "flex-direction") === "column", ".card 為直向 flex");
 R.ok(/flex\s*:\s*1/.test(rulesFor(".card > .card-body")), "撐高分配給 card-body");
 R.ok(decl(".sim-stage", "align-items") === "stretch", "實驗台內畫布欄與參數欄等高");

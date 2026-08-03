@@ -239,6 +239,40 @@
     return window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   }
 
+  /*
+   * 收合／展開左側課程目錄。
+   *
+   * canvas 的像素尺寸是用容器寬度算出來的，而引擎在畫布容器上掛了 ResizeObserver，
+   * 所以收合造成的寬度變化正常情況下會自己被接住。
+   * 這裡仍補一次重繪當作保險：如果哪天漏掉，症狀會是畫布維持收合前的寬度、
+   * 右邊留一條空白——而那看起來很像「這個實驗本來就畫不滿」，
+   * 不會有人想到是尺寸沒更新。這種靜默的失敗值得多花一次重繪。
+   *
+   * 用 requestAnimationFrame 等一格，是要先讓瀏覽器完成重新排版，
+   * 這時量到的容器寬度才是收合後的值。
+   */
+  function applySidebarCollapsed(collapsed) {
+    const app = document.querySelector(".app");
+    if (!app) return;
+    if (collapsed) app.setAttribute("data-sidebar", "collapsed");
+    else app.removeAttribute("data-sidebar");
+    store.set("pl-sidebar-collapsed", !!collapsed);
+
+    const btn = $("#sidebar-toggle");
+    if (btn) {
+      btn.setAttribute("aria-expanded", String(!collapsed));
+      btn.setAttribute("aria-label", collapsed ? "展開課程目錄" : "收合課程目錄");
+      btn.title = collapsed ? "展開課程目錄" : "收合課程目錄，放大實驗台";
+      const label = $("#sidebar-toggle-label");
+      if (label) label.textContent = collapsed ? "展開目錄" : "收合目錄";
+    }
+    requestAnimationFrame(() => {
+      if (currentSim && currentSim.rerender) {
+        try { currentSim.rerender(); } catch (e) { console.warn("收合側欄後重繪失敗", e); }
+      }
+    });
+  }
+
   function applyTheme(t) {
     const theme = t === "light" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", theme);
@@ -1678,6 +1712,13 @@
     $("#theme-toggle").addEventListener("click", () => {
       applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
     });
+    const sideBtn = $("#sidebar-toggle");
+    if (sideBtn) {
+      applySidebarCollapsed(store.get("pl-sidebar-collapsed", false));
+      sideBtn.addEventListener("click", () => {
+        applySidebarCollapsed(!document.querySelector(".app").matches('[data-sidebar="collapsed"]'));
+      });
+    }
     const lockBtn = $("#lock-session");
     if (lockBtn) lockBtn.addEventListener("click", lockLab);
     $("#menu-toggle").addEventListener("click", toggleSidebar);

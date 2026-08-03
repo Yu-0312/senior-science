@@ -23,13 +23,20 @@
     })();
   </script>
 
-  <!-- SEO / 社群分享（部署後請改成你的實際網址） -->
-  <link rel="canonical" href="https://yu-0312.github.io/senior-science/" />
+  <!--
+    SEO / 社群分享
+
+    注意：這兩個網址是手寫的，不會被 tools/build-static.js 重新產生
+    （那支只負責 p/ 底下的說明頁與 experiments.html）。
+    換網域時除了在 Vercel 設 SITE_URL，這裡也要一起改，否則首頁的
+    canonical 會指向一個不存在的位置——而這種錯不會有任何測試會叫。
+  -->
+  <link rel="canonical" href="https://senior-science.vercel.app/" />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="物理實驗室｜台灣中學互動物理" />
   <meta property="og:description" content="從國中自然到高中 108 課綱的互動物理實驗室；實驗與題型持續擴充，全部可即時操作模擬。" />
   <meta property="og:locale" content="zh_TW" />
-  <meta property="og:url" content="https://yu-0312.github.io/senior-science/" />
+  <meta property="og:url" content="https://senior-science.vercel.app/" />
 
   <!-- PWA -->
   <link rel="manifest" href="manifest.json" />
@@ -39,7 +46,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="物理實驗室" />
 
-  <link rel="stylesheet" href="css/style.css?v=20260803-3" />
+  <link rel="stylesheet" href="css/style.css?v=20260803-4" />
 
   <!-- MathJax（LaTeX 公式排版） -->
   <script>
@@ -105,6 +112,11 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l3 3v17H6z"/><path d="M15 2v4h4M9 11h6M9 15h6M9 19h4"/></svg>
         <span>授權</span>
       </a>
+      <!-- 收合課程目錄，把寬度讓給實驗台。狀態記在 localStorage。 -->
+      <button class="icon-btn" id="sidebar-toggle" type="button" aria-controls="sidebar" aria-expanded="true" aria-label="收合課程目錄" title="收合課程目錄，放大實驗台">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+        <span id="sidebar-toggle-label">收合目錄</span>
+      </button>
       <button class="icon-btn lock-session" id="lock-session" type="button" aria-label="鎖定實驗室"><span>鎖定</span></button>
       <button class="icon-btn" id="theme-toggle" aria-label="切換主題"></button>
     </header>
@@ -334,25 +346,25 @@
   </section>
 
   <!-- 核心 -->
-  <script src="js/site-config.js?v=20260803-3"></script>
-  <script src="js/curriculum.js?v=20260803-3"></script>
-  <script src="js/advanced-curriculum.js?v=20260803-3"></script>
-  <script src="js/comprehensive-curriculum.js?v=20260803-3"></script>
-  <script src="js/extension-registry.js?v=20260803-3"></script>
-  <script src="js/open-curriculum.js?v=20260803-3"></script>
-  <script src="js/school-curriculum.js?v=20260803-3"></script>
-  <script src="js/question-bank.js?v=20260803-3"></script>
-  <script src="js/sim-core.js?v=20260803-3"></script>
-  <script src="js/sim-tools.js?v=20260803-3"></script>
-  <script src="js/sim-insight.js?v=20260803-3"></script>
-  <script src="js/teaching-notes.js?v=20260803-3"></script>
-  <script src="js/sim-a11y.js?v=20260803-3"></script>
+  <script src="js/site-config.js?v=20260803-4"></script>
+  <script src="js/curriculum.js?v=20260803-4"></script>
+  <script src="js/advanced-curriculum.js?v=20260803-4"></script>
+  <script src="js/comprehensive-curriculum.js?v=20260803-4"></script>
+  <script src="js/extension-registry.js?v=20260803-4"></script>
+  <script src="js/open-curriculum.js?v=20260803-4"></script>
+  <script src="js/school-curriculum.js?v=20260803-4"></script>
+  <script src="js/question-bank.js?v=20260803-4"></script>
+  <script src="js/sim-core.js?v=20260803-4"></script>
+  <script src="js/sim-tools.js?v=20260803-4"></script>
+  <script src="js/sim-insight.js?v=20260803-4"></script>
+  <script src="js/teaching-notes.js?v=20260803-4"></script>
+  <script src="js/sim-a11y.js?v=20260803-4"></script>
 
   <!-- 實驗程式改為延遲載入：只掛對應表，開啟實驗時才抓對應的檔案 -->
-  <script src="js/experiment-manifest.js?v=20260803-3"></script>
+  <script src="js/experiment-manifest.js?v=20260803-4"></script>
 
 
   <!-- 應用外殼 -->
-  <script src="js/app.js?v=20260803-3"></script>
+  <script src="js/app.js?v=20260803-4"></script>
 </body>
 </html>

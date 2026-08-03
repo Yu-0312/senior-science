@@ -641,7 +641,19 @@
   /* --------------------------- 響應式畫布 --------------------------- */
   function createCanvas(wrap, aspect, maxW) {
     aspect = aspect || 0.6;
-    maxW = maxW || 780;
+    /*
+     * 寬度上限
+     *
+     * 這個數字（預設 780，另有 22 個實驗自己指定 820～960）是為舊的三欄版面挑的：
+     * 當時畫布最多也只有 470px 寬，上限根本碰不到，寫多少都無所謂。
+     * 版面改成實驗台獨佔整列之後，容器變成一千多像素，這些上限反而變成主要的限制——
+     * 畫布卡在 780px，右邊留一大片空白，看起來像是版面壞掉而不是刻意留白。
+     *
+     * 因此把個別實驗的設定當成「設計參考寬度」，實際上限統一放寬。
+     * 留一個上限而不是完全不限，是因為超寬螢幕上把單一畫布拉到兩千多像素，
+     * 反而讓兩端的元件遠到無法同時觀察。
+     */
+    maxW = Math.max(maxW || 780, 1500);
     const canvas = el("canvas", "sim-canvas", wrap);
     const ctx = canvas.getContext("2d");
     const cv = { canvas, ctx, W: 640, H: 400, dpr: 1, _resizeCbs: [], profile: wrap._labProfile || profileFor() };
@@ -651,14 +663,21 @@
       const w = Math.max(240, Math.min(rect.width || maxW, maxW));
       /*
        * 高度上限
-       * 橫向手機的可視高度只剩約 380px，照原本的長寬比算出來的畫布會比整個
-       * 螢幕還高，使用者看不到下方的讀數。這裡限制畫布不超過視窗高度的 68%，
-       * 讓「畫布 + 讀數」能同時出現。在桌機上這個上限幾乎不會生效。
+       *
+       * 這條規則原本是為橫向手機寫的：可視高度只剩約 380px，照長寬比算出來的
+       * 畫布會比整個螢幕還高，使用者看不到下方的讀數。當時註解寫「桌機上幾乎不會生效」，
+       * 因為畫布最寬只有 470px，算出來的高度遠低於門檻。
+       *
+       * 版面加寬之後這句話不再成立：畫布一千多像素寬時，0.68 倍視窗高會反過來
+       * 成為主要限制，把長寬比整個壓扁——而且是無聲的，畫面只會看起來比例怪怪的。
+       * 所以改成只在「本來就矮」的視窗套用嚴格上限，一般桌機視窗放寬到 0.9，
+       * 讓畫布照原比例長高。
+       *
        * 不用 CSS 的 max-height 是因為那只會把已經畫好的內容壓扁；
        * 在這裡改尺寸，實驗的繪圖程式會依新的 W／H 重新排版。
        */
-      const viewportCap = typeof window !== "undefined" && window.innerHeight
-        ? Math.max(200, window.innerHeight * 0.68) : Infinity;
+      const vh = typeof window !== "undefined" && window.innerHeight ? window.innerHeight : 0;
+      const viewportCap = vh ? Math.max(200, vh * (vh < 620 ? 0.68 : 0.9)) : Infinity;
       const h = Math.round(Math.min(w * aspect, viewportCap));
       // 2x 已足夠清晰，避免高 DPI 手機以 3x / 4x 重繪每個即時圖表。
       const dpr = Math.min(2, window.devicePixelRatio || 1);
