@@ -170,7 +170,9 @@
   }
   /* 站台設定（js/site-config.js）。合作結束後把 accessGate 改成 false 就全站公開。 */
   const SITE = window.PhysicsLabSite || {};
-  const ACCESS_HASH = SITE.accessHash || "";
+  const ACCESS_HASHES = Array.isArray(SITE.accessHashes)
+    ? SITE.accessHashes
+    : (SITE.accessHash ? [SITE.accessHash] : []);
   const ACCESS_GATE_ENABLED = SITE.accessGate !== false;
 
   /* ---------------------------------------------------------------------
@@ -1585,7 +1587,7 @@
       submit.disabled = true; error.textContent = "驗證中…";
       try {
         const digest = await sha256(input.value);
-        if (digest && digest === ACCESS_HASH) { unlockLab(); return; }
+        if (digest && ACCESS_HASHES.includes(digest)) { unlockLab(); return; }
         error.textContent = digest ? "密碼不正確，請再試一次。" : "此瀏覽器無法驗證密碼。";
         input.select();
       } catch (e) {

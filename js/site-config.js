@@ -26,14 +26,19 @@
        ------------------------------------------------------------------ */
     accessGate: true,
 
-    /* 密碼的 SHA-256。要換密碼時，在瀏覽器主控台執行：
+    /* 密碼的 SHA-256 陣列（可放多組，輸入任一組都能解鎖）。
+       要新增密碼時，在瀏覽器主控台執行：
          crypto.subtle.digest("SHA-256", new TextEncoder().encode("新密碼"))
            .then(b => console.log([...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("")))
+       算出雜湊後，加進下面陣列即可，不用刪掉舊的（除非要讓舊密碼失效）。
 
        注意：這是靜態網站的輕量閘門，用來區分「有給連結的合作對象」與
        「隨手點進來的人」，不是伺服器端的存取控制。雜湊寫在前端就一定
        可以被離線暴力破解，因此不要用它保護真正敏感的東西。 */
-    accessHash: "faf16b5c720233e537cc50efe380a2170b2a2fd339ae6f9f3f74465cef67e8cd",
+    accessHashes: [
+      "faf16b5c720233e537cc50efe380a2170b2a2fd339ae6f9f3f74465cef67e8cd",
+      "18b1965e109cf0aacadf3d81883a8e9fd0da68df964e5c543cc60a93050d1f89" /* Testla0312 */
+    ],
 
     /*
      * 部署網址，供 sitemap 與 canonical 使用。
