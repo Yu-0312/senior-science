@@ -37,7 +37,8 @@
        可以被離線暴力破解，因此不要用它保護真正敏感的東西。 */
     accessHashes: [
       "faf16b5c720233e537cc50efe380a2170b2a2fd339ae6f9f3f74465cef67e8cd",
-      "18b1965e109cf0aacadf3d81883a8e9fd0da68df964e5c543cc60a93050d1f89" /* Testla0312 */
+      "18b1965e109cf0aacadf3d81883a8e9fd0da68df964e5c543cc60a93050d1f89",
+      "599a6c9facc00fa5acee2723d961b0fa48c14817c90bac8aaa29d6b756fdeafc"
     ],
 
     /*
@@ -52,7 +53,7 @@
     siteUrl: "https://senior-science.vercel.app/",
 
     /* 版本號：同時用於快取破壞與 Service Worker */
-    build: "20260803-4"
+    build: "20260803-5"
   };
 
   /*
