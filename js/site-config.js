@@ -35,8 +35,16 @@
        可以被離線暴力破解，因此不要用它保護真正敏感的東西。 */
     accessHash: "faf16b5c720233e537cc50efe380a2170b2a2fd339ae6f9f3f74465cef67e8cd",
 
-    /* 部署網址，供 sitemap 與 canonical 使用 */
-    siteUrl: "https://yu-0312.github.io/senior-science/",
+    /*
+     * 部署網址，供 sitemap 與 canonical 使用。
+     *
+     * 這裡只是「本機建置」的預設值。實際部署時 tools/build-static.js 會優先採用
+     * SITE_URL 或 VERCEL_PROJECT_PRODUCTION_URL 環境變數（見 DEPLOY.md），
+     * 所以接上自訂網域時不必回來改這一行——在 Vercel 後台設 SITE_URL 即可。
+     *
+     * 結尾的斜線要保留：canonical 是直接字串相接的。
+     */
+    siteUrl: "https://senior-science.vercel.app/",
 
     /* 版本號：同時用於快取破壞與 Service Worker */
     build: "20260803-2"

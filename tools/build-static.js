@@ -413,6 +413,31 @@ ${sections}`;
 }
 
 /* ---------------------------------------------------------------------------
+   正式網址的判定
+   ---------------------------------------------------------------------------
+   canonical 與 sitemap 需要一個絕對網址，而這個網址在不同環境下不一樣：
+   本機是 file://、Vercel 預覽是隨機子網域、正式站才是真正的網址。
+
+   優先順序刻意這樣排：
+     1. SITE_URL 環境變數 —— 接自訂網域時只要在 Vercel 後台設一個變數，不必改程式
+     2. VERCEL_PROJECT_PRODUCTION_URL —— Vercel 自動注入的「正式站網址」。
+        用它而不是 VERCEL_URL 是關鍵：VERCEL_URL 每次部署都不同，
+        預覽部署會把 canonical 指到那個一次性網址，等於每推一次就多一份重複內容。
+     3. js/site-config.js 裡的 siteUrl —— 本機建置與其他環境的預設值
+
+   注意 Vercel 給的是不含協定的主機名（example.vercel.app），要自己補 https:// 與結尾斜線。
+   --------------------------------------------------------------------------- */
+function resolveSiteUrl(site) {
+  const withSlash = u => (u.endsWith("/") ? u : u + "/");
+  const env = process.env.SITE_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (env) {
+    const url = /^https?:\/\//.test(env) ? env : "https://" + env;
+    return withSlash(url);
+  }
+  return withSlash(site.siteUrl || "https://yu-0312.github.io/senior-science/");
+}
+
+/* ---------------------------------------------------------------------------
    主流程
    --------------------------------------------------------------------------- */
 function main() {
@@ -422,7 +447,7 @@ function main() {
     process.exit(1);
   }
   const gated = site.accessGate !== false;
-  const siteUrl = site.siteUrl || "https://yu-0312.github.io/senior-science/";
+  const siteUrl = resolveSiteUrl(site);
   const conf = { siteUrl, build: site.build || "dev", accessGate: site.accessGate };
 
   /*

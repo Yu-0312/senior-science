@@ -1,24 +1,23 @@
-name: Deploy to GitHub Pages
+# 建置與測試檢查
+#
+# 部署本身由 Vercel 負責（見 DEPLOY.md）——Vercel 監看 main 分支，
+# push 之後自己會建置並上線，所以這裡不再做部署。
+#
+# 但「有沒有人推壞掉的東西上來」還是要有人看。這份流程只做檢查、不動任何線上內容：
+# 建置得起來、產出通得過驗證、測試全綠。
+name: Build and test
 
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  check:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -28,19 +27,23 @@ jobs:
         with:
           node-version: '20'
       # 靜態說明頁、學習單、sitemap 與 robots 都由課程資料自動產生，
-      # 在部署前重新建置一次，內容才不會和實驗清單失去同步。
+      # 這裡重新建置一次，確認它們和實驗清單沒有失去同步。
       - name: Build experiment manifest
         run: node tools/build-manifest.js
       - name: Build static pages
         run: node tools/build-static.js
       - name: Verify build
         run: node tools/verify-static.js
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.'
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      # 完整版（含兩支耗時稽核）。CI 不趕時間，不需要 --fast。
+      - name: Run test suite
+        run: node tools/tests/run-all.js
+      # 建置產物有進版控。若 CI 重新建置後和版控裡的不一樣，
+      # 代表有人改了課程資料卻沒重新建置就推上來。
+      # 這種不同步在 GitHub Pages 時代會被部署流程默默蓋過去，現在要明講。
+      - name: Check generated files are committed
+        run: |
+          if ! git diff --quiet; then
+            echo "::error::建置產物與版控內容不一致，請在本機執行 node tools/build-static.js 後重新提交"
+            git diff --stat
+            exit 1
+          fi
