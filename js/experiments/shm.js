@@ -13,7 +13,7 @@
     const sK = PL.ui.slider(L.controls, { label: "勁度 k", min: 5, max: 60, step: 1, value: 20, unit: "N/m", digits: 0, onInput: () => hist = [] });
     const sA = PL.ui.slider(L.controls, { label: "振幅 A", min: 0.5, max: 2.5, step: 0.1, value: 1.6, unit: "m", digits: 1 });
     const row = PL.ui.buttonRow(L.controls);
-    const bP = PL.ui.button(row, "暫停", () => { anim.toggle(); bP.textContent = anim.running ? "暫停" : "播放"; }, { primary: true });
+    /* 播放／暫停由引擎的傳輸列統一提供（還附單步與速度），實驗不再自備，避免兩個開關互相打架。 */
     const rT = PL.ui.readout(L.readouts, { label: "週期 T", unit: "s" });
     const rX = PL.ui.readout(L.readouts, { label: "位移 x", unit: "m" });
     const rV = PL.ui.readout(L.readouts, { label: "速度 v", unit: "m/s" });

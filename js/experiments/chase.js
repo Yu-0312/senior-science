@@ -64,25 +64,29 @@
     PL.ui.section(L.controls, "初始條件");
     const sGap = PL.ui.slider(L.controls, { label: "初始間距 Δx₀", min: 0, max: 80, step: 1, value: 30, unit: "m", digits: 0, onInput: reset });
     const sTime = PL.ui.slider(L.controls, { label: "觀察時刻 t", min: 0, max: T_MAX, step: 0.05, value: 0, unit: "s", digits: 2,
-      onInput: v => { t = v; running = false; play.textContent = "播放"; draw(); } });
+      onInput: v => { t = v; anim.stop(); draw(); } });
 
     const row = PL.ui.buttonRow(L.controls);
-    let running = false;
-    const play = PL.ui.button(row, "播放", () => {
-      running = !running; play.textContent = running ? "暫停" : "播放";
-      if (running && t >= T_MAX) { t = 0; sTime.set(0); }
-    }, { primary: true });
+    /*
+     * 這裡刻意不做播放／暫停按鈕。
+     * 引擎的傳輸列已經提供播放、單步與速度，而且它控制的就是下面這個迴圈。
+     * 實驗若再維護一個自己的 running 旗標，就會變成「兩個開關要同時打開」——
+     * 傳輸列按了播放卻毫無反應，學生完全看不出問題在哪。這是實際回報過的狀況。
+     *
+     * 下面幾顆是「跳到某個時刻」的動作，按下時把動畫停住，
+     * 因為它們的用途就是停在那一刻仔細看。
+     */
     PL.ui.button(row, "跳到速度相等", () => {
       const te = equalSpeedTime();
-      if (te != null) { t = te; sTime.set(t); running = false; play.textContent = "播放"; draw(); }
-    });
+      if (te != null) { t = te; sTime.set(t); anim.stop(); draw(); }
+    }, { primary: true });
     PL.ui.button(row, "跳到追上", () => {
       const tc = catchTime();
-      if (tc != null) { t = tc; sTime.set(t); running = false; play.textContent = "播放"; draw(); }
+      if (tc != null) { t = tc; sTime.set(t); anim.stop(); draw(); }
     });
-    PL.ui.button(row, "重設", () => { t = 0; sTime.set(0); running = false; play.textContent = "播放"; draw(); });
+    PL.ui.button(row, "重設", () => { t = 0; sTime.set(0); draw(); });
 
-    function reset() { t = 0; sTime.set(0); running = false; play.textContent = "播放"; draw(); }
+    function reset() { t = 0; sTime.set(0); draw(); }
 
     PL.ui.note(L.controls,
       "「後車比前車快，遲早追上」這句話只對了一半。" +
@@ -371,10 +375,11 @@
     }
 
     const anim = PL.loop(dt => {
-      if (dt && running) {
+      if (dt) {
+        // 跑到觀察時間結束就停住，不要無限重播；使用者按傳輸列播放即可重新開始
+        if (t >= T_MAX) { anim.stop(); update(); return; }
         t = Math.min(T_MAX, t + dt);
         sTime.set(t);
-        if (t >= T_MAX) { running = false; play.textContent = "重新播放"; }
       }
       update();
     }, 50);

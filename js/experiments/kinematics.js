@@ -14,7 +14,7 @@
     const sV = PL.ui.slider(L.controls, { label: "初速 v₀", min: -8, max: 20, step: 0.5, value: 6, unit: "m/s", digits: 1, onInput: reset });
     const sA = PL.ui.slider(L.controls, { label: "加速度 a", min: -6, max: 6, step: 0.5, value: 2, unit: "m/s²", digits: 1, onInput: reset });
     const row = PL.ui.buttonRow(L.controls);
-    const bP = PL.ui.button(row, "暫停", () => { anim.toggle(); bP.textContent = anim.running ? "暫停" : "播放"; }, { primary: true });
+    /* 播放／暫停由引擎的傳輸列統一提供（還附單步與速度），實驗不再自備，避免兩個開關互相打架。 */
     PL.ui.button(row, "重設", reset);
     const rT = PL.ui.readout(L.readouts, { label: "時間 t", unit: "s" });
     const rX = PL.ui.readout(L.readouts, { label: "位置 x", unit: "m" });

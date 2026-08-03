@@ -39,7 +39,7 @@
     siteUrl: "https://yu-0312.github.io/senior-science/",
 
     /* 版本號：同時用於快取破壞與 Service Worker */
-    build: "20260727-2"
+    build: "20260727-3"
   };
 
   /*

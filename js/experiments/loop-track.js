@@ -27,7 +27,6 @@
     const cv = PL.canvas.create(L.canvasWrap, 0.52, 900);
 
     let s = 0;                   // 沿軌道走過的弧長（m）
-    let running = false;
     let detached = null;         // 脫軌時的狀態 {x, y, vx, vy}
     let flightT = 0;
 
@@ -51,13 +50,21 @@
     });
 
     const row = PL.ui.buttonRow(L.controls);
-    const play = PL.ui.button(row, "釋放", () => {
-      running = !running;
-      play.textContent = running ? "暫停" : "釋放";
+    /*
+     * 「釋放」是單向觸發：回到起點並開始跑，不是播放／暫停開關。
+     *
+     * 第一版把它做成 running 的 toggle，等於在引擎的傳輸列之外又多一個播放鍵——
+     * 兩個開關必須同時打開才會動，而傳輸列按了沒反應時學生完全看不出原因。
+     * 播放、暫停、單步、速度一律交給傳輸列，實驗只負責「開始這一次實驗」。
+     */
+    PL.ui.button(row, "釋放", () => {
+      s = 0; detached = null; flightT = 0;
+      anim.start();
+      update();
     }, { primary: true });
     PL.ui.button(row, "重置", reset);
 
-    function reset() { s = 0; running = false; detached = null; flightT = 0; play.textContent = "釋放"; update(); }
+    function reset() { s = 0; detached = null; flightT = 0; anim.stop(); update(); }
 
     PL.ui.note(L.controls,
       "先把釋放高度拉到剛好 2R：能量足夠把小球舉到環頂，但到了那裡速率是零——它過不去。" +
@@ -386,7 +393,7 @@
     }
 
     const anim = PL.loop(dt => {
-      if (dt && running) {
+      if (dt) {
         const total = loopEnd();
         if (detached) {
           // 脫軌後的拋體運動
@@ -394,13 +401,13 @@
           detached.vy -= sG.get() * dt;
           detached.x += detached.vx * dt;
           detached.y += detached.vy * dt;
-          if (detached.y <= 0) { detached.y = 0; running = false; play.textContent = "釋放"; }
+          if (detached.y <= 0) { detached.y = 0; anim.stop(); }
         } else {
           const p = pointAt(Math.min(s, total));
           const v = speedAt(p.y);
           if (v <= 1e-6 && p.part === "loop") {
             // 速度歸零：能量連爬到這裡都不夠，往回滑
-            running = false; play.textContent = "釋放";
+            anim.stop();
           } else {
             s += v * dt;
           }
@@ -417,7 +424,7 @@
             };
             flightT = 0;
           }
-          if (s >= total) { s = total; running = false; play.textContent = "釋放"; }
+          if (s >= total) { s = total; anim.stop(); }
         }
       }
       update();

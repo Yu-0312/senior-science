@@ -189,12 +189,8 @@
       const a = PL.ui.slider(L.controls, { label: config.a[0], min: config.a[1], max: config.a[2], value: config.a[3], step: step(config.a), unit: config.a[4], digits: decimal(config.a), onInput: () => render() });
       const b = PL.ui.slider(L.controls, { label: config.b[0], min: config.b[1], max: config.b[2], value: config.b[3], step: step(config.b), unit: config.b[4], digits: decimal(config.b), onInput: () => render() });
       PL.ui.note(L.controls, PL.templateGuide(id, config));
-      const buttons = PL.ui.buttonRow(L.controls); let playing = true, animation;
-      const play = PL.ui.button(buttons, "暫停", () => {
-        playing = !playing; play.textContent = playing ? "暫停" : "播放";
-        if (playing) animation.start(); else animation.stop();
-        render();
-      }, { primary: true });
+      const buttons = PL.ui.buttonRow(L.controls); let animation;
+      /* 播放／暫停由引擎的傳輸列統一提供，實驗不再自備 */
       PL.ui.button(buttons, "重設", () => { a.set(config.a[3]); b.set(config.b[3]); render(); });
       const reading = PL.ui.readout(L.readouts, { label: config.output, unit: config.unit });
       const parameter = PL.ui.readout(L.readouts, { label: config.b[0], unit: config.b[4] });

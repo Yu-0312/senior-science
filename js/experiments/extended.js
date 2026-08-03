@@ -277,12 +277,8 @@
       const sb = PL.ui.slider(L.controls, { label: cfg.b[0], min: cfg.b[1], max: cfg.b[2], value: cfg.b[3], step: (cfg.b[2] - cfg.b[1]) / 100, unit: cfg.b[4], digits: cfg.b[4] === "" ? 2 : 1, onInput: () => render() });
       PL.ui.note(L.controls, PL.templateGuide(id, cfg));
       const row = PL.ui.buttonRow(L.controls);
-      let playing = true, anim;
-      const play = PL.ui.button(row, "暫停", () => {
-        playing = !playing; play.textContent = playing ? "暫停" : "播放";
-        if (playing) anim.start(); else anim.stop();
-        render();
-      }, { primary: true });
+      let anim;
+      /* 播放／暫停由引擎的傳輸列統一提供，實驗不再自備 */
       PL.ui.button(row, "重設", () => { sa.set(cfg.a[3]); sb.set(cfg.b[3]); render(); });
       const r = PL.ui.readout(L.readouts, { label: cfg.output });
       const r2 = PL.ui.readout(L.readouts, { label: cfg.b[0], unit: cfg.b[4] });
@@ -396,14 +392,14 @@
   /* 路程與位移要把起點、折返點和終點留在同一張圖，不能只讓物體循環移動。 */
   PL.register("distance-displacement", { build(root) {
     const L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.63, 900);
-    let progress = 1, playing = false, anim;
+    let progress = 1, anim;
     PL.ui.section(L.controls, "路徑設定");
     const sOutward = PL.ui.slider(L.controls, { label: "去程距離 L", min: 4, max: 30, step: 1, value: 14, unit: "m", digits: 0, onInput: draw });
     const sReturn = PL.ui.slider(L.controls, { label: "回程比例 r", min: 0, max: 1, step: 0.05, value: 0.45, unit: "", digits: 2, onInput: draw });
     const sProgress = PL.ui.slider(L.controls, { label: "觀察路徑進度", min: 0, max: 100, step: 1, value: 100, unit: "%", digits: 0, onInput: value => { progress = value / 100; draw(); } });
     const row = PL.ui.buttonRow(L.controls);
-    const play = PL.ui.button(row, "播放整段路徑", () => { progress = 0; sProgress.set(0); playing = true; anim.start(); draw(); }, { primary: true });
-    PL.ui.button(row, "回到終點判讀", () => { playing = false; anim.stop(); progress = 1; sProgress.set(100); draw(); });
+    const play = PL.ui.button(row, "從起點重播", () => { progress = 0; sProgress.set(0); play.textContent = "從起點重播"; anim.start(); draw(); }, { primary: true });
+    PL.ui.button(row, "回到終點判讀", () => { anim.stop(); progress = 1; sProgress.set(100); draw(); });
     PL.ui.note(L.controls, "先從起點走到折返點，再往回走一段。路程只把走過的每一段相加；位移只比較終點與起點的位置，並保留方向。拖曳進度可在任何時刻停下判讀。");
     const rRoute = PL.ui.readout(L.readouts, { label: "總路程 s", unit: "m" });
     const rDisplacement = PL.ui.readout(L.readouts, { label: "終點位移 Δx", unit: "m" });
@@ -468,9 +464,14 @@
       rRoute.set(data.route, 2); rDisplacement.set(data.final, 2); rPosition.set(data.current, 2); rStage.set(progress < data.fractionOut ? "去程：遠離起點" : progress < 1 ? "回程：朝起點" : "已到終點，可比較路程與位移");
     }
     anim = PL.loop(dt => {
-      if (!playing || !dt) return;
+      /*
+       * 不再用 playing 旗標把迴圈擋住：傳輸列讓迴圈跑，這裡就該前進。
+       * 「播放整段路徑」的意義改成「回到起點重播」，而不是另一個開關。
+       * 走到終點就停下迴圈，避免無限重播。
+       */
+      if (!dt) { draw(); return; }
+      if (progress >= 1) { anim.stop(); play.textContent = "再播放一次"; draw(); return; }
       progress = Math.min(1, progress + dt * 0.24); sProgress.set(progress * 100);
-      if (progress >= 1) { playing = false; anim.stop(); play.textContent = "再播放一次"; }
       draw();
     });
     cv.onResize(draw); draw();

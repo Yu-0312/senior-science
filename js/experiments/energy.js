@@ -26,7 +26,7 @@
     const sTh = PL.ui.slider(L.controls, { label: "施力角 θ", min: 0, max: 80, step: 1, value: 30, unit: "°", digits: 0, onInput: reset });
     const sV = PL.ui.slider(L.controls, { label: "移動速率 v", min: 0.5, max: 4, step: 0.5, value: 2, unit: "m/s", digits: 1, onInput: reset });
     const row = PL.ui.buttonRow(L.controls);
-    const bP = PL.ui.button(row, "暫停", () => { anim.toggle(); bP.textContent = anim.running ? "暫停" : "播放"; }, { primary: true });
+    /* 播放／暫停由引擎的傳輸列統一提供（還附單步與速度），實驗不再自備，避免兩個開關互相打架。 */
     PL.ui.button(row, "重設", reset);
     const rW = PL.ui.readout(L.readouts, { label: "累積功 W", unit: "J" });
     const rP = PL.ui.readout(L.readouts, { label: "功率 P", unit: "W" });

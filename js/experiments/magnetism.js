@@ -357,7 +357,7 @@
     });
 
     const row = PL.ui.buttonRow(L.controls);
-    const play = PL.ui.button(row, "暫停", () => { anim.toggle(); play.textContent = anim.running ? "暫停" : "播放"; }, { primary: true });
+    /* 播放／暫停由引擎的傳輸列統一提供（還附單步與速度），實驗不再自備，避免兩個開關互相打架。 */
     PL.ui.button(row, "回中性面", () => { t = 0; hist = []; update(); });
     PL.ui.button(row, "重置", reset);
     function reset() { t = 0; hist = []; update(); }
@@ -569,7 +569,7 @@
     });
 
     const row = PL.ui.buttonRow(L.controls);
-    const play = PL.ui.button(row, "暫停", () => { anim.toggle(); play.textContent = anim.running ? "暫停" : "播放"; }, { primary: true });
+    /* 播放／暫停由引擎的傳輸列統一提供（還附單步與速度），實驗不再自備，避免兩個開關互相打架。 */
     PL.ui.button(row, "重置", () => { sNp.set(200); sNs.set(200); sVp.set(220); sR.set(440); draw(); });
 
     PL.ui.note(L.controls,

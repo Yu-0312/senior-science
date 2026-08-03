@@ -675,7 +675,8 @@
     const sEnv = PL.ui.slider(L.controls, { label: "室溫 T環境", min: 5, max: 35, step: 1, value: 25, unit: "°C", digits: 0 });
     const sK = PL.ui.slider(L.controls, { label: "散熱快慢 k（保溫程度）", min: 0.004, max: 0.05, step: 0.002, value: 0.016, unit: "1/s", digits: 3 });
     const row = PL.ui.buttonRow(L.controls);
-    const bRun = PL.ui.button(row, "暫停", () => { running = !running; bRun.textContent = running ? "暫停" : "繼續"; }, { primary: true });
+    /* 播放／暫停一律交給引擎的傳輸列。實驗自己再維護一個 running 旗標的話，
+       兩個開關必須同時打開才會動，而學生看不出來要按哪一個——這是實際回報過的問題。 */
     PL.ui.button(row, "重新開始", () => reset());
     PL.ui.note(L.controls,
       "降溫曲線本身是彎的，很難判斷「快慢」。右下圖把縱軸換成 ln(T − T環境) 之後就變成直線，" +

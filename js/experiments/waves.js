@@ -116,7 +116,7 @@
     const cv = PL.canvas.create(L.canvasWrap, 0.58, 880);
 
     const C_SOUND = 340;             // 空氣中的聲速（m/s）
-    let t = 0, wavefronts = [], emitAcc = 0, sourceX = 0, running = true;
+    let t = 0, wavefronts = [], emitAcc = 0, sourceX = 0;
 
     PL.ui.section(L.controls, "音源");
     const sVs = PL.ui.slider(L.controls, { label: "音源速度 vₛ", min: 0, max: 480, step: 10, value: 90, unit: "m/s", digits: 0, onInput: reset });
@@ -136,7 +136,8 @@
     });
 
     const row = PL.ui.buttonRow(L.controls);
-    const bRun = PL.ui.button(row, "暫停", () => { running = !running; bRun.textContent = running ? "暫停" : "繼續"; }, { primary: true });
+    /* 播放／暫停一律交給引擎的傳輸列。實驗自己再維護一個 running 旗標的話，
+       兩個開關必須同時打開才會動，而學生看不出來要按哪一個——這是實際回報過的問題。 */
     PL.ui.button(row, "重新開始", reset);
 
     PL.ui.note(L.controls,
@@ -281,7 +282,7 @@
     function drawAll() { scene(); chart(); }
 
     const anim = PL.loop(dt => {
-      if (dt && running) {
+      if (dt) {
         t += dt;
         sourceX += sVs.get() * dt;
         if (sourceX > 300) reset();
