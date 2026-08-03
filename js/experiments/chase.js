@@ -181,7 +181,7 @@
       cv.calibrate((W - 80) / X_MAX, "m");
 
       // 路面
-      D.rect(ctx, 34, roadTop, W - 68, roadBot - roadTop, { fill: PL.theme.shade(0.42), r: 4 });
+      D.rect(ctx, 34, roadTop, W - 68, roadBot - roadTop, { fill: PL.theme.shade(0.42), stroke: PL.theme.pale(0.26), width: 1, r: 4 });
       D.line(ctx, 34, roadTop, W - 34, roadTop, PL.theme.pale(0.30), 2);
       D.line(ctx, 34, roadBot, W - 34, roadBot, PL.theme.pale(0.30), 2);
       // 車道分隔虛線

@@ -75,4 +75,39 @@ R.section("主題衍生色的登記簿會隨主題失效（不能把淺色的值
   R.ok(PL.theme.isThemeSurface(darkShade) === true, "目前主題產生的值仍被認得", darkShade);
 }
 
+/*
+ * theme.shade() 只能當「凹進去的表面」，不能拿來畫要被看見的東西。
+ *
+ * shade() 與 pale() 是一對相反的東西：
+ *   pale()  = 與目前表面對比的墨色（深色主題給亮的，淺色主題給暗的）
+ *   shade() = 比面板再凹一層的表面（淺色主題給亮的，深色主題給更暗的）
+ *
+ * 所以在深色主題下 shade() 對實驗台底板的對比只有 1.01——實測值，等於沒畫。
+ * 拿它當面板底色是對的；拿它畫軌道、輪子、路面這種「物件」就會整個消失。
+ * 打點計時器就這樣讓小車浮在半空過，而且既有的稽核全都是綠的：
+ * 墨色層本來就刻意放行主題衍生的填色面，theme-audit 也只找刺眼白塊與黑洞。
+ *
+ * 判準很簡單：shade() 當填色時若同一次呼叫沒有描邊，深色主題下就沒有任何輪廓可看。
+ * 這是靜態掃描，因為問題出在「怎麼寫」，不需要真的跑起來才知道。
+ */
+R.section("theme.shade() 不可用來畫沒有描邊的物件");
+{
+  const dir = "js/experiments";
+  const offenders = [];
+  fs.readdirSync(dir).filter(f => f.endsWith(".js")).forEach(f => {
+    const src = fs.readFileSync(dir + "/" + f, "utf8");
+    src.split("\n").forEach((line, i) => {
+      // 找出 { ... fill: PL.theme.shade(...) ... } 這一組大括號的內容
+      const m = /\{[^{}]*fill:\s*PL\.theme\.shade\([^)]*\)[^{}]*\}/.exec(line);
+      if (!m) return;
+      if (/stroke\s*:/.test(m[0])) return;         // 有描邊就看得見輪廓
+      offenders.push(`${f}:${i + 1}  ${line.trim().slice(0, 92)}`);
+    });
+  });
+  R.ok(offenders.length === 0,
+    "沒有「shade 填色但不描邊」的物件",
+    offenders.length ? "\n    " + offenders.join("\n    ") : "掃過 " +
+      fs.readdirSync(dir).filter(f => f.endsWith(".js")).length + " 個實驗檔");
+}
+
 R.done();

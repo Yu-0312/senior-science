@@ -223,7 +223,7 @@
 
       // 電池：長短線是課本的畫法，學生認得
       const by = (y0 + y1) / 2;
-      D.rect(ctx, x0 - 13, by - 30, 26, 60, { fill: PL.theme.shade(0.35), r: 3 });
+      D.rect(ctx, x0 - 13, by - 30, 26, 60, { fill: PL.theme.shade(0.35), stroke: PL.theme.pale(0.26), width: 1, r: 3 });
       D.line(ctx, x0, by - 16, x0, by + 16, PL.theme.pale(0.85), 4);
       D.line(ctx, x0 - 7, by - 8, x0 - 7, by + 8, PL.theme.pale(0.85), 2);
       D.text(ctx, PL.fmt(c.V, 1) + " V", x0 - 18, by + 4, { color: PL.col("text-dim"), size: 12, align: "right", weight: "700" });

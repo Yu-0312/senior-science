@@ -383,8 +383,8 @@
       const X = mm => 30 + (mm - (d.snapped + k0 * vLenMm / divisions)) * perMm;
 
       const topY = H * 0.14, botY = H * 0.56;
-      D.rect(ctx, 22, topY - 6, W - 44, 30, { fill: PL.theme.shade(0.3), r: 4 });
-      D.rect(ctx, 22, botY - 6, W - 44, 32, { fill: PL.theme.shade(0.18), r: 4 });
+      D.rect(ctx, 22, topY - 6, W - 44, 30, { fill: PL.theme.shade(0.3), stroke: PL.theme.pale(0.26), width: 1, r: 4 });
+      D.rect(ctx, 22, botY - 6, W - 44, 32, { fill: PL.theme.shade(0.18), stroke: PL.theme.pale(0.26), width: 1, r: 4 });
       D.text(ctx, "主尺", 28, topY + 8, { color: PL.col("text-faint"), size: 9 });
       D.text(ctx, "游標", 28, botY + 8, { color: PL.col("text-faint"), size: 9 });
 
@@ -466,8 +466,8 @@
       const mm0 = Math.max(0, Math.floor(m.sleeve) - 1);
       const per = (W - 90) / 4;
       const X = v => 44 + (v - mm0) * per;
-      D.rect(ctx, 30, baseY - 40, W - 60, 38, { fill: PL.theme.shade(0.28), r: 4 });
-      D.rect(ctx, 30, baseY, W - 60, 34, { fill: PL.theme.shade(0.16), r: 4 });
+      D.rect(ctx, 30, baseY - 40, W - 60, 38, { fill: PL.theme.shade(0.28), stroke: PL.theme.pale(0.26), width: 1, r: 4 });
+      D.rect(ctx, 30, baseY, W - 60, 34, { fill: PL.theme.shade(0.16), stroke: PL.theme.pale(0.26), width: 1, r: 4 });
       for (let i = 0; i <= 4; i += 1) {
         const x = X(mm0 + i);
         D.line(ctx, x, baseY - 34, x, baseY - 6, PL.col("text-dim"), 1.4);

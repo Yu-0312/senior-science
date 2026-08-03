@@ -205,7 +205,7 @@
       cv.calibrate(sc, "m");
 
       // 地面
-      D.rect(ctx, 20, PY(0), W - 40, H - PY(0) - 6, { fill: PL.theme.shade(0.30), r: 3 });
+      D.rect(ctx, 20, PY(0), W - 40, H - PY(0) - 6, { fill: PL.theme.shade(0.30), stroke: PL.theme.pale(0.26), width: 1, r: 3 });
       D.line(ctx, 20, PY(0), W - 20, PY(0), PL.theme.pale(0.35), 2);
       D.text(ctx, "y = 0 基準面", W - 26, PY(0) + 16,
         { color: PL.col("text-faint"), size: 9.5, align: "right" });

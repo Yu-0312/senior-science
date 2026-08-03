@@ -379,7 +379,7 @@
       D.rect(ctx, slitX - 5, 24, 10, H - 78, { fill: PL.theme.pale(0.3) });
       const openings = mode === "single" ? [0] : [-slitHalf, slitHalf];
       openings.forEach(off => {
-        D.rect(ctx, slitX - 5, cy + off - 5, 10, 10, { fill: PL.theme.shade(0.85) });
+        D.rect(ctx, slitX - 5, cy + off - 5, 10, 10, { fill: PL.theme.shade(0.85), stroke: PL.theme.pale(0.26), width: 1 });
       });
       D.text(ctx, mode === "single" ? "單縫" : "雙縫 d=" + sD.get().toFixed(2) + "mm",
         slitX, H - 40, { color: PL.col("text-dim"), size: 11, align: "center" });

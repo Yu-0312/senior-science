@@ -599,8 +599,16 @@
       cv.calibrate(sc, "m");
       const carX = x0 + xAt(t) * sc;
 
-      // 軌道
-      D.rect(ctx, x0 - 8, trackY + 12, x1 - x0 + 16, 7, { fill: PL.theme.shade(0.5), r: 3 });
+      /*
+       * 軌道用 pale 而不是 shade。
+       *
+       * theme.shade() 的意思是「比面板再凹進去一層的表面」，只有在淺色主題下才是可見的；
+       * 深色主題它回傳近黑色，對實驗台底板的對比只有 1.01——等於沒畫。
+       * 第一版用 shade 畫軌道又沒有描邊，於是深色主題下小車看起來浮在半空。
+       * 要被看見的東西一律用 theme.pale()，它會隨主題翻面。
+       */
+      D.rect(ctx, x0 - 8, trackY + 12, x1 - x0 + 16, 7,
+        { fill: PL.theme.pale(0.16), stroke: PL.theme.pale(0.34), width: 1, r: 3 });
       for (let m = 0; m <= total; m += Math.max(0.1, Math.round(total / 8 * 10) / 10)) {
         const px = x0 + m * sc;
         if (px > x1) break;
@@ -620,7 +628,7 @@
 
       // 打點計時器本體（固定在桌上，紙帶從它底下通過）
       const tx = 92;
-      D.rect(ctx, tx - 34, tapeY - 46, 68, 34, { fill: PL.theme.shade(0.72), stroke: PL.col("border"), width: 1, r: 5 });
+      D.rect(ctx, tx - 34, tapeY - 46, 68, 34, { fill: PL.theme.pale(0.13), stroke: PL.theme.pale(0.42), width: 1.4, r: 5 });
       D.text(ctx, "計時器", tx, tapeY - 25, { color: PL.col("text-dim"), size: 10, align: "center" });
       D.text(ctx, PL.fmt(1 / T, 0) + " Hz", tx, tapeY - 14, { color: PL.col("accent-2"), size: 9, align: "center" });
       // 打點錘：剛打完的那一瞬間落下並發亮
@@ -632,8 +640,8 @@
       // 小車
       const cw = 34, ch = 18;
       D.rect(ctx, carX - cw / 2, trackY - ch + 12, cw, ch, { fill: MC(), stroke: PL.theme.pale(0.35), r: 3 });
-      D.disc(ctx, carX - 10, trackY + 12, 4.5, { fill: PL.theme.shade(0.35) });
-      D.disc(ctx, carX + 10, trackY + 12, 4.5, { fill: PL.theme.shade(0.35) });
+      D.disc(ctx, carX - 10, trackY + 12, 4.5, { fill: PL.col("text-dim") });
+      D.disc(ctx, carX + 10, trackY + 12, 4.5, { fill: PL.col("text-dim") });
       // 速度箭頭：長度正比於當前速率，停著的時候不畫
       const vNow = v0 + a * t;
       if (t > 0 && vNow > 0) {
