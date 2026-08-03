@@ -494,29 +494,217 @@
   }});
 
   /* 打點計時器（測速度與加速度） */
+  /* 打點計時器 —— 小車拉著紙帶跑，計時器一點一點打上去
+   *
+   * 舊版是一張靜態插圖：紙帶上的點一開始就全部畫好了。
+   * 那等於直接把答案攤在學生面前，而這個實驗真正要建立的因果是相反方向的——
+   * 「因為小車在加速，所以後面的點才會越拉越開」。點先出現，因果就不見了。
+   *
+   * 所以這一版把實驗做完整：
+   *   上半是實驗台，小車在軌道上前進，紙帶被它拉著穿過固定的計時器，
+   *   每打一點，打點錘就落下閃一次——點是「當場被打出來的」，不是本來就在那。
+   *   下半是同一條紙帶攤平後的樣子，也就是學生真正拿去量的那張紙。
+   *
+   * 還沒按開始時，紙帶上會有一排淡淡的預測點。
+   * 這不是裝飾：實驗課的順序本來就是「先算出你預期看到什麼，再去量」，
+   * 而且拉滑桿時看得到預測跟著變，不必先跑一次才知道參數有沒有效。
+   */
   PL.register("ticker-tape", { build(root) {
     const L = PL.ui.layout(root);
-    const cv = PL.canvas.create(L.canvasWrap, 0.5);
-    const sV = PL.ui.slider(L.controls, { label: "初速 v₀", min: 0, max: 8, step: 0.5, value: 2, unit: "m/s", digits: 1, onInput: draw });
-    const sA = PL.ui.slider(L.controls, { label: "加速度 a", min: 0, max: 8, step: 0.5, value: 3, unit: "m/s²", digits: 1, onInput: draw });
-    const sT = PL.ui.slider(L.controls, { label: "打點週期 T", min: 0.02, max: 0.1, step: 0.01, value: 0.05, unit: "s", digits: 2, onInput: draw });
-    PL.ui.note(L.controls, "點距等差增加代表等加速；相鄰點距差 ÷ T² 即加速度。");
+    const cv = PL.canvas.create(L.canvasWrap, 0.66, 900);
+
+    const N = 13;              // 觀察的打點間隔數
+    const SLOW = 0.12;         // 慢動作：真實只有零點幾秒，直接播完全看不清楚
+    let t = 0, dots = 0, flash = 0;
+
+    PL.ui.section(L.controls, "小車的運動");
+    const sV = PL.ui.slider(L.controls, { label: "初速 v₀", min: 0, max: 8, step: 0.5, value: 2, unit: "m/s", digits: 1, onInput: reset });
+    const sA = PL.ui.slider(L.controls, { label: "加速度 a", min: 0, max: 8, step: 0.5, value: 3, unit: "m/s²", digits: 1, onInput: reset });
+    PL.ui.section(L.controls, "計時器");
+    const sT = PL.ui.slider(L.controls, { label: "打點週期 T", min: 0.02, max: 0.1, step: 0.01, value: 0.05, unit: "s", digits: 2, onInput: reset });
+
+    PL.ui.presets(L.controls, {
+      label: "情境",
+      options: [
+        { label: "等速前進", hint: "沒有加速度時，點距從頭到尾一樣——這是判斷等速的依據",
+          apply: () => { sV.set(3); sA.set(0); reset(); } },
+        { label: "從靜止加速", hint: "起點附近的點會擠成一團，這正是實驗課要求「捨棄開頭」的原因",
+          apply: () => { sV.set(0); sA.set(4); reset(); } },
+        { label: "50 Hz 市電計時器", hint: "台灣市電 60 Hz，實驗室常用的計時器多為 50 或 60 Hz",
+          apply: () => { sT.set(0.02); reset(); } }
+      ]
+    });
+
+    const row = PL.ui.buttonRow(L.controls);
+    /*
+     * 「開始」是單向觸發，不是播放／暫停開關：它把紙帶清空、小車拉回起點、開始跑。
+     * 暫停、單步與速度一律由引擎的傳輸列負責；實驗自己再做一個開關的話，
+     * 兩個開關必須同時打開才會動，而傳輸列按了沒反應時學生看不出原因。
+     */
+    PL.ui.button(row, "開始", () => { t = 0; dots = 0; flash = 0; anim.start(); draw(); }, { primary: true });
+    PL.ui.button(row, "重設", reset);
+
+    function reset() { t = 0; dots = 0; flash = 0; anim.stop(); draw(); }
+
+    PL.ui.note(L.controls,
+      "先按「從靜止加速」再按開始：注意紙帶最前面那幾個點會擠成一團，幾乎分不出來。" +
+      "實驗課要求捨棄開頭那段，不是因為它不重要，而是因為那裡的量測誤差比點距本身還大。");
+
+    const T_END = () => N * sT.get();
+    const xAt = tt => sV.get() * tt + 0.5 * sA.get() * tt * tt;   // 小車位移（m）
+    const xn = k => xAt(k * sT.get());                            // 第 k 點的位置
+
+    const vd = PL.ui.verdict(L.readouts.parentNode || L.readouts, { label: "—", meter: true });
     const rV = PL.ui.readout(L.readouts, { label: "第 5 點速度", unit: "m/s" });
     const rA = PL.ui.readout(L.readouts, { label: "量得加速度", unit: "m/s²" });
     const rT = PL.ui.readout(L.readouts, { label: "每格時間", unit: "s" });
+    const rN = PL.ui.readout(L.readouts, { label: "已打點數", unit: "點" });
+
+    const dv = PL.ui.derived(L.canvasWrap.parentNode, [
+      { label: "第 5 段點距 x₅", unit: "cm", hint: "第 5 點到第 6 點的距離" },
+      { label: "點距差 Δ", unit: "cm", hint: "相鄰兩段點距相減，等加速時是定值" },
+      { label: "T²", unit: "s²", hint: "打點週期的平方" },
+      { label: "a = Δ / T²", unit: "m/s²", hint: "紙帶求加速度的標準式" }
+    ]);
+
+    PL.ui.causality(L.canvasWrap.parentNode, {
+      title: "為什麼一條紙帶就能算出加速度",
+      rows: [
+        { name: "每格時間都一樣", tone: "a", note: "計時器的週期 T 是固定的，所以點距不必再除以時間就能直接比較——點距長短本身就代表速度快慢。" },
+        { name: "點距 = 那一格的平均速度 × T", tone: "b", note: "所以量點距等於在量速度。這是整個實驗成立的關鍵一步。" },
+        { name: "點距等差增加 → 等加速", tone: "c", note: "每格速度增加同樣多，就是等加速度。相鄰點距的差 Δ 除以 T² 即為 a。" }
+      ]
+    });
+
+    PL.ui.procedure(L.controls, {
+      title: "打點計時器實驗的標準流程",
+      steps: [
+        "紙帶穿過計時器、一端固定在小車後方。<strong>先按下計時器讓它開始打點，再放開小車</strong>。",
+        "小車跑完後取下紙帶，找到開頭那段擠在一起的點，<strong>整段捨棄</strong>，從看得清楚的點開始編號 0、1、2……",
+        "把尺的零刻度對準第 0 點，<strong>一次量到每一點</strong>並記下累積距離，再相減得到各段點距。",
+        "第 5 點的瞬時速度用 <strong>(x₆ − x₄) / 2T</strong>，加速度用相鄰點距差除以 T²。"
+      ],
+      rule: "順序錯了整條紙帶就作廢：<strong>先啟動計時器、再放開小車</strong>——反過來的話，前幾個點是小車還沒動時打的，全部疊在同一個位置。" +
+            "另外點距一定要<strong>從同一個零點一次量到底</strong>再相減；一段一段量會把每次對準的誤差累積起來。"
+      });
+
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const v0 = sV.get(), a = sA.get(), T = sT.get(), N = 13;
-      const xn = k => v0 * (k * T) + 0.5 * a * (k * T) * (k * T);
-      const total = xn(N) || 1, sc = (W - 60) / total, ty = H * 0.4;
-      D.rect(ctx, 20, ty - 22, W - 40, 44, { fill: "rgba(255,255,255,0.04)", stroke: PL.col("border"), width: 1, r: 6 });
-      D.text(ctx, "點距（cm）逐格增加 →", 30, ty - 30, { color: PL.col("text-dim"), size: 11 });
-      for (let k = 0; k <= N; k++) { const px = 30 + xn(k) * sc; if (px < W - 24) D.disc(ctx, px, ty, 3, { fill: k === 5 ? MC() : "#e6edf3" }); }
-      for (let k = 0; k < 5; k++) { const x1 = 30 + xn(k) * sc, x2 = 30 + xn(k + 1) * sc; D.line(ctx, x1, ty + 16, x2, ty + 16, PL.col("text-faint"), 1); D.text(ctx, PL.fmt((xn(k + 1) - xn(k)) * 100, 1), (x1 + x2) / 2, ty + 30, { color: PL.col("text-faint"), size: 9, align: "center" }); }
-      const v5 = (xn(6) - xn(4)) / (2 * T), am = ((xn(6) - xn(5)) - (xn(5) - xn(4))) / (T * T);
-      rV.set(v5, 2); rA.set(am, 2); rT.set(T, 2);
+      const v0 = sV.get(), a = sA.get(), T = sT.get();
+      const total = xn(N) || 1;
+
+      /* ---------- 上半：實驗台 ---------- */
+      const trackY = H * 0.40, x0 = 132, x1 = W - 34;
+      const sc = (x1 - x0) / total;                 // 每公尺對應的像素
+      cv.calibrate(sc, "m");
+      const carX = x0 + xAt(t) * sc;
+
+      // 軌道
+      D.rect(ctx, x0 - 8, trackY + 12, x1 - x0 + 16, 7, { fill: PL.theme.shade(0.5), r: 3 });
+      for (let m = 0; m <= total; m += Math.max(0.1, Math.round(total / 8 * 10) / 10)) {
+        const px = x0 + m * sc;
+        if (px > x1) break;
+        D.line(ctx, px, trackY + 19, px, trackY + 25, PL.col("text-faint"), 1);
+        D.text(ctx, PL.fmt(m, 1), px, trackY + 36, { color: PL.col("text-faint"), size: 9, align: "center" });
+      }
+      D.text(ctx, "位置 (m)", x0, trackY + 52, { color: PL.col("text-faint"), size: 10 });
+
+      // 紙帶：從小車後方拉回來，穿過計時器再露出一小截
+      const tapeY = trackY - 26;
+      D.rect(ctx, 26, tapeY - 7, carX - 26, 14, { fill: PL.theme.pale(0.10), stroke: PL.theme.pale(0.26), width: 1 });
+      // 紙帶上已經打好的點（跟著紙帶一起往右移動）
+      for (let k = 0; k < dots; k++) {
+        const px = carX - (xAt(t) - xn(k)) * sc;
+        if (px > 26 && px < carX - 2) D.disc(ctx, px, tapeY, 2.6, { fill: k === 5 ? MC() : PL.col("text-dim") });
+      }
+
+      // 打點計時器本體（固定在桌上，紙帶從它底下通過）
+      const tx = 92;
+      D.rect(ctx, tx - 34, tapeY - 46, 68, 34, { fill: PL.theme.shade(0.72), stroke: PL.col("border"), width: 1, r: 5 });
+      D.text(ctx, "計時器", tx, tapeY - 25, { color: PL.col("text-dim"), size: 10, align: "center" });
+      D.text(ctx, PL.fmt(1 / T, 0) + " Hz", tx, tapeY - 14, { color: PL.col("accent-2"), size: 9, align: "center" });
+      // 打點錘：剛打完的那一瞬間落下並發亮
+      const hit = flash > 0;
+      D.line(ctx, tx, tapeY - 12, tx, tapeY - (hit ? 3 : 7),
+        hit ? PL.col("warn") : PL.col("text-faint"), hit ? 3 : 2);
+      if (hit) D.disc(ctx, tx, tapeY, 5, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 12 });
+
+      // 小車
+      const cw = 34, ch = 18;
+      D.rect(ctx, carX - cw / 2, trackY - ch + 12, cw, ch, { fill: MC(), stroke: PL.theme.pale(0.35), r: 3 });
+      D.disc(ctx, carX - 10, trackY + 12, 4.5, { fill: PL.theme.shade(0.35) });
+      D.disc(ctx, carX + 10, trackY + 12, 4.5, { fill: PL.theme.shade(0.35) });
+      // 速度箭頭：長度正比於當前速率，停著的時候不畫
+      const vNow = v0 + a * t;
+      if (t > 0 && vNow > 0) {
+        D.arrow(ctx, carX + cw / 2, trackY + 3, carX + cw / 2 + Math.min(60, vNow * 7), trackY + 3,
+          { color: PL.col("accent-2"), width: 2, label: "v = " + PL.fmt(vNow, 1) });
+      }
+
+      /* ---------- 下半：攤平的紙帶（拿去量的那一張） ---------- */
+      const ty = H * 0.78, tapeX0 = 30, tapeX1 = W - 24;
+      const tsc = (tapeX1 - tapeX0) / total;
+      D.text(ctx, "取下後攤平的紙帶", tapeX0, ty - 34, { color: PL.col("text-dim"), size: 11 });
+      D.rect(ctx, tapeX0 - 6, ty - 22, tapeX1 - tapeX0 + 12, 44,
+        { fill: PL.theme.pale(0.07), stroke: PL.col("border"), width: 1, r: 6 });
+
+      // 預測點：還沒打到的位置先用淡點標出來，讓「預期」與「實測」可以對照
+      for (let k = 0; k <= N; k++) {
+        if (k < dots) continue;
+        const px = tapeX0 + xn(k) * tsc;
+        if (px <= tapeX1) D.disc(ctx, px, ty, 2.4, { fill: PL.theme.pale(0.30) });
+      }
+      // 實際打出來的點
+      for (let k = 0; k < dots; k++) {
+        const px = tapeX0 + xn(k) * tsc;
+        if (px <= tapeX1) D.disc(ctx, px, ty, 3.2, { fill: k === 5 ? MC() : PL.col("text"), glow: k === dots - 1 ? PL.col("warn") : null, glowSize: 10 });
+      }
+      // 點距標註：只標已經打出來的段落，避免預告答案
+      for (let k = 0; k < Math.min(5, Math.max(0, dots - 1)); k++) {
+        const a1 = tapeX0 + xn(k) * tsc, a2 = tapeX0 + xn(k + 1) * tsc;
+        D.line(ctx, a1, ty + 16, a2, ty + 16, PL.col("text-faint"), 1);
+        D.line(ctx, a1, ty + 12, a1, ty + 20, PL.col("text-faint"), 1);
+        D.line(ctx, a2, ty + 12, a2, ty + 20, PL.col("text-faint"), 1);
+        D.text(ctx, PL.fmt((xn(k + 1) - xn(k)) * 100, 1), (a1 + a2) / 2, ty + 31,
+          { color: PL.col("text-faint"), size: 9, align: "center" });
+      }
+      if (dots > 1) D.text(ctx, "點距（cm）", tapeX0, ty + 31, { color: PL.col("text-faint"), size: 9 });
+
+      /* ---------- 讀數 ---------- */
+      const T2 = T * T;
+      const seg = k => xn(k + 1) - xn(k);
+      const delta = seg(5) - seg(4);
+      const v5 = (xn(6) - xn(4)) / (2 * T);
+      const am = ((xn(6) - xn(5)) - (xn(5) - xn(4))) / T2;
+      rV.set(v5, 2); rA.set(am, 2); rT.set(T, 2); rN.set(dots, 0);
+      dv.set(0, seg(5) * 100, 2); dv.set(1, delta * 100, 2); dv.set(2, T2, 4); dv.set(3, am, 2);
+      dv.tone(3, Math.abs(am - a) < 0.05 ? "good" : "");
+
+      const prog = Math.min(1, dots / (N + 1));
+      if (dots === 0) {
+        vd.set("紙帶還沒開始打點：淡色的是「你預期會看到的點」，按開始後才會被真的打出來", "info", 0);
+      } else if (a === 0) {
+        vd.set("點距從頭到尾一樣長 → 等速度運動，紙帶上量到的速度是 " + PL.fmt(v5, 2) + " m/s", "good", prog);
+      } else {
+        vd.set("點距每一格多出 " + PL.fmt(delta * 100, 2) + " cm → 等加速度運動，由紙帶反推 a = " +
+          PL.fmt(am, 2) + " m/s²", "good", prog);
+      }
     }
+
+    const anim = PL.loop(dt => {
+      if (dt) {
+        const T = sT.get();
+        if (t >= T_END()) { anim.stop(); }
+        else {
+          t = Math.min(T_END(), t + dt * SLOW);
+          // 補打這段時間內所有應該打的點（速度倍率調高時一格可能跨過好幾個週期）
+          while (dots <= N && dots * T <= t + 1e-9) { dots += 1; flash = 0.16; }
+        }
+        if (flash > 0) flash = Math.max(0, flash - dt);
+      }
+      draw();
+    });
     cv.onResize(draw); draw();
-    return { stop() { cv.destroy(); }, rerender: draw };
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
 })();
