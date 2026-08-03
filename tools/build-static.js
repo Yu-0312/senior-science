@@ -488,7 +488,21 @@ function main() {
   ].concat(flat.map(item => ({ loc: siteUrl + "p/" + item.exp.id + ".html", priority: "0.8" })))
    .concat(flat.map(item => ({ loc: siteUrl + "p/worksheet-" + item.exp.id + ".html", priority: "0.5" })));
 
-  const today = new Date().toISOString().slice(0, 10);
+  /*
+   * lastmod 取自建置版本，不是「執行這支腳本的當天」。
+   *
+   * 原本寫 new Date()，於是同一份原始碼在不同日子建置會產生不同的 sitemap。
+   * 這件事本身就不對（建置應該是可重現的），而且會讓 CI 那道
+   * 「建置產物有沒有和版控同步」的檢查從隔天開始每天都失敗——
+   * 明明沒有人改任何東西。這種每天固定紅一次的檢查，很快就會被當成雜訊忽略，
+   * 然後它真正該擋的問題也一起被忽略掉。
+   *
+   * 版本號本來就是 YYYYMMDD-n 的格式，拿它當 lastmod 語意也更準：
+   * 標示的是「內容更新到哪一版」，而不是「CI 剛好幾點跑的」。
+   */
+  const stamp = /^(\d{4})(\d{2})(\d{2})/.exec(String(site.build || ""));
+  const today = stamp ? `${stamp[1]}-${stamp[2]}-${stamp[3]}`
+                      : new Date().toISOString().slice(0, 10);
   const sitemap = '<?xml version="1.0" encoding="UTF-8"?>\n' +
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
     urls.map(u => `  <url><loc>${u.loc}</loc><lastmod>${today}</lastmod><priority>${u.priority}</priority></url>`).join("\n") +
