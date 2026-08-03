@@ -1664,3 +1664,124 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   a[href]::after { content: " (" attr(href) ")"; font-size: 10px; color: #555; }
   a[href^="#"]::after { content: ""; }
 }
+
+/* =======================================================================
+   教學元件組
+   對照市面上做得最細的中學物理模擬後補齊的七類元件。共通原則：
+   數值一律用等寬數字（tabular-nums）避免跳動；顏色只作輔助，
+   任何「量」都必須同時有文字或幾何呈現，不能只靠顏色分辨。
+   ======================================================================= */
+
+/* 學習鷹架裡的每一塊（自動生成的因果面板、情境預設等）
+   彼此之間要有呼吸空間，否則會黏成一整片讀不下去。 */
+.sim-insight-block { margin-top: 12px; }
+.sim-insight-block:first-child { margin-top: 0; }
+
+/* 判定徽章 */
+.sim-verdict {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 30px; padding: 0 12px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--tint-1);
+  font-size: 11.5px; font-weight: 700; color: var(--text-dim);
+}
+.sim-verdict-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+/* 判定文字：允許換行但不要把徽章撐破，數字用等寬避免每次更新都在跳 */
+.sim-verdict-text { min-width: 0; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.sim-verdict[data-tone="ok"]   { color: var(--ok);     border-color: color-mix(in srgb, var(--ok) 45%, var(--border)); background: color-mix(in srgb, var(--ok) 10%, transparent); }
+.sim-verdict[data-tone="warn"] { color: var(--warn);   border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); background: color-mix(in srgb, var(--warn) 10%, transparent); }
+.sim-verdict[data-tone="bad"]  { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.sim-verdict-meter { width: 62px; height: 5px; border-radius: 3px; background: var(--tint-2); overflow: hidden; flex: none; }
+.sim-verdict-meter > i { display: block; height: 100%; background: currentColor; transition: width 0.18s; }
+
+/* 衍生量卡 */
+.sim-derived {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(146px, 1fr));
+  gap: 10px; margin-top: 12px;
+}
+.sim-derived-cell {
+  min-width: 0; padding: 10px 12px; border: 1px solid var(--border-soft); border-radius: 8px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel-solid));
+}
+.sim-derived-cell[data-tone="ok"]   { border-color: color-mix(in srgb, var(--ok) 45%, var(--border-soft)); }
+.sim-derived-cell[data-tone="warn"] { border-color: color-mix(in srgb, var(--warn) 45%, var(--border-soft)); }
+.sim-derived-cell[data-tone="bad"]  { border-color: color-mix(in srgb, var(--danger) 45%, var(--border-soft)); }
+.sim-derived-label { color: var(--text-faint); font-size: 10.5px; line-height: 1.5; }
+.sim-derived-value {
+  margin-top: 3px; color: var(--text); font-size: 15px; font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.sim-derived-hint { margin-top: 2px; color: var(--text-faint); font-size: 9.5px; }
+
+/* 情境預設 */
+.sim-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.sim-presets-label { color: var(--text-faint); font-size: 10.5px; margin-right: 2px; }
+.sim-preset {
+  min-height: 30px; padding: 0 11px; border: 1px solid var(--border); border-radius: 7px;
+  background: var(--panel-2); color: var(--text-dim); font: inherit; font-size: 11.5px;
+  cursor: pointer; white-space: nowrap;
+}
+.sim-preset:hover { border-color: var(--m-color, var(--accent)); color: var(--m-ink, var(--m-color, var(--accent))); }
+.sim-preset.is-active {
+  border-color: var(--m-color, var(--accent));
+  background: color-mix(in srgb, var(--m-color, var(--accent)) 14%, transparent);
+  color: var(--m-ink, var(--m-color, var(--accent))); font-weight: 700;
+}
+
+/* 圖表分頁 */
+.sim-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.sim-chart-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.sim-chart-tab {
+  min-height: 26px; padding: 0 9px; border: 1px solid var(--border); border-radius: 6px;
+  background: transparent; color: var(--text-faint); font: inherit; font-size: 10.5px; cursor: pointer;
+}
+.sim-chart-tab.is-active {
+  border-color: var(--m-color, var(--accent)); color: var(--m-ink, var(--m-color, var(--accent)));
+  background: color-mix(in srgb, var(--m-color, var(--accent)) 12%, transparent); font-weight: 700;
+}
+
+/* 放大窗 */
+.sim-magnifier {
+  margin-top: 12px; padding: 11px 12px 8px;
+  border: 1px solid var(--border-soft); border-radius: 9px; background: var(--tint-1);
+}
+.sim-magnifier-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.sim-magnifier-title { color: var(--text); font-size: 12px; font-weight: 750; }
+.sim-magnifier-mode { color: var(--text-faint); font-size: 10px; }
+.sim-magnifier-note { margin: 4px 0 8px; color: var(--text-faint); font-size: 10.5px; line-height: 1.6; }
+
+/* 因果面板 */
+.sim-causality { margin-top: 12px; display: grid; gap: 8px; }
+.sim-causality-title { color: var(--text-dim); font-size: 11px; font-weight: 750; letter-spacing: 0.5px; }
+.sim-causality-row {
+  display: grid; grid-template-columns: minmax(0, 84px) minmax(0, 1fr); gap: 4px 10px;
+  padding: 9px 11px; border-left: 3px solid var(--border);
+  border-radius: 0 7px 7px 0; background: var(--tint-1);
+}
+.sim-causality-row[data-tone="a"] { border-left-color: var(--accent-2); }
+.sim-causality-row[data-tone="b"] { border-left-color: var(--danger); }
+.sim-causality-row[data-tone="c"] { border-left-color: var(--warn); }
+.sim-causality-name { color: var(--text); font-size: 12px; font-weight: 750; }
+.sim-causality-flow { color: var(--text); font-size: 12px; font-variant-numeric: tabular-nums; }
+.sim-causality-note { grid-column: 1 / -1; color: var(--text-faint); font-size: 10.5px; line-height: 1.6; }
+
+/* 步驟教學 */
+.sim-procedure-card {
+  margin-top: 12px; padding: 12px 14px;
+  border: 1px solid var(--border-soft); border-radius: 9px; background: var(--tint-1);
+}
+.sim-procedure-card-title { color: var(--text); font-size: 12px; font-weight: 750; margin-bottom: 7px; }
+.sim-steps { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.sim-step { color: var(--text-dim); font-size: 11.5px; line-height: 1.7; }
+.sim-step strong, .sim-step b { color: var(--text); }
+.sim-rule {
+  display: flex; gap: 8px; margin-top: 10px; padding: 8px 10px;
+  border-radius: 7px; background: color-mix(in srgb, var(--danger) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 34%, transparent);
+}
+.sim-rule-tag { color: var(--danger); font-size: 11px; font-weight: 800; white-space: nowrap; }
+.sim-rule-text { color: var(--text-dim); font-size: 11px; line-height: 1.65; }
+
+@media (max-width: 720px) {
+  .sim-derived { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+  .sim-causality-row { grid-template-columns: minmax(0, 1fr); }
+}

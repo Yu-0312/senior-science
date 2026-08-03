@@ -313,69 +313,422 @@
   }});
 
   /* 交流發電機 */
+  /* 交流發電機 —— 中性面才是重點
+   *
+   * 學生會背 e = nBAω·sin(ωt)，但問「線圈轉到中性面時電動勢是多少」
+   * 常常答「最大」——因為那時磁通量最大。這正好答反了。
+   *
+   * 中性面（線圈平面垂直於 B）的磁通量是極大值，而極值處的變化率是零，
+   * 所以那一刻 e = 0，而且電流正要換向。這是本單元最關鍵、也最反直覺的一點，
+   * 因此把「過中性面」做成會亮起來的判定，而不是埋在波形裡讓學生自己看。
+   *
+   * Φ 與 e 畫在同一張圖上（雙 y 軸），兩條線錯開四分之一週期——
+   * Φ 的山頂正好對上 e 的零點，這比任何文字說明都有效。
+   */
   PL.register("ac-generator", { build(root) {
     const L = PL.ui.layout(root);
-    const cv = PL.canvas.create(L.canvasWrap, 0.62);
+    const cv = PL.canvas.create(L.canvasWrap, 0.56, 900);
     let t = 0, hist = [];
-    const sW = PL.ui.slider(L.controls, { label: "轉速 ω", min: 0.5, max: 4, step: 0.1, value: 1.6, unit: "rad/s", digits: 1 });
-    PL.ui.note(L.controls, "線圈在磁場中轉動使磁通量週期變化，感應出正弦式交流電動勢 ε = ε₀ sin(ωt)。");
-    const rEmf = PL.ui.readout(L.readouts, { label: "瞬時電動勢", unit: "×ε₀" });
+
+    PL.ui.section(L.controls, "發電機參數");
+    const sN = PL.ui.stepper(L.controls, { label: "匝數 n", value: 50, min: 10, max: 200, step: 10, unit: "匝", digits: 0, onChange: reset });
+    const sB = PL.ui.stepper(L.controls, { label: "磁感應強度 B", value: 0.5, min: 0.1, max: 2, step: 0.1, unit: "T", digits: 1, onChange: reset });
+    const sW = PL.ui.stepper(L.controls, { label: "角速度 ω", value: 3, min: 0.5, max: 8, step: 0.5, unit: "rad/s", digits: 1, onChange: reset });
+    const sR = PL.ui.stepper(L.controls, { label: "外電阻 R", value: 10, min: 1, max: 100, step: 1, unit: "Ω", digits: 0, onChange: reset });
+
+    PL.ui.presets(L.controls, {
+      label: "快捷轉速",
+      options: [
+        { label: "慢 1.5", apply: () => { sW.set(1.5); reset(); } },
+        { label: "標準 3.0", apply: () => { sW.set(3); reset(); } },
+        { label: "快 6.0", apply: () => { sW.set(6); reset(); } }
+      ]
+    });
+
+    PL.ui.section(L.controls, "疊加層");
+    const layers = PL.ui.chipGroup(L.controls, {
+      multi: true, value: ["field", "neutral", "flow"],
+      options: [
+        { value: "field", label: "磁感線" },
+        { value: "neutral", label: "中性面" },
+        { value: "normal", label: "法線 n̂" },
+        { value: "flow", label: "電流流動" }
+      ]
+    });
+
+    const row = PL.ui.buttonRow(L.controls);
+    const play = PL.ui.button(row, "暫停", () => { anim.toggle(); play.textContent = anim.running ? "暫停" : "播放"; }, { primary: true });
+    PL.ui.button(row, "回中性面", () => { t = 0; hist = []; update(); });
+    PL.ui.button(row, "重置", reset);
+    function reset() { t = 0; hist = []; update(); }
+
+    PL.ui.note(L.controls,
+      "線圈轉到中性面時，磁通量是最大值——但電動勢恰好是零。" +
+      "山頂的斜率是零，這就是「磁通量最大處沒有電動勢」的原因。" +
+      "而且電流每經過中性面一次就換向一次。按「回中性面」把線圈轉回那個位置再看一次。");
+
+    const A = 0.02;                 // 線圈面積（m²），固定值
+    const vd = PL.ui.verdict(L.readouts.parentNode || L.readouts, { label: "—" });
+    const rE = PL.ui.readout(L.readouts, { label: "瞬時電動勢 e", unit: "V" });
+    const rE0 = PL.ui.readout(L.readouts, { label: "峰值 E₀ = nBAω", unit: "V" });
+    const rRms = PL.ui.readout(L.readouts, { label: "有效值 E₀/√2", unit: "V" });
+    const rT = PL.ui.readout(L.readouts, { label: "週期 T", unit: "s" });
+    const rPhi = PL.ui.readout(L.readouts, { label: "磁通量 Φ（單匝）", unit: "Wb" });
+    const rAng = PL.ui.readout(L.readouts, { label: "轉角 θ（從中性面起）", unit: "°" });
+
+    /*
+     * 從中性面起算轉角 θ = ωt：
+     *   Φ = B·A·cos θ        （中性面 θ=0 時最大）
+     *   e = n·B·A·ω·sin θ    （中性面時為零，正要換向）
+     */
+    function model(tt) {
+      const n = sN.get(), B = sB.get(), w = sW.get(), R = sR.get();
+      const th = w * tt;
+      const phi = B * A * Math.cos(th);
+      const e = n * B * A * w * Math.sin(th);
+      const E0 = n * B * A * w;
+      return { n, B, w, R, th, phi, e, E0, rms: E0 / Math.SQRT2, T: TAU / w, i: e / R };
+    }
+
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const cx = W * 0.26, cy = H * 0.42, R = 52;
-      // 磁極
-      D.rect(ctx, cx - 90, cy - 30, 20, 60, { fill: NP, r: 3 }); D.text(ctx, "N", cx - 80, cy + 5, { color: "#fff", size: 13, align: "center", weight: "700" });
-      D.rect(ctx, cx + 70, cy - 30, 20, 60, { fill: SP, r: 3 }); D.text(ctx, "S", cx + 80, cy + 5, { color: "#fff", size: 13, align: "center", weight: "700" });
-      // 轉動線圈（以橢圓投影表示）
-      const a = t, w = R * Math.cos(a);
-      ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 2.6; ctx.beginPath(); ctx.ellipse(cx, cy, Math.abs(w) + 2, R, 0, 0, TAU); ctx.stroke(); ctx.restore();
-      D.disc(ctx, cx + w, cy - R, 5, { fill: PL.col("accent-2") }); D.disc(ctx, cx - w, cy + R, 5, { fill: PL.col("warn") });
-      // EMF 圖
-      const bx = W * 0.52, by = 24, bw = W - bx - 20, bh = H - 48;
-      const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: 4 * Math.PI / sW.get(), y0: -1.1, y1: 1.1 });
-      g.frame({ title: "感應電動勢 ε – t", xlabel: "t" }); g.grid(4, 2);
-      const emf = Math.sin(sW.get() * t);
-      const Tw = 4 * Math.PI / sW.get();
-      const pts = hist.filter(h => h[0] > t - Tw).map(h => [h[0] - (t - Tw), h[1]]);
-      if (pts.length > 1) g.curve(pts, { color: MC(), width: 2.2 });
-      g.dot(Tw, emf, { color: MC(), glow: MC() });
-      rEmf.set(emf, 2);
+      const m = model(t);
+      const cx = W * 0.30, cy = H * 0.46, R = Math.min(W * 0.13, H * 0.26);
+
+      // 磁極與磁感線
+      D.rect(ctx, cx - R - 46, cy - R * 0.9, 22, R * 1.8, { fill: NP, r: 3 });
+      D.text(ctx, "N", cx - R - 35, cy + 5, { color: "#fff", size: 14, align: "center", weight: "700" });
+      D.rect(ctx, cx + R + 24, cy - R * 0.9, 22, R * 1.8, { fill: SP, r: 3 });
+      D.text(ctx, "S", cx + R + 35, cy + 5, { color: "#fff", size: 14, align: "center", weight: "700" });
+      if (layers.has("field")) {
+        // 磁感線密度隨 B：這是 B 這根滑桿唯一看得見的地方
+        const lines = PL.clamp(Math.round(2 + m.B * 3), 3, 9);
+        for (let i = 0; i < lines; i += 1) {
+          const y = cy - R * 0.8 + i * (R * 1.6 / Math.max(1, lines - 1));
+          D.arrow(ctx, cx - R - 22, y, cx + R + 22, y, { color: "rgba(120,200,180,0.35)", width: 1.2, head: 5 });
+        }
+        D.text(ctx, "B = " + PL.fmt(m.B, 1) + " T", cx, cy - R - 22,
+          { color: "rgba(120,200,180,0.8)", size: 10, align: "center" });
+      }
+
+      // 中性面：線圈平面垂直於 B 的位置
+      if (layers.has("neutral")) {
+        D.line(ctx, cx, cy - R - 10, cx, cy + R + 10, PL.col("ok"), 1.6, [5, 4]);
+        D.text(ctx, "中性面", cx, cy - R - 16, { color: PL.col("ok"), size: 10, align: "center" });
+      }
+
+      // 轉動的線圈：以橢圓投影呈現，寬度 = R·|cosθ|
+      const half = R * Math.cos(m.th);
+      ctx.save();
+      ctx.strokeStyle = MC(); ctx.lineWidth = 2.8;
+      ctx.beginPath(); ctx.ellipse(cx, cy, Math.max(1.5, Math.abs(half)), R, 0, 0, TAU); ctx.stroke();
+      ctx.restore();
+      D.disc(ctx, cx + half, cy - R, 5, { fill: PL.col("accent-2") });
+      D.disc(ctx, cx - half, cy + R, 5, { fill: PL.col("warn") });
+
+      // 法線：直接顯示線圈平面的朝向，與 B 的夾角就是 θ
+      if (layers.has("normal")) {
+        const nx = Math.cos(m.th), ny = 0, nz = Math.sin(m.th);
+        D.arrow(ctx, cx, cy, cx + nx * R * 0.8, cy - Math.abs(nz) * R * 0.35,
+          { color: PL.col("accent-3"), width: 2, head: 7, label: "n̂" });
+      }
+
+      // 電流流動：方向隨 e 的正負反轉，密度隨電流大小
+      if (layers.has("flow") && Math.abs(m.i) > 1e-4) {
+        const dir = m.i >= 0 ? 1 : -1;
+        const phase = (t * 1.2 * dir) % 1;
+        const n = PL.clamp(Math.round(Math.abs(m.i) * 40), 3, 14);
+        for (let i = 0; i < n; i += 1) {
+          const f = ((i / n) + (phase + 1) % 1) % 1;
+          const ang = f * TAU;
+          D.disc(ctx, cx + Math.abs(half) * Math.cos(ang), cy + R * Math.sin(ang), 2.6,
+            { fill: PL.col("warn") });
+        }
+      }
+
+      // 轉角與磁通量的即時標示
+      D.text(ctx, "轉角 θ = " + PL.fmt(m.th * 180 / Math.PI % 360, 0) + "°", cx, cy + R + 26,
+        { color: PL.col("text-dim"), size: 11, align: "center" });
+
+      PL.ui.caption(cv, Math.abs(Math.sin(m.th)) < 0.08
+        ? "正在通過中性面：線圈平面垂直於 B，磁通量此刻最大——但變化率是零，所以 e = 0，而且電流正要換向。"
+        : "電動勢 e = nBAω·sin θ 與磁通量 Φ = BA·cos θ 錯開四分之一週期：Φ 的極值正好是 e 的零點。");
     }
-    const anim = PL.loop(dt => { if (dt) { t += dt; hist.push([t, Math.sin(sW.get() * t)]); if (hist.length > 900) hist.shift(); } draw(); });
-    cv.onResize(draw); anim.start();
-    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+
+    /* Φ 與 e 同框（雙尺度）：兩條線錯開四分之一週期是本單元的核心圖像 */
+    const chart = PL.ui.chart(PL.ui.charts(root), {
+      title: "e − t 與 Φ − t 波形",
+      cap: "e 與 Φ 錯開四分之一週期：Φ 過極值（中性面）時 e = 0；波形每次穿過橫軸，電流換向一次。"
+    });
+
+    function drawChart() {
+      chart.clear();
+      const m = model(t);
+      const span = Math.max(2, m.T * 2);
+      const g = PL.graph(chart, { x: 52, y: 18, w: chart.W - 76, h: chart.H - 46 },
+        { x0: Math.max(0, t - span), x1: Math.max(span, t), y0: -m.E0 * 1.25, y1: m.E0 * 1.25 });
+      g.frame({ xlabel: "t (s)", ylabel: "e (V)" });
+      g.grid(6, 4);
+      g.hline(0, { color: PL.col("text-faint"), width: 1.2 });
+      g.hline(m.rms, { color: PL.col("ok"), dash: [4, 3], width: 1.2 });
+      g.label(Math.max(0, t - span) + span * 0.02, m.rms + m.E0 * 0.06,
+        "有效值 " + PL.fmt(m.rms, 2) + " V", { color: PL.col("ok"), size: 9.5 });
+
+      const recent = hist.filter(p => p[0] > t - span);
+      if (recent.length > 1) {
+        g.curve(recent.map(p => [p[0], p[1]]), { color: MC(), width: 2.4 });
+        // Φ 用同一張圖但自行縮放到相同高度，重點是相位差不是絕對值
+        const scale = m.E0 / Math.max(1e-9, m.B * A);
+        g.curve(recent.map(p => [p[0], p[2] * scale * 0.72]),
+          { color: PL.col("warn"), width: 2, dash: [6, 4] });
+      }
+      g.label(Math.max(0, t - span) + span * 0.02, m.E0 * 1.08, "電動勢 e", { color: MC(), size: 10 });
+      g.label(Math.max(0, t - span) + span * 0.02, m.E0 * 0.9, "磁通量 Φ（等比縮放）",
+        { color: PL.col("warn"), size: 10 });
+    }
+
+    function update() {
+      const m = model(t);
+      draw(); drawChart();
+      rE.set(m.e, 2); rE0.set(m.E0, 2); rRms.set(m.rms, 2);
+      rT.set(m.T, 2); rPhi.set(m.phi, 4);
+      rAng.set((m.th * 180 / Math.PI) % 360, 0);
+
+      const nearNeutral = Math.abs(Math.sin(m.th)) < 0.08;
+      if (nearNeutral) vd.set("過中性面：e = 0，電流換向", "warn");
+      else if (m.e > 0) vd.set("電動勢為正（e = " + PL.fmt(m.e, 2) + " V）", "ok");
+      else vd.set("電動勢為負（e = " + PL.fmt(m.e, 2) + " V），電流反向", "ok");
+    }
+
+    const anim = PL.loop(dt => {
+      if (dt) {
+        t += dt;
+        const m = model(t);
+        hist.push([t, m.e, m.phi]);
+        if (hist.length > 1200) hist.shift();
+      }
+      update();
+    }, 50);
+    cv.onResize(update); chart.onResize(update); update(); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); chart.destroy(); }, rerender: update };
   }});
 
   /* 變壓器 */
+  /* 變壓器 —— 理想變壓器與「誰決定誰」
+   *
+   * 學生都背得出 U₁/U₂ = n₁/n₂，但問「把負載換成更耗電的，原線圈電流會怎麼變」
+   * 就答不出來。原因是課本只給了比例式，沒講因果方向，而這一題的因果是分岔的：
+   *
+   *   電壓：原邊決定副邊   （U₂ 由 U₁ 與匝數比決定）
+   *   電流：副邊決定原邊   （I₂ 由負載決定，再回頭決定 I₁）
+   *   功率：輸出決定輸入   （負載越重，輸入功率越大）
+   *
+   * 三個量三個方向，這正是「制約關係」面板要講的事。
+   *
+   * 另外補上兩個課本會特別強調、但模擬很少做的狀態：
+   *   · 直流輸入 → 副邊沒有輸出（磁通量不變就沒有感應）
+   *   · 空載 → 電流幾乎為零，但電壓照樣有
+   */
   PL.register("transformer", { build(root) {
     const L = PL.ui.layout(root);
-    const cv = PL.canvas.create(L.canvasWrap, 0.6);
+    const cv = PL.canvas.create(L.canvasWrap, 0.52, 880);
     let t = 0;
-    const sNp = PL.ui.slider(L.controls, { label: "主線圈匝數 Nₚ", min: 20, max: 200, step: 10, value: 100, unit: "匝", digits: 0 });
-    const sNs = PL.ui.slider(L.controls, { label: "副線圈匝數 Nₛ", min: 20, max: 400, step: 10, value: 200, unit: "匝", digits: 0 });
-    const sVp = PL.ui.slider(L.controls, { label: "主線圈電壓 Vₚ", min: 10, max: 220, step: 10, value: 110, unit: "V", digits: 0 });
-    const rVs = PL.ui.readout(L.readouts, { label: "副線圈電壓 Vₛ", unit: "V" });
-    const rType = PL.ui.readout(L.readouts, { label: "類型" });
+
+    PL.ui.section(L.controls, "變壓器參數");
+    const sNp = PL.ui.stepper(L.controls, { label: "原線圈匝數 n₁", value: 200, min: 20, max: 800, step: 20, unit: "匝", digits: 0, onChange: draw });
+    const sNs = PL.ui.stepper(L.controls, { label: "副線圈匝數 n₂", value: 200, min: 20, max: 800, step: 20, unit: "匝", digits: 0, onChange: draw });
+    const sVp = PL.ui.stepper(L.controls, { label: "輸入電壓 U₁", value: 220, min: 10, max: 400, step: 10, unit: "V", digits: 0, onChange: draw });
+    const sR = PL.ui.stepper(L.controls, { label: "負載電阻 R", value: 440, min: 10, max: 2000, step: 10, unit: "Ω", digits: 0, onChange: draw });
+
+    PL.ui.presets(L.controls, {
+      label: "快捷預設",
+      options: [
+        { label: "升壓 1:2", hint: "副線圈匝數是原線圈的兩倍，電壓加倍、電流減半",
+          apply: () => { sNp.set(200); sNs.set(400); draw(); } },
+        { label: "降壓 4:1", hint: "電壓降為四分之一，電流變四倍",
+          apply: () => { sNp.set(400); sNs.set(100); draw(); } },
+        { label: "隔離 1:1", hint: "電壓不變，但原副邊在電路上完全分開",
+          apply: () => { sNp.set(200); sNs.set(200); draw(); } }
+      ]
+    });
+
+    PL.ui.section(L.controls, "電源與負載");
+    const srcChips = PL.ui.chipGroup(L.controls, {
+      value: "ac",
+      options: [{ value: "ac", label: "交流 ~" }, { value: "dc", label: "直流 =" }],
+      onChange: draw
+    });
+    const loadChips = PL.ui.chipGroup(L.controls, {
+      value: "on",
+      options: [{ value: "on", label: "接通" }, { value: "off", label: "空載" }],
+      onChange: draw
+    });
+    const layers = PL.ui.chipGroup(L.controls, {
+      multi: true, value: ["flux", "current"],
+      options: [{ value: "flux", label: "磁通 Φ" }, { value: "current", label: "電流流向" }]
+    });
+
+    const row = PL.ui.buttonRow(L.controls);
+    const play = PL.ui.button(row, "暫停", () => { anim.toggle(); play.textContent = anim.running ? "暫停" : "播放"; }, { primary: true });
+    PL.ui.button(row, "重置", () => { sNp.set(200); sNs.set(200); sVp.set(220); sR.set(440); draw(); });
+
+    PL.ui.note(L.controls,
+      "先按「降壓 4:1」：電壓降成四分之一，但電流變成四倍——功率沒有變。" +
+      "再把負載電阻調小（負載變重）：副線圈電流變大，原線圈電流跟著變大。" +
+      "注意因果方向：電壓是原邊決定副邊，電流卻是副邊決定原邊。" +
+      "最後把電源切成直流：磁通量不再變化，副邊完全沒有輸出。");
+
+    const vd = PL.ui.verdict(L.readouts.parentNode || L.readouts, { label: "—" });
+    const rVs = PL.ui.readout(L.readouts, { label: "副線圈電壓 U₂", unit: "V" });
+    const rIs = PL.ui.readout(L.readouts, { label: "副線圈電流 I₂", unit: "A" });
+    const rIp = PL.ui.readout(L.readouts, { label: "原線圈電流 I₁", unit: "A" });
+    const rP = PL.ui.readout(L.readouts, { label: "功率 P₁ = P₂", unit: "W" });
+
+    const cz = PL.ui.causality(L.canvasWrap.parentNode, {
+      title: "制約關係（誰決定誰）",
+      rows: [
+        { name: "電壓", tone: "a", note: "原 → 副：由原線圈電壓和匝數比決定。副邊接什麼負載都不會改變 U₂。" },
+        { name: "電流", tone: "b", note: "副 → 原：I₂ 由負載決定，再依匝數比回頭決定 I₁。這是最常被搞反的一條。" },
+        { name: "功率", tone: "c", note: "輸出 → 輸入：負載越重，輸出功率越大，輸入功率跟著變大。理想變壓器 P₁ = P₂。" }
+      ]
+    });
+
+    /* 理想變壓器：不計損耗，P₁ = P₂ */
+    function model() {
+      const n1 = sNp.get(), n2 = sNs.get(), U1 = sVp.get(), R = sR.get();
+      const ac = srcChips.get() === "ac";
+      const loaded = loadChips.get() === "on";
+      // 直流輸入：磁通量不變 → 沒有感應電動勢 → 副邊沒有輸出
+      const U2 = ac ? U1 * n2 / n1 : 0;
+      const I2 = ac && loaded ? U2 / R : 0;
+      const I1 = ac && loaded ? I2 * n2 / n1 : 0;
+      const P = U2 * I2;
+      return { n1, n2, U1, U2, I1, I2, P, R, ac, loaded, ratio: n2 / n1 };
+    }
+
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const Np = sNp.get(), Ns = sNs.get(), Vp = sVp.get(), Vs = Vp * Ns / Np;
-      const cx = W / 2, cy = H * 0.4;
-      // 鐵芯
-      D.rect(ctx, cx - 18, cy - 60, 36, 120, { stroke: PL.col("text-faint"), width: 3, r: 4 });
-      // 主副線圈
-      const coil = (x, n, c) => { const turns = Math.min(10, Math.round(n / 20)); for (let i = 0; i < turns; i++) D.ring(ctx, x, cy - 44 + i * (88 / turns), 14, c, 2); };
-      coil(cx - 32, Np, PL.col("accent-2")); coil(cx + 32, Ns, MC());
-      D.text(ctx, "主 Nₚ=" + Np, cx - 60, cy + 74, { color: PL.col("accent-2"), size: 11, align: "center" });
-      D.text(ctx, "副 Nₛ=" + Ns, cx + 60, cy + 74, { color: MC(), size: 11, align: "center" });
-      // 波形
-      const by = H - 46, amp = 22;
-      ctx.save(); ctx.strokeStyle = PL.col("accent-2"); ctx.lineWidth = 1.8; ctx.beginPath(); for (let x = 20; x < cx - 40; x += 2) ctx.lineTo(x, by - amp * (Vp / 220) * Math.sin((x - 20) * 0.1 - t * 4)); ctx.stroke();
-      ctx.strokeStyle = MC(); ctx.beginPath(); for (let x = cx + 40; x < W - 20; x += 2) ctx.lineTo(x, by - amp * PL.clamp(Vs / 220, -1.4, 1.4) * Math.sin((x - cx - 40) * 0.1 - t * 4)); ctx.stroke(); ctx.restore();
-      rVs.set(Vs, 0); rType.set(Ns > Np ? "升壓變壓器" : Ns < Np ? "降壓變壓器" : "1:1");
+      const m = model();
+      const cx = W * 0.5, cy = H * 0.46;
+      const coreW = 92, coreH = 128;
+
+      // 鐵芯（口字形閉合）
+      D.rect(ctx, cx - coreW / 2, cy - coreH / 2, coreW, coreH,
+        { fill: PL.theme.shade(0.30), stroke: PL.theme.pale(0.40), width: 2, r: 4 });
+      D.rect(ctx, cx - coreW / 2 + 18, cy - coreH / 2 + 18, coreW - 36, coreH - 36,
+        { fill: PL.col("sim-bg-1", "#0a0f16"), stroke: PL.theme.pale(0.25), width: 1.5, r: 3 });
+
+      // 磁通：交流時在鐵芯裡循環流動；直流時靜止且畫成灰色，一眼看出「沒有變化」
+      if (layers.has("flux")) {
+        const phase = m.ac ? (t * 1.4) % 1 : 0;
+        const col = m.ac ? PL.col("accent-3") : PL.col("text-faint");
+        for (let i = 0; i < 4; i += 1) {
+          const f = (i / 4 + phase) % 1;
+          const y = cy - coreH / 2 + 9 + f * (coreH - 18);
+          D.arrow(ctx, cx - coreW / 2 + 9, y, cx - coreW / 2 + 9, y + 14,
+            { color: col, width: 1.6, head: 5 });
+          D.arrow(ctx, cx + coreW / 2 - 9, cy + coreH / 2 - 9 - f * (coreH - 18),
+            cx + coreW / 2 - 9, cy + coreH / 2 - 23 - f * (coreH - 18),
+            { color: col, width: 1.6, head: 5 });
+        }
+        D.text(ctx, m.ac ? "Φ 變化中" : "Φ 不變（直流）", cx, cy + 4,
+          { color: col, size: 11, align: "center", weight: "700" });
+      }
+
+      // 線圈：匝數以實際圈數呈現，比例一眼可見
+      function coil(x, n, color, side) {
+        const turns = PL.clamp(Math.round(n / 40), 3, 14);
+        for (let i = 0; i < turns; i += 1) {
+          const y = cy - coreH / 2 + 14 + i * ((coreH - 28) / Math.max(1, turns - 1));
+          D.ring(ctx, x, y, 11, color, 2.2);
+        }
+        D.text(ctx, (side === "p" ? "n₁ = " : "n₂ = ") + n + " 匝", x, cy + coreH / 2 + 18,
+          { color, size: 11, align: "center", weight: "700" });
+      }
+      coil(cx - coreW / 2, m.n1, PL.col("accent-2"), "p");
+      coil(cx + coreW / 2, m.n2, PL.col("danger"), "s");
+
+      // 原邊迴路
+      const lx = 60, rx = W - 60, ty = cy - coreH / 2 - 26, by = cy + coreH / 2 + 42;
+      D.line(ctx, lx, ty, cx - coreW / 2, ty, PL.col("accent-2"), 2);
+      D.line(ctx, lx, by, cx - coreW / 2, by, PL.col("accent-2"), 2);
+      D.line(ctx, lx, ty, lx, by, PL.col("accent-2"), 2);
+      D.ring(ctx, lx, cy, 17, PL.col("accent-2"), 2);
+      D.text(ctx, m.ac ? "~" : "=", lx, cy + 6, { color: PL.col("accent-2"), size: 17, align: "center", weight: "700" });
+      D.text(ctx, "U₁ = " + PL.fmt(m.U1, 0) + " V", lx + 4, ty - 10, { color: PL.col("accent-2"), size: 11, weight: "700" });
+      D.text(ctx, "I₁ = " + PL.fmt(m.I1, 2) + " A", lx + 4, by + 16, { color: PL.col("accent-2"), size: 11 });
+
+      // 副邊迴路
+      D.line(ctx, cx + coreW / 2, ty, rx, ty, PL.col("danger"), 2);
+      D.line(ctx, cx + coreW / 2, by, rx, by, PL.col("danger"), 2);
+      if (m.loaded) {
+        D.line(ctx, rx, ty, rx, cy - 16, PL.col("danger"), 2);
+        D.line(ctx, rx, cy + 16, rx, by, PL.col("danger"), 2);
+        // 燈泡：亮度隨功率
+        const glow = PL.clamp(m.P / 200, 0, 1);
+        D.disc(ctx, rx, cy, 14, {
+          fill: m.P > 0.5 ? "rgba(255,214,120," + (0.25 + glow * 0.6) + ")" : PL.theme.shade(0.3),
+          stroke: PL.col("warn"), width: 1.8,
+          glow: m.P > 0.5 ? PL.col("warn") : null, glowSize: 6 + glow * 22
+        });
+        D.text(ctx, "R = " + PL.fmt(m.R, 0) + " Ω", rx, cy + 34,
+          { color: PL.col("warn"), size: 10.5, align: "center" });
+      } else {
+        // 空載：把斷口畫出來，「有電壓但沒電流」才看得懂
+        D.line(ctx, rx, ty, rx, cy - 22, PL.col("danger"), 2);
+        D.line(ctx, rx, cy + 22, rx, by, PL.col("danger"), 2);
+        D.disc(ctx, rx, cy - 22, 3, { fill: PL.col("danger") });
+        D.disc(ctx, rx, cy + 22, 3, { fill: PL.col("danger") });
+        D.text(ctx, "空載（斷路）", rx, cy + 4, { color: PL.col("text-faint"), size: 10, align: "center" });
+      }
+      D.text(ctx, "U₂ = " + PL.fmt(m.U2, 0) + " V", rx - 4, ty - 10,
+        { color: PL.col("danger"), size: 11, align: "right", weight: "700" });
+      D.text(ctx, "I₂ = " + PL.fmt(m.I2, 2) + " A", rx - 4, by + 16,
+        { color: PL.col("danger"), size: 11, align: "right" });
+
+      // 電流流動的點：密度隨電流大小，兩側可以直接比較
+      if (layers.has("current") && m.ac) {
+        const flow = (t * 0.6) % 1;
+        const dots = (x0, y0, x1, y1, amps, color) => {
+          if (amps <= 1e-6) return;
+          const len = Math.hypot(x1 - x0, y1 - y0);
+          const gap = PL.clamp(40 - amps * 12, 12, 40);
+          const n = Math.floor(len / gap);
+          for (let i = 0; i < n; i += 1) {
+            const f = ((i + flow) / Math.max(1, n)) % 1;
+            D.disc(ctx, x0 + (x1 - x0) * f, y0 + (y1 - y0) * f, 2.4, { fill: color });
+          }
+        };
+        dots(lx, ty, cx - coreW / 2, ty, m.I1, PL.col("accent-2"));
+        dots(cx + coreW / 2, ty, rx, ty, m.I2, PL.col("danger"));
+      }
+
+      PL.ui.caption(cv, !m.ac
+        ? "直流輸入：鐵芯裡的磁通量固定不變，沒有變化就沒有感應電動勢——副線圈完全沒有輸出。變壓器只能變交流。"
+        : !m.loaded
+          ? "空載：副線圈仍然有電壓 U₂，但電路斷開所以沒有電流，輸入功率也接近零。電壓與電流是兩回事。"
+          : "匝數比決定電壓比，電壓比又決定電流比（方向相反）。理想變壓器不產生也不消耗功率：P₁ = P₂。");
     }
-    const anim = PL.loop(dt => { if (dt) t += dt; draw(); });
-    cv.onResize(draw); anim.start();
-    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+
+    function update() {
+      const m = model();
+      draw();
+      rVs.set(m.U2, 1); rIs.set(m.I2, 2); rIp.set(m.I1, 2); rP.set(m.P, 1);
+
+      cz.set(0, "U₁ " + PL.fmt(m.U1, 0) + "V　×" + PL.fmt(m.ratio, 2) + " →　U₂ " + PL.fmt(m.U2, 0) + "V");
+      cz.set(1, "I₂ " + PL.fmt(m.I2, 2) + "A　×" + PL.fmt(m.ratio, 2) + " →　I₁ " + PL.fmt(m.I1, 2) + "A");
+      cz.set(2, "P₂ " + PL.fmt(m.P, 1) + "W　=　P₁ " + PL.fmt(m.P, 1) + "W");
+
+      if (!m.ac) vd.set("直流：磁通不變，副邊沒有輸出", "bad");
+      else if (!m.loaded) vd.set("空載：有電壓、沒有電流", "warn");
+      else if (Math.abs(m.ratio - 1) < 1e-9) vd.set("隔離變壓器 1:1（電壓不變，電路分開）", "ok");
+      else if (m.ratio > 1) vd.set("升壓 1:" + PL.fmt(m.ratio, 2) + "（電壓升、電流降）", "ok");
+      else vd.set("降壓 " + PL.fmt(1 / m.ratio, 2) + ":1（電壓降、電流升）", "ok");
+    }
+
+    const anim = PL.loop(dt => { if (dt) t += dt; update(); }, 40);
+    cv.onResize(update); update(); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: update };
   }});
 
   /* 電磁波與電磁波譜 */

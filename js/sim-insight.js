@@ -592,6 +592,159 @@
   /* =======================================================================
      掛載
      ======================================================================= */
+  /* =======================================================================
+     因果面板（自動生成）
+
+     全站盤點發現有 88 個實驗的課綱條目明確在講因果與依賴關係
+     （「與質量無關」「與√高度成正比」「由負載決定」），
+     但畫面上完全沒有呈現這件事——學生只能自己從讀數猜。
+
+     這裡不套模板寫空話，而是直接用探測引擎**實測出來的**關係生成：
+     哪根滑桿讓這個讀數變大、變小、是幾次方、以及哪一根完全不影響。
+     實測結果是這個模擬自己的行為，因此每一句都具體且為真。
+
+     只有「話值得說」才會出現：至少要有兩條有效關係，
+     或者有一個值得指出的不變性（該讀數明明對別的變因很敏感，唯獨這一個沒反應）。
+     ======================================================================= */
+  function buildCausality(context, insight) {
+    /*
+     * insight.primary 是「影響最大的那一條關係」，不是讀數本身。
+     * 第一版把它當成讀數，filter 全部落空，面板一列都沒生成——
+     * 而且不會報錯，只是安靜地什麼都不做。
+     */
+    /*
+     * 實驗自己已經寫了因果面板就不要再加一個。
+     * 手寫的那幾個（變壓器的「誰決定誰」、圓環的「兩個條件要分開看」）
+     * 講的是自動探測看不出來的東西——例如電流的因果是副邊決定原邊，
+     * 這不是量滑桿量得出來的。兩個面板並排只會互相稀釋。
+     */
+    if (context.root && context.root.querySelector &&
+        context.root.querySelector(".sim-causality")) return null;
+
+    const primary = insight.primary && insight.primary.readout;
+    if (!primary) return null;
+
+    const related = (insight.relations || []).filter(r => r.readout === primary);
+    const drivers = related.filter(r => r.direction === "up" || r.direction === "down");
+    const flats = related.filter(r => r.direction === "flat");
+    const peaks = related.filter(r => r.direction === "peak");
+    if (drivers.length + flats.length + peaks.length < 2) return null;
+    if (drivers.length === 0) return null;
+
+    // 影響最大的排前面：學生該先知道「主要由誰決定」
+    drivers.sort((a, b) => b.relative - a.relative);
+
+    const rows = [];
+    drivers.slice(0, 3).forEach((r, i) => {
+      rows.push({
+        name: r.slider.label,
+        tone: i === 0 ? "a" : "",
+        note: (i === 0 ? "影響最大：" : "") +
+          "把「" + r.slider.label + "」調大，「" + primary.label + "」" +
+          (r.direction === "up" ? "跟著變大" : "反而變小") +
+          (r.exponent != null ? "（" + describeExponent(r.exponent) + "）" : "") + "。"
+      });
+    });
+    peaks.slice(0, 1).forEach(r => {
+      rows.push({
+        name: r.slider.label,
+        tone: "c",
+        note: "非單調：「" + primary.label + "」在中間出現極值，不是一路變大或變小——" +
+          "這種變因要找的是極值位置，不是趨勢。"
+      });
+    });
+    flats.slice(0, 2).forEach(r => {
+      rows.push({
+        name: r.slider.label,
+        tone: "b",
+        note: "完全不影響：不管怎麼調，「" + primary.label + "」都不變。" +
+          "「沒有關係」本身就是結論，不是實驗做壞了。"
+      });
+    });
+    if (rows.length < 2) return null;
+
+    const wrap = el("div", "sim-insight-block");
+    const api = PL.ui.causality(wrap, {
+      title: "誰決定「" + primary.label + "」（由模擬實測）",
+      rows
+    });
+    // 把量測到的數值填進去，讓面板不只有文字還有實際範圍
+    let k = 0;
+    drivers.slice(0, 3).forEach(r => {
+      api.set(k++, r.slider.label + " " + PL.fmt(r.slider.min, 2) + " → " + PL.fmt(r.slider.max, 2) +
+        "　得 " + primary.label + " " + PL.fmt(r.first, 3) + " → " + PL.fmt(r.last, 3));
+    });
+    peaks.slice(0, 1).forEach(r => {
+      api.set(k++, "範圍內 " + primary.label + " 介於 " + PL.fmt(r.min, 3) + " ～ " + PL.fmt(r.max, 3));
+    });
+    flats.slice(0, 2).forEach(r => {
+      api.set(k++, r.slider.label + " 全範圍　" + primary.label + " 固定為 " + PL.fmt(r.first, 3));
+    });
+    return wrap;
+  }
+
+  /* =======================================================================
+     情境預設（自動生成）
+
+     學生面對五根滑桿時最常見的行為是亂拉一通，然後什麼結論都沒得到。
+     這裡用探測結果挑出「值得一看的操作點」，每一個都對應一個具體問題：
+
+       主要變因拉到兩端 → 看清楚趨勢的兩個極端
+       把不影響的變因拉到極端 → 親手驗證「它真的不影響」
+       回到預設 → 隨時能回到設計者安排的起點
+
+     第三個特別重要：不變性是最容易被當成「實驗做壞了」的結果，
+     讓學生自己動手把那根滑桿推到底、看著讀數紋風不動，
+     比在說明文字裡寫一句「與此無關」有說服力得多。
+     ======================================================================= */
+  function buildPresets(context, insight) {
+    // 實驗自己已經安排了預設就不要再加，設計者的選擇優先
+    if (context.root && context.root.querySelector &&
+        context.root.querySelector(".sim-presets")) return null;
+
+    const primary = insight.primary;
+    if (!primary || !primary.slider) return null;
+    const sliders = insight.sliders || [];
+    if (sliders.length < 2) return null;
+
+    const originals = sliders.map(s => s.read());
+    const opts = [];
+
+    const setOnly = (target, value) => () => {
+      sliders.forEach((s, i) => { try { s.write(i === sliders.indexOf(target) ? value : originals[i]); } catch (e) {} });
+    };
+
+    opts.push({
+      label: primary.slider.label + " 最小",
+      hint: "把影響最大的變因推到下限，看趨勢的一端",
+      apply: setOnly(primary.slider, primary.slider.min)
+    });
+    opts.push({
+      label: primary.slider.label + " 最大",
+      hint: "把影響最大的變因推到上限，和上一個對照",
+      apply: setOnly(primary.slider, primary.slider.max)
+    });
+
+    const inv = (insight.invariants || [])[0];
+    if (inv && inv.slider) {
+      opts.push({
+        label: "驗證「" + inv.slider.label + "」無關",
+        hint: "把它推到上限——「" + inv.readout.label + "」應該完全不動",
+        apply: setOnly(inv.slider, inv.slider.max)
+      });
+    }
+
+    opts.push({
+      label: "回到預設",
+      hint: "回到設計者安排的起始狀態",
+      apply: () => { sliders.forEach((s, i) => { try { s.write(originals[i]); } catch (e) {} }); }
+    });
+
+    const wrap = el("div", "sim-insight-block");
+    PL.ui.presets(wrap, { label: "值得一看的操作點", options: opts });
+    return wrap;
+  }
+
   PL._hooks.onBuilt((context, api) => {
     let insight = null;
     try {
@@ -611,6 +764,10 @@
     const puzzle = buildPuzzle(context, insight);
     if (puzzle) host.appendChild(puzzle);
     host.appendChild(buildSummary(context, insight));
+    const causal = buildCausality(context, insight);
+    if (causal) host.appendChild(causal);
+    const presets = buildPresets(context, insight);
+    if (presets) host.appendChild(presets);
 
     // 放在任務導讀之後、實驗台之前：先知道要看什麼，再開始操作
     const brief = context.root.querySelector(".sim-learning-brief");

@@ -13,6 +13,49 @@
   const R = String.raw, I = true;
 
   C.extendCatalog("taiwan-school-labs-2026-07", {
+    kinematics: [
+      {
+        id: "chase-and-meet",
+        title: "追及與相遇",
+        interactive: true,
+        concept: "同向共線的兩車何時相遇，取決於「後車走的距離是否補上初始間距」。學生最常背錯的一句話是「後車比前車快就遲早追得上」——這只對了一半：前車在剎車，它終會停下，你遲早追得上；前車在加速，速度相等的那一刻若還沒追上，之後就永遠追不上了。速度相等的時刻正是間距的極值，這是整個單元的鑰匙。",
+        formula: String.raw`\( x_\text{甲}=x_\text{乙}+\Delta x_0;\quad \Delta x \text{ 的極值出現在 } v_\text{甲}=v_\text{乙} \)`,
+        points: [
+          "相遇條件是位置相同，不是速度相同",
+          "速度相等的時刻是間距的極大或極小值",
+          "前車剎停後不再移動，套等加速度公式會讓它倒退（最常見的錯誤）",
+          "追不上與時間不夠是兩件事，要看速度相等之後間距還有沒有在縮小"
+        ]
+      },
+      {
+        id: "vernier-micrometer",
+        title: "長度測量與量具讀數",
+        interactive: I,
+        concept: "游標卡尺與螺旋測微器是中學唯一「讀數規則本身就是考點」的儀器。游標的 n 格恰好等於主尺的 n−1 mm，因此每一格比主尺少 1/n mm；當第 k 格與主尺某條刻線共線時，總長就是主尺整數毫米加上 k×(1/n) mm。螺旋測微器則是螺距 0.5 mm、圓周 50 格，一格 0.01 mm，而且末位必須估讀。兩者的關鍵差別在於：游標卡尺不估讀，螺旋測微器一定要估讀。",
+        formula: R`\( L=M+k\cdot\frac{1}{n}\ \text{mm}\quad(\text{游標});\qquad L=M+N\times0.01\ \text{mm}+\text{估讀}\quad(\text{測微器}) \)`,
+        points: [
+          "游標 n 格 = 主尺 n−1 mm，所以每格差 1/n mm",
+          "先讀主尺（游標 0 線左側最近的刻線），再找共線格",
+          "游標卡尺讀到分度值為止，多寫一位反而錯",
+          "螺旋測微器必須估讀一位，少寫一位同樣錯"
+        ]
+      }
+    ],
+    energy: [
+      {
+        id: "loop-track",
+        title: "力學能守恆與圓環軌道",
+        interactive: true,
+        concept: "過山車要通過豎直圓環，釋放高度必須至少 2.5R——但學生幾乎都答不出為什麼不是 2R。差的那 0.5R 來自一個完全不同的條件：2R 只保證「爬得上去」（能量足以舉到環頂），2.5R 才保證「過得去」（到了環頂還要有速率 √(gR) 維持圓周運動，否則軌道給不出向下的力）。把 h 設成剛好 2R 就能親眼看到小球在環頂之前脫離軌道。",
+        formula: String.raw`\( v_\text{頂}\ge\sqrt{gR},\quad h_{\min}=2.5R;\qquad E=mgh=\tfrac12mv^2+mgy \)`,
+        points: [
+          "「爬得上去」與「過得去」是兩個要分開判斷的條件",
+          "環頂最小速率 √(gR) 來自 mv²/R ≥ mg",
+          "臨界高度 h_min = 2.5R 與質量無關（m 在兩邊消掉）",
+          "動能裕度 ΔEk = mg(h − 2.5R)，負值就會脫軌"
+        ]
+      }
+    ],
     newton: [
       {
         id: "incline-friction-coefficient",

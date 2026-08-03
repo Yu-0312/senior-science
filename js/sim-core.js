@@ -761,7 +761,27 @@
         }
       });
     }
-    return { el: input, get: () => +input.value, set: v => { input.value = v; show(v); }, label: lab, valueEl: val, showUnit: show };
+    return {
+      el: input, get: () => +input.value, set: v => { input.value = v; show(v); },
+      /*
+       * 動態改變量程。
+       * 需要它的情境：同一支滑桿服務兩種量具（游標卡尺 0–150 mm、
+       * 螺旋測微器 0–25 mm），切換時量程必須跟著換，否則滑桿的手感
+       * 與可達範圍都會錯。探測引擎讀的是登記在 buildContext 的 min/max，
+       * 因此那一份也要同步更新。
+       */
+      setRange(min, max, step) {
+        input.min = String(min); input.max = String(max);
+        if (step != null) input.step = String(step);
+        const v = clamp(+input.value, min, max);
+        input.value = String(v); show(v);
+        if (buildContext) {
+          const meta = buildContext.sliders.find(x => x.el === input);
+          if (meta) { meta.min = Number(min); meta.max = Number(max); }
+        }
+      },
+      label: lab, valueEl: val, showUnit: show
+    };
   }
 
   function select(parent, o) {
@@ -816,6 +836,204 @@
       },
       raw: v, box
     };
+  }
+
+  /* =======================================================================
+     教學元件組
+
+     這一組元件的來源是一份對照：把本站的實驗和市面上做得最細的中學物理
+     模擬並排看，差距不在物理算得對不對（我們的物理是對的），
+     而在「學生看完知不知道自己看到了什麼」。對方多出來的東西可以歸納成七類，
+     而且每一類都是通用的，做進引擎就能用在全部 245 個實驗上：
+
+       verdict    判定徽章    「順利通過圓環」「已導通」——結果先講，不要讓學生自己猜
+       derived    衍生量卡    把中間量攤開（環頂動能／臨界動能／裕度），而不是只給最終答案
+       presets    情境預設    一鍵切到有意義的設定（設為臨界值、升壓 1:2），省去盲目亂拉
+       chartTabs  圖表分頁    同一組資料的多種看法（x-t／v-t／Δx-t）
+       magnifier  放大窗      有些東西整體看根本看不出來（游標卡尺 0.02mm 不到半個像素）
+       causality  因果面板    「誰決定誰」——學生最常錯的不是算式，是因果方向
+       procedure  步驟教學    編號步驟＋鐵律警示，把操作流程寫成可照做的清單
+
+     這些都是純 DOM，不進 canvas，因此不影響繪圖效能，也能被螢幕報讀器讀到。
+     ======================================================================= */
+
+  /*
+   * 判定徽章：把「現在這組設定的結果是什麼」直接講出來。
+   * tone 決定顏色語意：ok 成功／warn 臨界／bad 失敗／info 中性。
+   */
+  function verdict(parent, o) {
+    o = o || {};
+    const box = el("div", "sim-verdict", parent);
+    const dot = el("span", "sim-verdict-dot", box);
+    const text = el("span", "sim-verdict-text", box);
+    const meter = o.meter ? el("span", "sim-verdict-meter", box) : null;
+    const bar = meter ? el("i", "", meter) : null;
+    box.setAttribute("role", "status");
+    box.setAttribute("aria-live", "polite");
+    function set(label, tone, progress) {
+      box.dataset.tone = tone || "info";
+      text.textContent = label;
+      if (bar) bar.style.width = Math.round(clamp(progress == null ? 0 : progress, 0, 1) * 100) + "%";
+    }
+    set(o.label || "—", o.tone, o.progress);
+    return { set, box, dot };
+  }
+
+  /*
+   * 衍生量卡：介於「操作參數」與「最終讀數」之間的中間量。
+   * 學生卡住的地方通常不是最後一步，而是中間某個量算不出來；
+   * 把中間量攤在畫面上，等於把解題過程可視化。
+   */
+  function derived(parent, items) {
+    const row = el("div", "sim-derived", parent);
+    const cells = (items || []).map(it => {
+      const cell = el("div", "sim-derived-cell", row);
+      const lab = el("div", "sim-derived-label", cell);
+      lab.innerHTML = it.label;
+      const val = el("div", "sim-derived-value", cell); val.textContent = "—";
+      if (it.hint) { const h = el("div", "sim-derived-hint", cell); h.textContent = it.hint; }
+      return { val, unit: it.unit || "", cell };
+    });
+    return {
+      set(i, value, digits) {
+        const c = cells[i];
+        if (!c) return;
+        c.val.textContent = (typeof value === "number" ? fmt(value, digits) : value) +
+          (c.unit ? " " + c.unit : "");
+      },
+      tone(i, t) { if (cells[i]) cells[i].cell.dataset.tone = t || ""; },
+      row
+    };
+  }
+
+  /*
+   * 情境預設：一鍵跳到有教學意義的設定。
+   * 沒有這個的話，學生只能盲目拉滑桿，很難自己找到「剛好臨界」這種關鍵點。
+   */
+  function presets(parent, o) {
+    o = o || {};
+    const wrap = el("div", "sim-presets", parent);
+    if (o.label) { const l = el("span", "sim-presets-label", wrap); l.textContent = o.label; }
+    (o.options || []).forEach(opt => {
+      const b = el("button", "sim-preset", wrap);
+      b.type = "button";
+      b.textContent = opt.label;
+      if (opt.hint) b.title = opt.hint;
+      b.addEventListener("click", () => {
+        try { opt.apply && opt.apply(); } catch (e) { console.warn("預設套用失敗", e); }
+        Array.prototype.forEach.call(wrap.querySelectorAll(".sim-preset"),
+          n => n.classList.remove("is-active"));
+        b.classList.add("is-active");
+      });
+    });
+    return wrap;
+  }
+
+  /*
+   * 圖表分頁：同一組資料換個看法。
+   * 追及問題最典型——x-t 看交點、v-t 看面積、Δx-t 看極值，
+   * 三張圖講的是同一件事，但學生要三張都看過才會真的懂。
+   */
+  function chartTabs(container, o) {
+    o = o || {};
+    const wrap = el("div", "sim-chart", container);
+    const head = el("div", "sim-chart-head", wrap);
+    if (o.title) { const t = el("div", "chart-title", head); t.textContent = o.title; }
+    const tabs = el("div", "sim-chart-tabs", head);
+    tabs.setAttribute("role", "tablist");
+    const c = createCanvas(wrap, o.aspect || 0.6);
+    const cap = el("div", "cap", wrap);
+    let active = 0;
+    const defs = o.views || [];
+    const btns = defs.map((v, i) => {
+      const b = el("button", "sim-chart-tab", tabs);
+      b.type = "button"; b.textContent = v.label;
+      b.setAttribute("role", "tab");
+      b.addEventListener("click", () => { select(i); });
+      return b;
+    });
+    function select(i) {
+      active = i;
+      btns.forEach((b, k) => {
+        b.classList.toggle("is-active", k === i);
+        b.setAttribute("aria-selected", k === i ? "true" : "false");
+      });
+      if (defs[i] && defs[i].cap) cap.textContent = defs[i].cap;
+      draw();
+    }
+    function draw() {
+      const v = defs[active];
+      if (!v || typeof v.draw !== "function") return;
+      c.clear();
+      try { v.draw(c); } catch (e) { console.warn("圖表繪製失敗", e); }
+    }
+    c.onResize(draw);
+    select(0);
+    return { canvas: c, render: draw, select, wrap };
+  }
+
+  /*
+   * 放大窗：有些量在整體視圖裡根本看不出來。
+   * 游標卡尺 50 分度的一格錯位是 0.02 mm，在整支尺的比例下不到半個像素——
+   * 真的卡尺也要湊近瞇眼看，所以模擬也該提供這扇窗，而不是假裝看得到。
+   */
+  function magnifier(parent, o) {
+    o = o || {};
+    const wrap = el("div", "sim-magnifier", parent);
+    const head = el("div", "sim-magnifier-head", wrap);
+    const t = el("span", "sim-magnifier-title", head); t.textContent = o.title || "放大窗";
+    const mode = el("span", "sim-magnifier-mode", head); mode.textContent = o.mode || "";
+    if (o.note) { const n = el("p", "sim-magnifier-note", wrap); n.textContent = o.note; }
+    const c = createCanvas(wrap, o.aspect || 0.26);
+    return { canvas: c, wrap, setMode(txt) { mode.textContent = txt; } };
+  }
+
+  /*
+   * 因果面板：「誰決定誰」。
+   * 變壓器是最好的例子——電壓是原邊決定副邊，電流卻是副邊決定原邊。
+   * 學生會背 U₁/U₂ = n₁/n₂，但問「負載變重時原線圈電流怎麼變」就答不出來，
+   * 因為課本沒把因果方向講清楚。這個面板專門講這件事。
+   */
+  function causality(parent, o) {
+    o = o || {};
+    const wrap = el("div", "sim-causality", parent);
+    const h = el("div", "sim-causality-title", wrap);
+    h.textContent = o.title || "誰決定誰";
+    const rows = (o.rows || []).map(r => {
+      const row = el("div", "sim-causality-row", wrap);
+      row.dataset.tone = r.tone || "";
+      const name = el("div", "sim-causality-name", row); name.innerHTML = r.name;
+      const flow = el("div", "sim-causality-flow", row); flow.textContent = "—";
+      const note = el("div", "sim-causality-note", row); note.textContent = r.note || "";
+      return { flow };
+    });
+    return {
+      set(i, text) { if (rows[i]) rows[i].flow.innerHTML = text; },
+      wrap
+    };
+  }
+
+  /*
+   * 步驟教學：編號步驟 ＋「鐵律」警示框。
+   * 量具讀數這類題目，學生錯的往往不是概念而是流程（多寫一位、少寫一位）。
+   * 把流程寫成可以照做的清單，並把最常見的致命錯誤單獨框出來。
+   */
+  function procedure(parent, o) {
+    o = o || {};
+    const wrap = el("div", "sim-procedure-card", parent);
+    const h = el("div", "sim-procedure-card-title", wrap);
+    h.textContent = o.title || "操作步驟";
+    const ol = el("ol", "sim-steps", wrap);
+    (o.steps || []).forEach(s => {
+      const li = el("li", "sim-step", ol);
+      li.innerHTML = s;
+    });
+    if (o.rule) {
+      const box = el("div", "sim-rule", wrap);
+      const tag = el("span", "sim-rule-tag", box); tag.textContent = o.ruleTag || "鐵律";
+      const txt = el("span", "sim-rule-text", box); txt.innerHTML = o.rule;
+    }
+    return wrap;
   }
 
   /*
@@ -1430,7 +1648,12 @@
     has(id) { return !!registry[id]; },
     ids() { return Object.keys(registry); },
     // 對外助手
-    ui: { layout, slider, select, checkbox, buttonRow, button, readout, note, caption, section, stepper, chipGroup, charts, chart, relationChart },
+    ui: {
+      layout, slider, select, checkbox, buttonRow, button, readout, note, caption,
+      section, stepper, chipGroup, charts, chart, relationChart,
+      /* 教學元件組（見上方說明） */
+      verdict, derived, presets, chartTabs, magnifier, causality, procedure
+    },
     canvas: { create: createCanvas },
     draw: D,
     graph,
