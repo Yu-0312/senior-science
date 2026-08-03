@@ -65,11 +65,19 @@
     const rV = PL.ui.readout(L.readouts, { label: "速度 v", unit: "m/s" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const gy = 92, sc = (W - 120) / 16, px = 70 + (x % 16) * sc, K = 0.5 * sM.get() * v * v;
+      const m = sM.get();
+      const gy = 92, sc = (W - 120) / 16, px = 70 + (x % 16) * sc, K = 0.5 * m * v * v;
+      /*
+       * 方塊尺寸跟著質量走。原本固定 40×26，於是靜止時調整質量畫面完全不動，
+       * 學生看不出自己改的是「哪一個東西的什麼性質」。
+       * 同時也讓「同樣的力推更重的東西，加速度較小」有一個可以先預期的視覺線索。
+       */
+      const bw = 26 + m * 4, bh = 20 + m * 2.4;
       D.line(ctx, 20, gy, W - 20, gy, PL.col("text-faint"), 2);
-      D.rect(ctx, px - 20, gy - 26, 40, 26, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 4 });
-      D.arrow(ctx, px + 20, gy - 13, px + 20 + sF.get() * 4, gy - 13, { color: KEc, width: 2.2, label: "F" });
-      if (sFr.get() > 0) D.arrow(ctx, px - 20, gy - 13, px - 20 - sFr.get() * 4, gy - 13, { color: THc, width: 2, label: "f" });
+      D.rect(ctx, px - bw / 2, gy - bh, bw, bh, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 4 });
+      D.text(ctx, PL.fmt(m, 1) + " kg", px, gy - bh / 2 + 4, { color: "#04121a", size: 10, align: "center", weight: "700" });
+      D.arrow(ctx, px + bw / 2, gy - bh / 2, px + bw / 2 + sF.get() * 4, gy - bh / 2, { color: KEc, width: 2.2, label: "F" });
+      if (sFr.get() > 0) D.arrow(ctx, px - bw / 2, gy - bh / 2, px - bw / 2 - sFr.get() * 4, gy - bh / 2, { color: THc, width: 2, label: "f" });
       energyBars(cv, 40, gy + 40, W - 120, [{ label: "淨功", v: Wnet, c: MC() }, { label: "動能 K", v: K, c: KEc }], Math.max(Wnet, K, 10));
       PL.ui.caption(cv, "淨功 = 動能變化：兩條長條始終等長");
       rWn.set(Wnet, 1); rK.set(K, 1); rV.set(v, 2);

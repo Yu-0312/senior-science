@@ -159,7 +159,18 @@
     const rA2 = PL.ui.readout(L.readouts, { label: "球2 散射角", unit: "°" });
     const rAng = PL.ui.readout(L.readouts, { label: "夾角", unit: "°" });
     const R = 22, m1 = 1;
-    function reset() { const b = sB.get() * (R * 2); p1 = { x: -200, y: b, vx: 130, vy: 0, m: m1, r: R, c: MC() }; p2 = { x: 0, y: 0, vx: 0, vy: 0, m: sMr.get(), r: R, c: CB }; done = false; }
+    /*
+     * 球 2 的半徑跟著質量比走：同樣材質下 m ∝ r³，所以 r ∝ m^(1/3)。
+     * 原本兩球永遠一樣大，於是「質量比」這支滑桿在發射前完全看不出效果——
+     * 學生沒有任何線索知道自己正在改的是哪一顆球。
+     * 半徑同時也是碰撞判定用的量，所以改了之後瞄準參數的意義仍然一致。
+     */
+    function reset() {
+      const mr = sMr.get(), b = sB.get() * (R * 2);
+      p1 = { x: -200, y: b, vx: 130, vy: 0, m: m1, r: R, c: MC() };
+      p2 = { x: 0, y: 0, vx: 0, vy: 0, m: mr, r: R * Math.cbrt(mr), c: CB };
+      done = false;
+    }
     reset();
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);

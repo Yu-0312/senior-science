@@ -164,7 +164,10 @@
     PL.ui.section(L.controls, "氣體狀態");
     const sN = PL.ui.slider(L.controls, { label: "分子數 N", min: 20, max: 240, step: 10, value: 90, unit: "顆", digits: 0, onInput: rebuild });
     const sT = PL.ui.slider(L.controls, { label: "溫度 T", min: 100, max: 900, step: 25, value: 300, unit: "K", digits: 0, onInput: retemp });
-    const sPiston = PL.ui.slider(L.controls, { label: "活塞位置（體積）", min: 0.25, max: 0.98, step: 0.01, value: 0.78, unit: "", digits: 2 });
+    /* 活塞位置原本只在 stepPhysics 裡讀取，暫停時推活塞畫面完全不動——
+       而「把體積壓小」正是波以耳定律要學生親手做的那個動作。 */
+    const sPiston = PL.ui.slider(L.controls, { label: "活塞位置（體積）", min: 0.25, max: 0.98, step: 0.01, value: 0.78, unit: "", digits: 2,
+      onInput: v => { pistonX = v; } });
 
     PL.ui.section(L.controls, "顯示");
     const layers = PL.ui.chipGroup(L.controls, {

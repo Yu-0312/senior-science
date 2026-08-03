@@ -668,7 +668,7 @@
   PL.register("newton-cooling", { build(root) {
     const L = PL.ui.layout(root);
     const cv = PL.canvas.create(L.canvasWrap, 0.54);
-    let t = 0, curve = [], running = true;
+    let t = 0, curve = [];
 
     PL.ui.section(L.controls, "起始條件");
     const sT0 = PL.ui.slider(L.controls, { label: "熱水初溫 T₀", min: 40, max: 95, step: 5, value: 90, unit: "°C", digits: 0 });
@@ -697,7 +697,11 @@
       cap: "同一組資料換個縱軸就變成直線。直線斜率 = −k；這是實驗課要求「作圖求參數」的用意。"
     });
 
-    function reset() { t = 0; curve = []; running = true; bRun.textContent = "暫停"; }
+    /*
+     * 拿掉播放鍵時漏刪了這一行：bRun 已經不存在，按「重新開始」會丟 ReferenceError，
+     * 整個實驗當場停住。刪東西比加東西更容易留下這種懸空的引用。
+     */
+    function reset() { t = 0; curve = []; }
 
     function temperature(time) {
       const env = sEnv.get();
@@ -767,7 +771,7 @@
     }
 
     const anim = PL.loop(dt => {
-      if (dt && running && t < 300) {
+      if (dt && t < 300) {
         t += dt * 12;                                   // 加速 12 倍，5 分鐘的實驗 25 秒看完
         curve.push([t, temperature(t)]);
         if (curve.length > 1200) curve.shift();

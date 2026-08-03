@@ -22,7 +22,26 @@
       if (out) D.disc(ctx, cx, cy, 4, { fill: "#fff" });
       else { D.line(ctx, cx - 6, cy - 6, cx + 6, cy + 6, "#fff", 2); D.line(ctx, cx - 6, cy + 6, cx + 6, cy - 6, "#fff", 2); }
       // 場圈
-      for (let ri = 1; ri <= 5; ri++) { const R = 28 + ri * 26; D.ring(ctx, cx, cy, R, "rgba(149,117,205,0.4)", 1.3); const a = ccw * (t * 0.6) + ri; const ax = cx + R * Math.cos(a), ay = cy + R * Math.sin(a); const ta = a + ccw * Math.PI / 2; D.arrow(ctx, ax - Math.cos(ta) * 6, ay - Math.sin(ta) * 6, ax + Math.cos(ta) * 6, ay + Math.sin(ta) * 6, { color: MC(), width: 1.6, head: 6 }); }
+      /*
+       * 場圈的濃淡與箭頭長度代表磁場強度 B ∝ I / r。
+       *
+       * 舊版所有圈都畫成同一個 rgba(...,0.4)、箭頭一律 6 px，電流只影響動畫轉速。
+       * 於是這個實驗把「B 與距離成反比」寫在說明裡，畫面上卻完全看不出來；
+       * 暫停時調整電流更是毫無反應。現在把兩件事都畫進去：
+       * 往外一圈比一圈淡（距離反比），拉大電流則整體變濃、箭頭變長。
+       */
+      const B0 = 28;                                   // 參考半徑，用來把 B 正規化
+      for (let ri = 1; ri <= 5; ri++) {
+        const R = 28 + ri * 26;
+        const B = (I / 5) * (B0 / R);                  // 相對場強：I=5、r=28 時為 1
+        D.ring(ctx, cx, cy, R, "rgba(149,117,205," + PL.fmt(Math.min(0.75, 0.12 + B * 0.42), 3) + ")",
+          Math.min(3.2, 0.8 + B * 1.5));
+        const a = ccw * (t * 0.6) + ri;
+        const ax = cx + R * Math.cos(a), ay = cy + R * Math.sin(a), ta = a + ccw * Math.PI / 2;
+        const len = Math.min(14, 3 + B * 7);
+        D.arrow(ctx, ax - Math.cos(ta) * len, ay - Math.sin(ta) * len,
+          ax + Math.cos(ta) * len, ay + Math.sin(ta) * len, { color: MC(), width: 1.6, head: 6 });
+      }
       rB.set(I, 1);
     }
     const anim = PL.loop(dt => { if (dt) t += dt * sI.get(); draw(); });
@@ -92,7 +111,10 @@
     let history = [];
 
     PL.ui.section(L.controls, "磁鐵");
-    const sPos = PL.ui.slider(L.controls, { label: "磁鐵位置", min: -1.5, max: 1.5, step: 0.01, value: -1.2, unit: "", digits: 2 });
+    /* 磁鐵位置原本只在迴圈裡同步，暫停時拉滑桿磁鐵不會移動——
+       而「自己拉滑桿」本來就是這個實驗預設的操作方式。 */
+    const sPos = PL.ui.slider(L.controls, { label: "磁鐵位置", min: -1.5, max: 1.5, step: 0.01, value: -1.2, unit: "", digits: 2,
+      onInput: v => { if (mode === "manual") x = v; } });
     const sStrength = PL.ui.slider(L.controls, { label: "磁鐵強度", min: 0.4, max: 2.5, step: 0.1, value: 1.2, unit: "", digits: 1 });
     const sTurns = PL.ui.stepper(L.controls, { label: "線圈匝數 N", value: 20, min: 5, max: 60, step: 5 });
 

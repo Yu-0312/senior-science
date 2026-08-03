@@ -298,31 +298,166 @@
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
 
-  /* 力矩與靜力平衡 */
+  /* 力矩與靜力平衡 —— 天平式槓桿
+   *
+   * 這一題學生會背 m₁d₁ = m₂d₂，但畫面上原本看不到「力臂」這個量本身：
+   * 兩個砝碼掛在那裡，d 只是隱含在位置裡。於是「力臂是支點到作用線的垂直距離」
+   * 這句定義沒有對應的視覺，學生記的是公式而不是概念。
+   *
+   * 因此這一版把三件看不見的事畫出來：
+   *   · 力臂 d₁、d₂ 用標註線從支點量到懸掛點，長度會隨滑桿改變
+   *   · 重量 W = mg 用向下箭頭畫在懸掛點，箭頭長度正比於重量
+   *   · 兩側力矩用長條並排比較，誰長誰把桿子壓下去，一眼可見
+   *
+   * 另外把力矩改成真正的 N·m（τ = m g d），不再是沒有單位的 m×d。
+   * 單位是實驗課要求的東西，模擬器自己就該做對。
+   */
   PL.register("torque-equilibrium", { build(root) {
     const L = PL.ui.layout(root);
     const cv = PL.canvas.create(L.canvasWrap, 0.56);
+    const G = 9.8;
     let ang = 0;
+
+    PL.ui.section(L.controls, "左側（阻力端）");
     const sM1 = PL.ui.slider(L.controls, { label: "左側質量 m₁", min: 1, max: 8, step: 0.5, value: 3, unit: "kg", digits: 1 });
     const sD1 = PL.ui.slider(L.controls, { label: "左側力臂 d₁", min: 1, max: 5, step: 0.5, value: 3, unit: "m", digits: 1 });
+    PL.ui.section(L.controls, "右側（施力端）");
     const sM2 = PL.ui.slider(L.controls, { label: "右側質量 m₂", min: 1, max: 8, step: 0.5, value: 2, unit: "kg", digits: 1 });
     const sD2 = PL.ui.slider(L.controls, { label: "右側力臂 d₂", min: 1, max: 5, step: 0.5, value: 4, unit: "m", digits: 1 });
-    PL.ui.note(L.controls, "當 m₁d₁ = m₂d₂ 時左右力矩相等，橫桿保持水平平衡。");
-    const rL = PL.ui.readout(L.readouts, { label: "左力矩 τ₁", unit: "" });
-    const rR = PL.ui.readout(L.readouts, { label: "右力矩 τ₂", unit: "" });
+
+    const tau1 = () => sM1.get() * G * sD1.get();
+    const tau2 = () => sM2.get() * G * sD2.get();
+
+    PL.ui.presets(L.controls, {
+      label: "關鍵設定",
+      options: [
+        { label: "調到剛好平衡", hint: "在目前的 m₁、d₁、m₂ 之下，把 d₂ 移到合平衡的位置",
+          apply: () => {
+            const need = sM1.get() * sD1.get() / sM2.get();
+            sD2.set(PL.clamp(Math.round(need * 2) / 2, 1, 5));
+            settle();
+          } },
+        { label: "省力槓桿", hint: "施力臂比阻力臂長，用比較小的力就抬得動——代價是要移動比較長的距離",
+          apply: () => { sM1.set(6); sD1.set(1.5); sM2.set(2); sD2.set(4.5); settle(); } },
+        { label: "等臂天平", hint: "兩邊力臂一樣長，此時平衡等於「兩邊一樣重」——這是天平能量質量的原因",
+          apply: () => { sD1.set(3); sD2.set(3); sM1.set(4); sM2.set(4); settle(); } }
+      ]
+    });
+
+    PL.ui.note(L.controls,
+      "力矩 τ = 力 × 力臂，力臂是支點到作用線的垂直距離。左右力矩相等時橫桿保持水平。" +
+      "先按「省力槓桿」：右邊只掛 2 kg，卻壓得動左邊的 6 kg——多出來的不是力，是力臂。");
+
+    const vd = PL.ui.verdict(L.readouts.parentNode || L.readouts, { label: "—", meter: true });
+    const rL = PL.ui.readout(L.readouts, { label: "左力矩 τ₁", unit: "N·m" });
+    const rR = PL.ui.readout(L.readouts, { label: "右力矩 τ₂", unit: "N·m" });
     const rS = PL.ui.readout(L.readouts, { label: "狀態" });
+
+    const dv = PL.ui.derived(L.canvasWrap.parentNode, [
+      { label: "左側重量 W₁", unit: "N", hint: "= m₁g，這才是力，不是質量" },
+      { label: "右側重量 W₂", unit: "N", hint: "= m₂g" },
+      { label: "淨力矩 τ₂ − τ₁", unit: "N·m", hint: "為零才是靜力平衡" },
+      { label: "要平衡需要的 d₂", unit: "m", hint: "= m₁d₁ / m₂" }
+    ]);
+
+    PL.ui.causality(L.canvasWrap.parentNode, {
+      title: "轉不轉，看的是力矩不是力",
+      rows: [
+        { name: "力 × 力臂", tone: "a", note: "同樣的力，離支點越遠轉動效果越大。所以扳手要握在末端，門把裝在離門軸最遠的那一側。" },
+        { name: "力臂從支點量起", tone: "b", note: "是支點到「作用線」的垂直距離，不是到物體的距離。力的方向斜掉時，力臂會比看起來的短。" },
+        { name: "省力不省功", tone: "c", note: "力臂拉長到兩倍，施力減半，但施力端要移動兩倍的距離。W = Fd 兩邊相乘後完全一樣。" }
+      ]
+    });
+
+    PL.ui.procedure(L.controls, {
+      title: "槓桿原理實驗的標準流程",
+      steps: [
+        "先<strong>空桿調平</strong>：不掛任何砝碼時橫桿必須水平。沒調平就開始掛，桿子自身的重量會偷偷加進某一側的力矩。",
+        "在左側固定位置掛上已知砝碼，記下 m₁ 與 d₁。",
+        "右側改掛不同質量，每次移動位置直到橫桿回到水平，記錄該次的 m₂ 與 d₂。",
+        "至少做五組，把 m₂ 對 1/d₂ 作圖。若得到通過原點的直線，就驗證了 τ₁ = τ₂。"
+      ],
+      rule: "力臂要從<strong>支點</strong>量到<strong>懸掛點</strong>，不是量到砝碼的邊緣；而且橫桿自己有重量，" +
+            "沒有先空桿調平的話，每一組數據都會系統性偏向同一邊——這種誤差多做幾次也消不掉。"
+    });
+
+    /* 目前的滑桿設定下，桿子最終會停在哪個角度 */
+    const targetAng = () => PL.clamp((tau2() - tau1()) / 60, -0.34, 0.34);
+    /* 預設值切換後讓桿子直接就位，不必等動畫 */
+    function settle() { ang = targetAng(); draw(); }
+
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const m1 = sM1.get(), d1 = sD1.get(), m2 = sM2.get(), d2 = sD2.get(), tauL = m1 * d1, tauR = m2 * d2;
-      const cx = W / 2, cy = H * 0.42, half = Math.min(W * 0.4, 180), sc = half / 5, c = Math.cos(ang), s = Math.sin(ang);
-      D.line(ctx, cx, cy, cx - 24, cy + 48, PL.col("text-faint"), 2); D.line(ctx, cx, cy, cx + 24, cy + 48, PL.col("text-faint"), 2); D.line(ctx, cx - 34, cy + 48, cx + 34, cy + 48, PL.col("text-faint"), 2);
+      const m1 = sM1.get(), d1 = sD1.get(), m2 = sM2.get(), d2 = sD2.get();
+      const t1 = tau1(), t2 = tau2(), W1 = m1 * G, W2 = m2 * G;
+      const cx = W / 2, cy = H * 0.38, half = Math.min(W * 0.38, 180), sc = half / 5;
+      const c = Math.cos(ang), s = Math.sin(ang);
+
+      // 支架與支點
+      D.line(ctx, cx, cy, cx - 24, cy + 48, PL.col("text-faint"), 2);
+      D.line(ctx, cx, cy, cx + 24, cy + 48, PL.col("text-faint"), 2);
+      D.line(ctx, cx - 34, cy + 48, cx + 34, cy + 48, PL.col("text-faint"), 2);
+      // 水平參考線：桿子傾斜時才看得出來偏了多少
+      D.line(ctx, cx - half, cy, cx + half, cy, PL.col("text-faint"), 1, [4, 5]);
       D.line(ctx, cx - half * c, cy - half * s, cx + half * c, cy + half * s, MC(), 6);
-      D.disc(ctx, cx, cy, 5, { fill: "#fff" });
-      const hang = (dist, m, side) => { const ax = cx + side * dist * sc * c, ay = cy + side * dist * sc * s, bw = 20 + m * 4; D.line(ctx, ax, ay, ax, ay + 24, "#c9d3e0", 1.5); D.rect(ctx, ax - bw / 2, ay + 24, bw, 18 + m * 2, { fill: side < 0 ? MC() : "#ffab80", stroke: "rgba(255,255,255,0.4)", r: 4 }); D.text(ctx, m + "", ax, ay + 38, { color: "#04121a", size: 11, align: "center", weight: "700" }); };
-      hang(d1, m1, -1); hang(d2, m2, 1);
-      rL.set(tauL, 1); rR.set(tauR, 1); rS.set(Math.abs(tauL - tauR) < 0.1 ? "平衡" : tauL > tauR ? "左傾" : "右傾");
+      D.disc(ctx, cx, cy, 5, { fill: PL.col("text-dim") });
+      D.text(ctx, "支點", cx, cy + 64, { color: PL.col("text-faint"), size: 10, align: "center" });
+
+      /* 一側的砝碼、重量箭頭與力臂標註 */
+      function side(dist, m, weight, sign, name, tone) {
+        const ax = cx + sign * dist * sc * c, ay = cy + sign * dist * sc * s;
+        const bw = 20 + m * 4, bh = 16 + m * 2;
+        D.line(ctx, ax, ay, ax, ay + 22, PL.col("text-dim"), 1.5);
+        D.rect(ctx, ax - bw / 2, ay + 22, bw, bh, { fill: tone, stroke: PL.theme.pale(0.4), r: 4 });
+        D.text(ctx, PL.fmt(m, 1) + " kg", ax, ay + 22 + bh / 2 + 4,
+          { color: "#04121a", size: 10, align: "center", weight: "700" });
+        // 重量箭頭：長度正比於 W，讓「力」有大小可看
+        const aLen = 16 + weight / 78 * 34;
+        D.arrow(ctx, ax, ay + 24 + bh, ax, ay + 24 + bh + aLen,
+          { color: PL.col("accent-2"), width: 2, label: name + " " + PL.fmt(weight, 0) + " N" });
+        // 力臂標註：從支點沿水平量到懸掛點正下方
+        const dimY = cy + 96;
+        D.line(ctx, cx, dimY, ax, dimY, PL.col("accent"), 1.5);
+        D.line(ctx, cx, dimY - 5, cx, dimY + 5, PL.col("accent"), 1.5);
+        D.line(ctx, ax, dimY - 5, ax, dimY + 5, PL.col("accent"), 1.5);
+        D.text(ctx, (sign < 0 ? "d₁ = " : "d₂ = ") + PL.fmt(dist, 1) + " m", (cx + ax) / 2, dimY - 9,
+          { color: PL.col("accent"), size: 10, align: "center" });
+      }
+      side(d1, m1, W1, -1, "W₁", MC());
+      side(d2, m2, W2, 1, "W₂", "#ffab80");
+
+      /* 力矩長條比較：把「誰比較大」變成長度而不是兩個數字 */
+      const barY = H - 46, barX = 56, barW = W - 112, tMax = Math.max(t1, t2, 1);
+      D.text(ctx, "力矩比較 τ = W × d", barX, barY - 12, { color: PL.col("text-dim"), size: 11 });
+      [[t1, MC(), "τ₁"], [t2, "#ffab80", "τ₂"]].forEach((b, i) => {
+        const y = barY + i * 15;
+        D.rect(ctx, barX, y, barW * (b[0] / tMax), 11, { fill: b[1], r: 3 });
+        D.text(ctx, b[2] + " = " + PL.fmt(b[0], 1) + " N·m", barX + barW * (b[0] / tMax) + 6, y + 9,
+          { color: PL.col("text-dim"), size: 10 });
+      });
+
+      const net = t2 - t1, need = m1 * d1 / m2;
+      dv.set(0, W1, 1); dv.set(1, W2, 1); dv.set(2, net, 1); dv.set(3, need, 2);
+      dv.tone(2, Math.abs(net) < 0.05 ? "good" : "warn");
+
+      rL.set(t1, 1); rR.set(t2, 1);
+      const balanced = Math.abs(net) < 0.05;
+      rS.set(balanced ? "平衡" : net < 0 ? "左傾" : "右傾");
+      if (balanced) {
+        vd.set("平衡：兩側力矩相等，合力矩為零", "good", 1);
+      } else {
+        const heavier = net < 0 ? "左" : "右";
+        const move = PL.fmt(Math.abs(need - d2), 2);
+        vd.set(heavier + "側力矩較大，桿子往" + heavier + "傾；把 d₂ 移到 " + PL.fmt(need, 2) +
+          " m（差 " + move + " m）就會平衡", "warn",
+          1 - Math.min(1, Math.abs(net) / Math.max(t1, t2, 1)));
+      }
     }
-    const anim = PL.loop(dt => { if (dt) { const net = sM2.get() * sD2.get() - sM1.get() * sD1.get(); ang += (PL.clamp(net * 0.02, -0.3, 0.3) - ang) * Math.min(1, dt * 3); } draw(); });
+
+    const anim = PL.loop(dt => {
+      if (dt) ang += (targetAng() - ang) * Math.min(1, dt * 3);
+      draw();
+    });
     cv.onResize(draw); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});

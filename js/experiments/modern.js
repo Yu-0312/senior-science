@@ -318,7 +318,15 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const N = nucleus();
-      D.disc(ctx, N.x, N.y, 10, { fill: PL.col("danger"), glow: PL.col("danger"), glowSize: 16 }); D.text(ctx, "原子核 +", N.x, N.y - 18, { color: PL.col("danger"), size: 11, align: "center" });
+      /*
+       * 核的大小與標籤跟著 Z 走。
+       * 原本半徑固定 10、標籤永遠是「原子核 +」，於是在射出粒子之前
+       * 調整 Z 完全看不出任何差別——這支滑桿在靜止畫面上等於不存在。
+       * 核半徑取 Z^(1/3)：這正是核物理 R ∝ A^(1/3) 的比例，不是隨便放大。
+       */
+      const Z = sZ.get(), nr = 6 + 5 * Math.cbrt(Z / 79);
+      D.disc(ctx, N.x, N.y, nr, { fill: PL.col("danger"), glow: PL.col("danger"), glowSize: 16 });
+      D.text(ctx, "原子核 Z = " + Z, N.x, N.y - nr - 8, { color: PL.col("danger"), size: 11, align: "center" });
       alphas.forEach(p => { ctx.save(); ctx.strokeStyle = p.hl ? MC() : "rgba(255,255,255,0.22)"; ctx.lineWidth = p.hl ? 2 : 1; ctx.beginPath(); p.trail.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke(); ctx.restore(); D.disc(ctx, p.x, p.y, p.hl ? 5 : 3, { fill: p.hl ? MC() : "#ffe08a" }); });
       if (hi) rAng.set(Math.atan2(-hi.vy, hi.vx) * 180 / Math.PI, 1);
     }

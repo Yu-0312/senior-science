@@ -109,10 +109,26 @@ function makeEl(tag) {
       const a = this._listeners[t]; if (!a) return;
       const i = a.indexOf(fn); if (i >= 0) a.splice(i, 1);
     },
-    dispatch(t, ev) {
+    /*
+     * 事件要往上冒泡。
+     *
+     * 原本只呼叫自己身上的監聽器，於是任何「掛在容器上、靠冒泡收事件」的程式
+     * 在測試裡等於不存在——引擎「暫停時拉滑桿要重畫」就是掛在實驗根節點上的。
+     * 少了冒泡，測試會把 41 個其實正常的實驗全部報成壞的，
+     * 而且報出來的樣子和真的壞掉一模一樣。
+     *
+     * 真實瀏覽器裡 input / change / click 都會冒泡；只有明確標 bubbles: false 才不會。
+     */
+    dispatch(t, ev, origin) {
+      const target = origin || this;
       (this._listeners[t] || []).slice().forEach(fn => {
-        fn(Object.assign({ preventDefault() {}, stopPropagation() {}, pointerId: 1, target: this }, ev));
+        fn(Object.assign({ preventDefault() {}, stopPropagation() {}, pointerId: 1 },
+          ev, { target, currentTarget: this }));
       });
+      if (ev && ev.bubbles === false) return;
+      if (this.parentNode && typeof this.parentNode.dispatch === "function") {
+        this.parentNode.dispatch(t, ev, target);
+      }
     },
     dispatchEvent(ev) { this.dispatch(ev && ev.type, ev); return true; },
 
@@ -149,23 +165,37 @@ function makeEl(tag) {
       return null;
     },
     querySelector(sel) { return this.querySelectorAll(sel)[0] || null; },
+    /*
+     * 支援逗號分隔的選擇器群組。
+     *
+     * 原本直接用 split(/\s+/) 拆，於是 ".a, .b" 被當成「.a, 底下的 .b」這種後代選擇器，
+     * 回傳 0 筆。這在測試裡的表現是「找不到任何節點」，
+     * 和「這些節點真的不存在」完全分不出來——實際害一支稽核把 28 支正常的滑桿
+     * 判成沒反應。選擇器引擎自己有 bug 是最難察覺的一種。
+     */
     querySelectorAll(sel) {
-      const out = [];
-      const parts = String(sel).trim().split(/\s+/);
       const collect = (node, acc) => {
         (node.children || []).forEach(c => { acc.push(c); collect(c, acc); });
         return acc;
       };
-      let pool = collect(this, []);
-      parts.forEach((p, i) => {
-        if (i === 0) pool = pool.filter(n => matches(n, p));
-        else {
-          const next = [];
-          pool.forEach(n => collect(n, []).forEach(d => { if (matches(d, p)) next.push(d); }));
-          pool = next;
-        }
+      const all = collect(this, []);
+      const out = [], seen = new Set();
+      String(sel).split(",").forEach(group => {
+        const parts = group.trim().split(/\s+/).filter(Boolean);
+        if (!parts.length) return;
+        let pool = all;
+        parts.forEach((p, i) => {
+          if (i === 0) pool = pool.filter(n => matches(n, p));
+          else {
+            const next = [];
+            pool.forEach(n => collect(n, []).forEach(d => { if (matches(d, p)) next.push(d); }));
+            pool = next;
+          }
+        });
+        pool.forEach(n => { if (!seen.has(n)) { seen.add(n); out.push(n); } });
       });
-      pool.forEach(n => out.push(n));
+      // 依文件順序回傳，和真實 DOM 一致
+      out.sort((a, b) => all.indexOf(a) - all.indexOf(b));
       return out;
     }
   };
@@ -213,6 +243,9 @@ class IntersectionObserverStub {
   observe() {} unobserve() {} disconnect() {}
 }
 
+/* 排隊中的影格 callback；只有 flushFrames() 會把它們跑掉。 */
+const rafQueue = [];
+
 const window = {
   document, documentElement,
   innerWidth: 1280, innerHeight: 900, devicePixelRatio: 1,
@@ -230,8 +263,15 @@ const window = {
   })(),
   matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} }),
   getComputedStyle: cssStub,
-  requestAnimationFrame: () => 1,
-  cancelAnimationFrame: () => {},
+  /*
+   * requestAnimationFrame 原本是 () => 1，也就是排進去的 callback 永遠不會被執行。
+   * 這對「不想讓動畫自己跑起來」是對的，但也讓任何把工作延到下一格的程式
+   * 在測試裡等於不存在——例如引擎「暫停時拉滑桿要重畫一次」的那段。
+   * 現在改成排進佇列，只有測試明確呼叫 flushFrames() 才執行，
+   * 兩件事就都成立：不會自己跑，但測得到。
+   */
+  requestAnimationFrame: cb => rafQueue.push(cb),
+  cancelAnimationFrame: id => { const i = id - 1; if (i >= 0 && i < rafQueue.length) rafQueue[i] = null; },
   setTimeout, clearTimeout, setInterval, clearInterval,
   addEventListener() {}, removeEventListener() {},
   performance: { now: () => Date.now() },
@@ -259,6 +299,20 @@ def("getComputedStyle", cssStub);
 def("matchMedia", window.matchMedia);
 def("requestAnimationFrame", window.requestAnimationFrame);
 def("cancelAnimationFrame", window.cancelAnimationFrame);
+
+/*
+ * 執行目前排隊中的影格 callback。
+ * 只處理呼叫當下的快照：frame() 會把自己再排一次，若連新排進來的也一起跑
+ * 就會變成無窮迴圈。
+ */
+function flushFrames(times) {
+  for (let i = 0; i < (times || 1); i++) {
+    const batch = rafQueue.splice(0, rafQueue.length);
+    batch.forEach(cb => { if (cb) { try { cb(Date.now()); } catch (e) { /* 由測試自行斷言 */ } } });
+  }
+}
+def("flushFrames", flushFrames);
+window.flushFrames = flushFrames;
 def("MathJax", undefined);
 def("ResizeObserver", ResizeObserverStub);
 def("IntersectionObserver", IntersectionObserverStub);

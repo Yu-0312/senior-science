@@ -210,14 +210,34 @@
    *   3. 飽和但偏亮的顏色（淺黃、淺橘、粉藍…）在淺背景上對比不足
    *      → 保留色相壓暗，讓能量曲線、磁力線這些「有物理意義的顏色」不會消失
    */
+  /*
+   * 同一種顏色、同一種背景亮度，算出來的結果一定一樣，
+   * 但一個影格裡同樣的組合會出現上千次（例如打點計時器的每一個點）。
+   * 半透明那條規則要做二分逼近，不快取的話成本會很明顯。
+   * 主題一換，登記簿與色票都變了，整份快取跟著作廢。
+   */
+  const inkMemo = { key: "", map: new Map() };
+
   function ink(ctx, color, x, y, kind) {
+    const bg = backdropLum(ctx, x, y);
+    const key = cacheKey();
+    if (inkMemo.key !== key) { inkMemo.key = key; inkMemo.map.clear(); }
+    // 背景亮度分到 40 個級距就夠了：再細也看不出差別，但快取命中率差很多
+    const mk = color + "|" + (kind || "") + "|" + Math.round(bg * 40);
+    const hit = inkMemo.map.get(mk);
+    if (hit !== undefined) return hit;
+    const res = inkCompute(color, bg, kind);
+    if (inkMemo.map.size < 5000) inkMemo.map.set(mk, res);
+    return res;
+  }
+
+  function inkCompute(color, bg, kind) {
     const rgb = parseColor(color);
     if (!rgb) return color;
     const lum = luminance(rgb);
     const chroma = (Math.max(rgb[0], rgb[1], rgb[2]) - Math.min(rgb[0], rgb[1], rgb[2])) / 255;
     const pale = isPaleNeutral(rgb);
     const dark = lum <= 0.12 && chroma <= 0.16;
-    const bg = backdropLum(ctx, x, y);
 
     /*
      * 主題衍生色用作填色面時直接放行（見上方登記簿的說明）。
@@ -250,11 +270,72 @@
     }
     // 只在真的看不清楚時才動，避免無謂地改變配色。
     // 門檻取 WCAG 對非文字圖形要求的 3:1；中間調的灰也一併處理。
+    /*
+     * 這一條和下一條要能接力，所以不再直接 return：
+     * 先把顏色壓到對比夠的亮度，再交給下面的半透明檢查。
+     * 早期版本這裡是直接回傳的，於是 v–t 圖那塊 14% 的陰影被壓深了一點點就收工，
+     * 合成到底板上依然看不見——「先修一半就離開」比沒修更難察覺。
+     */
+    let out = rgb;
     if (!pale && !dark && bg > 0.5 && contrast(lum, bg) < 3.0) {
       const target = (bg + 0.05) / 3.2 - 0.05;
-      return rgba(toLuminance(rgb, Math.max(0.02, target)), rgb[3]);
+      out = toLuminance(rgb, Math.max(0.02, target));
     }
-    return color;
+
+    /*
+     * 半透明色要看「合成之後」的樣子。
+     *
+     * 上面每一條規則都把顏色當成不透明來算對比，這對線條大致夠用，
+     * 但對大面積的淡色陰影就完全失準：v–t 圖裡「曲線下的面積＝位移」
+     * 那塊 rgba(77,140,221,0.14)，本色與淺色底板的對比是 3.06——
+     * 剛好高過上一條的門檻 3.0 而被放行——可是只有 14% 不透明度疊上去，
+     * 眼睛看到的對比是 1.07，那塊陰影等於不存在。
+     * 而「面積代表位移」正是這張圖唯一要教的事。
+     *
+     * 做法是先加不透明度（最不更動原本配色意圖），仍然不夠才把色彩本身推開，
+     * 推開之後再解一次不透明度。
+     */
+    if (out[3] < 1 && out[3] > 0 && !isThemeSurface(color)) {
+      const MIN = 1.5, CAP = 0.55, HARD_CAP = 0.82;
+      /*
+       * 合成必須在 sRGB 通道空間做，不能對「相對亮度」做線性內插。
+       * canvas 是逐通道混色的，而亮度到通道之間隔著 gamma；
+       * 用線性內插估出來的對比會偏樂觀——實測同一個藍色陰影，
+       * 內插法算出 1.50，真正合成後只有 1.27。差的這 0.23 就是「看得見」與否。
+       * 背景只知道亮度，因此用同亮度的中性灰代表，對可見度判斷夠用。
+       */
+      const bgGrey = (() => {
+        const L = Math.max(0, Math.min(1, bg));
+        const v = 255 * (L <= 0.0031308 ? L * 12.92 : 1.055 * Math.pow(L, 1 / 2.4) - 0.055);
+        return [v, v, v];
+      })();
+      const seen = (c, a) => luminance([
+        c[0] * a + bgGrey[0] * (1 - a),
+        c[1] * a + bgGrey[1] * (1 - a),
+        c[2] * a + bgGrey[2] * (1 - a)
+      ]);
+      // seen(a) 對 a 單調，但經過 gamma 之後沒有簡單反函數，直接二分逼近
+      const solve = (c, cap) => {
+        if (contrast(seen(c, cap), bg) < MIN) return cap;
+        let lo = out[3], hi = cap;
+        for (let i = 0; i < 18; i++) {
+          const mid = (lo + hi) / 2;
+          if (contrast(seen(c, mid), bg) >= MIN) hi = mid; else lo = mid;
+        }
+        return hi;
+      };
+      if (contrast(seen(out, out[3]), bg) < MIN) {
+        const a = solve(out, CAP);
+        if (contrast(seen(out, a), bg) >= MIN) return rgba(out, a);
+        // 提高不透明度還是不夠：本色太貼近背景，把色彩往背景的反方向推
+        const L = luminance(out);
+        const want = L < bg ? Math.max(0.02, (bg + 0.05) / (MIN * 2.2) - 0.05)
+                            : Math.min(1, (bg + 0.05) * MIN * 2.2 - 0.05);
+        out = toLuminance(out, want);
+        return rgba(out, solve(out, HARD_CAP));
+      }
+    }
+    return out === rgb ? color : rgba(out, out[3]);
   }
 
   function fmt(n, d) {
@@ -1492,11 +1573,23 @@
         for (let j = 1; j < ny; j++) { const gy = box.y + box.h * j / ny; ctx.moveTo(box.x, gy); ctx.lineTo(box.x + box.w, gy); }
         ctx.stroke(); ctx.restore();
       },
+      /*
+       * 曲線與面積是圖表裡唯二自己設定 strokeStyle／fillStyle 的地方，
+       * 其餘（dot、vline、hline、label）都轉呼叫 D.* 而享有墨色調整。
+       *
+       * 這個漏洞的代價：等加速度運動的 x–t 參考曲線寫死成 rgba(255,255,255,0.18)，
+       * 在淺色主題下白線畫在近白的圖表底板上，整張 x–t 圖看起來完全是空的——
+       * 學生會以為位置沒有變化，而這正是這個實驗要教的東西。
+       *
+       * 取樣點用圖框中心：frame() 已經用 sim-bg-1 把整塊底板填滿並登記進墨色圖，
+       * 所以框內任一點的背景亮度都一樣，中心是有代表性的。
+       */
       curve(pts, o) {
         o = o || {}; if (pts.length < 2) return;
         ctx.save(); ctx.beginPath();
         ctx.rect(box.x, box.y, box.w, box.h); ctx.clip();
-        ctx.strokeStyle = o.color || col("accent"); ctx.lineWidth = o.width || 2;
+        ctx.strokeStyle = ink(ctx, o.color || col("accent"), box.x + box.w / 2, box.y + box.h / 2);
+        ctx.lineWidth = o.width || 2;
         if (o.dash) ctx.setLineDash(o.dash);
         ctx.beginPath();
         pts.forEach((p, i) => { const px = X(p[0]), py = Y(p[1]); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); });
@@ -1514,7 +1607,9 @@
         ctx.moveTo(X(pts[0][0]), Y(0));
         pts.forEach(p => ctx.lineTo(X(p[0]), Y(p[1])));
         ctx.lineTo(X(pts[pts.length - 1][0]), Y(0));
-        ctx.closePath(); ctx.fillStyle = o.fill || "rgba(52,211,196,0.15)"; ctx.fill(); ctx.restore();
+        ctx.closePath();
+        ctx.fillStyle = ink(ctx, o.fill || "rgba(52,211,196,0.15)", box.x + box.w / 2, box.y + box.h / 2, "fill");
+        ctx.fill(); ctx.restore();
       },
       dot(x, y, o) { o = o || {}; D.disc(ctx, X(x), Y(y), o.r || 4, { fill: o.color || col("accent-2"), glow: o.glow }); },
       vline(x, o) { o = o || {}; D.line(ctx, X(x), box.y, X(x), box.y + box.h, o.color || col("accent-2"), o.width || 1.5, o.dash); },
@@ -1607,6 +1702,40 @@
       setTimeout(stopWiggle, 6000);
       root.addEventListener("pointerdown", stopWiggle, { once: true });
     }
+
+    /*
+     * 暫停時拉滑桿也要重畫。
+     *
+     * 這個洞是這樣開的：許多實驗把重繪整個放在動畫迴圈裡，滑桿因此不必接
+     * onInput——反正每個影格都會重畫。但迴圈停下來的時候 step() 一次都不會被呼叫，
+     * 於是暫停狀態下拉滑桿，只有滑桿旁邊那個數字會變，畫面與讀數全部不動。
+     *
+     * 而實驗進場預設就是暫停的（不自動播放）。也就是說學生打開槓桿，
+     * 把四個滑桿從頭拉到尾，什麼事都不會發生——看起來就是壞掉的。
+     * 盤點下來有 41 個實驗踩到這件事。
+     *
+     * 修在引擎層而不是逐檔補 onInput：一來 41 個檔案容易漏，
+     * 二來以後新增的實驗會自動享有這個保證，不必記得這條規則。
+     *
+     * loop.render() 是「時間不前進、只重畫一格」，所以拉滑桿不會偷偷推進模擬時間。
+     */
+    let repaintPending = false;
+    function repaintIfPaused() {
+      if (anyRunning() || repaintPending) return;
+      repaintPending = true;
+      // 拖曳滑桿會連續觸發 input，用一個影格把它們併成一次重畫。
+      requestAnimationFrame(() => {
+        repaintPending = false;
+        if (anyRunning()) return;
+        // 有迴圈就讓迴圈自己重畫（step(0) 走的是實驗真正的繪圖路徑）；
+        // 沒有迴圈的靜態實驗才退回 api.rerender，避免同一格畫兩次。
+        if (loops.length) loops.forEach(l => { try { l.render(); } catch (e) {} });
+        else if (api && typeof api.rerender === "function") { try { api.rerender(); } catch (e) {} }
+        paint();
+      });
+    }
+    root.addEventListener("input", repaintIfPaused);
+    root.addEventListener("change", repaintIfPaused);
 
     paint();
     builtHooks.forEach(fn => { try { fn(context, api); } catch (e) { console.warn("建置掛鉤失敗", e); } });

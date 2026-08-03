@@ -62,7 +62,14 @@ function makeRecorder() {
         if (REC) {
           const nums = args.filter(v => typeof v === "number" && isFinite(v))
             .map(v => Math.round(v * 2) / 2);
-          REC.push((isText ? "T" : "G") + op + nums.join(","));
+          /*
+           * 文字要連內容一起記，不能只記座標。
+           * 半衰期實驗改變 T½ 時，圖的座標軸會跟著縮放，曲線形狀完全自我相似，
+           * 真正改變的只有刻度上的數字。只記座標的話兩張圖的雜湊一模一樣，
+           * 一支正常的滑桿會被判成完全沒反應。
+           */
+          const str = isText && typeof args[0] === "string" ? "«" + args[0] + "»" : "";
+          REC.push((isText ? "T" : "G") + op + str + nums.join(","));
         }
         return orig.apply(this, args);
       };

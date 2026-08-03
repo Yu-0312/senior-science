@@ -12,11 +12,24 @@
     const sType = PL.ui.select(L.controls, { label: "波的種類", value: "trans", options: [{ value: "trans", label: "橫波（如繩波）" }, { value: "long", label: "縱波（如聲波）" }] });
     const sF = PL.ui.slider(L.controls, { label: "頻率 f", min: 0.3, max: 1.5, step: 0.1, value: 0.7, unit: "Hz", digits: 1 });
     const sA = PL.ui.slider(L.controls, { label: "振幅 A", min: 6, max: 26, step: 1, value: 18, unit: "", digits: 0 });
-    PL.ui.note(L.controls, "紅色質點只在原地振動，波形卻向右傳遞——傳遞的是能量而非介質。");
-    const rV = PL.ui.readout(L.readouts, { label: "波速 v=fλ", unit: "" });
+    PL.ui.note(L.controls,
+      "紅色質點只在原地振動，波形卻向右傳遞——傳遞的是能量而非介質。" +
+      "波速由介質決定，所以提高頻率不會讓波跑得比較快，只會讓波長變短：λ = v / f。");
+    const rV = PL.ui.readout(L.readouts, { label: "波速 v（由介質決定）", unit: "" });
+    const rLam = PL.ui.readout(L.readouts, { label: "波長 λ = v/f", unit: "" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const midY = H / 2, k = TAU / (W * 0.34), w = TAU * sF.get(), A = sA.get();
+      /*
+       * 波速由介質決定，是這一版的重點修正。
+       *
+       * 舊版把波長寫死（k 是常數），頻率只出現在 ω·t 裡。結果有二：
+       *   · 靜止畫面上調整頻率完全看不出差別
+       *   · 讀數寫著「波速 v = fλ」，而 λ 固定，等於在教「頻率越高波速越快」
+       * 這對繩波與聲波都是錯的——同一條繩、同一團空氣，v 是定值，
+       * 改變頻率改的是波長。現在固定 v，由 λ = v/f 反推 k。
+       */
+      const midY = H / 2, V = W * 0.30, f = sF.get();
+      const lambda = V / f, k = TAU / lambda, w = TAU * f, A = sA.get();
       if (sType.get() === "trans") {
         ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 2.4; ctx.beginPath();
         for (let x = 30; x <= W - 30; x += 3) { const y = midY + A * Math.sin(k * x - w * t); x === 30 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
@@ -26,7 +39,8 @@
         D.text(ctx, "疏部", 34 + (W - 68) * 0.25, midY - 30, { color: PL.col("text-faint"), size: 10, align: "center" });
         D.text(ctx, "密部", 34 + (W - 68) * 0.5, midY - 30, { color: PL.col("text-dim"), size: 10, align: "center" });
       }
-      rV.set(sF.get() * (W * 0.34) / 30, 2);
+      // 以「畫面寬度為 1」的無因次尺度呈現，讓兩個讀數可以直接互相印證
+      rV.set(V / W, 2); rLam.set(lambda / W, 2);
     }
     const anim = PL.loop(dt => { if (dt) t += dt; draw(); });
     cv.onResize(draw); anim.start();

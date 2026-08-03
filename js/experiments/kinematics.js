@@ -37,7 +37,13 @@
       const vend = v0 + a * TMAX; let vmin = Math.min(0, v0, vend), vmax = Math.max(0, v0, vend); if (vmax - vmin < 2) vmax = vmin + 2;
       const g1 = PL.graph(cv, { x: gx1, y: gTop, w: gW, h: gH }, { x0: 0, x1: TMAX, y0: xmin, y1: xmax });
       g1.frame({ title: "x – t 圖", xlabel: "t (s)" }); g1.grid(4, 4);
-      g1.fn(tt => v0 * tt + 0.5 * a * tt * tt, { color: "rgba(255,255,255,0.18)", width: 1.5 });
+      /*
+       * 理論曲線用主題變數而不是寫死的白色。
+       * 舊版寫 rgba(255,255,255,0.18)，淺色主題下白線畫在近白的圖表底板上，
+       * x–t 圖看起來整張是空的——而「位置隨時間怎麼變」正是這個實驗要教的。
+       * 畫成虛線是為了和實際走過的軌跡（實線）分開：虛線是預測，實線是量到的。
+       */
+      g1.fn(tt => v0 * tt + 0.5 * a * tt * tt, { color: PL.col("text-faint"), width: 1.6, dash: [5, 4] });
       if (hist.length > 1) g1.curve(hist.map(h => [h[0], h[1]]), { color: m, width: 2.4 });
       g1.dot(t, s.x, { color: m, glow: m });
       const g2 = PL.graph(cv, { x: gx2, y: gTop, w: gW, h: gH }, { x0: 0, x1: TMAX, y0: vmin, y1: vmax });
