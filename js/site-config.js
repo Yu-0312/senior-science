@@ -24,7 +24,7 @@
        合作試用期間：true
        合作結束、準備公開推廣時：改成 false，然後重新部署即可
        ------------------------------------------------------------------ */
-    accessGate: true,
+    accessGate: false,
 
     /* 密碼的 SHA-256 陣列（可放多組，輸入任一組都能解鎖）。
        要新增密碼時，在瀏覽器主控台執行：
@@ -53,7 +53,7 @@
     siteUrl: "https://senior-science.vercel.app/",
 
     /* 版本號：同時用於快取破壞與 Service Worker */
-    build: "20260803-5"
+    build: "20260803-6"
   };
 
   /*
@@ -92,14 +92,21 @@
   } catch (e) { /* 沒有 DOM 的環境（建置工具沙箱）直接略過 */ }
 
   /*
-   * 閘門開著時就別讓搜尋引擎收錄。
-   * 用 JS 動態插入而不是寫死在 HTML，是為了讓「改一行就公開」這件事成立——
-   * 否則翻牌時還得記得回來刪這個 meta，很容易漏掉。
+   * 閘門開著時才鎖住畫面。
+   *
+   * body 原本硬寫 class="access-locked"，靠 app.js 在載入後移除。
+   * 但腳本在 body 末尾才跑，翻成公開之後每個訪客進站瞬間仍會先閃一下密碼框——
+   * 正是首頁 <head> 那段 inline script 特地為主題色解決過的同一種閃爍。
+   *
+   * 改由這裡（設定的唯一來源、且早於 app.js）決定：閘門開著才加上 access-locked。
+   * 公開狀態完全不閃；翻回試用模式時，這支腳本仍會把畫面鎖上。
+   * 兩種狀態都只由 accessGate 一個開關決定，維持「改一行就切換」的設計。
    */
   if (window.PhysicsLabSite.accessGate) {
     var robots = document.createElement("meta");
     robots.name = "robots";
     robots.content = "noindex, nofollow";
     document.head.appendChild(robots);
+    if (document.body) document.body.classList.add("access-locked");
   }
 })();

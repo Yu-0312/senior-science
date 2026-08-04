@@ -1,4 +1,4 @@
-# 合作試用期間：暫不開放索引。
-# 把 js/site-config.js 的 accessGate 改成 false 並重新建置即可開放。
 User-agent: *
-Disallow: /
+Allow: /
+
+Sitemap: https://senior-science.vercel.app/sitemap.xml
