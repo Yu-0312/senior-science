@@ -114,7 +114,7 @@
     const sTh = PL.ui.slider(L.controls, { label: "傾角 θ", min: 5, max: 60, step: 1, value: 30, unit: "°", digits: 0, onInput: reset });
     const sMu = PL.ui.slider(L.controls, { label: "摩擦係數 μ", min: 0, max: 1, step: 0.02, value: 0.2, unit: "", digits: 2, onInput: reset });
     const row = PL.ui.buttonRow(L.controls);
-    PL.ui.button(row, "釋放", () => { reset(); anim.start(); }, { primary: true });
+    PL.ui.button(row, "釋放", () => { reset(); anim.start(); }, { primary: true, trigger: true });
     PL.ui.button(row, "重設", reset);
     const rA = PL.ui.readout(L.readouts, { label: "加速度 a", unit: "m/s²" });
     const rN = PL.ui.readout(L.readouts, { label: "正向力 N", unit: "×mg" });
@@ -208,7 +208,7 @@
     const s1 = PL.ui.slider(L.controls, { label: "左質量 m₁", min: 0.5, max: 8, step: 0.5, value: 3, unit: "kg", digits: 1, onInput: reset });
     const s2 = PL.ui.slider(L.controls, { label: "右質量 m₂", min: 0.5, max: 8, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: reset });
     const row = PL.ui.buttonRow(L.controls);
-    PL.ui.button(row, "釋放", () => { reset(); anim.start(); }, { primary: true });
+    PL.ui.button(row, "釋放", () => { reset(); anim.start(); }, { primary: true, trigger: true });
     PL.ui.button(row, "重設", reset);
     const rA = PL.ui.readout(L.readouts, { label: "加速度 a", unit: "m/s²" });
     const rT = PL.ui.readout(L.readouts, { label: "繩張力 T", unit: "N" });
@@ -892,7 +892,7 @@
     const sHang = PL.ui.slider(L.controls, { label: "懸掛物 mₕ", min: 0.5, max: 5, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: reset });
     const sMs = PL.ui.slider(L.controls, { label: "靜摩擦係數 μₛ", min: 0.05, max: 0.8, step: 0.02, value: 0.35, unit: "", digits: 2, onInput: reset });
     const sMk = PL.ui.slider(L.controls, { label: "動摩擦係數 μₖ", min: 0.05, max: 0.7, step: 0.02, value: 0.25, unit: "", digits: 2, onInput: reset });
-    const row = PL.ui.buttonRow(L.controls); PL.ui.button(row, "釋放", () => { reset(); released = true; if (!model().staticHold) anim.start(); else draw(); }, { primary: true }); PL.ui.button(row, "重設", reset);
+    const row = PL.ui.buttonRow(L.controls); PL.ui.button(row, "釋放", () => { reset(); released = true; if (!model().staticHold) anim.start(); else draw(); }, { primary: true, trigger: true }); PL.ui.button(row, "重設", reset);
     PL.ui.note(L.controls, "懸掛物的重力要先克服桌上物體的最大靜摩擦力；運動後再換成動摩擦力計算加速度。 ");
     const rA = PL.ui.readout(L.readouts, { label: "系統加速度 a", unit: "m/s²" });
     const rT = PL.ui.readout(L.readouts, { label: "繩張力 T", unit: "N" });

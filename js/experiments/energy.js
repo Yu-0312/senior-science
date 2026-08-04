@@ -465,7 +465,7 @@
     const sK = PL.ui.slider(L.controls, { label: "彈簧勁度 k", min: 100, max: 800, step: 20, value: 400, unit: "N/m", digits: 0, onInput: r });
     const sM = PL.ui.slider(L.controls, { label: "物體質量 m", min: 0.5, max: 4, step: 0.5, value: 1, unit: "kg", digits: 1, onInput: r });
     const row = PL.ui.buttonRow(L.controls);
-    PL.ui.button(row, "釋放", () => { r(); comp = sX.get(); phase = "spring"; anim.start(); }, { primary: true });
+    PL.ui.button(row, "釋放", () => { r(); comp = sX.get(); phase = "spring"; anim.start(); }, { primary: true, trigger: true });
     PL.ui.button(row, "重設", r);
     const rHmax = PL.ui.readout(L.readouts, { label: "理論最大高度", unit: "m" });
     const rV = PL.ui.readout(L.readouts, { label: "速率 v", unit: "m/s" });

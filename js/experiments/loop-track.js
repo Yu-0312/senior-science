@@ -61,7 +61,7 @@
       s = 0; detached = null; flightT = 0;
       anim.start();
       update();
-    }, { primary: true });
+    }, { primary: true, trigger: true });
     PL.ui.button(row, "重置", reset);
 
     function reset() { s = 0; detached = null; flightT = 0; anim.stop(); update(); }

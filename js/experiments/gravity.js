@@ -174,6 +174,8 @@
     let p, v, trail, state;
     const sF = PL.ui.slider(L.controls, { label: "水平發射速率（×近地圓速）", min: 0.4, max: 1.5, step: 0.01, value: 1, unit: "", digits: 2, onInput: reset });
     const row = PL.ui.buttonRow(L.controls);
+    /* 衛星是持續繞行，暫停下來讀速度向量有教學價值，所以保留傳輸列的播放/暫停，
+       這顆維持單純的重置（不轉成隱藏播放的觸發鈕）。 */
     PL.ui.button(row, "發射", reset, { primary: true });
     PL.ui.note(L.controls, "太慢會墜回地面；恰當則進入軌道；≥√2 倍圓速即可脫離。");
     const rV = PL.ui.readout(L.readouts, { label: "發射速率", unit: "×圓速" });
@@ -274,6 +276,7 @@
     const g = 9.8, m = 1; let beta = 0, dir = 1, mode = "circle", px = 0, py = 0, vx = 0, vy = 0;
     const sV = PL.ui.slider(L.controls, { label: "最低點速率 v₀", min: 2, max: 10, step: 0.5, value: 7, unit: "m/s", digits: 1, onInput: reset });
     const sR = PL.ui.slider(L.controls, { label: "半徑 r", min: 1, max: 3, step: 0.5, value: 2, unit: "m", digits: 1, onInput: reset });
+    /* 持續繞行，保留播放/暫停以便暫停觀察；這顆維持單純重置。 */
     PL.ui.button(PL.ui.buttonRow(L.controls), "重新開始", reset, { primary: true });
     PL.ui.note(L.controls, "要能通過最高點，該處速率至少 √(gr)，否則繩鬆脫、物體脫離圓周。");
     const rTop = PL.ui.readout(L.readouts, { label: "頂點速率", unit: "m/s" });

@@ -153,7 +153,7 @@
     const sB = PL.ui.slider(L.controls, { label: "瞄準參數 b", min: -1, max: 1, step: 0.05, value: 0.4, unit: "×R", digits: 2, onInput: reset });
     const sMr = PL.ui.slider(L.controls, { label: "質量比 m₂/m₁", min: 0.3, max: 3, step: 0.1, value: 1, unit: "", digits: 1, onInput: reset });
     const row = PL.ui.buttonRow(L.controls);
-    PL.ui.button(row, "發射", reset, { primary: true });
+    PL.ui.button(row, "發射", reset, { primary: true, trigger: true });
     PL.ui.note(L.controls, "等質量彈性碰撞時，兩球碰後速度方向恰好夾 90°（撞球檯的規律）。");
     const rA1 = PL.ui.readout(L.readouts, { label: "球1 散射角", unit: "°" });
     const rA2 = PL.ui.readout(L.readouts, { label: "球2 散射角", unit: "°" });
@@ -213,7 +213,7 @@
     const sM2 = PL.ui.slider(L.controls, { label: "砲彈質量 m", min: 0.5, max: 6, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: reset });
     const sE = PL.ui.slider(L.controls, { label: "爆炸釋放（砲彈速度）", min: 4, max: 20, step: 1, value: 12, unit: "m/s", digits: 0, onInput: reset });
     const row = PL.ui.buttonRow(L.controls);
-    PL.ui.button(row, "發射", () => { reset(); fired = true; anim.start(); }, { primary: true });
+    PL.ui.button(row, "發射", () => { reset(); fired = true; anim.start(); }, { primary: true, trigger: true });
     PL.ui.button(row, "重設", reset);
     const rV1 = PL.ui.readout(L.readouts, { label: "砲身後座 V", unit: "m/s" });
     const rV2 = PL.ui.readout(L.readouts, { label: "砲彈速度 v", unit: "m/s" });
@@ -259,7 +259,7 @@
     const sm = PL.ui.slider(L.controls, { label: "子彈質量 m", min: 0.01, max: 0.2, step: 0.01, value: 0.05, unit: "kg", digits: 2 });
     const sM = PL.ui.slider(L.controls, { label: "木塊質量 M", min: 1, max: 5, step: 0.5, value: 2, unit: "kg", digits: 1 });
     const sv = PL.ui.slider(L.controls, { label: "子彈初速 v", min: 100, max: 500, step: 10, value: 300, unit: "m/s", digits: 0 });
-    PL.ui.button(PL.ui.buttonRow(L.controls), "發射", () => { const m = sm.get(), M = sM.get(); V = m * sv.get() / (m + M); hmax = V * V / (2 * g); phase = "fly"; bx = 0; th = 0; t = 0; anim.start(); }, { primary: true });
+    PL.ui.button(PL.ui.buttonRow(L.controls), "發射", () => { const m = sm.get(), M = sM.get(); V = m * sv.get() / (m + M); hmax = V * V / (2 * g); phase = "fly"; bx = 0; th = 0; t = 0; anim.start(); }, { primary: true, trigger: true });
     const rV = PL.ui.readout(L.readouts, { label: "合體速度 V", unit: "m/s" });
     const rH = PL.ui.readout(L.readouts, { label: "上升高度 h", unit: "m" });
     const rTh = PL.ui.readout(L.readouts, { label: "擺角", unit: "°" });

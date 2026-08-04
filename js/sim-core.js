@@ -914,6 +914,34 @@
     o = o || {};
     const b = el("button", "btn" + (o.primary ? " btn-primary" : ""), row);
     b.type = "button"; b.textContent = label;
+
+    /*
+     * trigger 鈕 = 這支實驗自己的「開始這一次」（發射、釋放、開始…）。
+     *
+     * 使用者回報：頂部傳輸列有「播放」，實驗又有「發射」，看起來是兩顆重複的開始鍵。
+     * 兩件事一起處理：
+     *   1. 按下時順便啟動主迴圈。以前有幾支（拋體、衛星…）只設了自己的旗標卻沒有
+     *      start()，等於「傳輸列的播放」和「發射」兩個開關要同時打開才會動——
+     *      傳輸列按了沒反應時學生完全看不出原因。呼叫 start() 是等冪的，
+     *      本來就有 start() 的觸發鈕再呼叫一次也無妨。
+     *   2. 標記這次建置有自己的觸發鈕，finishBuild 會據此把傳輸列的播放/暫停藏起來，
+     *      只留下單步、速度與全部重設。這樣畫面上就只有一顆「開始」（發射）。
+     *
+     * 這裡抓的是 context 物件本身而不是全域 buildContext——onClick 是之後才觸發的，
+     * 那時 buildContext 早已被重設；但 context.loops 是同一個陣列，建置結束時已填好。
+     */
+    if (o.trigger && buildContext) {
+      buildContext.hasTrigger = true;
+      const ctx = buildContext;
+      b.addEventListener("click", () => {
+        onClick();
+        const primary = ctx.loops && ctx.loops[0];
+        if (primary) { try { primary.start(); } catch (e) {} }
+        markGuideStep(row, 1);
+      });
+      return b;
+    }
+
     b.addEventListener("click", () => { onClick(); if (o.primary) markGuideStep(row, 1); });
     return b;
   }
@@ -1649,8 +1677,14 @@
     const loops = context.loops;
     // 沒有動畫迴圈的實驗（純靜態圖解）不需要播放控制，只留重設。
     const animated = loops.length > 0;
+    /*
+     * 這支實驗有自己的觸發鈕（發射／釋放／開始）時，就把傳輸列的「播放/暫停」藏起來。
+     * 使用者回報那兩顆看起來是重複的開始鍵；保留實驗自己那顆語意明確的，
+     * 傳輸列只留單步、速度與全部重設——單步仍可在停住時逐格檢視。
+     */
+    const selfTriggered = animated && context.hasTrigger;
     ui.transport.hidden = false;
-    ui.playBtn.hidden = !animated;
+    ui.playBtn.hidden = !animated || selfTriggered;
     ui.stepBtnT.hidden = !animated;
     ui.timeLabel.hidden = !animated;
     Array.from(ui.transport.querySelectorAll(".sim-speed")).forEach(node => { node.hidden = !animated; });
@@ -1714,8 +1748,9 @@
      * 進場不自動播放（依 PhET 訪談結論）。
      * 建置期要求過自動播放的實驗，這裡改成停在第一格，並讓播放鍵抖動一下
      * 指出「從這裡開始」——也就是 PhET 說的 wiggle-me。
+     * 但自帶觸發鈕的實驗已經把播放鍵藏起來了，就別抖一顆看不見的按鈕。
      */
-    if (animated && loops.some(l => l.armed)) {
+    if (animated && !selfTriggered && loops.some(l => l.armed)) {
       root.classList.add("show-wiggle");
       ui.playBtn.classList.add("wiggle");
       setTimeout(stopWiggle, 6000);

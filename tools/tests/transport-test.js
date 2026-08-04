@@ -114,4 +114,47 @@ R.section("傳輸列真的推得動 chase-and-meet（實際回報的案例）");
   if (api && api.stop) api.stop();
 }
 
+R.section("自帶觸發鈕的實驗：藏掉傳輸列播放，而且觸發鈕會啟動迴圈");
+{
+  /*
+   * 使用者回報「有兩個播放」——傳輸列的播放 + 實驗的發射。
+   * 一次性實驗（發射／釋放／開始）現在把傳輸列播放藏起來，只留發射那一顆。
+   * 這裡驗兩件事：藏對了、而且發射真的能啟動（以前有幾支只設旗標沒 start()，
+   * 藏掉播放後就會變成完全按不動）。
+   *
+   * 用 projectile 當代表：它同時是使用者截圖回報的那一支，也是這輪從
+   * flying 旗標改成 landed 的那一支。
+   */
+  const root = document.createElement("div");
+  root.dataset = { simId: "projectile" };
+  let captured = null;
+  const restore = PL._hooks.onBuilt(c => { captured = c; });
+  const api = PL.get("projectile").build(root);
+  const ctx = captured;
+  const trans = root._labTransport;
+
+  R.ok(!!ctx && ctx.hasTrigger === true, "projectile 被標記為自帶觸發鈕");
+  R.ok(!!trans && trans.playBtn.hidden === true, "傳輸列的播放鈕已隱藏");
+  R.ok(!!trans && trans.stepBtnT.hidden !== true, "單步鈕仍保留（可逐格檢視）");
+
+  const loop = (ctx.loops || [])[0];
+  const fireBtn = Array.from(root.querySelectorAll("button")).find(b => b.textContent.trim() === "發射");
+  R.ok(!!fireBtn, "找得到「發射」鈕");
+  R.ok(loop && loop.running === false, "發射前迴圈是停的");
+  if (fireBtn) fireBtn.dispatch("click", {});
+  R.ok(loop && loop.running === true, "按發射後迴圈啟動了（觸發鈕確實有 start）");
+  if (api && api.stop) api.stop();
+}
+
+R.section("持續運動的實驗仍保留傳輸列播放（例如衛星繞行）");
+{
+  const root = document.createElement("div");
+  root.dataset = { simId: "satellite" };
+  const api = PL.get("satellite").build(root);
+  const trans = root._labTransport;
+  R.ok(!!trans && trans.playBtn.hidden !== true,
+    "satellite 保留播放/暫停（持續繞行要能暫停讀值）");
+  if (api && api.stop) api.stop();
+}
+
 R.done();

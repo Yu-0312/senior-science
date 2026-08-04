@@ -68,7 +68,7 @@
     const sH = PL.ui.slider(L.controls, { label: "初始高度 h", min: 5, max: 80, step: 1, value: 45, unit: "m", digits: 0, onInput: reset });
     const sG = PL.ui.slider(L.controls, { label: "重力加速度 g", min: 1.6, max: 20, step: 0.1, value: 9.8, unit: "m/s²", digits: 1, onInput: reset });
     const row = PL.ui.buttonRow(L.controls);
-    const bP = PL.ui.button(row, "釋放", () => { if (landed) reset(); anim.start(); }, { primary: true });
+    const bP = PL.ui.button(row, "釋放", () => { if (landed) reset(); anim.start(); }, { primary: true, trigger: true });
     PL.ui.button(row, "重設", reset);
     const rT = PL.ui.readout(L.readouts, { label: "落下時間", unit: "s" });
     const rV = PL.ui.readout(L.readouts, { label: "速率 v", unit: "m/s" });
@@ -138,7 +138,15 @@
     };
     let ammoKey = "basket";
 
-    let t = 0, flying = false, shots = [], flash = 0;
+    /*
+     * 用 landed 停止、t 一律驅動位置，而不是用 flying 當「要不要推進」的開關。
+     *
+     * 舊版：發射把 flying 設成 true，迴圈只在 flying 時推進 t，而球的位置本來就是
+     * 純用 t 算的。這造成兩個問題：發射鈕沒有 start()，得先按傳輸列的播放才會動
+     * （兩個開關）；而且傳輸列的「單步」推進的是迴圈、不是 flying，所以逐格看根本沒反應。
+     * 改成 landed 之後，發射＝t 歸零並開跑、落地＝停住，單步也能一格一格把球往前推。
+     */
+    let t = 0, landed = false, shots = [], flash = 0;
 
     PL.ui.section(L.controls, "發射參數");
     const sV = PL.ui.stepper(L.controls, { label: "初速 v₀ (m/s)", value: 24, min: 5, max: 45, step: 1, onInput: onParam });
@@ -166,8 +174,9 @@
     });
 
     const row = PL.ui.buttonRow(L.controls);
-    PL.ui.button(row, "發射", () => { t = 0; flash = 0; flying = true; }, { primary: true });
-    PL.ui.button(row, "清除落點", () => { shots = []; t = 0; flying = false; flash = 0; drawAll(); });
+    /* trigger: true → 這顆就是唯一的「開始」，按下時引擎會順便啟動迴圈並藏掉傳輸列的播放。 */
+    PL.ui.button(row, "發射", () => { t = 0; flash = 0; landed = false; }, { primary: true, trigger: true });
+    PL.ui.button(row, "清除落點", () => { shots = []; t = 0; landed = false; flash = 0; anim.stop(); drawAll(); });
 
     PL.ui.note(L.controls,
       "先在真空下找出射程最遠的角度，再打開空氣阻力重找一次——最佳角度會往下移。" +
@@ -227,7 +236,7 @@
 
     let model = simulate();
 
-    function onParam() { t = 0; flying = false; flash = 0; model = simulate(); }
+    function onParam() { t = 0; landed = false; flash = 0; model = simulate(); }
 
     /* 射程對角度：有阻力時要逐點積分，才看得到最佳角度的移動 */
     function rangeAt(angleDeg) {
@@ -386,10 +395,12 @@
 
     const anim = PL.loop(dt => {
       if (dt) {
-        if (flying) {
+        // 只要還沒落地就推進 t——不論是傳輸列的單步，還是發射後的連續播放，走的都是這條路。
+        if (!landed) {
           t += dt;
           if (t >= model.time) {
-            t = model.time; flying = false; flash = 1;
+            t = model.time; landed = true; flash = 1;
+            anim.stop();                     // 一次性運動，落地即停，不空轉
             shots.push({ x: model.range, label: AMMO[ammoKey].label + (cDrag.get() ? "·阻力" : "") });
             if (shots.length > 6) shots.shift();
           }
@@ -541,7 +552,7 @@
      * 暫停、單步與速度一律由引擎的傳輸列負責；實驗自己再做一個開關的話，
      * 兩個開關必須同時打開才會動，而傳輸列按了沒反應時學生看不出原因。
      */
-    PL.ui.button(row, "開始", () => { t = 0; dots = 0; flash = 0; anim.start(); draw(); }, { primary: true });
+    PL.ui.button(row, "開始", () => { t = 0; dots = 0; flash = 0; anim.start(); draw(); }, { primary: true, trigger: true });
     PL.ui.button(row, "重設", reset);
 
     function reset() { t = 0; dots = 0; flash = 0; anim.stop(); draw(); }
