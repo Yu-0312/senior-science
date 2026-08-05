@@ -184,7 +184,7 @@ ${gate ? '<meta name="robots" content="noindex, nofollow" />\n' : ""}<link rel="
 <meta property="og:description" content="${escapeHtml(o.description)}" />
 <meta property="og:locale" content="zh_TW" />
 <meta property="og:url" content="${escapeHtml(o.canonical)}" />
-<meta name="theme-color" content="#0e1210" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#0e1013" media="(prefers-color-scheme: dark)" />
 <meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
 <meta name="color-scheme" content="dark light" />
 <link rel="icon" type="image/svg+xml" href="${o.base}icons/icon.svg" />

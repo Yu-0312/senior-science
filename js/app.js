@@ -288,7 +288,7 @@
     document.querySelectorAll('meta[name="theme-color"]').forEach(meta => meta.remove());
     const meta = document.createElement("meta");
     meta.name = "theme-color";
-    meta.content = theme === "light" ? "#eef2f8" : "#0e1210";
+    meta.content = theme === "light" ? "#eef2f8" : "#0e1013";
     document.head.appendChild(meta);
     // 主題切換後重繪目前模擬
     if (currentSim && currentSim.rerender) {
