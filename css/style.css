@@ -157,26 +157,29 @@ body.checkpoint-active { overflow: hidden; }
 .checkpoint-review-item.incorrect { border-left-color: var(--danger); }
 
 /* 背景極光：三團模糊漸層，營造深度與科技感 */
+/*
+ * 背景光暈：以前是青(#35e0cf)＋藍＋紫三顆大範圍高不透明度的模糊光斑，
+ * 糊在整個背景上，疊在近黑底就變成一片青綠暈染——這正是「整片墨綠」的來源。
+ * 使用者要的是乾淨的中性深底（像競品），綠只留在按鈕與選中項這些強調處。
+ *
+ * 因此把光暈壓成幾乎看不見的冷灰、只在角落給一點點層次，不再對整個畫面染色。
+ * 完全拿掉會太平，但飽和的彩色暈染一定要移除。
+ */
 .aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
 .aurora::before, .aurora::after {
-  content: ""; position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.5;
+  content: ""; position: absolute; border-radius: 50%; filter: blur(110px); opacity: 0.5;
 }
 .aurora::before {
-  width: 620px; height: 620px; top: -230px; right: -140px;
-  background: radial-gradient(circle at 30% 30%, rgba(53, 224, 207, 0.5), transparent 62%);
+  width: 560px; height: 560px; top: -240px; right: -160px;
+  background: radial-gradient(circle at 30% 30%, rgba(120, 134, 158, 0.10), transparent 66%);
   animation: drift1 22s ease-in-out infinite alternate;
 }
 .aurora::after {
-  width: 560px; height: 560px; bottom: -220px; left: -120px;
-  background: radial-gradient(circle at 50% 50%, rgba(90, 162, 255, 0.42), transparent 60%);
+  width: 520px; height: 520px; bottom: -240px; left: -140px;
+  background: radial-gradient(circle at 50% 50%, rgba(110, 126, 150, 0.08), transparent 64%);
   animation: drift2 26s ease-in-out infinite alternate;
 }
-.aurora i {
-  position: absolute; width: 440px; height: 440px; top: 32%; left: 46%;
-  border-radius: 50%; filter: blur(100px); opacity: 0.32;
-  background: radial-gradient(circle, rgba(185, 139, 255, 0.5), transparent 60%);
-  animation: drift3 30s ease-in-out infinite alternate;
-}
+.aurora i { display: none; }
 @keyframes drift1 { to { transform: translate(-70px, 60px) scale(1.12); } }
 @keyframes drift2 { to { transform: translate(60px, -50px) scale(1.1); } }
 @keyframes drift3 { to { transform: translate(-40px, -60px) scale(1.16); } }
