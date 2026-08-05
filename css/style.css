@@ -376,7 +376,14 @@ body.checkpoint-active { overflow: hidden; }
   background: linear-gradient(100deg, var(--text) 10%, var(--accent) 82%);
   max-width: 100%; overflow-wrap: anywhere; -webkit-background-clip: text; background-clip: text; color: transparent;
 }
-.hero-sub { color: var(--text-dim); font-size: 15.5px; max-width: 660px; margin: 0 auto 26px; }
+.hero-sub { color: var(--text-dim); font-size: 15.5px; max-width: 660px; margin: 0 auto 26px; line-height: 1.75; }
+/*
+ * 「模擬會自己說出物理關係」那句，關係式一定要整段不換行（span.nowrap），
+ * 否則 T ∝ √L 會在 ∝／√ 處被拆到下一行，看起來像排版壞掉。
+ */
+.hero-highlight { color: var(--text); font-size: 15px; max-width: 680px; margin: 0 auto 26px; line-height: 1.8; }
+.hero-highlight b { color: var(--text); font-weight: 700; }
+.nowrap { white-space: nowrap; }
 .hero-actions { display: flex; gap: 13px; justify-content: center; flex-wrap: wrap; }
 .btn-hero {
   font-family: inherit; font-size: 14.5px; font-weight: 700; padding: 13px 26px; border-radius: 12px; cursor: pointer;
@@ -432,8 +439,13 @@ body.checkpoint-active { overflow: hidden; }
 .study-card h3 { margin: 0 0 9px; color: var(--text); font-size: 17px; line-height: 1.4; letter-spacing: 0; }
 .study-card p { margin: 0; color: var(--text-dim); font-size: 13px; line-height: 1.7; }
 .study-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-/* 只有上排三張工具卡把按鈕推到底對齊；今日任務卡的按鈕後面還有進度與清單，不能推。 */
-.study-card:not(.today-card) > .study-card-actions { margin-top: auto; padding-top: 16px; }
+/*
+ * 只有「內容短、按鈕就是最後一塊」的卡片才把按鈕推到底對齊（存檔卡、離線卡）。
+ * 計劃卡的按鈕要緊貼上面的天數／分鐘選單，不能被推到卡片最底——否則選單和按鈕
+ * 中間會裂開一大塊空白（使用者回報的「按鈕被調走了」）。
+ */
+.save-card > .study-card-actions,
+.offline-card > .study-card-actions { margin-top: auto; padding-top: 16px; }
 .study-btn {
   min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 7px; cursor: pointer;
   background: var(--panel-2); color: var(--text); font: inherit; font-size: 12px; font-weight: 750;
