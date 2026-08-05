@@ -262,11 +262,10 @@
 
     const btn = $("#sidebar-toggle");
     if (btn) {
+      // 箭頭方向由 CSS 依 data-sidebar 反轉，這裡只更新無障礙標籤。
       btn.setAttribute("aria-expanded", String(!collapsed));
       btn.setAttribute("aria-label", collapsed ? "展開課程目錄" : "收合課程目錄");
       btn.title = collapsed ? "展開課程目錄" : "收合課程目錄，放大實驗台";
-      const label = $("#sidebar-toggle-label");
-      if (label) label.textContent = collapsed ? "展開目錄" : "收合目錄";
     }
     requestAnimationFrame(() => {
       if (currentSim && currentSim.rerender) {
@@ -289,7 +288,7 @@
     document.querySelectorAll('meta[name="theme-color"]').forEach(meta => meta.remove());
     const meta = document.createElement("meta");
     meta.name = "theme-color";
-    meta.content = theme === "light" ? "#eef2f8" : "#080b11";
+    meta.content = theme === "light" ? "#eef2f8" : "#0e1210";
     document.head.appendChild(meta);
     // 主題切換後重繪目前模擬
     if (currentSim && currentSim.rerender) {

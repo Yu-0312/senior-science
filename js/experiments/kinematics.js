@@ -30,8 +30,17 @@
       const mapX = x => tX0 + (x - xmin) / (xmax - xmin) * (tX1 - tX0);
       D.line(ctx, tX0, tY, tX1, tY, PL.col("text-faint"), 2);
       for (let gx = Math.ceil(xmin / 5) * 5; gx <= xmax; gx += 5) { const px = mapX(gx); D.line(ctx, px, tY - 4, px, tY + 4, PL.col("text-faint"), 1); D.text(ctx, gx + "", px, tY + 16, { color: PL.col("text-faint"), size: 9, align: "center" }); }
-      const s = st(t); D.disc(ctx, mapX(s.x), tY, 9, { fill: m, glow: m, glowSize: 14 });
-      D.text(ctx, "位置 (m)", tX0, tY - 14, { color: PL.col("text-dim"), size: 11 });
+      // 一台小車在數線上移動（比一顆球更能連到實驗裝置）
+      const s = st(t), cx = mapX(s.x);
+      D.rect(ctx, cx - 13, tY - 13, 26, 13, { fill: m, stroke: PL.theme.pale(0.35), r: 3 });
+      D.disc(ctx, cx - 7, tY, 3.5, { fill: PL.col("text-dim"), stroke: PL.theme.pale(0.4), width: 1 });
+      D.disc(ctx, cx + 7, tY, 3.5, { fill: PL.col("text-dim"), stroke: PL.theme.pale(0.4), width: 1 });
+      // 速度箭頭：長度與符號都跟著 v 走（負速度時指向左）
+      if (Math.abs(s.v) > 0.1) {
+        const aLen = PL.clamp(s.v * 4, -46, 46);
+        D.arrow(ctx, cx, tY - 20, cx + aLen, tY - 20, { color: PL.col("accent-2"), width: 2, label: "v" });
+      }
+      D.text(ctx, "位置 (m)", tX0, tY - 26, { color: PL.col("text-dim"), size: 11 });
 
       const gTop = 78, gH = H - gTop - 24, gap = 16, gW = (W - 44 - gap) / 2, gx1 = 30, gx2 = 30 + gW + gap;
       const vend = v0 + a * TMAX; let vmin = Math.min(0, v0, vend), vmax = Math.max(0, v0, vend); if (vmax - vmin < 2) vmax = vmin + 2;
@@ -505,20 +514,20 @@
   }});
 
   /* 打點計時器（測速度與加速度） */
-  /* 打點計時器 —— 小車拉著紙帶跑，計時器一點一點打上去
+  /* 打點計時器 —— 重物拉著小車加速，計時器一點一點把過程打在紙帶上
    *
-   * 舊版是一張靜態插圖：紙帶上的點一開始就全部畫好了。
-   * 那等於直接把答案攤在學生面前，而這個實驗真正要建立的因果是相反方向的——
-   * 「因為小車在加速，所以後面的點才會越拉越開」。點先出現，因果就不見了。
+   * 照真實的實驗裝置設計：
+   *   計時器 → 紙帶 → 小車 →（繩）→ 滑輪 → 重物
+   * 重物受重力往下掉，透過跨過滑輪的繩子拉著小車前進，小車越跑越快。
+   * 加速度不是憑空給的，而是 a = mg/(M+m)——調重物質量，點距整排跟著變，
+   * 「釋放 → 小車加速」這句話因此有了看得見的因。
    *
-   * 所以這一版把實驗做完整：
-   *   上半是實驗台，小車在軌道上前進，紙帶被它拉著穿過固定的計時器，
-   *   每打一點，打點錘就落下閃一次——點是「當場被打出來的」，不是本來就在那。
-   *   下半是同一條紙帶攤平後的樣子，也就是學生真正拿去量的那張紙。
-   *
-   * 還沒按開始時，紙帶上會有一排淡淡的預測點。
-   * 這不是裝飾：實驗課的順序本來就是「先算出你預期看到什麼，再去量」，
-   * 而且拉滑桿時看得到預測跟著變，不必先跑一次才知道參數有沒有效。
+   * 兩個刻意的設計：
+   *   · 點是「當場被打出來的」，不是一開始就畫好——因為這個實驗的因果是
+   *     「小車先加速，點才越拉越開」，把點先攤出來等於先給答案。
+   *   · 還沒開始時紙帶上有一排淡預測點：實驗課本來就先算預期再去量，
+   *     而且拉滑桿時預測跟著變，不必先跑一次才知道參數有沒有效。
+   * 下半是同一條紙帶攤平後的樣子，也就是學生真正拿去量的那張紙。
    */
   PL.register("ticker-tape", { build(root) {
     const L = PL.ui.layout(root);
@@ -526,21 +535,31 @@
 
     const N = 13;              // 觀察的打點間隔數
     const SLOW = 0.12;         // 慢動作：真實只有零點幾秒，直接播完全看不清楚
+    const G = 9.8;
     let t = 0, dots = 0, flash = 0;
 
-    PL.ui.section(L.controls, "小車的運動");
-    const sV = PL.ui.slider(L.controls, { label: "初速 v₀", min: 0, max: 8, step: 0.5, value: 2, unit: "m/s", digits: 1, onInput: reset });
-    const sA = PL.ui.slider(L.controls, { label: "加速度 a", min: 0, max: 8, step: 0.5, value: 3, unit: "m/s²", digits: 1, onInput: reset });
+    /*
+     * 這一版照著真實的實驗裝置設計：小車被跨過滑輪的重物拉著加速。
+     * 加速度不是直接給的，而是由「重物的重量」和「總質量」決定：
+     *   a = m·g / (M + m)
+     * 小車從靜止釋放（v₀ = 0），所以「釋放 → 小車加速」這句話有了具體的因。
+     * 學生調重物質量，就會看到點距整排跟著變——加速的原因被畫了出來。
+     */
+    PL.ui.section(L.controls, "實驗裝置");
+    const sM = PL.ui.slider(L.controls, { label: "小車質量 M", min: 0.2, max: 1.2, step: 0.1, value: 0.5, unit: "kg", digits: 1, onInput: reset });
+    const sMw = PL.ui.slider(L.controls, { label: "重物質量 m", min: 0.05, max: 0.6, step: 0.05, value: 0.15, unit: "kg", digits: 2, onInput: reset });
     PL.ui.section(L.controls, "計時器");
     const sT = PL.ui.slider(L.controls, { label: "打點週期 T", min: 0.02, max: 0.1, step: 0.01, value: 0.05, unit: "s", digits: 2, onInput: reset });
+
+    const accel = () => sMw.get() * G / (sM.get() + sMw.get());   // a = mg/(M+m)，從靜止
 
     PL.ui.presets(L.controls, {
       label: "情境",
       options: [
-        { label: "等速前進", hint: "沒有加速度時，點距從頭到尾一樣——這是判斷等速的依據",
-          apply: () => { sV.set(3); sA.set(0); reset(); } },
-        { label: "從靜止加速", hint: "起點附近的點會擠成一團，這正是實驗課要求「捨棄開頭」的原因",
-          apply: () => { sV.set(0); sA.set(4); reset(); } },
+        { label: "輕重物 · 小加速", hint: "重物輕、小車重，拉力小，加速度小——點距增加得慢",
+          apply: () => { sM.set(1.2); sMw.set(0.05); reset(); } },
+        { label: "重重物 · 大加速", hint: "重物重、小車輕，加速度大——點距一格比一格拉開得明顯",
+          apply: () => { sM.set(0.3); sMw.set(0.5); reset(); } },
         { label: "50 Hz 市電計時器", hint: "台灣市電 60 Hz，實驗室常用的計時器多為 50 或 60 Hz",
           apply: () => { sT.set(0.02); reset(); } }
       ]
@@ -558,11 +577,11 @@
     function reset() { t = 0; dots = 0; flash = 0; anim.stop(); draw(); }
 
     PL.ui.note(L.controls,
-      "先按「從靜止加速」再按開始：注意紙帶最前面那幾個點會擠成一團，幾乎分不出來。" +
-      "實驗課要求捨棄開頭那段，不是因為它不重要，而是因為那裡的量測誤差比點距本身還大。");
+      "重物一放開就把小車拉著往前，小車越跑越快，紙帶上的點也越拉越開。" +
+      "注意紙帶最前面那幾個點會擠成一團——那是剛釋放、還很慢的時候打的，量測誤差比點距本身還大，實驗課要求整段捨棄。");
 
     const T_END = () => N * sT.get();
-    const xAt = tt => sV.get() * tt + 0.5 * sA.get() * tt * tt;   // 小車位移（m）
+    const xAt = tt => 0.5 * accel() * tt * tt;                    // 小車位移（m），從靜止 v₀=0
     const xn = k => xAt(k * sT.get());                            // 第 k 點的位置
 
     const vd = PL.ui.verdict(L.readouts.parentNode || L.readouts, { label: "—", meter: true });
@@ -572,43 +591,47 @@
     const rN = PL.ui.readout(L.readouts, { label: "已打點數", unit: "點" });
 
     const dv = PL.ui.derived(L.canvasWrap.parentNode, [
-      { label: "第 5 段點距 x₅", unit: "cm", hint: "第 5 點到第 6 點的距離" },
       { label: "點距差 Δ", unit: "cm", hint: "相鄰兩段點距相減，等加速時是定值" },
-      { label: "T²", unit: "s²", hint: "打點週期的平方" },
-      { label: "a = Δ / T²", unit: "m/s²", hint: "紙帶求加速度的標準式" }
+      { label: "由紙帶量得 a", unit: "m/s²", hint: "a = Δ / T²，這是實測值" },
+      { label: "理論 a = mg/(M+m)", unit: "m/s²", hint: "由重物與總質量算出的預期值" },
+      { label: "誤差", unit: "%", hint: "實測與理論的差距" }
     ]);
 
     PL.ui.causality(L.canvasWrap.parentNode, {
-      title: "為什麼一條紙帶就能算出加速度",
+      title: "重物拉著小車加速，紙帶把過程記下來",
       rows: [
-        { name: "每格時間都一樣", tone: "a", note: "計時器的週期 T 是固定的，所以點距不必再除以時間就能直接比較——點距長短本身就代表速度快慢。" },
-        { name: "點距 = 那一格的平均速度 × T", tone: "b", note: "所以量點距等於在量速度。這是整個實驗成立的關鍵一步。" },
-        { name: "點距等差增加 → 等加速", tone: "c", note: "每格速度增加同樣多，就是等加速度。相鄰點距的差 Δ 除以 T² 即為 a。" }
+        { name: "重物的重量就是拉力", tone: "a", note: "跨過滑輪的重物受重力往下掉，透過繩子拉著小車前進。整個系統的加速度 a = mg/(M+m)：重物越重、小車越輕，加速度越大。" },
+        { name: "點距 = 那一格的平均速度 × T", tone: "b", note: "計時器每隔固定時間 T 打一點，所以量點距等於在量速度——點距長短本身就代表快慢，不必再除以時間。" },
+        { name: "點距等差增加 → 等加速", tone: "c", note: "每格速度增加同樣多，就是等加速度。相鄰點距的差 Δ 除以 T² 得到的 a，應該和 mg/(M+m) 相符。" }
       ]
     });
 
     PL.ui.procedure(L.controls, {
       title: "打點計時器實驗的標準流程",
       steps: [
-        "紙帶穿過計時器、一端固定在小車後方。<strong>先按下計時器讓它開始打點，再放開小車</strong>。",
-        "小車跑完後取下紙帶，找到開頭那段擠在一起的點，<strong>整段捨棄</strong>，從看得清楚的點開始編號 0、1、2……",
-        "把尺的零刻度對準第 0 點，<strong>一次量到每一點</strong>並記下累積距離，再相減得到各段點距。",
-        "第 5 點的瞬時速度用 <strong>(x₆ − x₄) / 2T</strong>，加速度用相鄰點距差除以 T²。"
+        "紙帶穿過計時器、一端固定在小車後方；小車另一端的繩子跨過滑輪、掛上重物。",
+        "<strong>先按下計時器讓它開始打點，再放開小車</strong>，重物落下把小車拉著加速。",
+        "小車跑完後取下紙帶，開頭那段擠在一起的點<strong>整段捨棄</strong>，從看得清楚的點開始編號 0、1、2……",
+        "把尺的零刻度對準第 0 點，<strong>一次量到每一點</strong>再相減得各段點距；加速度用相鄰點距差除以 T²，和 mg/(M+m) 對照。"
       ],
       rule: "順序錯了整條紙帶就作廢：<strong>先啟動計時器、再放開小車</strong>——反過來的話，前幾個點是小車還沒動時打的，全部疊在同一個位置。" +
-            "另外點距一定要<strong>從同一個零點一次量到底</strong>再相減；一段一段量會把每次對準的誤差累積起來。"
+            "真實實驗還要先<strong>平衡摩擦力</strong>（把長木板稍微墊高），否則量到的 a 會比 mg/(M+m) 小一截。"
       });
 
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const v0 = sV.get(), a = sA.get(), T = sT.get();
+      const a = accel(), T = sT.get();
       const total = xn(N) || 1;
 
-      /* ---------- 上半：實驗台 ---------- */
-      const trackY = H * 0.40, x0 = 132, x1 = W - 34;
+      /* ---------- 上半：實驗台（照真實裝置：計時器→紙帶→小車→繩→滑輪→重物） ---------- */
+      const trackY = H * 0.40;
+      const pulleyX = W - 40, pulleyY = trackY - 6, pulleyR = 12;
+      const x0 = 132, x1 = pulleyX - 44;            // 軌道右端留給滑輪
       const sc = (x1 - x0) / total;                 // 每公尺對應的像素
       cv.calibrate(sc, "m");
+      const frac = Math.min(1, xAt(t) / total);
       const carX = x0 + xAt(t) * sc;
+      const cw = 40, ch = 20;
 
       /*
        * 軌道用 pale 而不是 shade。
@@ -637,26 +660,55 @@
         if (px > 26 && px < carX - 2) D.disc(ctx, px, tapeY, 2.6, { fill: k === 5 ? MC() : PL.col("text-dim") });
       }
 
-      // 打點計時器本體（固定在桌上，紙帶從它底下通過）
+      // 打點計時器本體（固定在桌上，紙帶從它底下通過）——照圖片：有 AC 電源面板
       const tx = 92;
-      D.rect(ctx, tx - 34, tapeY - 46, 68, 34, { fill: PL.theme.pale(0.13), stroke: PL.theme.pale(0.42), width: 1.4, r: 5 });
-      D.text(ctx, "計時器", tx, tapeY - 25, { color: PL.col("text-dim"), size: 10, align: "center" });
-      D.text(ctx, PL.fmt(1 / T, 0) + " Hz", tx, tapeY - 14, { color: PL.col("accent-2"), size: 9, align: "center" });
+      D.text(ctx, "打點計時器", tx, tapeY - 52, { color: PL.col("accent-2"), size: 11, align: "center", weight: "700" });
+      D.rect(ctx, tx - 36, tapeY - 44, 72, 38, { fill: PL.theme.pale(0.13), stroke: PL.theme.pale(0.42), width: 1.4, r: 5 });
+      // AC 電源的條紋面板
+      D.rect(ctx, tx - 30, tapeY - 40, 26, 30, { fill: PL.theme.shade(0.3), stroke: PL.theme.pale(0.3), width: 1, r: 2 });
+      for (let s = 0; s < 4; s++) D.line(ctx, tx - 27 + s * 6, tapeY - 38, tx - 27 + s * 6, tapeY - 12, PL.theme.pale(0.28), 1);
+      D.text(ctx, "AC", tx - 17, tapeY - 8, { color: PL.col("text-faint"), size: 8, align: "center" });
+      D.text(ctx, PL.fmt(1 / T, 0) + " Hz", tx + 14, tapeY - 22, { color: PL.col("accent-2"), size: 9, align: "center" });
       // 打點錘：剛打完的那一瞬間落下並發亮
       const hit = flash > 0;
       D.line(ctx, tx, tapeY - 12, tx, tapeY - (hit ? 3 : 7),
         hit ? PL.col("warn") : PL.col("text-faint"), hit ? 3 : 2);
       if (hit) D.disc(ctx, tx, tapeY, 5, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 12 });
 
-      // 小車
-      const cw = 34, ch = 18;
+      /* 繩子：從小車前緣水平拉到滑輪，再垂下去接重物。滑輪把「水平的拉」轉成「垂直的落」。
+         重物隨小車前進而下落——物理上兩者位移相等，但畫面上垂直空間有限，
+         所以這裡按「小車跑完全程的比例」在可用高度內下落，示意「重物掉、小車加速」。 */
+      const ropeY = trackY - 2;
+      const weightTop = pulleyY + pulleyR + 14;
+      const weightY = weightTop + (H * 0.20) * frac;
+      D.line(ctx, carX + cw / 2, ropeY, pulleyX, pulleyY, PL.col("text-dim"), 1.6);
+      D.line(ctx, pulleyX, pulleyY, pulleyX, weightY, PL.col("text-dim"), 1.6);
+
+      // 滑輪
+      D.disc(ctx, pulleyX, pulleyY, pulleyR, { fill: PL.theme.pale(0.14), stroke: PL.theme.pale(0.42), width: 1.6 });
+      D.disc(ctx, pulleyX, pulleyY, 3, { fill: PL.col("text-faint") });
+      D.text(ctx, "滑輪", pulleyX, pulleyY - pulleyR - 6, { color: PL.col("text-faint"), size: 10, align: "center" });
+
+      // 重物
+      const ww = 20, wh = 26;
+      D.rect(ctx, pulleyX - ww / 2, weightY, ww, wh, { fill: PL.col("warn"), stroke: PL.theme.pale(0.4), r: 3 });
+      D.text(ctx, "重", pulleyX, weightY + wh / 2 + 4, { color: "#04121a", size: 11, align: "center", weight: "700" });
+      D.text(ctx, PL.fmt(sMw.get(), 2) + " kg", pulleyX, weightY + wh + 12, { color: PL.col("text-faint"), size: 9, align: "center" });
+      // 重物受力箭頭：往下的重力，長度正比於 mg
+      if (t === 0) {
+        D.arrow(ctx, pulleyX + ww / 2 + 4, weightY + wh / 2, pulleyX + ww / 2 + 4, weightY + wh / 2 + 16 + sMw.get() * 18,
+          { color: PL.col("accent-2"), width: 1.6, label: "mg" });
+      }
+
+      // 小車（有車廂與兩個輪子）
       D.rect(ctx, carX - cw / 2, trackY - ch + 12, cw, ch, { fill: MC(), stroke: PL.theme.pale(0.35), r: 3 });
-      D.disc(ctx, carX - 10, trackY + 12, 4.5, { fill: PL.col("text-dim") });
-      D.disc(ctx, carX + 10, trackY + 12, 4.5, { fill: PL.col("text-dim") });
-      // 速度箭頭：長度正比於當前速率，停著的時候不畫
-      const vNow = v0 + a * t;
+      D.text(ctx, "小車", carX, trackY - ch / 2 + 13, { color: "#04121a", size: 10, align: "center", weight: "700" });
+      D.disc(ctx, carX - 11, trackY + 12, 4.5, { fill: PL.col("text-dim"), stroke: PL.theme.pale(0.4), width: 1 });
+      D.disc(ctx, carX + 11, trackY + 12, 4.5, { fill: PL.col("text-dim"), stroke: PL.theme.pale(0.4), width: 1 });
+      // 速度箭頭：長度正比於當前速率，停著時不畫
+      const vNow = a * t;
       if (t > 0 && vNow > 0) {
-        D.arrow(ctx, carX + cw / 2, trackY + 3, carX + cw / 2 + Math.min(60, vNow * 7), trackY + 3,
+        D.arrow(ctx, carX + cw / 2, trackY + 3, carX + cw / 2 + Math.min(56, vNow * 7), trackY + 3,
           { color: PL.col("accent-2"), width: 2, label: "v = " + PL.fmt(vNow, 1) });
       }
 
@@ -695,18 +747,17 @@
       const delta = seg(5) - seg(4);
       const v5 = (xn(6) - xn(4)) / (2 * T);
       const am = ((xn(6) - xn(5)) - (xn(5) - xn(4))) / T2;
+      const err = a > 0 ? Math.abs(am - a) / a * 100 : 0;
       rV.set(v5, 2); rA.set(am, 2); rT.set(T, 2); rN.set(dots, 0);
-      dv.set(0, seg(5) * 100, 2); dv.set(1, delta * 100, 2); dv.set(2, T2, 4); dv.set(3, am, 2);
-      dv.tone(3, Math.abs(am - a) < 0.05 ? "good" : "");
+      dv.set(0, delta * 100, 2); dv.set(1, am, 2); dv.set(2, a, 2); dv.set(3, err, 1);
+      dv.tone(3, err < 3 ? "good" : "");
 
       const prog = Math.min(1, dots / (N + 1));
       if (dots === 0) {
-        vd.set("紙帶還沒開始打點：淡色的是「你預期會看到的點」，按開始後才會被真的打出來", "info", 0);
-      } else if (a === 0) {
-        vd.set("點距從頭到尾一樣長 → 等速度運動，紙帶上量到的速度是 " + PL.fmt(v5, 2) + " m/s", "good", prog);
+        vd.set("重物還沒放開：淡色的是「你預期會看到的點」，按開始後重物才會拉著小車跑、把點打出來", "info", 0);
       } else {
-        vd.set("點距每一格多出 " + PL.fmt(delta * 100, 2) + " cm → 等加速度運動，由紙帶反推 a = " +
-          PL.fmt(am, 2) + " m/s²", "good", prog);
+        vd.set("重物拉著小車加速：點距每一格多出 " + PL.fmt(delta * 100, 2) + " cm，由紙帶反推 a = " +
+          PL.fmt(am, 2) + " m/s²，和理論 mg/(M+m) = " + PL.fmt(a, 2) + " m/s² 相符", "good", prog);
       }
     }
 

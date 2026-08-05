@@ -4,26 +4,31 @@
    ========================================================================= */
 
 :root {
-  --bg: #080b11;
-  --bg-2: #0d1119;
-  --panel: #121826cc;         /* 玻璃面板（含透明度） */
-  --panel-solid: #131a26;
-  --panel-2: #1a2231;
-  --panel-3: #212b3d;
-  --border: #253044;
-  --border-soft: #1c2536;
-  --text: #eef3fa;
-  --text-dim: #9aa8bd;
+  /* ---------------------------------------------------------------------
+     深色主題：中性炭底 ＋ 清新綠主色
+     從原本的藍黑＋青綠「科技風」改成柔和炭灰＋綠，少掉那層藍，
+     暖橘／紅／琥珀（--warn/--danger 與各實驗的視覺化色）維持不變。
+     --------------------------------------------------------------------- */
+  --bg: #0e1210;
+  --bg-2: #131813;
+  --panel: #161c17cc;         /* 玻璃面板（含透明度） */
+  --panel-solid: #161c17;
+  --panel-2: #1d251e;
+  --panel-3: #26312a;
+  --border: #2c382e;
+  --border-soft: #222c23;
+  --text: #eef2ea;
+  --text-dim: #a4b1a5;
   /* 原本的 #64738a 疊在面板底上只有 3.3:1，所有小字級的說明與軸標都低於 AA。 */
-  --text-faint: #8593ab;
-  --accent: #35e0cf;          /* 主色：青綠 */
-  --accent-2: #5aa2ff;        /* 次色：藍 */
+  --text-faint: #8f9c91;
+  --accent: #46d68a;          /* 主色：清新綠 */
+  --accent-2: #5aa2ff;        /* 次色：藍（圖表曲線用） */
   --accent-3: #b98bff;        /* 輔色：紫（漸層用） */
   --warn: #ffcc66;
   --danger: #ff6b6b;
   --ok: #52e0a4;
-  --sim-bg-1: #070b11;
-  --sim-bg-2: #0b1119;
+  --sim-bg-1: #0c110d;
+  --sim-bg-2: #0f140f;
   --radius: 14px;
   --radius-sm: 9px;
   --sidebar-w: 306px;
@@ -43,7 +48,7 @@
   --grid-line: rgba(255, 255, 255, 0.025);
   --grid-line-2: rgba(255, 255, 255, 0.02);
   --scrim: rgba(2, 6, 12, 0.76);          /* 對話框遮罩 */
-  --on-accent: #04121a;                   /* 疊在主色按鈕上的文字色 */
+  --on-accent: #06170e;                   /* 疊在主色（綠）按鈕上的文字色 */
   --sim-shadow: rgba(0, 0, 0, 0.4);
   --drawer-shadow: rgba(0, 0, 0, 0.5);
   font-synthesis: none;
@@ -245,6 +250,28 @@ body.checkpoint-active { overflow: hidden; }
  * 容器變了但沒有觸發 ResizeObserver 的話，畫布會維持舊寬度。
  */
 .app[data-sidebar="collapsed"] .sidebar { display: none; }
+
+/*
+ * 側欄伸縮把手：貼在側欄右緣、垂直置中的小拉片。
+ * 用 sticky 讓它跟著捲動停在畫面中央高度；margin-left:-1px 讓它壓在側欄的邊框上，
+ * 看起來是「從欄位邊緣長出來」而不是浮在旁邊。收合後側欄不在了，
+ * 這個兄弟元素會自動變成 layout 的第一個項目、落在最左邊，箭頭轉向就成了展開鈕。
+ */
+.sidebar-handle {
+  position: sticky; top: calc(50vh - 26px); align-self: flex-start;
+  flex: 0 0 auto; margin-left: -1px; margin-top: 14px;
+  width: 17px; height: 52px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--panel-solid); color: var(--text-dim);
+  border: 1px solid var(--border); border-left-color: transparent;
+  border-radius: 0 9px 9px 0; cursor: pointer; z-index: 7;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.sidebar-handle:hover { color: var(--accent); border-color: var(--accent); background: var(--panel-2); }
+.sidebar-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sidebar-handle .handle-icon { width: 15px; height: 15px; transition: transform 0.2s; }
+/* 收合後箭頭反向（指向右＝展開） */
+.app[data-sidebar="collapsed"] .sidebar-handle .handle-icon { transform: scaleX(-1); }
 .sidebar-head { padding: 20px 20px 6px; }
 .sidebar-head .title { font-size: 11px; color: var(--text-faint); letter-spacing: 2.5px; text-transform: uppercase; }
 .sidebar-head .stat { display: flex; gap: 20px; margin-top: 12px; }
@@ -1039,7 +1066,13 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .sim-readout-panel { margin-top: 14px; border-radius: 8px; overflow: hidden; }
 .sim-readout-head { min-height: 36px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px; background: var(--tint-1); border-bottom: 1px solid var(--border-soft); }
 .sim-readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; margin: 0; padding: 10px 12px 12px; }
-.readout { background: linear-gradient(180deg, var(--panel-2), var(--panel-solid)); border: 1px solid var(--border-soft); border-radius: 7px; padding: 11px 12px; transition: border-color 0.16s; }
+/*
+ * 讀數框用細邊框定義，不用實心填色。
+ * 舊版用 panel-2→panel-solid 的漸層填色，在中性炭底的新配色下那塊填色會讀成
+ * 泥綠／橄欖色（低飽和的綠在那個亮度就是這樣）。改成幾乎透明的淺色疊層 ＋ 清楚的邊框，
+ * 框線由邊界而非色塊分出來，數字也更跳。tint 與 border 都是語意變數，深淺主題自動翻面。
+ */
+.readout { background: var(--tint-1); border: 1px solid var(--border); border-radius: 7px; padding: 11px 12px; transition: border-color 0.16s; }
 .readout:hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
 .readout-value { font-size: 18px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: 0.2px; line-height: 1.25; overflow-wrap: anywhere; }
 .readout-label { font-size: 11px; color: var(--text-faint); margin-top: 3px; overflow-wrap: anywhere; }
@@ -1348,8 +1381,8 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   --border: #c9d4e4; --border-soft: #dde5f0;
   /* 文字灰階：原本的 #8291a4 在白底上只有 3.0:1，小字讀不清楚 */
   --text: #16202e; --text-dim: #3d4b60; --text-faint: #5e6d82;
-  /* 主色壓深，讓「白字疊在主色按鈕上」與「主色當文字放在白底上」兩種用法都達 AA */
-  --accent: #06756b; --accent-2: #1f5fc4; --accent-3: #6d28d9;
+  /* 主色壓深的綠，讓「白字疊在主色按鈕上」與「主色當文字放在白底上」兩種用法都達 AA */
+  --accent: #0b6e40; --accent-2: #1f5fc4; --accent-3: #6d28d9;
   /* 狀態色：亮色版在白底上幾乎無法辨識，改用深一階的同色系 */
   --warn: #8a5a00;
   --danger: #c62f2f;
@@ -1424,6 +1457,8 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   }
   .sidebar.open { transform: translateX(0); }
   .menu-toggle { display: inline-block; }
+  /* 窄螢幕改用抽屜式側欄（漢堡選單），伸縮把手在這裡沒有意義，藏起來。 */
+  .sidebar-handle { display: none; }
   .main { padding: 22px 18px 54px; }
   .sim-controls { width: 100%; }
   .scrim { position: fixed; inset: 65px 0 0 0; background: rgba(0, 0, 0, 0.55); z-index: 34; display: none; }

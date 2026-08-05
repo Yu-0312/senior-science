@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>物理實驗室｜台灣中學互動物理</title>
   <meta name="description" content="從台灣國中自然到高中 108 課綱的互動物理實驗室：12 個學習模組，實驗與題型持續擴充，全部附即時 Canvas 模擬、實驗流程、即時讀數與圖表。" />
-  <meta name="theme-color" content="#080b11" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#0e1210" media="(prefers-color-scheme: dark)" />
   <meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
   <meta name="color-scheme" content="dark light" />
   <!-- 在樣式表載入前先決定主題：避免淺色使用者每次進站都閃一下深色底。 -->
@@ -46,7 +46,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="物理實驗室" />
 
-  <link rel="stylesheet" href="css/style.css?v=20260805-1" />
+  <link rel="stylesheet" href="css/style.css?v=20260805-3" />
 
   <!-- MathJax（LaTeX 公式排版） -->
   <script>
@@ -112,11 +112,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l3 3v17H6z"/><path d="M15 2v4h4M9 11h6M9 15h6M9 19h4"/></svg>
         <span>授權</span>
       </a>
-      <!-- 收合課程目錄，把寬度讓給實驗台。狀態記在 localStorage。 -->
-      <button class="icon-btn" id="sidebar-toggle" type="button" aria-controls="sidebar" aria-expanded="true" aria-label="收合課程目錄" title="收合課程目錄，放大實驗台">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
-        <span id="sidebar-toggle-label">收合目錄</span>
-      </button>
       <button class="icon-btn lock-session" id="lock-session" type="button" aria-label="鎖定實驗室"><span>鎖定</span></button>
       <button class="icon-btn" id="theme-toggle" aria-label="切換主題"></button>
     </header>
@@ -149,6 +144,14 @@
           <button class="btn-reset-progress" id="btn-reset">重設學習進度</button>
         </div>
       </aside>
+      <!--
+        側欄伸縮把手：貼在側欄右緣、垂直置中。
+        它是 .sidebar 的「兄弟」而不是子元素——因為收合時側欄整個 display:none，
+        把手若在側欄裡就會跟著消失。放在外面，收合後它會自動落到最左邊當展開鈕。
+      -->
+      <button class="sidebar-handle" id="sidebar-toggle" type="button" aria-controls="sidebar" aria-expanded="true" aria-label="收合課程目錄" title="收合課程目錄，放大實驗台">
+        <svg class="handle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/><path d="M5 5v14"/></svg>
+      </button>
       <div class="scrim" id="scrim" aria-hidden="true"></div>
 
       <!-- 主內容 -->
@@ -346,25 +349,25 @@
   </section>
 
   <!-- 核心 -->
-  <script src="js/site-config.js?v=20260805-1"></script>
-  <script src="js/curriculum.js?v=20260805-1"></script>
-  <script src="js/advanced-curriculum.js?v=20260805-1"></script>
-  <script src="js/comprehensive-curriculum.js?v=20260805-1"></script>
-  <script src="js/extension-registry.js?v=20260805-1"></script>
-  <script src="js/open-curriculum.js?v=20260805-1"></script>
-  <script src="js/school-curriculum.js?v=20260805-1"></script>
-  <script src="js/question-bank.js?v=20260805-1"></script>
-  <script src="js/sim-core.js?v=20260805-1"></script>
-  <script src="js/sim-tools.js?v=20260805-1"></script>
-  <script src="js/sim-insight.js?v=20260805-1"></script>
-  <script src="js/teaching-notes.js?v=20260805-1"></script>
-  <script src="js/sim-a11y.js?v=20260805-1"></script>
+  <script src="js/site-config.js?v=20260805-3"></script>
+  <script src="js/curriculum.js?v=20260805-3"></script>
+  <script src="js/advanced-curriculum.js?v=20260805-3"></script>
+  <script src="js/comprehensive-curriculum.js?v=20260805-3"></script>
+  <script src="js/extension-registry.js?v=20260805-3"></script>
+  <script src="js/open-curriculum.js?v=20260805-3"></script>
+  <script src="js/school-curriculum.js?v=20260805-3"></script>
+  <script src="js/question-bank.js?v=20260805-3"></script>
+  <script src="js/sim-core.js?v=20260805-3"></script>
+  <script src="js/sim-tools.js?v=20260805-3"></script>
+  <script src="js/sim-insight.js?v=20260805-3"></script>
+  <script src="js/teaching-notes.js?v=20260805-3"></script>
+  <script src="js/sim-a11y.js?v=20260805-3"></script>
 
   <!-- 實驗程式改為延遲載入：只掛對應表，開啟實驗時才抓對應的檔案 -->
-  <script src="js/experiment-manifest.js?v=20260805-1"></script>
+  <script src="js/experiment-manifest.js?v=20260805-3"></script>
 
 
   <!-- 應用外殼 -->
-  <script src="js/app.js?v=20260805-1"></script>
+  <script src="js/app.js?v=20260805-3"></script>
 </body>
 </html>
