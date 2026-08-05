@@ -455,6 +455,12 @@ body.checkpoint-active { overflow: hidden; }
 .study-btn.primary:hover { color: var(--on-accent); filter: brightness(1.06); }
 .plan-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 12px; }
 .plan-controls label { display: grid; gap: 5px; min-width: 0; color: var(--text-faint); font-size: 10.5px; font-weight: 750; letter-spacing: 0.5px; }
+/*
+ * 讓 hidden 屬性真的能隱藏「自訂天數」。
+ * 上面的 .plan-controls label { display: grid } 特異度比 UA 的 [hidden]{display:none} 高，
+ * 會把它蓋過去——結果自訂天數永遠顯示、切換也藏不掉（回報的「天數切換失效」）。
+ */
+.plan-controls label[hidden] { display: none; }
 .plan-controls select, .plan-controls input {
   width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; outline: none;
   background: var(--panel-2); color: var(--text); font: inherit; font-size: 12.5px;
