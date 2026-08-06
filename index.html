@@ -163,13 +163,20 @@
             <h1 class="hero-title">看得見的物理，<br />可以動手玩的實驗室</h1>
             <p class="hero-sub">12 個學習模組、<span id="hero-exp-count">0</span> 個持續擴充的國中到高中物理實驗，並提供大學入門延伸。每一個都附即時互動模擬、可拖曳的碼錶與量角器，以及可列印的學習單。</p>
             <p class="hero-highlight"><b>模擬會自己說出物理關係。</b>單擺會告訴你 \(T \propto \sqrt{L}\)、而且振幅完全不影響週期；雙狹縫會得出 \(\Delta x \propto \lambda L / d\)。這些不是寫死的答案，是程式實際掃描模型量出來的。</p>
-            <div class="hero-actions">
-              <button class="btn-hero" id="hero-start">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg>
-                開始探索
+            <div class="hero-modes" role="group" aria-label="選擇使用模式">
+              <button class="hero-mode teacher" id="enter-teacher" type="button">
+                <span class="hero-mode-name">教師演示版</span>
+                <span class="hero-mode-desc">精簡畫面，打開就能拖、直接投影演示</span>
               </button>
+              <button class="hero-mode" id="enter-student" type="button">
+                <span class="hero-mode-name">自學完整版</span>
+                <span class="hero-mode-desc">保留任務導讀、判讀與逐步引導鷹架</span>
+              </button>
+            </div>
+            <div class="hero-actions">
               <button class="btn-hero ghost" id="hero-browse">瀏覽全部模組</button>
             </div>
+            <p class="hero-mode-hint">兩種模式進入的是同一批實驗，只差畫面繁簡；進實驗後右上角隨時可切換。</p>
             <div class="hero-stats">
               <div><div class="hstat-n" id="stat-mod">0</div><div class="hstat-l">學習模組</div></div>
               <div><div class="hstat-n b2" id="stat-exp">0</div><div class="hstat-l">實驗主題</div></div>

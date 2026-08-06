@@ -1725,7 +1725,21 @@
     $("#menu-toggle").addEventListener("click", toggleSidebar);
     $("#scrim").addEventListener("click", closeSidebarMobile);
     $("#brand-home").addEventListener("click", () => location.hash = "");
-    $("#hero-start").addEventListener("click", () => location.hash = "#" + FLAT[0].exp.id);
+    /*
+     * 首頁的兩條入口：教師演示版（精簡）與自學完整版（有鷹架）。
+     * 進入的是同一批實驗，差別只在 body.demo-mode——sim-core 會據此收起或顯示鷹架。
+     * 先把模式寫進 localStorage 並套到 body，再導向第一個實驗；之後進任何實驗都維持這個模式。
+     */
+    function enterWithMode(demo) {
+      document.body.classList.toggle("demo-mode", demo);
+      store.set("pl-demo-mode-flag", demo);   // 給 app 端記錄；sim-core 讀的是原始鍵
+      try { localStorage.setItem("pl-demo-mode", demo ? "1" : "0"); } catch (e) {}
+      location.hash = "#" + FLAT[0].exp.id;
+    }
+    const teacherBtn = $("#enter-teacher");
+    if (teacherBtn) teacherBtn.addEventListener("click", () => enterWithMode(true));
+    const studentBtn = $("#enter-student");
+    if (studentBtn) studentBtn.addEventListener("click", () => enterWithMode(false));
     $("#hero-browse").addEventListener("click", () => $("#module-grid").scrollIntoView({ behavior: "smooth" }));
     $("#btn-reset").addEventListener("click", resetProgress);
     $("#btn-export-save").addEventListener("click", exportLearningSave);
