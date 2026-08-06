@@ -980,6 +980,29 @@ body.is-offline .topbar { position: sticky; }
 .sim-procedure-note { margin: 0; padding: 0 12px 10px; color: var(--text-faint); font-size: 10.5px; }
 .lab-sim.is-focused .sim-control-deck, .lab-sim.is-focused .sim-readout-panel, .lab-sim.is-focused .sim-charts { display: none; }
 .lab-sim.is-focused .sim-stage { grid-template-columns: minmax(0, 1fr); }
+
+/* ---------------------------------------------------------------------------
+   演示模式（原型）
+   目標：回到 PhET 那種直覺——打開就能拖、拖了就有現象，中間不要一堵字牆。
+   收起所有教學鷹架，只留畫布、控制項、讀數、播放、圖表與量測工具。
+   保留完整版（不加 body.demo-mode 時）給自學的學生。
+   --------------------------------------------------------------------------- */
+body.demo-mode .learning-output,
+body.demo-mode .content-grid > .guide,
+body.demo-mode .sim-learning-brief,
+body.demo-mode .sim-procedure,
+body.demo-mode .sim-verdict,
+body.demo-mode .sim-derived,
+body.demo-mode .sim-causality,
+body.demo-mode .sim-procedure-card,
+body.demo-mode .sim-insight-block,
+body.demo-mode .sim-magnifier,
+body.demo-mode .sim-command-teach { display: none; }
+/* 右側概念卡收起後，模擬工作區就佔滿整列，畫布更大。 */
+body.demo-mode .content-grid { grid-template-columns: minmax(0, 1fr); }
+/* 演示模式的開關本身用主色點一下，讓老師找得到。 */
+.sim-command-demo { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+body.demo-mode .sim-command-demo { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .lab-sim:fullscreen { padding: 18px; overflow: auto; background: var(--bg); }
 .lab-sim:fullscreen .sim-stage { max-width: 1600px; margin: 0 auto; }
 .sim-stage::before {

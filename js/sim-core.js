@@ -512,8 +512,15 @@
     const stageLabel = el("span", "sim-command-stage", commandTitle); stageLabel.textContent = profile.stage;
     const stageMeta = el("span", "sim-command-meta", commandTitle); stageMeta.textContent = "操作 · 量測 · 驗證";
     const commandTools = el("div", "sim-command-tools", commandBar);
-    const guideBtn = el("button", "sim-command", commandTools); guideBtn.type = "button"; guideBtn.textContent = "實驗指南"; guideBtn.setAttribute("aria-expanded", "false");
-    const stepBtn = el("button", "sim-command", commandTools); stepBtn.type = "button"; stepBtn.textContent = "分步演示";
+    /*
+     * 演示模式（給老師上台用）：預設維持完整教學版；按下後把鷹架（任務導讀、
+     * 實驗流程、判讀、衍生量、因果、右側概念卡…）收起，只留畫布、控制項、
+     * 讀數、播放與圖表——回到 PhET 那種「打開就能拖、拖了就有現象」的直覺。
+     * 選擇記在 localStorage，切了就一直維持，不必每個實驗重按。
+     */
+    const demoBtn = el("button", "sim-command sim-command-demo", commandTools); demoBtn.type = "button"; demoBtn.setAttribute("aria-pressed", "false");
+    const guideBtn = el("button", "sim-command sim-command-teach", commandTools); guideBtn.type = "button"; guideBtn.textContent = "實驗指南"; guideBtn.setAttribute("aria-expanded", "false");
+    const stepBtn = el("button", "sim-command sim-command-teach", commandTools); stepBtn.type = "button"; stepBtn.textContent = "分步演示";
     const focusBtn = el("button", "sim-command", commandTools); focusBtn.type = "button"; focusBtn.textContent = "專注模式"; focusBtn.setAttribute("aria-pressed", "false");
     const exportBtn = el("button", "sim-command", commandTools); exportBtn.type = "button"; exportBtn.textContent = "匯出讀數";
     const screenBtn = el("button", "sim-command", commandTools); screenBtn.type = "button"; screenBtn.textContent = "截取主畫面";
@@ -569,6 +576,21 @@
       focusBtn.setAttribute("aria-pressed", String(focused));
       focusBtn.textContent = focused ? "離開專注" : "專注模式";
     });
+    function applyDemoMode(on) {
+      document.body.classList.toggle("demo-mode", on);
+      demoBtn.textContent = on ? "完整模式" : "演示模式";
+      demoBtn.title = on
+        ? "切回完整教學版：顯示任務導讀、實驗流程、判讀等鷹架"
+        : "演示模式：只留畫布、控制項與播放，適合上台展示";
+      demoBtn.setAttribute("aria-pressed", String(on));
+      try { localStorage.setItem("pl-demo-mode", on ? "1" : "0"); } catch (e) {}
+    }
+    demoBtn.addEventListener("click", () => applyDemoMode(!document.body.classList.contains("demo-mode")));
+    (function () {
+      let on = false;
+      try { on = localStorage.getItem("pl-demo-mode") === "1"; } catch (e) {}
+      applyDemoMode(on);
+    })();
     exportBtn.addEventListener("click", () => {
       const rows = [["實驗", profile.id], ["實驗台", profile.stage], ["匯出時間", new Date().toLocaleString("zh-TW")]];
       root._labReadouts.forEach(item => rows.push([item.label, item.value + (item.unit ? " " + item.unit : "")]));
