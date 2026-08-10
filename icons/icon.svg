@@ -1,16 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#35e0cf"/>
-      <stop offset="0.5" stop-color="#5aa2ff"/>
-      <stop offset="1" stop-color="#b98bff"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5be39a"/>
+      <stop offset="1" stop-color="#2fb673"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="112" fill="url(#g)"/>
-  <g fill="none" stroke="#061019" stroke-width="17">
-    <ellipse cx="256" cy="256" rx="176" ry="72"/>
-    <ellipse cx="256" cy="256" rx="176" ry="72" transform="rotate(60 256 256)"/>
-    <ellipse cx="256" cy="256" rx="176" ry="72" transform="rotate(120 256 256)"/>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- 錐形燒瓶（實驗室）：瓶口、瓶身、瓶底 -->
+  <g stroke="#06170e" stroke-width="24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M228 118 V210 L150 372 Q141 400 170 400 H342 Q371 400 362 372 L284 210 V118"/>
+    <path d="M212 118 H300"/>
   </g>
-  <circle cx="256" cy="256" r="34" fill="#061019"/>
+  <!-- 瓶內液體 -->
+  <path d="M190 300 H322 L349 372 Q356 390 337 390 H175 Q156 390 163 372 Z" fill="#06170e"/>
+  <!-- 氣泡（用底色綠當鏤空） -->
+  <circle cx="234" cy="350" r="14" fill="#43cf85"/>
+  <circle cx="276" cy="364" r="10" fill="#43cf85"/>
+  <circle cx="252" cy="332" r="8" fill="#43cf85"/>
 </svg>

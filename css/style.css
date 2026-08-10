@@ -200,7 +200,7 @@ body.checkpoint-active { overflow: hidden; }
 .brand:hover { background: var(--hover); }
 .brand-logo {
   width: 40px; height: 40px; border-radius: 12px; position: relative;
-  background: conic-gradient(from 210deg, var(--accent), var(--accent-2), var(--accent-3), var(--accent));
+  background: linear-gradient(150deg, #5be39a, #2fb673);
   display: grid; place-items: center;
   box-shadow: 0 0 22px rgba(70, 214, 138, 0.4), inset 0 0 12px rgba(0, 0, 0, 0.3);
 }
