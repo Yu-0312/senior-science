@@ -519,12 +519,12 @@
      * 選擇記在 localStorage，切了就一直維持，不必每個實驗重按。
      */
     const demoBtn = el("button", "sim-command sim-command-demo", commandTools); demoBtn.type = "button"; demoBtn.setAttribute("aria-pressed", "false");
-    const guideBtn = el("button", "sim-command sim-command-teach", commandTools); guideBtn.type = "button"; guideBtn.textContent = "實驗指南"; guideBtn.setAttribute("aria-expanded", "false");
-    const stepBtn = el("button", "sim-command sim-command-teach", commandTools); stepBtn.type = "button"; stepBtn.textContent = "分步演示";
+    const guideBtn = el("button", "sim-command", commandTools); guideBtn.type = "button"; guideBtn.textContent = "實驗指南"; guideBtn.setAttribute("aria-expanded", "false");
+    const stepBtn = el("button", "sim-command", commandTools); stepBtn.type = "button"; stepBtn.textContent = "分步演示";
     const focusBtn = el("button", "sim-command", commandTools); focusBtn.type = "button"; focusBtn.textContent = "專注模式"; focusBtn.setAttribute("aria-pressed", "false");
     const exportBtn = el("button", "sim-command", commandTools); exportBtn.type = "button"; exportBtn.textContent = "匯出讀數";
     const screenBtn = el("button", "sim-command", commandTools); screenBtn.type = "button"; screenBtn.textContent = "截取主畫面";
-    const fullBtn = el("button", "sim-command", commandTools); fullBtn.type = "button"; fullBtn.textContent = "全螢幕";
+    const fullBtn = el("button", "sim-command sim-command-full", commandTools); fullBtn.type = "button"; fullBtn.textContent = "全螢幕";
 
     const learningBrief = el("section", "sim-learning-brief", root);
     const briefHead = el("div", "sim-learning-brief-head", learningBrief);

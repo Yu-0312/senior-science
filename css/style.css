@@ -1016,7 +1016,13 @@ body.demo-mode .sim-causality,
 body.demo-mode .sim-procedure-card,
 body.demo-mode .sim-insight-block,
 body.demo-mode .sim-magnifier,
-body.demo-mode .sim-command-teach { display: none; }
+/* 指令列的標題與提示文字、麵包屑、控制項裡的說明——教師演示不需要，收掉更像 PhET。 */
+body.demo-mode .sim-command-title,
+body.demo-mode .exp-crumb,
+body.demo-mode .exp-learning-path,
+body.demo-mode .ctrl-note,
+/* 指令列只留「演示模式」開關與「全螢幕」，其餘（指南、分步、專注、匯出、截圖）收掉。 */
+body.demo-mode .sim-command-tools .sim-command:not(.sim-command-demo):not(.sim-command-full) { display: none; }
 /* 右側概念卡收起後，模擬工作區就佔滿整列，畫布更大。 */
 body.demo-mode .content-grid { grid-template-columns: minmax(0, 1fr); }
 /* 演示模式的開關本身用主色點一下，讓老師找得到。 */
