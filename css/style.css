@@ -1021,6 +1021,10 @@ body.demo-mode .sim-command-title,
 body.demo-mode .exp-crumb,
 body.demo-mode .exp-learning-path,
 body.demo-mode .ctrl-note,
+/* 量測工具列（碼錶／量角器／尺）是學生自己量測的活動，實驗台底部的識別列是裝飾——
+   教師演示都用不到，收掉讓畫面只剩「演示＋調整」。圖表與讀數保留：那是演示畫面本身。 */
+body.demo-mode .sim-tool-bar,
+body.demo-mode .sim-instrument-strip,
 /* 指令列只留「演示模式」開關與「全螢幕」，其餘（指南、分步、專注、匯出、截圖）收掉。 */
 body.demo-mode .sim-command-tools .sim-command:not(.sim-command-demo):not(.sim-command-full) { display: none; }
 /* 右側概念卡收起後，模擬工作區就佔滿整列，畫布更大。 */
