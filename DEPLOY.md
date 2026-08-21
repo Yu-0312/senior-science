@@ -2,6 +2,19 @@
 
 正式站在 **Vercel**。GitHub Pages 已停用。
 
+## 授權頁為什麼叫 `licensing.html`
+
+**不要把它改回 `license.html`。**
+
+GitHub 會掃描 repo 根目錄，凡是檔名為 `license` / `licence` / `copying`
+且副檔名是 `.md`、`.txt`、`.html` 的檔案，一律當成「授權檔」。
+這頁原本叫 `license.html`，於是它和真正的 `LICENSE.md` 同時被認成授權檔，
+repo 首頁側邊欄就出現了 License 與 License-2 兩個分頁。
+
+改名成 `licensing.html` 之後就不再符合那個規則（比對要求 `licen[sc]e`
+後面直接接副檔名或結尾）。`vercel.json` 有一條 308 redirect 把舊網址
+`/license.html` 導到新的，舊連結與既有的搜尋結果不會斷。
+
 ## 為什麼快取設定長這樣
 
 `vercel.json` 把資源分成兩類，因為它們的更新方式完全不同：

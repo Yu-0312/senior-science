@@ -3,6 +3,13 @@
   "buildCommand": "node tools/build-manifest.js && node tools/build-static.js && node tools/verify-static.js",
   "outputDirectory": ".",
   "cleanUrls": false,
+  "redirects": [
+    {
+      "source": "/license.html",
+      "destination": "/licensing.html",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/sw.js",

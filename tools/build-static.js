@@ -206,7 +206,7 @@ ${o.jsonLd ? '<script type="application/ld+json">' + JSON.stringify(o.jsonLd) + 
   <a class="license-home" href="${o.base}index.html"><span class="license-home-mark" aria-hidden="true">PH</span>物理實驗室</a>
   <div class="license-topbar-actions">
     <a class="license-toplink" href="${o.base}experiments.html">全部實驗</a>
-    <a class="license-toplink" href="${o.base}license.html">授權</a>
+    <a class="license-toplink" href="${o.base}licensing.html">授權</a>
   </div>
 </header>
 <main class="license-page">
@@ -434,7 +434,10 @@ function resolveSiteUrl(site) {
     const url = /^https?:\/\//.test(env) ? env : "https://" + env;
     return withSlash(url);
   }
-  return withSlash(site.siteUrl || "https://yu-0312.github.io/senior-science/");
+  /* 最後一道預設值。GitHub Pages 已停用（見 DEPLOY.md），所以這裡跟著指向
+     Vercel 正式站——萬一 site-config.js 的 siteUrl 漏掉，至少不會整批產出
+     指向死網址的 canonical。 */
+  return withSlash(site.siteUrl || "https://senior-science.vercel.app/");
 }
 
 /* ---------------------------------------------------------------------------
@@ -484,7 +487,7 @@ function main() {
   const urls = [
     { loc: siteUrl, priority: "1.0" },
     { loc: siteUrl + "experiments.html", priority: "0.9" },
-    { loc: siteUrl + "license.html", priority: "0.3" }
+    { loc: siteUrl + "licensing.html", priority: "0.3" }
   ].concat(flat.map(item => ({ loc: siteUrl + "p/" + item.exp.id + ".html", priority: "0.8" })))
    .concat(flat.map(item => ({ loc: siteUrl + "p/worksheet-" + item.exp.id + ".html", priority: "0.5" })));
 
