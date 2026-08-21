@@ -3,7 +3,7 @@
 從國中自然的生活物理銜接到教育部 **108 課綱**自然科學領域物理的互動模擬網站。全站繁體中文，涵蓋國中基礎、必修物理與選修物理加深加廣內容，目前提供 **12 個學習模組、248 個實驗主題、248 個即時 Canvas 互動模擬**；目錄採資料驅動擴充，沒有預設的實驗或題型數量上限。
 
 **線上網站：** [https://senior-science.vercel.app/](https://senior-science.vercel.app/)
-**使用授權：** [免費教育使用與推廣授權](https://senior-science.vercel.app/license.html)
+**使用授權：** [免費教育使用與推廣授權](https://senior-science.vercel.app/licensing.html)
 
 > 合作試用期間全站有密碼閘門，並自動加上 `noindex`。結束後把 `js/site-config.js` 的 `accessGate` 改成 `false` 重新部署即可全站公開，SEO 會同時上線。
 
@@ -256,7 +256,7 @@ PhysicsLab.register("your-id", {
 
 原創教學內容與視覺素材採用 **CC BY-NC-SA 4.0**：可用於非商業教學、分享與改編，但須標示來源、連結授權並以相同方式分享。另提供科普推廣特別許可，老師、學生社團與創作者可以在公開文章、社群或含廣告分潤的平台中，以截圖、錄影與連結介紹本網站；不得把本站內容、鏡像站或改作包裝成付費服務。
 
-完整條款見 [免費教育使用與推廣授權](https://senior-science.vercel.app/license.html) 與 [LICENSE.md](LICENSE.md)。
+完整條款見 [免費教育使用與推廣授權](https://senior-science.vercel.app/licensing.html) 與 [LICENSE.md](LICENSE.md)。
 
 ---
 

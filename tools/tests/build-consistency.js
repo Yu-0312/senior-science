@@ -1,9 +1,9 @@
 /*
  * build-consistency.js — 發佈前的版本一致性檢查
  *
- * 由來：license.html 的 style.css 停在 ?v=20260725-8，其餘全站都是 20260726-5。
- * 每次改版我都用 sed 批次替換舊版號，但 license.html 落後了好幾版，
- * 舊的替換字串一直對不到它，於是它就一直留在原地。
+ * 由來：授權頁（當時叫 license.html，現已改名 licensing.html）的 style.css
+ * 停在 ?v=20260725-8，其餘全站都是 20260726-5。每次改版我都用 sed 批次替換
+ * 舊版號，但這一頁落後了好幾版，舊的替換字串一直對不到它，於是它就留在原地。
  *
  * 後果不只是「拿到舊 CSS」：Service Worker 預先快取的是
  * css/style.css?v=<目前版本>，另一個查詢字串等於完全不同的網址，
@@ -29,7 +29,7 @@ ok(BUILD === SW_BUILD, "sw.js 的 BUILD 與 site-config 相同",
   "site-config=" + BUILD + " sw=" + SW_BUILD);
 
 console.log("\n=== 所有 HTML 的 ?v= 都等於目前版本 ===");
-const htmls = ["index.html", "experiments.html", "license.html"]
+const htmls = ["index.html", "experiments.html", "licensing.html"]
   .concat(fs.existsSync("p") ? fs.readdirSync("p").map(f => "p/" + f).filter(f => f.endsWith(".html")) : []);
 const bad = [];
 htmls.forEach(f => {

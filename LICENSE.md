@@ -19,4 +19,4 @@ Copyright (c) 2026 Yu-0312. 除另有標示外，本專案的原創教學文字�
 
 本授權主要涵蓋教學內容與視覺素材。原始程式碼、商標與專案識別保留所有權利；若要鏡像、商業整合、重新發佈或大量重製，請先取得專案維護者的書面許可。
 
-完整易讀版請見 [授權頁](https://yu-0312.github.io/senior-science/license.html)。CC BY-NC-SA 4.0 的法律效力以 [正式法律文本](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode.zh-hant) 為準。
+完整易讀版請見 [授權頁](https://senior-science.vercel.app/licensing.html)。CC BY-NC-SA 4.0 的法律效力以 [正式法律文本](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode.zh-hant) 為準。

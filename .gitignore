@@ -1,0 +1,30 @@
+# 作業系統
+.DS_Store
+._*
+Thumbs.db
+desktop.ini
+
+# 編輯器
+.vscode/
+.idea/
+*.swp
+*~
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.npm/
+
+# 環境變數與憑證（本專案是純靜態站，不該有這些東西進版控）
+.env
+.env.*
+*.pem
+
+# Vercel 本機開發產物
+.vercel/
+
+# 暫存
+*.bak
+*.tmp
+*.log

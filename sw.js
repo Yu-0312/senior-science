@@ -7,7 +7,7 @@
 const BUILD = "20260806-2";
 const CACHE = "physics-lab-" + BUILD;
 
-const CORE = ["./", "index.html", "license.html", "manifest.json"];
+const CORE = ["./", "index.html", "licensing.html", "manifest.json"];
 const VERSIONED = [
   "css/style.css",
   "js/site-config.js",
