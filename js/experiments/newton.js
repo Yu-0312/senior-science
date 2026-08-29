@@ -89,11 +89,15 @@
     const rX = PL.ui.readout(L.readouts, { label: "位移 x", unit: "m" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const AP = PL.apparatus;
       const gy = H - 40, a = sF.get() / sM.get();
-      D.line(ctx, 20, gy, W - 20, gy, PL.col("text-faint"), 2);
+      // 軌道：小車跑在導軌上，質量越大車身越寬
+      AP.benchTop(ctx, W, H, gy + 6);
+      AP.steel(ctx, 18, gy, W - 36, 7, -6);
       const sc = (W - 140) / 24, px = 70 + (x % 24) * sc;
       const w = 30 + sM.get() * 4;
-      block(ctx, px, gy, w, 22 + sM.get() * 2, MC(), sM.get() + "kg");
+      AP.cart(ctx, px, gy, w, 22 + sM.get() * 2);
+      D.text(ctx, sM.get() + " kg", px, gy - 26, { color: "#2b1f10", size: 11, align: "center", weight: "700" });
       if (sF.get() > 0) D.arrow(ctx, px + w / 2, gy - 16, px + w / 2 + sF.get() * 5, gy - 16, { color: PL.col("accent-2"), width: 2.5, label: "F = " + sF.get() + " N" });
       // a 長條
       D.text(ctx, "a = F / m = " + PL.fmt(a, 2) + " m/s²", 24, 28, { color: MC(), size: 13 });
@@ -126,16 +130,17 @@
       const A = { x: 50, y: H - 40 }; const Lpx = Math.min((W - 120) / Math.cos(th), (H - 90) / Math.sin(th));
       const apex = { x: A.x + Lpx * Math.cos(th), y: A.y - Lpx * Math.sin(th) };
       const foot = { x: apex.x, y: A.y };
-      ctx.save(); ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(apex.x, apex.y); ctx.lineTo(foot.x, foot.y); ctx.closePath();
-      ctx.fillStyle = PL.theme.pale(0.05); ctx.fill(); ctx.strokeStyle = PL.col("text-faint"); ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
-      D.text(ctx, sTh.get() + "°", A.x + 30, A.y - 6, { color: PL.col("text-dim"), size: 12 });
+      /* 斜面畫成實物斜面板（有厚度、有支撐面），不是一個三角形線框 */
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, A.y + 4);
+      AP.ramp(ctx, A.x, A.y, Lpx, th);
+      AP.protractorArc = null;   // 保留欄位供日後量角器使用
+      D.text(ctx, sTh.get() + "°", A.x + 34, A.y - 8, { color: PL.col("text-dim"), size: 12, weight: "700" });
       const u = { x: -Math.cos(th), y: Math.sin(th) }; // 下坡方向
       const n = { x: -Math.sin(th), y: -Math.cos(th) }; // 外法線
       const bs = Math.min(s, Lpx - 30);
       const bx = apex.x + u.x * (bs + 24), by = apex.y + u.y * (bs + 24);
-      ctx.save(); ctx.translate(bx, by); ctx.rotate(-th);
-      D.rect(ctx, -18, -30, 36, 24, { fill: m, stroke: "rgba(255,255,255,0.4)", width: 1.5, r: 4 });
-      ctx.restore();
+      AP.woodBlock(ctx, bx, by - 6, 40, 26, -th);
       const cx = bx + n.x * 18, cy = by + n.y * 18; const FS = 26;
       D.arrow(ctx, cx, cy, cx, cy + FS * 1.4, { color: PL.col("warn"), width: 2, label: "mg" });
       D.arrow(ctx, cx, cy, cx + n.x * FS * Math.cos(th), cy + n.y * FS * Math.cos(th), { color: PL.col("accent-2"), width: 2, label: "N" });
@@ -176,14 +181,28 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const F = sF.get(), fsMax = sMs.get() * N, fk = sMk.get() * N, moving = F > fsMax;
       const f = moving ? fk : F, a = moving ? (F - fk) / mass : 0;
-      const gy = 130;
-      D.line(ctx, 20, gy, W - 20, gy, PL.col("text-faint"), 2);
-      const px = 90 + (moving ? (x % 20) * 6 : 0);
-      block(ctx, px, gy, 46, 30, MC(), mass + "kg");
-      D.arrow(ctx, px + 23, gy - 15, px + 23 + F * 5, gy - 15, { color: PL.col("accent-2"), width: 2.4, label: "F=" + PL.fmt(F, 1) });
-      D.arrow(ctx, px - 23, gy - 15, px - 23 - f * 5, gy - 15, { color: PL.col("danger"), width: 2.4, label: "f=" + PL.fmt(f, 1) });
+      const AP = PL.apparatus;
+      const gy = 124;
+      /* 桌面：摩擦力發生在木塊與桌面之間，那個接觸面要看得見。
+         只鋪一條窄帶，不能鋪到畫布底部——下面還有 f–F 圖。 */
+      ctx.save();
+      const tg = ctx.createLinearGradient(0, gy, 0, gy + 16);
+      tg.addColorStop(0, "rgba(122,112,96,0.42)");
+      tg.addColorStop(1, "rgba(60,56,50,0)");
+      ctx.fillStyle = tg; ctx.fillRect(0, gy, W, 16);
+      ctx.restore();
+      D.line(ctx, 16, gy, W - 16, gy, PL.theme.pale(0.5), 2);
+
+      const px = 120 + (moving ? (x % 20) * 6 : 0);
+      AP.woodBlock(ctx, px, gy, 52, 32, 0);
+      D.text(ctx, mass + " kg", px, gy - 12, { color: "#2b1f10", size: 11, align: "center", weight: "700" });
+      // 拉力用彈簧秤施加，指針位置就是施力大小
+      AP.springScale(ctx, px + 28, gy - 16, 62, F / 30);
+      // 力向量畫在木塊上方，避開彈簧秤
+      D.arrow(ctx, px + 22, gy - 46, px + 22 + F * 5, gy - 46, { color: PL.col("accent-2"), width: 2.4, label: "F=" + PL.fmt(F, 1) });
+      D.arrow(ctx, px - 22, gy - 46, px - 22 - f * 5, gy - 46, { color: PL.col("danger"), width: 2.4, label: "f=" + PL.fmt(f, 1), lx: -8, ly: -8 });
       // 摩擦力 vs 施力 圖
-      const bx = 40, by = gy + 34, bw = W - 80, bh = H - by - 20;
+      const bx = 40, by = gy + 32, bw = W - 80, bh = H - by - 20;
       const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: 30, y0: 0, y1: Math.max(fsMax, fk) * 1.3 + 1 });
       g.frame({ title: "摩擦力 f 對 施力 F", xlabel: "F (N)", ylabel: "f (N)" }); g.grid(6, 4);
       g.curve([[0, 0], [fsMax, fsMax]], { color: PL.col("warn"), width: 2 });        // 靜摩擦：f=F
@@ -216,15 +235,18 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const m1 = s1.get(), m2 = s2.get(), m = MC();
       const a = (m1 - m2) * 9.8 / (m1 + m2), T = 2 * m1 * m2 * 9.8 / (m1 + m2);
-      const cx = W / 2, py = 44, pr = 22;
-      D.ring(ctx, cx, py, pr, PL.col("text-faint"), 3);
-      D.disc(ctx, cx, py, 4, { fill: PL.col("text-faint") });
+      const A = PL.apparatus;
+      const cx = W / 2, py = 52, pr = 24;
+      A.benchTop(ctx, W, H, H - 22);
+      A.standRod(ctx, cx - 132, H - 20, py - 30);
+      A.crossArm(ctx, cx - 132, py - 20, cx);
+      A.pulley(ctx, cx, py, pr);
       const lx = cx - pr, rx = cx + pr;
-      const mid = (H - 90) / 2, y1 = 70 + mid + y, y2 = 70 + mid - y;
-      D.line(ctx, lx, py, lx, y1, "#c9d3e0", 2); D.line(ctx, rx, py, rx, y2, "#c9d3e0", 2);
-      const bw1 = 30 + m1 * 4, bw2 = 30 + m2 * 4;
-      D.rect(ctx, lx - bw1 / 2, y1, bw1, 26, { fill: m, stroke: "rgba(255,255,255,0.4)", r: 4 }); D.text(ctx, m1 + "kg", lx, y1 + 17, { color: "#04121a", size: 11, align: "center", weight: "700" });
-      D.rect(ctx, rx - bw2 / 2, y2, bw2, 26, { fill: "#ffab80", stroke: "rgba(255,255,255,0.4)", r: 4 }); D.text(ctx, m2 + "kg", rx, y2 + 17, { color: "#04121a", size: 11, align: "center", weight: "700" });
+      const mid = (H - 108) / 2, y1 = 82 + mid + y, y2 = 82 + mid - y;
+      A.cord(ctx, lx, py, lx, y1); A.cord(ctx, rx, py, rx, y2);
+      const bw1 = 26 + m1 * 3.4, bw2 = 26 + m2 * 3.4;
+      A.weight(ctx, lx, y1, bw1, 28, m1 + " kg");
+      A.weight(ctx, rx, y2, bw2, 28, m2 + " kg");
       const dir = a > 0.01 ? "m₁ 下降" : a < -0.01 ? "m₂ 下降" : "平衡靜止";
       D.text(ctx, dir, cx, H - 16, { color: PL.col("text-dim"), size: 12, align: "center" });
       rA.set(Math.abs(a), 2); rT.set(T, 1);
@@ -393,15 +415,34 @@
       const cx = W / 2, cy = H * 0.38, half = Math.min(W * 0.38, 180), sc = half / 5;
       const c = Math.cos(ang), s = Math.sin(ang);
 
-      // 支架與支點
-      D.line(ctx, cx, cy, cx - 24, cy + 48, PL.col("text-faint"), 2);
-      D.line(ctx, cx, cy, cx + 24, cy + 48, PL.col("text-faint"), 2);
-      D.line(ctx, cx - 34, cy + 48, cx + 34, cy + 48, PL.col("text-faint"), 2);
+      // 支架與支點：三角刀口座立在檯面上
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, cy + 46);
+      AP.contactShadow(ctx, cx, cy + 50, 46);
+      ctx.save();
+      const kg = ctx.createLinearGradient(0, cy, 0, cy + 48);
+      kg.addColorStop(0, "rgb(160,170,186)");
+      kg.addColorStop(0.5, "rgb(104,113,128)");
+      kg.addColorStop(1, "rgb(58,64,76)");
+      ctx.fillStyle = kg;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + 2); ctx.lineTo(cx + 26, cy + 48); ctx.lineTo(cx - 26, cy + 48);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(30,38,50,0.6)"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.restore();
+      AP.steel(ctx, cx - 38, cy + 46, 76, 7, 6);
       // 水平參考線：桿子傾斜時才看得出來偏了多少
       D.line(ctx, cx - half, cy, cx + half, cy, PL.col("text-faint"), 1, [4, 5]);
-      D.line(ctx, cx - half * c, cy - half * s, cx + half * c, cy + half * s, MC(), 6);
+      ctx.save();
+      const bg = ctx.createLinearGradient(0, cy - 4, 0, cy + 4);
+      bg.addColorStop(0, "rgb(206,214,226)"); bg.addColorStop(0.45, "rgb(140,150,166)"); bg.addColorStop(1, "rgb(80,88,102)");
+      ctx.strokeStyle = bg; ctx.lineWidth = 7; ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(cx - half * c, cy - half * s); ctx.lineTo(cx + half * c, cy + half * s);
+      ctx.stroke();
+      ctx.restore();
       D.disc(ctx, cx, cy, 5, { fill: PL.col("text-dim") });
-      D.text(ctx, "支點", cx, cy + 64, { color: PL.col("text-faint"), size: 10, align: "center" });
+      D.text(ctx, "支點", cx, cy + 68, { color: PL.col("text-faint"), size: 10, align: "center" });
 
       /* 一側的砝碼、重量箭頭與力臂標註 */
       function side(dist, m, weight, sign, name, tone) {
@@ -505,14 +546,28 @@
     const rK = PL.ui.readout(L.readouts, { label: "勁度 k", unit: "N/m" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const A = PL.apparatus;
       const m = sM.get(), k = sK.get(), F = m * 9.8, x = F / k;
-      const topY = 34, cx = W * 0.26, natural = 66, ext = PL.clamp(x * 320, 0, H - 150);
-      D.rect(ctx, cx - 40, topY - 8, 80, 8, { fill: PL.col("text-faint") });
+      const topY = 44, cx = W * 0.28, natural = 66, ext = PL.clamp(x * 320, 0, H - 170);
+      const baseY = H - 26;
+
+      /* 鐵架 + 橫桿：彈簧是掛在實驗架上的，不是憑空吊著 */
+      A.benchTop(ctx, W, H, baseY - 6);
+      A.standRod(ctx, cx - 78, baseY, topY - 24);
+      A.crossArm(ctx, cx - 78, topY - 14, cx);
+
+      // 對照用的刻度尺，讓「伸長量」是量出來的
+      const pxPerCm = 320 / 100;                       // ext = x(m) * 320 → 1 cm = 3.2 px
+      A.ruler(ctx, cx + 52, topY + natural - 4, baseY - 12, pxPerCm);
+
       D.spring(ctx, cx, topY, cx, topY + natural + ext, 10, 11, MC());
-      D.rect(ctx, cx - 24, topY + natural + ext, 48, 34, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 5 });
-      D.text(ctx, m + "kg", cx, topY + natural + ext + 22, { color: "#04121a", size: 11, align: "center", weight: "700" });
-      D.line(ctx, cx + 58, topY + natural, cx + 58, topY + natural + ext, PL.col("accent-2"), 2);
-      D.text(ctx, "x", cx + 66, topY + natural + ext / 2, { color: PL.col("accent-2"), size: 12 });
+      A.weight(ctx, cx, topY + natural + ext, 44, 36, m + " kg");
+
+      // 伸長量標註
+      D.line(ctx, cx + 34, topY + natural, cx + 34, topY + natural + ext, PL.col("accent-2"), 2);
+      D.line(ctx, cx + 28, topY + natural, cx + 40, topY + natural, PL.col("accent-2"), 1.4);
+      D.line(ctx, cx + 28, topY + natural + ext, cx + 40, topY + natural + ext, PL.col("accent-2"), 1.4);
+      D.text(ctx, "x", cx + 44, topY + natural + ext / 2, { color: PL.col("accent-2"), size: 12, weight: "700" });
       const bx = W * 0.52, by = 30, bw = W - bx - 20, bh = H - 60;
       const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: 0.6, y0: 0, y1: 60 });
       g.frame({ title: "F – x（斜率 = k）", xlabel: "x (m)", ylabel: "F (N)" }); g.grid(4, 4);

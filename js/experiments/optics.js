@@ -16,7 +16,12 @@
     return `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`;
   };
 
-  /* 反射與折射（司乃耳定律） */
+  /* 反射與折射（司乃耳定律）
+   *
+   * 畫面照著課堂那一套走：光具座上的量角圓盤、盤心的半圓形介質、
+   * 從左上打進來的雷射筆。學生在教室裡看到的是這些東西，
+   * 螢幕上就該是這些東西——角度與光路疊在器材上面，而不是取代它。
+   */
   PL.register("snell", { build(root) {
     const L = PL.ui.layout(root);
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
@@ -27,106 +32,263 @@
     const rTIR = PL.ui.readout(L.readouts, { label: "臨界角 θc", unit: "°" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const cx = W / 2, cy = H / 2, Ln = Math.min(W, H) * 0.4, th1 = sTh.get() * Math.PI / 180, n1 = sN1.get(), n2 = sN2.get();
-      D.rect(ctx, 0, 0, W, cy, { fill: "rgba(90,162,255,0.06)" });
-      D.rect(ctx, 0, cy, W, H - cy, { fill: "rgba(240,98,146,0.08)" });
-      D.line(ctx, 0, cy, W, cy, PL.col("text-faint"), 2);
-      D.line(ctx, cx, 20, cx, H - 20, "rgba(255,255,255,0.2)", 1, [4, 4]);
-      D.text(ctx, "n₁ = " + PL.fmt(n1, 2), 14, cy - 12, { color: PL.col("accent-2"), size: 12 });
-      D.text(ctx, "n₂ = " + PL.fmt(n2, 2), 14, cy + 20, { color: MC(), size: 12 });
-      // 入射
-      D.arrow(ctx, cx - Ln * Math.sin(th1), cy - Ln * Math.cos(th1), cx, cy, { color: "#ffe08a", width: 2.4, label: "入射" });
+      const A = PL.apparatus;
+      const cx = W / 2, cy = H * 0.5;
+      const R = Math.min(W * 0.30, H * 0.40);
+      const th1 = sTh.get() * Math.PI / 180, n1 = sN1.get(), n2 = sN2.get();
+
+      A.benchTop(ctx, W, H, H - 26);
+
+      // 量角圓盤與盤心的半圓介質
+      A.protractor(ctx, cx, cy, R);
+      A.semiCircleGlass(ctx, cx, cy, R * 0.62);
+
+      // 界面與法線
+      D.line(ctx, cx - R, cy, cx + R, cy, PL.theme.pale(0.5), 1.6);
+      D.line(ctx, cx, cy - R - 6, cx, cy + R + 6, PL.theme.pale(0.34), 1, [5, 4]);
+      D.text(ctx, "法線", cx + 6, cy - R - 10, { color: PL.col("text-faint"), size: 10 });
+      D.text(ctx, "n₁ = " + PL.fmt(n1, 2), cx - R - 4, cy - 12, { color: PL.col("accent-2"), size: 12, align: "right" });
+      D.text(ctx, "n₂ = " + PL.fmt(n2, 2), cx - R - 4, cy + 20, { color: MC(), size: 12, align: "right" });
+
+      const Ln = R * 0.98;
+      // 雷射筆放在入射線的外端，筆身指向盤心
+      const ix = cx - Ln * Math.sin(th1), iy = cy - Ln * Math.cos(th1);
+      A.laser(ctx, ix, iy, Math.atan2(cy - iy, cx - ix));
+
+      // 入射：標籤放在光線中段，放在箭頭尖端會壓在盤心上和「折射」疊在一起
+      D.arrow(ctx, ix, iy, cx, cy, { color: "#ffe08a", width: 2.4 });
+      D.text(ctx, "入射", (ix + cx) / 2 - 26, (iy + cy) / 2 + 4, { color: "#ffe08a", size: 12 });
       // 反射
       D.arrow(ctx, cx, cy, cx + Ln * Math.sin(th1), cy - Ln * Math.cos(th1), { color: "rgba(255,224,138,0.6)", width: 2, label: "反射" });
       const sinth2 = n1 * Math.sin(th1) / n2;
-      if (sinth2 <= 1) { const th2 = Math.asin(sinth2); D.arrow(ctx, cx, cy, cx + Ln * Math.sin(th2), cy + Ln * Math.cos(th2), { color: MC(), width: 2.4, label: "折射" }); rTh2.set(th2 * 180 / Math.PI, 1); }
-      else { D.text(ctx, "全反射！", cx + 10, cy + 30, { color: PL.col("danger"), size: 13 }); rTh2.set("全反射"); }
+      if (sinth2 <= 1) {
+        const th2 = Math.asin(sinth2);
+        D.arrow(ctx, cx, cy, cx + Ln * Math.sin(th2), cy + Ln * Math.cos(th2), { color: MC(), width: 2.4, label: "折射", lx: 8, ly: 14 });
+        rTh2.set(th2 * 180 / Math.PI, 1);
+      } else {
+        D.text(ctx, "全反射！", cx + 10, cy + 30, { color: PL.col("danger"), size: 13 });
+        rTh2.set("全反射");
+      }
       rTIR.set(n1 > n2 ? Math.asin(n2 / n1) * 180 / Math.PI : "不適用");
     }
     cv.onResize(draw); draw();
     return { stop() { cv.destroy(); }, rerender: draw };
   }});
 
-  /* 透鏡成像 */
+  /* 透鏡成像
+   *
+   * 這一版把示意圖換成光具座：導軌上有蠟燭、透鏡與光屏，刻度是真的公分。
+   * 原本焦距與物距的單位是 px——學生沒辦法把「200 px」跟課堂上那把
+   * 光具座連起來，而這是本實驗最需要的那一步連結。
+   *
+   * 座標系：導軌左端為 0 cm，全長 BENCH_CM，透鏡固定在 LENS_CM。
+   * 垂直與水平共用同一個 pxPerCm，因此可以呼叫 calibrate() 讓尺真的能量。
+   */
   PL.register("lens", { build(root) {
     const L = PL.ui.layout(root);
-    const cv = PL.canvas.create(L.canvasWrap, 0.6);
+    const cv = PL.canvas.create(L.canvasWrap, 0.58);
+    const BENCH_CM = 120, LENS_CM = 45, OBJ_H_CM = 12;
     const sType = PL.ui.select(L.controls, { label: "透鏡", value: "conv", options: [{ value: "conv", label: "凸透鏡（會聚）" }, { value: "div", label: "凹透鏡（發散）" }], onChange: draw });
-    const sF = PL.ui.slider(L.controls, { label: "焦距 |f|", min: 40, max: 150, step: 5, value: 90, unit: "px", digits: 0, onInput: draw });
-    const sP = PL.ui.slider(L.controls, { label: "物距 p", min: 40, max: 320, step: 5, value: 200, unit: "px", digits: 0, onInput: draw });
-    const rQ = PL.ui.readout(L.readouts, { label: "像距 q", unit: "px" });
+    const sF = PL.ui.slider(L.controls, { label: "焦距 |f|", min: 8, max: 30, step: 1, value: 15, unit: "cm", digits: 0, onInput: draw });
+    const sP = PL.ui.slider(L.controls, { label: "物距 u", min: 10, max: 40, step: 1, value: 34, unit: "cm", digits: 0, onInput: draw });
+    const rQ = PL.ui.readout(L.readouts, { label: "像距 v", unit: "cm" });
     const rM = PL.ui.readout(L.readouts, { label: "放大率 m", unit: "" });
     const rType = PL.ui.readout(L.readouts, { label: "成像" });
+    const rZone = PL.ui.readout(L.readouts, { label: "物距所在區間" });
+
+    function zoneOf(u, f, conv) {
+      if (!conv) return "凹透鏡：恆為正立縮小虛像";
+      if (Math.abs(u - f) < 0.5) return "u = f：不成像（射出平行光）";
+      if (u < f) return "u < f：正立放大虛像（放大鏡）";
+      if (Math.abs(u - 2 * f) < 0.5) return "u = 2f：倒立等大實像";
+      if (u > 2 * f) return "u > 2f：倒立縮小實像（照相機）";
+      return "f < u < 2f：倒立放大實像（投影機）";
+    }
+
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const conv = sType.get() === "conv", f = sF.get() * (conv ? 1 : -1);
-      const xL = W * 0.5, cy = H / 2, p = sP.get(), ho = -46;
-      D.line(ctx, 20, cy, W - 20, cy, PL.col("text-faint"), 1.5);
-      // 透鏡
-      ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(xL, cy - 60); ctx.lineTo(xL, cy + 60); ctx.stroke();
-      if (conv) { D.arrow(ctx, xL, cy - 60, xL - 8, cy - 52, { color: MC(), width: 2 }); D.arrow(ctx, xL, cy - 60, xL + 8, cy - 52, { color: MC(), width: 2 }); D.arrow(ctx, xL, cy + 60, xL - 8, cy + 52, { color: MC(), width: 2 }); D.arrow(ctx, xL, cy + 60, xL + 8, cy + 52, { color: MC(), width: 2 }); }
-      ctx.restore();
-      [[-1, "F"], [1, "F'"]].forEach(([s, lab]) => { const fx = xL + s * Math.abs(f); D.disc(ctx, fx, cy, 3, { fill: PL.col("text-dim") }); D.text(ctx, lab, fx, cy + 16, { color: PL.col("text-faint"), size: 10, align: "center" }); });
-      // 物
-      const xo = xL - p, top = { x: xo, y: cy + ho };
-      D.arrow(ctx, xo, cy, xo, cy + ho, { color: PL.col("accent-2"), width: 2.4, label: "物" });
-      // 兩條主要光線
-      const A = { x: xL, y: cy + ho };
-      const Fp = { x: xL + f, y: cy };
-      const d1 = conv ? { x: Fp.x - A.x, y: Fp.y - A.y } : { x: A.x - Fp.x, y: A.y - Fp.y };
-      const center = { x: xL, y: cy };
-      const d2 = { x: center.x - top.x, y: center.y - top.y };
-      const img = intersect(A, d1, top, d2);
-      // 畫光線
-      D.line(ctx, xo, cy + ho, A.x, A.y, "#ffe08a", 1.6);
-      D.line(ctx, xo, cy + ho, center.x, center.y, "#ffe08a", 1.6);
-      const far = 1000;
-      D.line(ctx, A.x, A.y, A.x + d1.x / Math.hypot(d1.x, d1.y) * far, A.y + d1.y / Math.hypot(d1.x, d1.y) * far, "#ffe08a", 1.6);
-      D.line(ctx, center.x, center.y, center.x + d2.x / Math.hypot(d2.x, d2.y) * far, center.y + d2.y / Math.hypot(d2.x, d2.y) * far, "#ffe08a", 1.6);
-      if (img) {
-        const virtual = img.x < xL;
-        D.arrow(ctx, img.x, cy, img.x, img.y, { color: MC(), width: 2.4, label: virtual ? "虛像" : "實像", dash: virtual ? [4, 3] : null });
-        const qq = img.x - xL, m = (img.y - cy) / ho;
-        rQ.set(qq, 0); rM.set(m, 2); rType.set(virtual ? "正立虛像" : "倒立實像");
+      const A = PL.apparatus;
+      const conv = sType.get() === "conv";
+      const f = sF.get() * (conv ? 1 : -1), u = sP.get();
+
+      const x1 = 44, x2 = W - 44, pxPerCm = (x2 - x1) / BENCH_CM;
+      const X = cm => x1 + cm * pxPerCm;
+      const cy = Math.round(H * 0.62);
+      const railTop = Math.min(H - 30, cy + 84);
+      cv.calibrate(pxPerCm, "cm");
+
+      const hoPx = OBJ_H_CM * pxPerCm;          // 物高（畫面像素）
+      const xL = X(LENS_CM), xo = X(LENS_CM - u);
+
+      // 檯面與導軌
+      A.benchTop(ctx, W, H, railTop + 26);
+      A.bench(ctx, x1, x2, railTop, { pxPerCm, cm0: 0 });
+
+      // 主光軸
+      D.line(ctx, x1, cy, x2, cy, PL.theme.pale(0.30), 1.2, [6, 5]);
+
+      // 焦點與二倍焦距標記（畫在光軸上，對應五分區）
+      [[-2, "2F"], [-1, "F"], [1, "F′"], [2, "2F′"]].forEach(([k, lab]) => {
+        const fx = xL + k * Math.abs(f) * pxPerCm;
+        if (fx < x1 || fx > x2) return;
+        D.line(ctx, fx, cy - 7, fx, cy + 7, PL.theme.pale(0.75), 1.6);
+        D.text(ctx, lab, fx, cy + 21, { color: PL.col("text-dim"), size: 10, align: "center", weight: "600" });
+      });
+
+      // 成像計算（實正虛負，v > 0 表示像在透鏡右側可用光屏承接）
+      const denom = u - f;
+      const v = Math.abs(denom) < 1e-6 ? Infinity : f * u / denom;
+      const m = isFinite(v) ? -v / u : Infinity;
+      const real = isFinite(v) && v > 0;
+      const imgH = isFinite(m) ? Math.abs(m) * hoPx : 0;
+      const xi = isFinite(v) ? xL + v * pxPerCm : NaN;
+
+      // 光屏：只有成實像時才擺上導軌
+      let screenCm = null, offRail = false;
+      if (real) {
+        screenCm = LENS_CM + v;
+        if (screenCm > BENCH_CM - 3) { screenCm = BENCH_CM - 3; offRail = true; }
       }
+
+      // ---- 器材（由後往前疊）----
+      // 蠟燭（物）：光軸通過燭台底面，像才會清楚地倒在光軸另一側
+      A.carrier(ctx, xo, railTop, cy);
+      A.candle(ctx, xo, cy, { h: hoPx, r: Math.max(4, hoPx * 0.16) });
+      D.text(ctx, "物（蠟燭）", xo, cy + 42, { color: PL.col("accent-2"), size: 10, align: "center", weight: "600" });
+
+      // 光屏
+      if (screenCm !== null) {
+        const xs = X(screenCm);
+        const sharp = offRail ? 0.25 : 1;
+        A.carrier(ctx, xs, railTop, cy + 52);
+        A.screen(ctx, xs, cy, 30, 104, c => {
+          if (imgH > 1) A.projectedFlame(c, xs, cy, Math.min(imgH, 96), true, sharp);
+        });
+        D.text(ctx, offRail ? "光屏（已到導軌盡頭）" : "光屏", xs, cy - 62, {
+          color: offRail ? PL.col("danger") : PL.col("text-dim"), size: 10, align: "center"
+        });
+      }
+
+      // 透鏡
+      A.carrier(ctx, xL, railTop, cy + 54);
+      A.lens(ctx, xL, cy, 54, conv);
+      D.text(ctx, conv ? "凸透鏡" : "凹透鏡", xL, cy - 66, { color: MC(), size: 11, align: "center" });
+
+      // ---- 光路（疊在器材上）----
+      const rayY = cy - hoPx;                    // 燭焰頂端
+      const Atop = { x: xL, y: rayY };
+      const Fp = { x: xL + f * pxPerCm, y: cy };
+      const d1 = conv ? { x: Fp.x - Atop.x, y: Fp.y - Atop.y } : { x: Atop.x - Fp.x, y: Atop.y - Fp.y };
+      const d2 = { x: xL - xo, y: cy - rayY };
+      const img = intersect(Atop, d1, { x: xo, y: rayY }, d2);
+
+      const RAY = "#ffd77a";
+      // 光線裁在導軌上方：射穿檯面的線只會讓畫面變亂，也不是真的會發生的事
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, railTop - 2); ctx.clip();
+      D.line(ctx, xo, rayY, Atop.x, Atop.y, RAY, 1.8);          // 平行光軸入射
+      D.line(ctx, xo, rayY, xL, cy, RAY, 1.8);                   // 通過光心
+      const far = Math.max(W, H) * 1.6;
+      const n1 = Math.hypot(d1.x, d1.y), n2 = Math.hypot(d2.x, d2.y);
+      D.line(ctx, Atop.x, Atop.y, Atop.x + d1.x / n1 * far, Atop.y + d1.y / n1 * far, RAY, 1.8);
+      D.line(ctx, xL, cy, xL + d2.x / n2 * far, cy + d2.y / n2 * far, RAY, 1.8);
+      ctx.restore();
+
+      // 虛像：把反向延長線畫成虛線，並說明光屏接不到
+      if (img && !real) {
+        D.line(ctx, Atop.x, Atop.y, img.x, img.y, "rgba(255,215,122,0.45)", 1.2, [5, 4]);
+        D.line(ctx, xL, cy, img.x, img.y, "rgba(255,215,122,0.45)", 1.2, [5, 4]);
+        D.arrow(ctx, img.x, cy, img.x, img.y, { color: MC(), width: 2.4, label: "虛像", dash: [4, 3] });
+        D.text(ctx, "虛像用光屏接不到，要從透鏡另一側往回看", xL, cy - 84, {
+          color: PL.col("text-dim"), size: 11, align: "center"
+        });
+      }
+
+      // ---- 讀數 ----
+      if (!isFinite(v)) {
+        rQ.set("不成像"); rM.set("—"); rType.set("射出平行光");
+      } else {
+        rQ.set(v, 1); rM.set(m, 2);
+        rType.set(real ? (Math.abs(m) > 1 ? "倒立放大實像" : Math.abs(m) < 1 ? "倒立縮小實像" : "倒立等大實像")
+                       : "正立放大虛像");
+      }
+      rZone.set(zoneOf(u, Math.abs(f), conv));
     }
     cv.onResize(draw); draw();
     return { stop() { cv.destroy(); }, rerender: draw };
   }});
 
-  /* 面鏡成像 */
+  /* 面鏡成像 —— 同樣改成光具座上的實物配置，單位為公分 */
   PL.register("mirror", { build(root) {
     const L = PL.ui.layout(root);
-    const cv = PL.canvas.create(L.canvasWrap, 0.6);
+    const cv = PL.canvas.create(L.canvasWrap, 0.58);
+    const BENCH_CM = 120, MIRROR_CM = 104, OBJ_H_CM = 12;
     const sType = PL.ui.select(L.controls, { label: "面鏡", value: "concave", options: [{ value: "concave", label: "凹面鏡（會聚）" }, { value: "convex", label: "凸面鏡（發散）" }], onChange: draw });
-    const sF = PL.ui.slider(L.controls, { label: "焦距 |f|", min: 40, max: 150, step: 5, value: 90, unit: "px", digits: 0, onInput: draw });
-    const sP = PL.ui.slider(L.controls, { label: "物距 p", min: 40, max: 300, step: 5, value: 180, unit: "px", digits: 0, onInput: draw });
-    const rQ = PL.ui.readout(L.readouts, { label: "像距 q", unit: "px" });
+    const sF = PL.ui.slider(L.controls, { label: "焦距 |f|", min: 8, max: 30, step: 1, value: 18, unit: "cm", digits: 0, onInput: draw });
+    const sP = PL.ui.slider(L.controls, { label: "物距 u", min: 10, max: 50, step: 1, value: 30, unit: "cm", digits: 0, onInput: draw });
+    const rQ = PL.ui.readout(L.readouts, { label: "像距 v", unit: "cm" });
+    const rM = PL.ui.readout(L.readouts, { label: "放大率 m", unit: "" });
     const rType = PL.ui.readout(L.readouts, { label: "成像" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const concave = sType.get() === "concave", f = sF.get() * (concave ? 1 : -1);
-      const xm = W * 0.72, cy = H / 2, p = sP.get(), ho = -46;
-      D.line(ctx, 20, cy, xm, cy, PL.col("text-faint"), 1.5);
-      // 面鏡弧
-      ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 2.6; ctx.beginPath();
-      const R = Math.abs(f) * 2, sgn = concave ? -1 : 1;
-      for (let a = -60; a <= 60; a += 3) { const yy = cy + a; const xx = xm + sgn * (R - Math.sqrt(Math.max(0, R * R - a * a))); a === -60 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy); } ctx.stroke(); ctx.restore();
-      const F = { x: xm - f, y: cy };
-      D.disc(ctx, F.x, cy, 3, { fill: PL.col("text-dim") }); D.text(ctx, "F", F.x, cy + 16, { color: PL.col("text-faint"), size: 10, align: "center" });
-      const xo = xm - p, top = { x: xo, y: cy + ho }, A = { x: xm, y: cy + ho }, V = { x: xm, y: cy };
-      // ray1: 平行入射 → 反射過 F（凹）或看似來自 F（凸）
-      const d1 = concave ? { x: F.x - A.x, y: F.y - A.y } : { x: A.x - F.x, y: A.y - F.y };
-      // ray2: 射向頂點 → 對主軸反射
-      const din = { x: V.x - top.x, y: V.y - top.y }; const d2 = { x: -din.x, y: din.y };
-      const img = intersect(A, d1, V, d2);
-      D.line(ctx, xo, cy + ho, A.x, A.y, "#ffe08a", 1.6);
-      D.line(ctx, xo, cy + ho, V.x, V.y, "#ffe08a", 1.6);
-      const far = 900, n1 = Math.hypot(d1.x, d1.y), n2 = Math.hypot(d2.x, d2.y);
-      D.line(ctx, A.x, A.y, A.x + d1.x / n1 * far, A.y + d1.y / n1 * far, "#ffe08a", 1.6);
-      D.line(ctx, V.x, V.y, V.x + d2.x / n2 * far, V.y + d2.y / n2 * far, "#ffe08a", 1.6);
-      D.arrow(ctx, xo, cy, xo, cy + ho, { color: PL.col("accent-2"), width: 2.4, label: "物" });
-      if (img) { const virtual = img.x > xm; D.arrow(ctx, img.x, cy, img.x, img.y, { color: MC(), width: 2.4, label: virtual ? "虛像" : "實像", dash: virtual ? [4, 3] : null }); rQ.set(xm - img.x, 0); rType.set(virtual ? "正立虛像" : "倒立實像"); }
+      const A = PL.apparatus;
+      const concave = sType.get() === "concave";
+      const fcm = sF.get() * (concave ? 1 : -1), u = sP.get();
+
+      const x1 = 44, x2 = W - 44, pxPerCm = (x2 - x1) / BENCH_CM;
+      const X = cm => x1 + cm * pxPerCm;
+      const cy = Math.round(H * 0.62), railTop = Math.min(H - 30, cy + 84);
+      cv.calibrate(pxPerCm, "cm");
+
+      const hoPx = OBJ_H_CM * pxPerCm;
+      const xm = X(MIRROR_CM), xo = X(MIRROR_CM - u), f = fcm * pxPerCm;
+
+      A.benchTop(ctx, W, H, railTop + 26);
+      A.bench(ctx, x1, x2, railTop, { pxPerCm, cm0: 0 });
+      D.line(ctx, x1, cy, xm, cy, PL.theme.pale(0.30), 1.2, [6, 5]);
+
+      // 面鏡（安裝在導軌右端）
+      A.carrier(ctx, xm, railTop, cy + 56);
+      A.curvedMirror(ctx, xm, cy, 56, Math.abs(f) * 2, concave);
+      D.text(ctx, concave ? "凹面鏡" : "凸面鏡", xm, cy - 68, { color: MC(), size: 11, align: "center" });
+
+      // 焦點與曲率中心
+      [[1, "F"], [2, "C"]].forEach(([k, lab]) => {
+        const fx = xm - k * f;
+        if (fx < x1 || fx > x2) return;
+        D.line(ctx, fx, cy - 7, fx, cy + 7, PL.theme.pale(0.75), 1.6);
+        D.text(ctx, lab, fx, cy + 21, { color: PL.col("text-dim"), size: 10, align: "center", weight: "600" });
+      });
+
+      // 物（蠟燭）
+      A.carrier(ctx, xo, railTop, cy);
+      A.candle(ctx, xo, cy, { h: hoPx, r: Math.max(4, hoPx * 0.16) });
+      D.text(ctx, "物（蠟燭）", xo, cy + 42, { color: PL.col("accent-2"), size: 10, align: "center", weight: "600" });
+
+      // 光路
+      const rayY = cy - hoPx;
+      const F = { x: xm - f, y: cy }, Ap = { x: xm, y: rayY }, V = { x: xm, y: cy };
+      const d1 = concave ? { x: F.x - Ap.x, y: F.y - Ap.y } : { x: Ap.x - F.x, y: Ap.y - F.y };
+      const din = { x: V.x - xo, y: V.y - rayY }, d2 = { x: -din.x, y: din.y };
+      const img = intersect(Ap, d1, V, d2);
+      const RAY = "#ffd77a", far = Math.max(W, H) * 1.6;
+      const n1 = Math.hypot(d1.x, d1.y), n2 = Math.hypot(d2.x, d2.y);
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, railTop - 2); ctx.clip();
+      D.line(ctx, xo, rayY, Ap.x, Ap.y, RAY, 1.8);
+      D.line(ctx, xo, rayY, V.x, V.y, RAY, 1.8);
+      D.line(ctx, Ap.x, Ap.y, Ap.x + d1.x / n1 * far, Ap.y + d1.y / n1 * far, RAY, 1.8);
+      D.line(ctx, V.x, V.y, V.x + d2.x / n2 * far, cy + d2.y / n2 * far, RAY, 1.8);
+      ctx.restore();
+
+      if (img) {
+        const virtual = img.x > xm;
+        D.arrow(ctx, img.x, cy, img.x, img.y, { color: MC(), width: 2.4, label: virtual ? "虛像" : "實像", dash: virtual ? [4, 3] : null });
+        const vcm = (xm - img.x) / pxPerCm, m = -(img.y - cy) / hoPx;
+        rQ.set(vcm, 1); rM.set(m, 2);
+        rType.set(virtual ? "正立放大虛像" : (Math.abs(m) > 1 ? "倒立放大實像" : "倒立縮小實像"));
+        if (virtual) D.text(ctx, "虛像在鏡後，光屏接不到", xm, cy - 86, { color: PL.col("text-dim"), size: 11, align: "center" });
+      } else {
+        rQ.set("不成像"); rM.set("—"); rType.set("反射後為平行光");
+      }
     }
     cv.onResize(draw); draw();
     return { stop() { cv.destroy(); }, rerender: draw };

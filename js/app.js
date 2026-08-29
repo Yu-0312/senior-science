@@ -203,12 +203,32 @@
   }
 
   /* 確保某個實驗的程式碼已經就緒 */
+    /*
+   * 器材繪製層（sim-apparatus.js）跟實驗程式一樣是延遲載入的。
+   *
+   * 理由和實驗檔完全相同：首頁不跑任何模擬，卻要學生先把整個器材庫下載完，
+   * 等於把省下來的流量又花掉。它只在第一個實驗真正要開啟前才載入，
+   * 之後留在 PL.apparatus 上供所有實驗共用。
+   */
+  let apparatusPromise = null;
+  function ensureApparatus() {
+    if (PL.apparatus) return Promise.resolve(true);
+    if (!apparatusPromise) {
+      const build = (window.PhysicsLabSite && window.PhysicsLabSite.build) || "";
+      apparatusPromise = loadScript("js/sim-apparatus.js" + (build ? "?v=" + build : ""))
+        .then(() => true)
+        .catch(err => { console.error(err); apparatusPromise = null; return false; });
+    }
+    return apparatusPromise;
+  }
+
   function ensureExperiment(id) {
-    if (PL.has(id)) return Promise.resolve(true);
+    if (PL.has(id)) return ensureApparatus().then(() => true);
     const file = EXPERIMENT_FILES[id];
     if (!file) return Promise.resolve(false);
     const build = (window.PhysicsLabSite && window.PhysicsLabSite.build) || "";
-    return loadScript("js/experiments/" + file + (build ? "?v=" + build : ""))
+    return ensureApparatus()
+      .then(() => loadScript("js/experiments/" + file + (build ? "?v=" + build : "")))
       .then(() => PL.has(id))
       .catch(err => { console.error(err); return false; });
   }
@@ -506,10 +526,135 @@
   /* ------------------------------- 實驗頁 ------------------------------- */
   const pendingTypeset = new Set();
 
+  /*
+   * MathJax 載不到時的退路
+   *
+   * 由來：MathJax 從 cdn.jsdelivr.net 載，而 Service Worker 對跨網域資源
+   * 是「網路優先、失敗看快取」——但那份快取從來沒被寫入過，所以離線時必定失敗。
+   * 失敗時 typeset() 只是把節點丟進 pendingTypeset 等一個永遠不會來的事件，
+   * 畫面上就留著 \(T \propto \sqrt{L}\) 這種原始碼。首頁 hero 就有兩處，
+   * 等於主打「離線可用」的 PWA 一離線就先讓學生看到壞掉的字串。
+   *
+   * 這裡把 tools/build-static.js 為靜態頁寫的同一套 LaTeX→純文字轉換
+   * 縮成瀏覽器版：載不到就退成「T ∝ √L」，讀得懂，也不會看起來像壞掉。
+   */
+  const GREEK = {
+    pi: "π", theta: "θ", lambda: "λ", mu: "μ", rho: "ρ", alpha: "α", beta: "β",
+    gamma: "γ", Delta: "Δ", delta: "δ", omega: "ω", Omega: "Ω", sigma: "σ",
+    varepsilon: "ε", epsilon: "ε", phi: "φ", tau: "τ", nu: "ν", eta: "η"
+  };
+  const SYM = {
+    propto: "∝", times: "×", cdot: "·", pm: "±", approx: "≈", neq: "≠",
+    leq: "≤", geq: "≥", ll: "≪", gg: "≫", to: "→", Rightarrow: "⇒",
+    infty: "∞", quad: " ", qquad: "  ", left: "", right: "", displaystyle: "",
+    mathrm: "", text: "", ldots: "…", cdots: "⋯"
+  };
+  const OPERATOR = new Set(["∝", "×", "·", "±", "≈", "≠", "≤", "≥", "≪", "≫", "→", "⇒"]);
+  const SUP = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "+": "⁺", "-": "⁻", n: "ⁿ", i: "ⁱ" };
+  const SUB = { "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄", "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉", "+": "₊", "-": "₋" };
+  const isAtomic = s => /^[A-Za-z0-9ℏℓπθλμρσταβγδεφωνηΔΩ]+$/.test(s);
+
+  // 從 index（必須是 "{"）讀出成對的大括號內容；分子分母本身會含大括號，
+  // 所以必須數深度，不能用正規表示式。
+  function readGroup(src, index) {
+    if (src[index] !== "{") return null;
+    let depth = 0;
+    for (let i = index; i < src.length; i++) {
+      if (src[i] === "{") depth++;
+      else if (src[i] === "}" && --depth === 0) return { body: src.slice(index + 1, i), end: i + 1 };
+    }
+    return null;
+  }
+  function fraction(a, b) {
+    if (isAtomic(a) && isAtomic(b)) return a + "/" + b;
+    return "(" + (isAtomic(a) ? a : "(" + a + ")") + "/" + (isAtomic(b) ? b : "(" + b + ")") + ")";
+  }
+  function mapScript(body, table) {
+    let out = "";
+    for (const ch of body) { if (!table[ch]) return null; out += table[ch]; }
+    return out;
+  }
+  function plainFormula(latex) {
+    const src = String(latex || "");
+    let out = "", i = 0;
+    while (i < src.length) {
+      const ch = src[i];
+      if (ch === "\\") {
+        const m = /^[A-Za-z]+/.exec(src.slice(i + 1));
+        if (!m) { i += 2; continue; }
+        const name = m[0];
+        let j = i + 1 + name.length;
+        while (src[j] === " ") j++;
+        if (name === "dfrac" || name === "frac" || name === "tfrac") {
+          const a = readGroup(src, j); if (!a) { i = j; continue; }
+          const b = readGroup(src, a.end); if (!b) { i = a.end; continue; }
+          out += fraction(plainFormula(a.body), plainFormula(b.body)); i = b.end; continue;
+        }
+        if (name === "sqrt") {
+          const a = readGroup(src, j);
+          if (a) { out += "√" + (isAtomic(a.body) ? plainFormula(a.body) : "(" + plainFormula(a.body) + ")"); i = a.end; continue; }
+        }
+        if (name === "mathrm" || name === "text") {
+          const a = readGroup(src, j);
+          if (a) { out += a.body; i = a.end; continue; }
+        }
+        // 希臘字母是變數，\Delta P 要黏成 ΔP；運算子則要留空白，∝ √L 才讀得順
+        if (GREEK[name]) { out += GREEK[name]; i = j; continue; }
+        if (name in SYM) {
+          const sym = SYM[name];
+          if (sym && OPERATOR.has(sym)) out += (/\s$/.test(out) || !out ? "" : " ") + sym + " ";
+          else out += sym;
+          i = j; continue;
+        }
+        out += name; i = j; continue;
+      }
+      if (ch === "^" || ch === "_") {
+        const table = ch === "^" ? SUP : SUB;
+        const g = readGroup(src, i + 1);
+        const body = g ? g.body : src[i + 1];
+        const mapped = body == null ? null : mapScript(plainFormula(body), table);
+        if (mapped != null) { out += mapped; i = g ? g.end : i + 2; continue; }
+        out += ch + (g ? "(" + plainFormula(g.body) + ")" : body || "");
+        i = g ? g.end : i + 2; continue;
+      }
+      if (ch === "{" || ch === "}" || ch === "$") { i++; continue; }
+      out += ch; i++;
+    }
+    return out.replace(/\s{2,}/g, " ");
+  }
+
+  /* 把節點底下所有文字裡的 \( … \) 與 \[ … \] 換成可讀文字 */
+  const MATH_RE = /\\\(([\s\S]*?)\\\)|\\\[([\s\S]*?)\\\]/g;
+  function renderPlainMath(node) {
+    if (!node || !node.nodeType) return;
+    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null);
+    const hits = [];
+    let t;
+    while ((t = walker.nextNode())) if (t.nodeValue && t.nodeValue.indexOf("\\") >= 0) hits.push(t);
+    hits.forEach(n => {
+      n.nodeValue = n.nodeValue.replace(MATH_RE, (_, a, b) => plainFormula(a != null ? a : b));
+    });
+  }
+
+  let mathFailed = false;
+  function failMath() {
+    if (mathFailed) return;
+    if (window.MathJax && MathJax.typesetPromise) return;   // 只是還沒跑完，不是失敗
+    mathFailed = true;
+    pendingTypeset.clear();
+    renderPlainMath(document.body);
+  }
+  window.addEventListener("mathjax-failed", failMath);
+  // script 的 onerror 不是每種失敗都會觸發（例如被代理伺服器回一個空檔），
+  // 因此另外壓一道時間上限。
+  setTimeout(failMath, 5000);
+
   function typeset(node) {
     if (!node) return;
     if (window.MathJax && MathJax.typesetPromise) {
       MathJax.typesetPromise([node]).catch(() => {});
+    } else if (mathFailed) {
+      renderPlainMath(node);
     } else {
       pendingTypeset.add(node);
     }

@@ -182,13 +182,15 @@
       const len = Lm * scale;
       const bobX = pivotX + Math.sin(th) * len, bobY = pivotY + Math.cos(th) * len;
 
-      // 支架
-      D.rect(ctx, pivotX - 70, pivotY - 12, 140, 10, { fill: PL.col("text-faint"), r: 3 });
-      D.disc(ctx, pivotX, pivotY, 4, { fill: PL.col("text-dim") });
+      // 支架：鐵架直柱 + 橫桿夾頭。擺長是從夾頭量到球心，架子畫出來這件事就自己解釋了
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, H - 22);
+      AP.standRod(ctx, pivotX - 118, H - 20, pivotY - 26);
+      AP.crossArm(ctx, pivotX - 118, pivotY - 16, pivotX);
       // 鉛直參考線與擺線
       D.line(ctx, pivotX, pivotY, pivotX, pivotY + len, PL.theme.pale(0.18), 1, [4, 4]);
-      D.line(ctx, pivotX, pivotY, bobX, bobY, PL.col("text-dim"), 2);
-      D.disc(ctx, bobX, bobY, 13, { fill: MC(), glow: MC(), glowSize: 12 });
+      AP.cord(ctx, pivotX, pivotY, bobX, bobY);
+      AP.bob(ctx, bobX, bobY, 13);
 
       // 擺長標示
       D.arrow(ctx, pivotX - 92, pivotY, pivotX - 92, pivotY + len, { color: PL.col("accent-2"), width: 1.5, head: 7 });
@@ -280,16 +282,19 @@
       const natural = 90, stretch = m * 9.8 / K_TRUE * 260;   // 靜態伸長（像素）
       const amp = 26, dy = amp * Math.cos(w * t);
 
-      const topY = 34;
+      const topY = 44;
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, H - 22);
       // 左：靜態量伸長；右：動態量週期。並排讓兩種方法的關係一眼看清。
       [{ x: W * 0.32, moving: false, tag: "靜態：掛上砝碼量伸長" },
        { x: W * 0.68, moving: true, tag: "動態：拉一下量週期" }].forEach(col => {
         const offset = col.moving ? dy : 0;
         const bottom = topY + natural + stretch + offset;
-        D.rect(ctx, col.x - 46, topY - 10, 92, 9, { fill: PL.col("text-faint"), r: 3 });
+        // 兩座鐵架並排：同一根彈簧、同一顆砝碼，只差在量的方式
+        AP.standRod(ctx, col.x - 74, H - 20, topY - 22);
+        AP.crossArm(ctx, col.x - 74, topY - 12, col.x);
         D.spring(ctx, col.x, topY, col.x, bottom, 9, 11, MC());
-        D.rect(ctx, col.x - 22, bottom, 44, 30, { fill: MC(), stroke: PL.theme.pale(0.4), r: 5 });
-        D.text(ctx, m.toFixed(2), col.x, bottom + 20, { color: "#08131c", size: 11, align: "center", weight: "700" });
+        AP.weight(ctx, col.x, bottom, 44, 30, m.toFixed(2) + " kg");
         D.text(ctx, col.tag, col.x, H - 30, { color: PL.col("text-faint"), size: 11, align: "center" });
 
         if (!col.moving) {

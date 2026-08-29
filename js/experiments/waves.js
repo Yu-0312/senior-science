@@ -89,7 +89,8 @@
     const rNodes = PL.ui.readout(L.readouts, { label: "波節數" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const n = sN.get(), x0 = 40, x1 = W - 40, Ls = x1 - x0, midY = H / 2, A = H * 0.3;
+      const AP = PL.apparatus;
+      const n = sN.get(), x0 = 76, x1 = W - 88, Ls = x1 - x0, midY = H * 0.44, A = H * 0.26;
       /*
        * 原本振盪速率寫死成 w = 4，「波速 v」這根滑桿只改讀數不改畫面。
        * 駐波的頻率 f = n·v /（2L），波速變快，弦本來就該抖得更快。
@@ -98,6 +99,17 @@
       const vWave = sV.get(), Lm = 1.2;                 // 弦長取 1.2 m 作為畫面對應
       const freq = n * vWave / (2 * Lm);
       const k = n * Math.PI / Ls, w = freq * 0.12;
+      /* 實驗裝置：左端電動振動器驅動，右端跨過滑輪掛重物提供張力。
+         「波速由張力決定」這句話，要看得見那顆重物才成立。 */
+      const deskY = midY + A + 44;
+      AP.benchTop(ctx, W, H, deskY);
+      AP.vibrator(ctx, x0 - 26, midY + 26, 52);
+      D.text(ctx, "振動器", x0 - 26, midY + 42, { color: PL.col("text-faint"), size: 10, align: "center" });
+      AP.pulley(ctx, x1 + 16, midY, 13);
+      AP.cord(ctx, x1 + 16, midY + 13, x1 + 16, midY + 46);
+      AP.weight(ctx, x1 + 16, midY + 46, 20, 24, null);
+      D.text(ctx, "張力", x1 + 16, midY + 84, { color: PL.col("text-faint"), size: 10, align: "center" });
+
       // 包絡
       ctx.save(); ctx.strokeStyle = PL.theme.pale(0.12); ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
       ctx.beginPath(); for (let x = x0; x <= x1; x += 2) ctx.lineTo(x, midY - A * Math.abs(Math.sin(k * (x - x0)))); ctx.stroke();
@@ -364,13 +376,33 @@
        * 改成管長以滑桿上限 1 m 對應最大寬度。
        */
       const L_MAX = 1.0;
-      const x0 = 50, x1 = 50 + (W - 90) * (0.25 + 0.75 * Lm / L_MAX), span = x1 - x0, midY = H / 2, A = H * 0.28;
+      const x0 = 50, x1 = 50 + (W - 90) * (0.25 + 0.75 * Lm / L_MAX), span = x1 - x0, midY = H / 2, A = 38;
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, midY + 92);
+
+      /* 玻璃管本體：橫放的共鳴管，閉管端用金屬塞封住。
+         「管長決定哪些頻率會共鳴」這件事，要看得見管子才成立。 */
+      ctx.save();
+      const gg = ctx.createLinearGradient(0, midY - 46, 0, midY + 46);
+      gg.addColorStop(0.00, "rgba(226,244,252,0.30)");
+      gg.addColorStop(0.16, "rgba(255,255,255,0.14)");
+      gg.addColorStop(0.84, "rgba(200,224,238,0.10)");
+      gg.addColorStop(1.00, "rgba(226,244,252,0.30)");
+      ctx.fillStyle = gg; ctx.fillRect(x0, midY - 46, x1 - x0, 92);
+      ctx.strokeStyle = "rgba(206,232,244,0.75)"; ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(x0, midY - 46); ctx.lineTo(x1, midY - 46);
+      ctx.moveTo(x0, midY + 46); ctx.lineTo(x1, midY + 46);
+      ctx.stroke();
+      ctx.restore();
+      if (closed) AP.steel(ctx, x0 - 5, midY - 46, 10, 92, -14);   // 封閉端的塞子
+      // 音叉：在開口端敲響，驅動管內空氣柱
+      AP.tuningFork(ctx, x1 + 32, midY + 46, 74);
+      D.text(ctx, "音叉", x1 + 32, midY + 62, { color: PL.col("text-faint"), size: 10, align: "center" });
+
       D.line(ctx, x0, midY + 66, x1, midY + 66, PL.col("text-faint"), 1, [4, 4]);
       D.text(ctx, "L = " + PL.fmt(Lm, 2) + " m", (x0 + x1) / 2, midY + 80,
         { color: PL.col("text-faint"), size: 10, align: "center" });
-      // 管壁
-      D.line(ctx, x0, midY - 46, x1, midY - 46, PL.col("text-faint"), 2); D.line(ctx, x0, midY + 46, x1, midY + 46, PL.col("text-faint"), 2);
-      if (closed) D.line(ctx, x0, midY - 46, x0, midY + 46, PL.col("m-color", "#7986cb"), 4); // 封閉端
       // 位移駐波：閉管封閉端為節、開口端為腹
       const shape = xx => { const u = (xx - x0) / span; // 0..1
         if (closed) return Math.sin((2 * n - 1) * Math.PI / 2 * u);

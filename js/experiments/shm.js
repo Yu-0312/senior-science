@@ -23,11 +23,13 @@
       const x = A * Math.cos(w * t), v = -A * w * Math.sin(w * t);
       const midY = 70, wallX = 40, sc = (W - 160) / 5, eqX = wallX + 90 + 2.5 * sc * 0.5;
       cv.calibrate(sc, "m");      // 尺可直接量振幅與位移
-      // 牆
-      D.rect(ctx, wallX - 8, midY - 34, 8, 68, { fill: PL.col("text-faint") });
+      // 牆與滑軌：彈簧一端固定在牆上，滑塊在軌道上運動
+      const AP = PL.apparatus;
+      AP.steel(ctx, wallX - 12, midY - 38, 12, 76, -20);
+      AP.steel(ctx, wallX - 12, midY + 24, W - wallX - 20, 7, 4);
       const mx = eqX + x * sc;
       D.spring(ctx, wallX, midY, mx - 22, midY, 11, 12, MC());
-      D.rect(ctx, mx - 22, midY - 22, 44, 44, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 6 });
+      AP.woodBlock(ctx, mx, midY + 24, 46, 46, 0);
       // 平衡線
       D.line(ctx, eqX, midY - 40, eqX, midY + 40, "rgba(255,255,255,0.15)", 1, [3, 3]);
       D.arrow(ctx, mx, midY, mx + v * 12, midY, { color: PL.col("accent-2"), width: 2, label: "v" });
@@ -60,14 +62,20 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const Lm = sL.get(), g = sG.get(), th0 = sTh.get() * Math.PI / 180, w = Math.sqrt(g / Lm);
       const th = th0 * Math.cos(w * t);
-      const px = W / 2, py = 34, Lpx = Math.min((H - 80), (W * 0.42)) * (Lm / 4) + 40;
-      D.rect(ctx, px - 40, py - 8, 80, 8, { fill: PL.col("text-faint") });
+      const A = PL.apparatus;
+      const px = W / 2, py = 46, Lpx = Math.min((H - 96), (W * 0.42)) * (Lm / 4) + 40;
+
+      /* 鐵架吊起的單擺：擺長是從夾頭量到球心，架子畫出來學生才知道那一段從哪算起 */
+      A.benchTop(ctx, W, H, H - 24);
+      A.standRod(ctx, px - 118, H - 22, py - 26);
+      A.crossArm(ctx, px - 118, py - 16, px);
+
       // 擺動弧
-      D.ring(ctx, px, py, Lpx, "rgba(255,255,255,0.06)", 1);
+      D.ring(ctx, px, py, Lpx, PL.theme.pale(0.10), 1);
       const bx = px + Lpx * Math.sin(th), by = py + Lpx * Math.cos(th);
-      D.line(ctx, px, py, bx, by, "#c9d3e0", 2);
-      D.line(ctx, px, py, px, py + Lpx, "rgba(255,255,255,0.12)", 1, [3, 3]);
-      D.disc(ctx, bx, by, 15, { fill: MC(), glow: MC(), glowSize: 16 });
+      D.line(ctx, px, py, px, py + Lpx, PL.theme.pale(0.18), 1, [4, 4]);
+      A.cord(ctx, px, py, bx, by);
+      A.bob(ctx, bx, by, 15);
       rT.set(TAU / w, 2); rTh.set(th * 180 / Math.PI, 1);
     }
     const anim = PL.loop(dt => { if (dt) t += dt; draw(); });

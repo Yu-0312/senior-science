@@ -174,10 +174,20 @@
       // 線圈：一圈一圈畫出來，匝數改變看得見
       const turns = Math.min(18, Math.round(sTurns.get() / 3));
       const coilW = 96, coilH = 74;
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, cy + coilH / 2 + 40);
+      // 線軸的兩片端板，銅線繞在中間
+      AP.steel(ctx, cx - coilW / 2 - 7, cy - coilH / 2 - 8, 6, coilH + 16, -12);
+      AP.steel(ctx, cx + coilW / 2 + 1, cy - coilH / 2 - 8, 6, coilH + 16, -12);
       for (let i = 0; i < turns; i += 1) {
         const off = (i - (turns - 1) / 2) * (coilW / Math.max(1, turns));
         ctx.save();
-        ctx.strokeStyle = "#c98a4b"; ctx.lineWidth = 2.6;
+        // 銅線有亮暗面，一圈一圈才看得出是繞上去的線而不是畫的橢圓
+        const cg = ctx.createLinearGradient(cx + off - 9, 0, cx + off + 9, 0);
+        cg.addColorStop(0, "rgb(140,86,40)");
+        cg.addColorStop(0.35, "rgb(226,164,92)");
+        cg.addColorStop(1, "rgb(150,94,44)");
+        ctx.strokeStyle = cg; ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.ellipse(cx + off, cy, 9, coilH / 2, 0, 0, TAU);
         ctx.stroke();
@@ -201,8 +211,16 @@
         const rr = magH * 0.7 + i * 9;
         D.ring(ctx, mx, cy, rr, "rgba(209,73,91,0.16)", 1);
       }
-      D.rect(ctx, mx - magW, cy - magH / 2, magW, magH, { fill: "#d1495b", r: 2 });
-      D.rect(ctx, mx, cy - magH / 2, magW, magH, { fill: "#4a6fa5", r: 2 });
+      ctx.save();
+      const ng = ctx.createLinearGradient(0, cy - magH / 2, 0, cy + magH / 2);
+      ng.addColorStop(0, "rgb(226,110,124)"); ng.addColorStop(0.4, "rgb(196,64,84)"); ng.addColorStop(1, "rgb(140,38,54)");
+      ctx.fillStyle = ng; ctx.fillRect(mx - magW, cy - magH / 2, magW, magH);
+      const sg = ctx.createLinearGradient(0, cy - magH / 2, 0, cy + magH / 2);
+      sg.addColorStop(0, "rgb(118,152,206)"); sg.addColorStop(0.4, "rgb(66,102,158)"); sg.addColorStop(1, "rgb(38,62,104)");
+      ctx.fillStyle = sg; ctx.fillRect(mx, cy - magH / 2, magW, magH);
+      ctx.strokeStyle = "rgba(22,26,34,0.6)"; ctx.lineWidth = 1;
+      ctx.strokeRect(mx - magW, cy - magH / 2, magW * 2, magH);
+      ctx.restore();
       D.text(ctx, "N", mx - magW / 2, cy + 5, { color: "#fff", size: 13, align: "center", weight: "700" });
       D.text(ctx, "S", mx + magW / 2, cy + 5, { color: "#fff", size: 13, align: "center", weight: "700" });
 
@@ -211,10 +229,10 @@
 
       // 導線與檢流計
       const gx = W * 0.83, gy = cy;
-      D.line(ctx, cx + coilW / 2, cy - coilH / 2 + 6, gx - 34, gy - 26, PL.theme.pale(0.4), 2);
-      D.line(ctx, cx + coilW / 2, cy + coilH / 2 - 6, gx - 34, gy + 26, PL.theme.pale(0.4), 2);
-      D.rect(ctx, gx - 34, gy - 30, 68, 60, { fill: PL.theme.shade(0.4), stroke: PL.theme.pale(0.3), r: 6 });
-      D.text(ctx, "檢流計", gx, gy + 44, { color: PL.col("text-faint"), size: 10, align: "center" });
+      AP.wire(ctx, [{ x: cx + coilW / 2 + 7, y: cy - coilH / 2 + 6 }, { x: gx - 30, y: gy - 26 }], "rgb(186,54,48)", 2.8);
+      AP.wire(ctx, [{ x: cx + coilW / 2 + 7, y: cy + coilH / 2 - 6 }, { x: gx - 30, y: gy + 26 }], "rgb(58,96,168)", 2.8);
+      AP.meter(ctx, gx, gy - 6, 26, 0.5 + Math.max(-0.5, Math.min(0.5, e * 0.5)), null);
+      D.text(ctx, "檢流計", gx, gy + 52, { color: PL.col("text-faint"), size: 10, align: "center" });
       // 指針：偏轉角正比於電動勢，方向就是電流方向
       const maxE = 3.2;
       const ang = Math.max(-1, Math.min(1, e / maxE)) * 0.85;
@@ -320,12 +338,15 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const cy = H / 2, coilX = W * 0.6, approach = sMode.get() === "approach";
       const osc = (Math.sin(t) * 0.5 + 0.5), mx = approach ? coilX - 180 + osc * 90 : coilX - 90 - osc * 90;
-      for (let i = 0; i < 5; i++) D.ring(ctx, coilX + i * 12, cy, 36, MC(), 2.4);
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, cy + 74);
+      AP.coilWinding(ctx, coilX + 24, cy, 60, 36, 6);
       const nearPole = approach ? "N" : "S";
       D.text(ctx, nearPole, coilX - 6, cy - 44, { color: approach ? NP : SP, size: 15, align: "center", weight: "700" });
       D.text(ctx, "感應近端：" + nearPole + " 極", coilX + 20, cy - 44, { color: PL.col("text-dim"), size: 10 });
-      D.rect(ctx, mx - 34, cy - 12, 34, 24, { fill: NP, r: 3 }); D.text(ctx, "N", mx - 17, cy + 5, { color: "#fff", size: 13, align: "center", weight: "700" });
-      D.rect(ctx, mx, cy - 12, 34, 24, { fill: SP, r: 3 }); D.text(ctx, "S", mx + 17, cy + 5, { color: "#fff", size: 13, align: "center", weight: "700" });
+      AP.barMagnet(ctx, mx, cy, 34, 24);
+      D.text(ctx, "N", mx - 17, cy + 5, { color: "#fff", size: 13, align: "center", weight: "700" });
+      D.text(ctx, "S", mx + 17, cy + 5, { color: "#fff", size: 13, align: "center", weight: "700" });
       D.arrow(ctx, mx + 17, cy + 30, mx + 17 + (approach ? 34 : -34), cy + 30, { color: "#fff", width: 1.8, label: approach ? "接近" : "遠離" });
       rFace.set(approach ? "N（排斥）" : "S（吸引）"); rForce.set(approach ? "互相排斥" : "互相吸引");
     }
@@ -417,10 +438,12 @@
       const m = model(t);
       const cx = W * 0.30, cy = H * 0.46, R = Math.min(W * 0.13, H * 0.26);
 
-      // 磁極與磁感線
-      D.rect(ctx, cx - R - 46, cy - R * 0.9, 22, R * 1.8, { fill: NP, r: 3 });
+      // 磁極靴與磁感線
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, cy + R + 42);
+      AP.polePiece(ctx, cx - R - 46, cy - R * 0.9, 22, R * 1.8, true);
       D.text(ctx, "N", cx - R - 35, cy + 5, { color: "#fff", size: 14, align: "center", weight: "700" });
-      D.rect(ctx, cx + R + 24, cy - R * 0.9, 22, R * 1.8, { fill: SP, r: 3 });
+      AP.polePiece(ctx, cx + R + 24, cy - R * 0.9, 22, R * 1.8, false);
       D.text(ctx, "S", cx + R + 35, cy + 5, { color: "#fff", size: 14, align: "center", weight: "700" });
       if (layers.has("field")) {
         // 磁感線密度隨 B：這是 B 這根滑桿唯一看得見的地方
@@ -436,13 +459,18 @@
       // 中性面：線圈平面垂直於 B 的位置
       if (layers.has("neutral")) {
         D.line(ctx, cx, cy - R - 10, cx, cy + R + 10, PL.col("ok"), 1.6, [5, 4]);
-        D.text(ctx, "中性面", cx, cy - R - 16, { color: PL.col("ok"), size: 10, align: "center" });
+        D.text(ctx, "中性面", cx, cy - R - 34, { color: PL.col("ok"), size: 10, align: "center" });
       }
 
       // 轉動的線圈：以橢圓投影呈現，寬度 = R·|cosθ|
       const half = R * Math.cos(m.th);
       ctx.save();
-      ctx.strokeStyle = MC(); ctx.lineWidth = 2.8;
+      // 線圈是銅線，用漸層畫出亮暗面，和其他電磁實驗的線圈長得一樣
+      const wg = ctx.createLinearGradient(cx - Math.abs(half), 0, cx + Math.abs(half), 0);
+      wg.addColorStop(0, "rgb(140,86,40)");
+      wg.addColorStop(0.35, "rgb(232,170,96)");
+      wg.addColorStop(1, "rgb(150,94,44)");
+      ctx.strokeStyle = wg; ctx.lineWidth = 3.2;
       ctx.beginPath(); ctx.ellipse(cx, cy, Math.max(1.5, Math.abs(half)), R, 0, 0, TAU); ctx.stroke();
       ctx.restore();
       D.disc(ctx, cx + half, cy - R, 5, { fill: PL.col("accent-2") });
@@ -634,11 +662,10 @@
       const cx = W * 0.5, cy = H * 0.46;
       const coreW = 92, coreH = 128;
 
-      // 鐵芯（口字形閉合）
-      D.rect(ctx, cx - coreW / 2, cy - coreH / 2, coreW, coreH,
-        { fill: PL.theme.shade(0.30), stroke: PL.theme.pale(0.40), width: 2, r: 4 });
-      D.rect(ctx, cx - coreW / 2 + 18, cy - coreH / 2 + 18, coreW - 36, coreH - 36,
-        { fill: PL.col("sim-bg-1", "#0a0f16"), stroke: PL.theme.pale(0.25), width: 1.5, r: 3 });
+      // 鐵芯：疊片矽鋼片疊成的口字形閉合磁路
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, cy + coreH / 2 + 46);
+      AP.ironCore(ctx, cx - coreW / 2, cy - coreH / 2, coreW, coreH, 18);
 
       // 磁通：交流時在鐵芯裡循環流動；直流時靜止且畫成灰色，一眼看出「沒有變化」
       if (layers.has("flux")) {
@@ -658,12 +685,15 @@
       }
 
       // 線圈：匝數以實際圈數呈現，比例一眼可見
+      /* 線圈：繞在鐵芯柱上的漆包銅線。匝數多的那一側線圈明顯繞得比較密，
+         「匝數比決定電壓比」這件事因此看得見，而不只是讀數字。 */
       function coil(x, n, color, side) {
         const turns = PL.clamp(Math.round(n / 40), 3, 14);
-        for (let i = 0; i < turns; i += 1) {
-          const y = cy - coreH / 2 + 14 + i * ((coreH - 28) / Math.max(1, turns - 1));
-          D.ring(ctx, x, y, 11, color, 2.2);
-        }
+        const half = (coreH - 26) / 2;
+        ctx.save();
+        ctx.translate(x, cy); ctx.rotate(Math.PI / 2);
+        AP.coilWinding(ctx, 0, 0, half * 2 - 6, 12, turns, true);
+        ctx.restore();
         D.text(ctx, (side === "p" ? "n₁ = " : "n₂ = ") + n + " 匝", x, cy + coreH / 2 + 18,
           { color, size: 11, align: "center", weight: "700" });
       }
