@@ -212,91 +212,64 @@
       const m = MC();
       const c = circuit();
 
-      const x0 = 58, x1 = W - 58, y0 = 52, y1 = H - 58;
-      const wireColor = c.openCircuit ? PL.col("text-faint") : m;
+      const A = PL.apparatus;
+      const x0 = 70, x1 = W - 78, y0 = 88, y1 = H - 74;
+      const live = !c.openCircuit;
+      const wireColor = live ? "rgb(186,54,48)" : "rgb(118,110,108)";
 
-      // 導線迴路
-      ctx.save();
-      ctx.strokeStyle = wireColor; ctx.lineWidth = 2.4; ctx.lineJoin = "round";
-      ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
-      ctx.restore();
+      // 檯面：讓元件看起來是擺在桌上接起來的，不是符號圖
+      A.benchTop(ctx, W, H, y1 + 42);
 
-      // 電池：長短線是課本的畫法，學生認得
+      /* 導線迴路：先畫線，元件再壓在上面蓋住接點 */
+      A.wire(ctx, [{ x: x0, y: y1 }, { x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }], wireColor, 3.6);
+
+      // 電池組（左側）
       const by = (y0 + y1) / 2;
-      D.rect(ctx, x0 - 13, by - 30, 26, 60, { fill: PL.theme.shade(0.35), stroke: PL.theme.pale(0.26), width: 1, r: 3 });
-      D.line(ctx, x0, by - 16, x0, by + 16, PL.theme.pale(0.85), 4);
-      D.line(ctx, x0 - 7, by - 8, x0 - 7, by + 8, PL.theme.pale(0.85), 2);
-      D.text(ctx, PL.fmt(c.V, 1) + " V", x0 - 18, by + 4, { color: PL.col("text-dim"), size: 12, align: "right", weight: "700" });
+      A.battery(ctx, x0 - 17, by - 34, 34, 68);
+      D.text(ctx, PL.fmt(c.V, 1) + " V", x0 - 24, by + 4, { color: PL.col("text-dim"), size: 12, align: "right", weight: "700" });
 
-      // 燈泡
+      // 燈泡（上方）
       const bulbX = (x0 + x1) / 2, bulbY = y0;
       const brightness = burnt ? 0 : Math.min(1, c.P / BULB_MAX_POWER);
-      if (brightness > 0.02) {
-        ctx.save();
-        ctx.globalAlpha = 0.16 + brightness * 0.55;
-        D.disc(ctx, bulbX, bulbY, 20 + brightness * 26, { fill: "#ffd76a" });
-        ctx.restore();
-      }
-      D.disc(ctx, bulbX, bulbY, 15, {
-        fill: burnt ? "#3a3a3a" : "rgb(" + Math.round(90 + brightness * 165) + "," +
-          Math.round(85 + brightness * 140) + "," + Math.round(70 + brightness * 40) + ")",
-        stroke: PL.theme.pale(0.5), width: 1.5
-      });
-      D.rect(ctx, bulbX - 7, bulbY + 13, 14, 9, { fill: PL.theme.pale(0.42), r: 2 });
+      A.bulb(ctx, bulbX, bulbY - 6, 22, brightness);
       if (burnt) {
-        D.line(ctx, bulbX - 8, bulbY - 8, bulbX + 8, bulbY + 8, PL.col("danger"), 2.5);
-        D.line(ctx, bulbX + 8, bulbY - 8, bulbX - 8, bulbY + 8, PL.col("danger"), 2.5);
+        D.line(ctx, bulbX - 12, bulbY - 18, bulbX + 12, bulbY + 6, PL.col("danger"), 2.8);
+        D.line(ctx, bulbX + 12, bulbY - 18, bulbX - 12, bulbY + 6, PL.col("danger"), 2.8);
       }
-      D.text(ctx, burnt ? "燈泡燒毀" : PL.fmt(c.P, 1) + " W", bulbX, bulbY - 30,
+      D.text(ctx, burnt ? "燈泡燒毀" : PL.fmt(c.P, 1) + " W", bulbX, bulbY - 40,
         { color: burnt ? PL.col("danger") : PL.col("warn"), size: 12, align: "center", weight: "700" });
 
-      // 保險絲
+      // 保險絲（下方）
       if (cFuse.get()) {
-        const fx = x0 + (x1 - x0) * 0.24;
-        D.rect(ctx, fx - 17, y1 - 9, 34, 18, { fill: PL.theme.shade(0.4), stroke: PL.theme.pale(0.35), r: 4 });
-        if (fuseBlown) {
-          D.line(ctx, fx - 10, y1, fx - 3, y1, PL.col("danger"), 2);
-          D.line(ctx, fx + 3, y1, fx + 10, y1, PL.col("danger"), 2);
-          D.text(ctx, "保險絲斷了", fx, y1 + 26, { color: PL.col("danger"), size: 11, align: "center", weight: "700" });
-        } else {
-          D.line(ctx, fx - 11, y1, fx + 11, y1, PL.col("ok"), 2);
-          D.text(ctx, FUSE_LIMIT + " A", fx, y1 + 26, { color: PL.col("text-faint"), size: 10, align: "center" });
-        }
+        const fx = x0 + (x1 - x0) * 0.28;
+        A.fuse(ctx, fx, y1, fuseBlown);
+        D.text(ctx, fuseBlown ? "保險絲斷了" : FUSE_LIMIT + " A 保險絲", fx, y1 + 26,
+          { color: fuseBlown ? PL.col("danger") : PL.col("text-faint"), size: 10.5, align: "center", weight: fuseBlown ? "700" : "" });
       }
 
-      // 電阻：鋸齒是課本畫法
-      function resistor(cx, cy, label, vertical) {
-        const len = 54;
-        ctx.save();
-        ctx.translate(cx, cy);
-        if (vertical) ctx.rotate(Math.PI / 2);
-        ctx.strokeStyle = PL.col("accent-2"); ctx.lineWidth = 2.4;
-        ctx.beginPath(); ctx.moveTo(-len / 2, 0);
-        for (let i = 0; i < 6; i += 1) ctx.lineTo(-len / 2 + 4 + i * 9, (i % 2 ? 8 : -8));
-        ctx.lineTo(len / 2, 0); ctx.stroke();
-        ctx.restore();
-        D.text(ctx, label, cx, cy - 16, { color: PL.col("accent-2"), size: 11, align: "center" });
-      }
-
+      // 電阻（右側）
       if (wiring === "single") {
-        resistor(x1, (y0 + y1) / 2, PL.fmt(c.R, 1) + "Ω", true);
+        A.resistorBox(ctx, x1, (y0 + y1) / 2, 56, null, true);
+        D.text(ctx, PL.fmt(c.R, 1) + " Ω", x1 + 22, (y0 + y1) / 2 + 4, { color: PL.col("accent-2"), size: 11, weight: "700" });
       } else if (wiring === "series") {
-        resistor(x1, y0 + (y1 - y0) * 0.32, PL.fmt(c.R, 1) + "Ω", true);
-        resistor(x1, y0 + (y1 - y0) * 0.68, PL.fmt(c.R, 1) + "Ω", true);
+        [0.32, 0.68].forEach(k => {
+          const yy = y0 + (y1 - y0) * k;
+          A.resistorBox(ctx, x1, yy, 50, null, true);
+          D.text(ctx, PL.fmt(c.R, 1) + " Ω", x1 + 22, yy + 4, { color: PL.col("accent-2"), size: 11, weight: "700" });
+        });
       } else {
         // 並聯：兩條支路並排，總電阻變小、電流變大
-        const mx = x1 - 46;
-        D.line(ctx, x1, y0 + 22, mx, y0 + 22, wireColor, 2.2);
-        D.line(ctx, x1, y1 - 22, mx, y1 - 22, wireColor, 2.2);
-        D.line(ctx, mx, y0 + 22, mx, y1 - 22, wireColor, 2.2);
-        resistor(x1, (y0 + y1) / 2, PL.fmt(c.R, 1) + "Ω", true);
-        resistor(mx, (y0 + y1) / 2, PL.fmt(c.R, 1) + "Ω", true);
-        D.text(ctx, "並聯後 " + PL.fmt(c.R / 2, 1) + "Ω", mx - 8, y0 + 12,
-          { color: PL.col("accent-2"), size: 10, align: "right" });
+        const mx = x1 - 58, cyMid = (y0 + y1) / 2;
+        A.wire(ctx, [{ x: x1, y: y0 + 26 }, { x: mx, y: y0 + 26 }, { x: mx, y: y1 - 26 }, { x: x1, y: y1 - 26 }], wireColor, 3);
+        A.resistorBox(ctx, x1, cyMid, 50, null, true);
+        A.resistorBox(ctx, mx, cyMid, 50, null, true);
+        D.text(ctx, PL.fmt(c.R, 1) + " Ω", x1 + 22, cyMid + 4, { color: PL.col("accent-2"), size: 11, weight: "700" });
+        D.text(ctx, "並聯後 " + PL.fmt(c.R / 2, 1) + " Ω", mx - 14, y0 + 18,
+          { color: PL.col("accent-2"), size: 10, align: "right", weight: "700" });
       }
 
       // 電子流：速度正比於電流，「電流大小」因此看得見
-      if (!c.openCircuit && c.I > 0.001) {
+      if (live && c.I > 0.001) {
         const peri = 2 * ((x1 - x0) + (y1 - y0));
         const count = 22;
         for (let i = 0; i < count; i += 1) {
@@ -306,7 +279,7 @@
           else if (d < (x1 - x0) + (y1 - y0)) { ex = x1; ey = y0 + (d - (x1 - x0)); }
           else if (d < 2 * (x1 - x0) + (y1 - y0)) { ex = x1 - (d - (x1 - x0) - (y1 - y0)); ey = y1; }
           else { ex = x0; ey = y1 - (d - 2 * (x1 - x0) - (y1 - y0)); }
-          D.disc(ctx, ex, ey, 3, { fill: PL.col("accent-2") });
+          D.disc(ctx, ex, ey, 3, { fill: "#ffe9a8" });
         }
       }
 
@@ -418,25 +391,24 @@
     function draw() {
       const { ctx, W, H } = cv, s = state(); cv.clear(); D.bg(cv);
       const top = 58, bot = H - 42, left = 48, right = W - 46, mid = (top + bot) / 2;
-      const wire = "rgba(237,245,250,0.78)", active = MC();
-      D.line(ctx, left, top, right, top, wire, 2); D.line(ctx, left, bot, right, bot, wire, 2);
-      D.line(ctx, left, top, left, bot, wire, 2); D.line(ctx, right, top, right, bot, wire, 2);
-      D.line(ctx, left - 7, mid - 18, left - 7, mid + 18, "#fff", 3); D.line(ctx, left + 7, mid - 11, left + 7, mid + 11, "#fff", 2);
-      D.text(ctx, s.E + " V", left - 18, mid + 34, { color: PL.col("text-dim"), size: 11, align: "center" });
+      const AP = PL.apparatus, active = MC();
+      AP.benchTop(ctx, W, H, bot + 34);
+      // 實物導線接成迴路，元件再壓在接點上
+      AP.wire(ctx, [{ x: left, y: bot }, { x: left, y: top }, { x: right, y: top },
+                    { x: right, y: bot }, { x: left, y: bot }], "rgb(186,54,48)", 3.4);
+      AP.battery(ctx, left - 15, mid - 30, 30, 60);
+      D.text(ctx, s.E + " V", left - 22, mid + 4, { color: PL.col("text-dim"), size: 11, align: "right", weight: "700" });
       meter(W * 0.47, top, s.I, 1.5, "A", "A", MC());
       const rvx = right - 54;
-      ctx.save(); ctx.strokeStyle = active; ctx.lineWidth = 2.2; ctx.beginPath();
-      for (let i = 0; i < 7; i++) ctx.lineTo(rvx - 28 + i * 9, top + (i % 2 ? 8 : -8));
-      ctx.stroke(); ctx.restore(); D.line(ctx, rvx, top - 26, rvx + 16, top - 7, PL.col("warn"), 1.8);
+      AP.resistorBox(ctx, rvx, top, 56, null, false); D.line(ctx, rvx, top - 26, rvx + 16, top - 7, PL.col("warn"), 1.8);
       D.text(ctx, "Rᵥ=" + s.Rv + "Ω", rvx, top - 37, { color: active, size: 11, align: "center" });
       const rx = W * 0.48;
-      ctx.save(); ctx.strokeStyle = active; ctx.lineWidth = 2.4; ctx.beginPath();
-      for (let i = 0; i < 7; i++) ctx.lineTo(rx - 30 + i * 10, bot + (i % 2 ? 8 : -8));
-      ctx.stroke(); ctx.restore();
+      AP.resistorBox(ctx, rx, bot, 62, null, false);
       D.text(ctx, "被測 R=" + s.R + "Ω", rx, bot + 27, { color: active, size: 11, align: "center" });
       const vx = W * 0.76, vy = mid;
-      D.line(ctx, rx - 36, bot, rx - 36, vy, wire, 1.5); D.line(ctx, rx - 36, vy, vx - 31, vy, wire, 1.5);
-      D.line(ctx, rx + 36, bot, rx + 36, vy, wire, 1.5); D.line(ctx, rx + 36, vy, vx + 31, vy, wire, 1.5);
+      // 電壓計的兩條並聯引線（比主迴路細，才看得出是「跨接上去」的）
+      AP.wire(ctx, [{ x: rx - 36, y: bot }, { x: rx - 36, y: vy }, { x: vx - 31, y: vy }], "rgb(58,96,168)", 2.6);
+      AP.wire(ctx, [{ x: rx + 36, y: bot }, { x: rx + 36, y: vy }, { x: vx + 31, y: vy }], "rgb(58,96,168)", 2.6);
       meter(vx, vy, s.U, 12, "V", "V", PL.col("accent-2"));
       D.text(ctx, "A 串聯", W * 0.47, 20, { color: PL.col("text-faint"), size: 10, align: "center" });
       D.text(ctx, "V 並聯於被測電阻兩端", vx, H - 13, { color: PL.col("text-faint"), size: 10, align: "center" });
@@ -713,15 +685,9 @@
     /* 電阻方塊：長度正比於電阻值，因此「哪一顆比較大」用看的就知道 */
     function resBox(ctx, x, y, r, lab, volts, amps) {
       const w = 26 + r * 3.4;                     // 1Ω→29px、20Ω→94px
-      D.rect(ctx, x, y - 13, w, 26, { fill: "rgba(77,182,170,0.15)", stroke: MC(), width: 1.5, r: 4 });
-      // 電阻符號的鋸齒，齒數也隨電阻增加，遠看就有「這顆比較擋」的感覺
-      const teeth = Math.max(3, Math.round(r / 2));
-      ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 1.4; ctx.beginPath();
-      for (let i = 0; i <= teeth; i += 1) {
-        const px = x + 5 + (w - 10) * i / teeth;
-        ctx.lineTo(px, y + (i % 2 ? -6 : 6));
-      }
-      ctx.stroke(); ctx.restore();
+      /* 畫成真的線繞電阻，但長度仍正比於阻值——「這顆比較擋」的視覺隱喻要留著，
+         只是把課本符號換成學生在實驗桌上會拿到的那個東西。 */
+      PL.apparatus.resistorBox(ctx, x + w / 2, y, w, null, false);
       D.text(ctx, lab + " = " + r + " Ω", x + w / 2, y - 19, { color: MC(), size: 10.5, align: "center", weight: "700" });
       D.text(ctx, PL.fmt(volts, 1) + " V ／ " + PL.fmt(amps, 2) + " A", x + w / 2, y + 30,
         { color: PL.col("text-dim"), size: 10, align: "center" });
@@ -743,34 +709,38 @@
       }
     }
 
+    /* 導線畫成有厚度、帶陰影與高光的實物線，取代原本的示意細線 */
+    const WIRECOLOR = "rgb(186,54,48)";
+    function WIRELINE(ctx, ax, ay, bx, by, color, w) {
+      PL.apparatus.wire(ctx, [{ x: ax, y: ay }, { x: bx, y: by }], color === WIRECOLOR ? WIRECOLOR : color, (w || 2) + 1.2);
+    }
+
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const R1 = sR1.get(), R2 = sR2.get(), V = sV.get(), series = sCfg.get() === "series";
       const Req = series ? R1 + R2 : R1 * R2 / (R1 + R2), Itot = V / Req;
       const x0 = 56, x1 = W - 56, cy = H / 2 + 16, top = cy - 62;
 
-      // 電池：高度正比於電壓，長短極板是標準符號
-      const bh = 12 + V * 1.6;
-      D.line(ctx, x0, cy, x0, cy - bh * 0.5, PL.col("text-faint"), 2);
-      D.line(ctx, x0 - 13, cy - bh * 0.5, x0 + 13, cy - bh * 0.5, "#fff", 3.4);
-      D.line(ctx, x0 - 7, cy - bh * 0.5 - 7, x0 + 7, cy - bh * 0.5 - 7, "#fff", 1.8);
-      D.line(ctx, x0, cy - bh * 0.5 - 7, x0, top, PL.col("text-faint"), 2);
-      D.text(ctx, V + " V", x0 - 17, cy - bh * 0.5, { color: PL.col("text"), size: 12, align: "right", weight: "700" });
+      // 電池組：高度仍正比於電壓，讓「電壓大小」看得見
+      const bh = Math.max(26, 12 + V * 1.6);
+      PL.apparatus.wire(ctx, [{ x: x0, y: cy }, { x: x0, y: top }], "rgb(186,54,48)", 3.2);
+      PL.apparatus.battery(ctx, x0 - 15, cy - bh * 0.5 - 14, 30, bh);
+      D.text(ctx, V + " V", x0 - 21, cy - bh * 0.5, { color: PL.col("text"), size: 12, align: "right", weight: "700" });
 
       if (series) {
         // 串聯：兩顆電阻首尾相接，方塊總長就是等效電阻
         const w1 = 26 + R1 * 3.4, w2 = 26 + R2 * 3.4;
         const startX = (W - (w1 + w2 + 30)) / 2;
         currentDots(ctx, x0, top, startX, top, Itot);
-        D.line(ctx, x0, top, startX, top, PL.col("text-faint"), 2);
+        WIRELINE(ctx, x0, top, startX, top, WIRECOLOR, 2);
         resBox(ctx, startX, top, R1, "R₁", Itot * R1, Itot);
-        D.line(ctx, startX + w1, top, startX + w1 + 30, top, PL.col("text-faint"), 2);
+        WIRELINE(ctx, startX + w1, top, startX + w1 + 30, top, WIRECOLOR, 2);
         currentDots(ctx, startX + w1, top, startX + w1 + 30, top, Itot);
         resBox(ctx, startX + w1 + 30, top, R2, "R₂", Itot * R2, Itot);
-        D.line(ctx, startX + w1 + 30 + w2, top, x1, top, PL.col("text-faint"), 2);
+        WIRELINE(ctx, startX + w1 + 30 + w2, top, x1, top, WIRECOLOR, 2);
         currentDots(ctx, startX + w1 + 30 + w2, top, x1, top, Itot);
-        D.line(ctx, x1, top, x1, cy, PL.col("text-faint"), 2);
-        D.line(ctx, x0, cy, x1, cy, PL.col("text-faint"), 2);
+        WIRELINE(ctx, x1, top, x1, cy, WIRECOLOR, 2);
+        WIRELINE(ctx, x0, cy, x1, cy, WIRECOLOR, 2);
         currentDots(ctx, x1, cy, x0, cy, Itot);
         rBranch.set(Itot, 2);
         PL.ui.caption(cv, "串聯：兩顆電阻的電流點速度一模一樣——電流處處相同。" +
@@ -781,21 +751,21 @@
         const w1 = 26 + R1 * 3.4, w2 = 26 + R2 * 3.4;
         const bx = W / 2 - Math.max(w1, w2) / 2, jx = bx - 34, jx2 = bx + Math.max(w1, w2) + 34;
         const yA = top - 26, yB = top + 34;
-        D.line(ctx, x0, top, jx, top, PL.col("text-faint"), 2);
+        WIRELINE(ctx, x0, top, jx, top, WIRECOLOR, 2);
         currentDots(ctx, x0, top, jx, top, Itot);
         [[yA, R1, "R₁", i1, w1], [yB, R2, "R₂", i2, w2]].forEach(([yy, rr, lab, ii, ww]) => {
-          D.line(ctx, jx, top, jx, yy, PL.col("text-faint"), 2);
-          D.line(ctx, jx, yy, bx, yy, PL.col("text-faint"), 2);
+          WIRELINE(ctx, jx, top, jx, yy, WIRECOLOR, 2);
+          WIRELINE(ctx, jx, yy, bx, yy, WIRECOLOR, 2);
           currentDots(ctx, jx, yy, bx, yy, ii);
           resBox(ctx, bx, yy, rr, lab, V, ii);
-          D.line(ctx, bx + ww, yy, jx2, yy, PL.col("text-faint"), 2);
+          WIRELINE(ctx, bx + ww, yy, jx2, yy, WIRECOLOR, 2);
           currentDots(ctx, bx + ww, yy, jx2, yy, ii);
-          D.line(ctx, jx2, yy, jx2, top, PL.col("text-faint"), 2);
+          WIRELINE(ctx, jx2, yy, jx2, top, WIRECOLOR, 2);
         });
-        D.line(ctx, jx2, top, x1, top, PL.col("text-faint"), 2);
+        WIRELINE(ctx, jx2, top, x1, top, WIRECOLOR, 2);
         currentDots(ctx, jx2, top, x1, top, Itot);
-        D.line(ctx, x1, top, x1, cy, PL.col("text-faint"), 2);
-        D.line(ctx, x0, cy, x1, cy, PL.col("text-faint"), 2);
+        WIRELINE(ctx, x1, top, x1, cy, WIRECOLOR, 2);
+        WIRELINE(ctx, x0, cy, x1, cy, WIRECOLOR, 2);
         currentDots(ctx, x1, cy, x0, cy, Itot);
         rBranch.set(i1, 2);
         PL.ui.caption(cv, "並聯：兩條支路的電壓一樣，但電阻小的那條電流點跑得明顯比較快。" +
@@ -827,8 +797,14 @@
       const tau = sR.get() * sC.get() / 1000, V0 = 1;
       const V = mode === "charge" ? V0 * (1 - Math.exp(-t / tau)) : V0 * Math.exp(-t / tau);
       // 電容器示意
+      const AP = PL.apparatus;
       const cx = 74, cyc = 70, gap = 22 * (0.3 + V * 0.7);
-      D.line(ctx, cx - 26, cyc - gap, cx + 26, cyc - gap, POS, 4); D.line(ctx, cx - 26, cyc + gap, cx + 26, cyc + gap, NEG, 4);
+      /* 極板畫成有厚度的金屬片，並用導線接出來——電容器是兩片金屬，
+         不是兩條線。極板間距隨電壓變化仍然保留。 */
+      AP.steel(ctx, cx - 26, cyc - gap - 4, 52, 6, 12);
+      AP.steel(ctx, cx - 26, cyc + gap - 2, 52, 6, -18);
+      AP.wire(ctx, [{ x: cx, y: cyc - gap - 4 }, { x: cx, y: cyc - 34 }], "rgb(186,54,48)", 2.4);
+      AP.wire(ctx, [{ x: cx, y: cyc + gap + 4 }, { x: cx, y: cyc + 34 }], "rgb(58,96,168)", 2.4);
       for (let i = 0; i < Math.round(V * 6); i++) { D.text(ctx, "+", cx - 20 + i * 8, cyc - gap - 4, { color: POS, size: 12 }); D.text(ctx, "−", cx - 20 + i * 8, cyc + gap + 12, { color: NEG, size: 12 }); }
       D.text(ctx, "電容器", cx, cyc + 40, { color: PL.col("text-dim"), size: 11, align: "center" });
       // V–t 與 I–t

@@ -90,6 +90,30 @@
    * 注意：探測會暫時改動滑桿，結束後一定要還原，否則學生一進來看到的
    * 就不是實驗設計者安排的初始狀態。
    */
+  /*
+   * 把一組滑桿寫回指定值。
+   *
+   * 為什麼要跑兩輪
+   * --------------
+   * 由來：氣體實驗的「分子數」滑桿在 onInput 裡重新灑點，而灑點的範圍
+   * 由「活塞位置」滑桿決定。單輪還原是照滑桿順序寫回去的，分子數若排在
+   * 活塞前面，重新灑點時活塞還停在掃描的最後一個值（0.98），分子就被灑到
+   * 活塞右側；接著活塞才被還原成 0.78，那些分子便落在活塞外面。
+   *
+   * 這不是氣體實驗特有的問題：只要有任何一支滑桿的 onInput 讀取另一支
+   * 滑桿的狀態，還原順序就會決定結果對不對，而探測引擎會掃過每一支滑桿，
+   * 等於必定會踩到。第二輪重寫時所有滑桿都已在原位，任何跨滑桿的重算
+   * 都會拿到一致的狀態。
+   *
+   * write() 每次都會觸發 onInput（即使值沒變），所以第二輪確實會重算。
+   */
+  function restoreSliders(sliders, values, rerender) {
+    for (let pass = 0; pass < 2; pass += 1) {
+      sliders.forEach((s, i) => { try { s.write(values[i]); } catch (err) {} });
+    }
+    if (rerender) { try { rerender(); } catch (e) {} }
+  }
+
   function probe(context, api) {
     const sliders = context.sliders.slice(0, MAX_SLIDERS);
     const readouts = context.readouts;
@@ -173,9 +197,21 @@
     } catch (e) {
       console.warn("模型探測失敗", e);
     } finally {
-      // 還原所有滑桿並重畫，確保學生看到的是原本設計的初始狀態
-      sliders.forEach((s, i) => { try { s.write(originals[i]); } catch (err) {} });
-      try { rerender(); } catch (e) {}
+      /*
+       * 還原要跑兩輪，不是一輪。
+       *
+       * 由來：氣體實驗的「分子數」滑桿在 onInput 裡重新灑點，而灑點的範圍
+       * 由「活塞位置」滑桿決定。單輪還原是照滑桿順序寫回去的，分子數排在
+       * 活塞前面——所以重新灑點時活塞還停在掃描的最後一個值（0.98），
+       * 分子被灑到活塞右側；接著活塞才被還原成 0.78，那些分子就落在活塞外面。
+       *
+       * 這不是氣體實驗特有的問題：只要有任何一支滑桿的 onInput 讀取另一支
+       * 滑桿的狀態，還原順序就會決定結果對不對。第二輪重寫時所有滑桿都已
+       * 在原位，任何跨滑桿的重算都會拿到一致的狀態。
+       *
+       * write() 每次都會觸發 onInput（即使值沒變），所以第二輪確實會重算。
+       */
+      restoreSliders(sliders, originals, rerender);
     }
 
     if (!relations.length) return null;
@@ -226,8 +262,7 @@
       } catch (e) {
         flats.forEach(r => { r.confirmedFlat = false; });
       } finally {
-        sliders.forEach((s, i) => { try { s.write(originalsNow[i]); } catch (err) {} });
-        try { rerender(); } catch (e) {}
+        restoreSliders(sliders, originalsNow, rerender);
       }
       // 沒通過複驗的，降級成「在目前設定下沒有變化」，不當成定律陳述
       flats.forEach(r => { if (!r.confirmedFlat) r.direction = "clamped"; });
@@ -711,7 +746,8 @@
     const opts = [];
 
     const setOnly = (target, value) => () => {
-      sliders.forEach((s, i) => { try { s.write(i === sliders.indexOf(target) ? value : originals[i]); } catch (e) {} });
+      const ti = sliders.indexOf(target);
+      restoreSliders(sliders, originals.map((v, i) => (i === ti ? value : v)));
     };
 
     opts.push({
@@ -737,7 +773,7 @@
     opts.push({
       label: "回到預設",
       hint: "回到設計者安排的起始狀態",
-      apply: () => { sliders.forEach((s, i) => { try { s.write(originals[i]); } catch (e) {} }); }
+      apply: () => { restoreSliders(sliders, originals); }
     });
 
     const wrap = el("div", "sim-insight-block");

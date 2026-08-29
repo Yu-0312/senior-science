@@ -18,17 +18,18 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const ro = sObj.get(), rf = sFl.get(), ratio = ro / rf, floats = ratio < 1;
-      const surf = 90, tankL = 40, tankR = W - 40, bottom = H - 24;
-      D.rect(ctx, tankL, surf, tankR - tankL, bottom - surf, { fill: "rgba(90,162,255,0.14)" });
-      D.line(ctx, tankL, surf, tankR, surf, PL.col("accent-2"), 2);
-      D.line(ctx, tankL, bottom, tankR, bottom, PL.col("text-faint"), 2);
-      D.line(ctx, tankL, surf, tankL, bottom, PL.col("text-faint"), 2); D.line(ctx, tankR, surf, tankR, bottom, PL.col("text-faint"), 2);
+      const AP = PL.apparatus;
+      const surf = 96, tankL = Math.round(W * 0.21), tankR = Math.round(W * 0.79), bottom = H - 30;
+      // 玻璃水槽：水面、杯壁與刻度都畫出來，「沒入多少」才量得出來
+      AP.benchTop(ctx, W, H, bottom - 2);
+      AP.beaker(ctx, (tankL + tankR) / 2, bottom, tankR - tankL, bottom - surf + 26,
+        (bottom - surf) / (bottom - surf + 26));
       const boxW = 84, boxH = 64, cx = W / 2;
       const sub = floats ? ratio : 1;
       let topY = floats ? surf - boxH * (1 - sub) + bob : surf - 0 + bob;
       if (!floats) topY = bottom - boxH; // 沉底
-      D.rect(ctx, cx - boxW / 2, topY, boxW, boxH, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 4 });
-      D.text(ctx, ro + "", cx, topY + boxH / 2 + 4, { color: "#04121a", size: 12, align: "center", weight: "700" });
+      AP.woodBlock(ctx, cx, topY + boxH, boxW, boxH, 0);
+      D.text(ctx, ro + "", cx, topY + boxH / 2 + 4, { color: "#2b1f10", size: 12, align: "center", weight: "700" });
       // 力向量
       const midX = cx, wY = topY + boxH / 2;
       D.arrow(ctx, midX - 26, wY, midX - 26, wY + 42, { color: PL.col("warn"), width: 2.4, label: "重力" });
@@ -63,18 +64,17 @@
     }
     function drawScale(x, y, tension) {
       const { ctx } = cv;
-      D.rect(ctx, x - 28, y - 42, 56, 84, { fill: PL.col("panel-2"), stroke: PL.col("border"), width: 2, r: 5 });
-      D.ring(ctx, x, y - 7, 20, MC(), 2);
-      const a = Math.PI * (1.1 + 0.8 * PL.clamp(tension / 20, 0, 1));
-      D.line(ctx, x, y - 7, x + Math.cos(a) * 16, y - 7 + Math.sin(a) * 16, PL.col("warn"), 2);
-      D.text(ctx, "彈簧秤", x, y - 29, { color: PL.col("text-dim"), size: 10, align: "center" });
+      PL.apparatus.meter(ctx, x, y - 14, 24, PL.clamp(tension / 20, 0, 1), null);
+      D.text(ctx, "彈簧秤", x, y - 46, { color: PL.col("text-dim"), size: 10, align: "center" });
       D.text(ctx, PL.fmt(tension, 2) + " N", x, y + 34, { color: MC(), size: 11, align: "center", weight: "700" });
     }
     function draw() {
       const { ctx, W, H } = cv, s = data(); cv.clear(); D.bg(cv);
+      const AP = PL.apparatus;
       const tankL = W * 0.45, tankR = W - 36, surface = H * 0.31, floor = H - 28;
-      D.rect(ctx, tankL, surface, tankR - tankL, floor - surface, { fill: "rgba(90,162,255,0.15)", stroke: "rgba(90,162,255,0.45)", width: 1.5 });
-      D.line(ctx, tankL, surface, tankR, surface, PL.col("accent-2"), 2);
+      AP.benchTop(ctx, W, H, floor - 2);
+      AP.beaker(ctx, (tankL + tankR) / 2, floor, tankR - tankL, floor - surface + 26,
+        (floor - surface) / (floor - surface + 26));
       D.text(ctx, s.rhoL + " kg/m³", tankL + 12, surface + 19, { color: PL.col("accent-2"), size: 11 });
       const sx = W * 0.22, sy = H * 0.25, boxW = 72, boxH = 56;
       drawScale(sx, sy, s.T);
@@ -283,14 +283,27 @@
       const px = xm => ox + xm / BOX_W * boxW;
       const py = ym => oy + ym / BOX_H * boxH;
 
-      // 容器
+      const AP = PL.apparatus;
+      // 容器：厚壁玻璃汽缸，看得出來是一個「裝著氣體的東西」
       D.rect(ctx, ox, oy, boxW, boxH, { fill: PL.theme.shade(0.28), stroke: PL.theme.pale(0.35), width: 2 });
+      ctx.save();
+      const cg = ctx.createLinearGradient(0, oy, 0, oy + boxH);
+      cg.addColorStop(0.00, "rgba(226,244,252,0.16)");
+      cg.addColorStop(0.12, "rgba(255,255,255,0.07)");
+      cg.addColorStop(1.00, "rgba(180,206,222,0.05)");
+      ctx.fillStyle = cg; ctx.fillRect(ox, oy, boxW, boxH);
+      ctx.strokeStyle = "rgba(206,232,244,0.55)"; ctx.lineWidth = 2;
+      ctx.strokeRect(ox, oy, boxW, boxH);
+      ctx.restore();
 
-      // 活塞
+      // 活塞：金屬盤 + 推桿
       const pistonPx = px(pistonX * BOX_W);
-      D.rect(ctx, pistonPx, oy, 14, boxH, { fill: "#8d97a6", stroke: PL.theme.pale(0.45), width: 1.5 });
-      D.rect(ctx, pistonPx + 14, oy + boxH / 2 - 5, W - pad - (pistonPx + 14), 10,
-        { fill: PL.theme.pale(0.28), r: 3 });
+      AP.steel(ctx, pistonPx, oy + 2, 15, boxH - 4, -10);
+      ctx.strokeStyle = "rgba(28,34,44,0.6)"; ctx.lineWidth = 1;
+      ctx.strokeRect(pistonPx + 0.5, oy + 2.5, 14, boxH - 5);
+      AP.steel(ctx, pistonPx + 15, oy + boxH / 2 - 5, W - pad - (pistonPx + 15), 10, 8);
+      // 推桿末端的握把
+      AP.brassDisc(ctx, W - pad, oy + boxH / 2, 8);
       D.text(ctx, "活塞", pistonPx + 7, oy - 10, { color: PL.col("text-dim"), size: 10.5, align: "center" });
 
       // 分子
@@ -431,9 +444,19 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const Tf = (sm1.get() * T1 + sm2.get() * T2) / (sm1.get() + sm2.get());
+      const AP = PL.apparatus;
       const cy = H / 2, w1 = 60 + sm1.get() * 14, w2 = 60 + sm2.get() * 14;
-      D.rect(ctx, W / 2 - w1 - 6, cy - 40, w1, 80, { fill: tcol(T1), stroke: "rgba(255,255,255,0.3)", r: 6 });
-      D.rect(ctx, W / 2 + 6, cy - 40, w2, 80, { fill: tcol(T2), stroke: "rgba(255,255,255,0.3)", r: 6 });
+      AP.benchTop(ctx, W, H, cy + 44);
+      /* 兩杯水：杯寬正比於質量，水色仍隨溫度變化。
+         比起兩個色塊，燒杯讓「把兩杯水倒在一起」這個動作有具體對象。 */
+      ctx.save();
+      ctx.fillStyle = tcol(T1);
+      ctx.fillRect(W / 2 - w1 - 6 + 3, cy - 34, w1 - 6, 70);
+      ctx.fillStyle = tcol(T2);
+      ctx.fillRect(W / 2 + 6 + 3, cy - 34, w2 - 6, 70);
+      ctx.restore();
+      AP.beaker(ctx, W / 2 - w1 / 2 - 6, cy + 40, w1, 84, 0.84);
+      AP.beaker(ctx, W / 2 + w2 / 2 + 6, cy + 40, w2, 84, 0.84);
       D.text(ctx, PL.fmt(T1, 0) + "°C", W / 2 - w1 / 2 - 6, cy + 4, { color: "#fff", size: 14, align: "center", weight: "700" });
       D.text(ctx, PL.fmt(T2, 0) + "°C", W / 2 + w2 / 2 + 6, cy + 4, { color: "#fff", size: 14, align: "center", weight: "700" });
 
@@ -449,9 +472,8 @@
       const thX = 46, thW = 22, thTop = cy - 92, thH = 168;
       const tempY = T => thTop + thH * (1 - PL.clamp(T, 0, 100) / 100);
       [[thX, T1, "物體1", MC()], [W - thX - thW, T2, "物體2", PL.col("accent-2")]].forEach(([x, T, lab, c]) => {
-        D.rect(ctx, x, thTop, thW, thH, { fill: PL.theme.shade(0.35), stroke: PL.theme.pale(0.25), r: 11 });
-        D.rect(ctx, x + 3, tempY(T), thW - 6, thTop + thH - tempY(T) - 3,
-          { fill: tcol(T), r: 8 });
+        AP.thermometer(ctx, x + thW / 2, thTop, thTop + thH, thW, PL.clamp(T, 0, 100) / 100);
+        D.rect(ctx, x, thTop, 0, 0, { });
         for (let v = 0; v <= 100; v += 20) {
           D.line(ctx, x + thW, tempY(v), x + thW + 5, tempY(v), PL.col("text-faint"), 1);
           D.text(ctx, String(v), x + thW + 8, tempY(v) + 3, { color: PL.col("text-faint"), size: 8 });

@@ -641,8 +641,15 @@
        * 第一版用 shade 畫軌道又沒有描邊，於是深色主題下小車看起來浮在半空。
        * 要被看見的東西一律用 theme.pale()，它會隨主題翻面。
        */
-      D.rect(ctx, x0 - 8, trackY + 12, x1 - x0 + 16, 7,
-        { fill: PL.theme.pale(0.16), stroke: PL.theme.pale(0.34), width: 1, r: 3 });
+      const AP = PL.apparatus;
+      /* 檯面只鋪窄窄一條：下半部還要放「取下後攤平的紙帶」，鋪到底會把它壓成灰的 */
+      ctx.save();
+      const tg = ctx.createLinearGradient(0, trackY + 20, 0, trackY + 44);
+      tg.addColorStop(0, "rgba(122,112,96,0.34)");
+      tg.addColorStop(1, "rgba(60,56,50,0)");
+      ctx.fillStyle = tg; ctx.fillRect(0, trackY + 20, W, 24);
+      ctx.restore();
+      AP.steel(ctx, x0 - 10, trackY + 12, x1 - x0 + 20, 8, -6);
       for (let m = 0; m <= total; m += Math.max(0.1, Math.round(total / 8 * 10) / 10)) {
         const px = x0 + m * sc;
         if (px > x1) break;
@@ -660,20 +667,11 @@
         if (px > 26 && px < carX - 2) D.disc(ctx, px, tapeY, 2.6, { fill: k === 5 ? MC() : PL.col("text-dim") });
       }
 
-      // 打點計時器本體（固定在桌上，紙帶從它底下通過）——照圖片：有 AC 電源面板
+      // 打點計時器本體（固定在桌上，紙帶從它底下通過）
       const tx = 92;
-      D.text(ctx, "打點計時器", tx, tapeY - 52, { color: PL.col("accent-2"), size: 11, align: "center", weight: "700" });
-      D.rect(ctx, tx - 36, tapeY - 44, 72, 38, { fill: PL.theme.pale(0.13), stroke: PL.theme.pale(0.42), width: 1.4, r: 5 });
-      // AC 電源的條紋面板
-      D.rect(ctx, tx - 30, tapeY - 40, 26, 30, { fill: PL.theme.shade(0.3), stroke: PL.theme.pale(0.3), width: 1, r: 2 });
-      for (let s = 0; s < 4; s++) D.line(ctx, tx - 27 + s * 6, tapeY - 38, tx - 27 + s * 6, tapeY - 12, PL.theme.pale(0.28), 1);
-      D.text(ctx, "AC", tx - 17, tapeY - 8, { color: PL.col("text-faint"), size: 8, align: "center" });
-      D.text(ctx, PL.fmt(1 / T, 0) + " Hz", tx + 14, tapeY - 22, { color: PL.col("accent-2"), size: 9, align: "center" });
-      // 打點錘：剛打完的那一瞬間落下並發亮
-      const hit = flash > 0;
-      D.line(ctx, tx, tapeY - 12, tx, tapeY - (hit ? 3 : 7),
-        hit ? PL.col("warn") : PL.col("text-faint"), hit ? 3 : 2);
-      if (hit) D.disc(ctx, tx, tapeY, 5, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 12 });
+      D.text(ctx, "打點計時器", tx, tapeY - 58, { color: PL.col("accent-2"), size: 11, align: "center", weight: "700" });
+      AP.tickerTimer(ctx, tx, tapeY, PL.fmt(1 / T, 0) + " Hz", flash > 0);
+      if (flash > 0) D.disc(ctx, tx - 14, tapeY, 5, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 12 });
 
       /* 繩子：從小車前緣水平拉到滑輪，再垂下去接重物。滑輪把「水平的拉」轉成「垂直的落」。
          重物隨小車前進而下落——物理上兩者位移相等，但畫面上垂直空間有限，
@@ -681,18 +679,16 @@
       const ropeY = trackY - 2;
       const weightTop = pulleyY + pulleyR + 14;
       const weightY = weightTop + (H * 0.20) * frac;
-      D.line(ctx, carX + cw / 2, ropeY, pulleyX, pulleyY, PL.col("text-dim"), 1.6);
-      D.line(ctx, pulleyX, pulleyY, pulleyX, weightY, PL.col("text-dim"), 1.6);
+      AP.cord(ctx, carX + cw / 2, ropeY, pulleyX, pulleyY);
+      AP.cord(ctx, pulleyX, pulleyY, pulleyX, weightY);
 
       // 滑輪
-      D.disc(ctx, pulleyX, pulleyY, pulleyR, { fill: PL.theme.pale(0.14), stroke: PL.theme.pale(0.42), width: 1.6 });
-      D.disc(ctx, pulleyX, pulleyY, 3, { fill: PL.col("text-faint") });
-      D.text(ctx, "滑輪", pulleyX, pulleyY - pulleyR - 6, { color: PL.col("text-faint"), size: 10, align: "center" });
+      AP.pulley(ctx, pulleyX, pulleyY, pulleyR);
+      D.text(ctx, "滑輪", pulleyX, pulleyY - pulleyR - 8, { color: PL.col("text-faint"), size: 10, align: "center" });
 
       // 重物
-      const ww = 20, wh = 26;
-      D.rect(ctx, pulleyX - ww / 2, weightY, ww, wh, { fill: PL.col("warn"), stroke: PL.theme.pale(0.4), r: 3 });
-      D.text(ctx, "重", pulleyX, weightY + wh / 2 + 4, { color: "#04121a", size: 11, align: "center", weight: "700" });
+      const ww = 22, wh = 26;
+      AP.weight(ctx, pulleyX, weightY, ww, wh, null);
       D.text(ctx, PL.fmt(sMw.get(), 2) + " kg", pulleyX, weightY + wh + 12, { color: PL.col("text-faint"), size: 9, align: "center" });
       // 重物受力箭頭：往下的重力，長度正比於 mg
       if (t === 0) {
@@ -701,7 +697,7 @@
       }
 
       // 小車（有車廂與兩個輪子）
-      D.rect(ctx, carX - cw / 2, trackY - ch + 12, cw, ch, { fill: MC(), stroke: PL.theme.pale(0.35), r: 3 });
+      AP.cart(ctx, carX, trackY + 12, cw, ch);
       D.text(ctx, "小車", carX, trackY - ch / 2 + 13, { color: "#04121a", size: 10, align: "center", weight: "700" });
       D.disc(ctx, carX - 11, trackY + 12, 4.5, { fill: PL.col("text-dim"), stroke: PL.theme.pale(0.4), width: 1 });
       D.disc(ctx, carX + 11, trackY + 12, 4.5, { fill: PL.col("text-dim"), stroke: PL.theme.pale(0.4), width: 1 });
