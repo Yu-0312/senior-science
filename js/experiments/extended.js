@@ -64,11 +64,13 @@
       D.arrow(ctx, ox + length * Math.cos(angle), oy, ox + length * Math.cos(angle), oy - length * Math.sin(angle), { color: PL.col("warn"), width: 1.7, label: "y" });
       fillPill(ctx, 18, 18, "向量實驗", PL.fmt(value, 2), 112, c);
     } else if (["motion", "momentum", "impulse", "rocket", "work", "power", "energy"].includes(cfg.kind)) {
+      const AP = PL.apparatus;
       const railY = H * 0.7, pos = x0 + (0.15 + 0.7 * (0.5 + 0.5 * Math.sin(t * 1.2))) * (x1 - x0);
-      D.rect(ctx, x0, railY, x1 - x0, 8, { fill: "rgba(255,255,255,0.10)", r: 4 });
-      for (let x = x0 + 12; x < x1; x += 26) D.line(ctx, x, railY, x, railY + 8, "rgba(255,255,255,0.18)", 1);
-      D.rect(ctx, pos - 25, railY - 34, 50, 25, { fill: c, stroke: "rgba(255,255,255,0.42)", r: 5 });
-      D.disc(ctx, pos - 14, railY - 6, 5, { fill: PL.col("panel-3") }); D.disc(ctx, pos + 14, railY - 6, 5, { fill: PL.col("panel-3") });
+      // 導軌 + 力學小車：這一支涵蓋運動、動量、衝量、功率等七種題型，換一次全部受惠
+      AP.benchTop(ctx, W, H, railY + 12);
+      AP.steel(ctx, x0, railY, x1 - x0, 8, -6);
+      for (let x = x0 + 12; x < x1; x += 26) D.line(ctx, x, railY + 8, x, railY + 13, PL.theme.pale(0.30), 1);
+      AP.cart(ctx, pos, railY, 54, 26);
       if (cfg.kind === "rocket") { for (let i = 0; i < 4; i++) D.line(ctx, pos - 31 - i * 8, railY - 23, pos - 42 - i * 8, railY - 23 + Math.sin(t * 8 + i) * 5, PL.col("warn"), 2); }
       if (cfg.kind === "energy") { D.rect(ctx, 42, 48, 20, H * 0.36, { fill: c, r: 3 }); D.rect(ctx, 70, H * 0.42, 20, H * 0.42, { fill: PL.col("accent-2"), r: 3 }); }
       D.arrow(ctx, pos, railY - 47, pos + 44, railY - 47, { color: PL.col("accent-2"), width: 2, label: "運動" });
@@ -82,10 +84,13 @@
       D.arrow(ctx, cabinX + cabinW / 2, cabinY + cabinH * 0.62, cabinX + cabinW / 2, cabinY + cabinH * 0.86, { color: PL.col("danger"), width: 2, label: "mg" });
       fillPill(ctx, W - 148, 20, "體重計", PL.fmt(value, 0) + " N", 126, c);
     } else if (["spring", "oscillation"].includes(cfg.kind)) {
+      const AP = PL.apparatus;
       const wall = 52, center = W * 0.56, dx = Math.sin(t * 2.3) * (20 + a * 1.4), my = cy;
-      D.rect(ctx, wall - 10, my - 55, 10, 110, { fill: "rgba(255,255,255,0.26)" });
+      AP.benchTop(ctx, W, H, my + 46);
+      AP.steel(ctx, wall - 12, my - 58, 12, 116, -20);      // 固定牆
+      AP.steel(ctx, wall - 12, my + 29, W - wall - 30, 7, 4); // 滑軌
       D.spring(ctx, wall, my, center + dx - 30, my, 12, 12, c);
-      D.rect(ctx, center + dx - 30, my - 29, 60, 58, { fill: PL.col("panel-3"), stroke: c, width: 2, r: 7 });
+      AP.woodBlock(ctx, center + dx, my + 29, 60, 58, 0);
       D.line(ctx, center, 38, center, H - 38, "rgba(255,255,255,0.14)", 1, [4, 4]);
       D.arrow(ctx, center + dx, my - 40, center + dx + 30 * Math.cos(t * 2.3), my - 40, { color: PL.col("accent-2"), width: 2, label: "v" });
       fillPill(ctx, 18, 18, "振動讀值", PL.fmt(value, 2), 118, c);
@@ -112,10 +117,14 @@
       fillPill(ctx, W - 154, 20, "軌道量測", PL.fmt(value, 2), 132, c);
     } else if (cfg.kind === "thermal") {
       const tankX = W * 0.23, tankY = 42, tankW = W * 0.45, tankH = H * 0.56, fillY = tankY + tankH * (0.6 - 0.18 * Math.sin(t));
-      D.rect(ctx, tankX, tankY, tankW, tankH, { fill: "rgba(255,255,255,0.03)", stroke: c, width: 2, r: 7 });
-      D.rect(ctx, tankX + 2, fillY, tankW - 4, tankY + tankH - fillY - 2, { fill: "rgba(90,162,255,0.20)", r: 4 });
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, tankY + tankH + 2);
+      AP.beaker(ctx, tankX + tankW / 2, tankY + tankH, tankW, tankH,
+        (tankY + tankH - fillY) / tankH);
       for (let i = 0; i < 18; i++) { const x = tankX + 16 + (i * 43 % (tankW - 30)); const y = fillY + 16 + ((i * 29 + t * 28) % Math.max(20, tankY + tankH - fillY - 30)); D.disc(ctx, x, y, 2.4, { fill: i % 2 ? PL.col("accent-2") : c }); }
-      D.line(ctx, tankX + tankW + 32, tankY, tankX + tankW + 32, tankY + tankH, PL.col("text-faint"), 2); D.disc(ctx, tankX + tankW + 32, fillY + 8, 7, { fill: PL.col("danger") });
+      // 插在槽邊的玻璃溫度計
+      AP.thermometer(ctx, tankX + tankW + 34, tankY + 6, tankY + tankH, 15,
+        PL.clamp((tankY + tankH - fillY) / tankH, 0, 1));
       fillPill(ctx, 18, 18, "系統讀值", PL.fmt(value, 2), 118, c);
     } else if (cfg.kind === "wave") {
       /*
@@ -179,7 +188,17 @@
       const left = 70, right = W - 74, top = H * 0.3, bottom = H * 0.72;
       D.line(ctx, left, top, right, top, c, 2.2); D.line(ctx, right, top, right, bottom, c, 2.2); D.line(ctx, right, bottom, left, bottom, c, 2.2); D.line(ctx, left, bottom, left, top, c, 2.2);
       D.disc(ctx, left, cy, 21, { fill: "rgba(255,204,102,0.14)", stroke: PL.col("warn"), width: 2 }); D.text(ctx, "+", left, cy + 6, { color: PL.col("warn"), size: 18, align: "center", weight: "700" });
-      if (cfg.kind === "magnetic") { for (let i = 0; i < 7; i++) D.ring(ctx, W * 0.5, cy, 24 + i * 8, "rgba(201,140,255,0.18)", 1); D.arrow(ctx, W * 0.5, cy, W * 0.5 + 45, cy, { color: PL.col("accent-2"), width: 2, label: "B" }); }
+      if (cfg.kind === "magnetic") {
+        // 載流導線畫成銅線，磁力線一圈一圈繞著它
+        for (let i = 0; i < 7; i++) D.ring(ctx, W * 0.5, cy, 24 + i * 8, "rgba(201,140,255,0.18)", 1);
+        ctx.save();
+        const wg = ctx.createLinearGradient(0, cy - 5, 0, cy + 5);
+        wg.addColorStop(0, "rgb(150,94,44)"); wg.addColorStop(0.4, "rgb(232,170,96)"); wg.addColorStop(1, "rgb(140,86,40)");
+        ctx.strokeStyle = wg; ctx.lineWidth = 6; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(W * 0.5, cy - 92); ctx.lineTo(W * 0.5, cy + 92); ctx.stroke();
+        ctx.restore();
+        D.arrow(ctx, W * 0.5 + 8, cy, W * 0.5 + 50, cy, { color: PL.col("accent-2"), width: 2, label: "B" });
+      }
       if (cfg.kind === "field") {
         if (cfg.id === "electrostatic-shield") {
           /*

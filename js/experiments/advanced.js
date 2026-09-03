@@ -101,10 +101,13 @@
       D.text(ctx, "名義面積 A = " + PL.fmt(area, 3) + " m²", chartX + chartW / 2, chartY + chartH - 30, { color: c, size: 10, align: "center", weight: "700" });
       label(ctx, 20, 18, "範圍傳遞", "邊長誤差會被平方放大", 148, c);
     } else if (["fall", "dimension"].includes(config.kind)) {
-      D.line(ctx, W * 0.5, 30, W * 0.5, railY, "rgba(255,255,255,0.18)", 2);
-      for (let y = 42; y < railY; y += 28) D.line(ctx, W * 0.5 - 8, y, W * 0.5 + 8, y, "rgba(255,255,255,0.18)", 1);
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, railY + 4);
+      // 落體管：直立刻度尺 + 金屬球，落下距離量得出來
+      AP.ruler(ctx, W * 0.5 + 24, 34, railY - 4, (railY - 38) / 12);
+      D.line(ctx, W * 0.5, 30, W * 0.5, railY, PL.theme.pale(0.22), 2, [5, 5]);
       const y = 60 + ((time * 60) % Math.max(100, railY - 85));
-      D.disc(ctx, cx, y, 16, { fill: c, glow: c, glowSize: 14 });
+      AP.bob(ctx, cx, y, 16);
       D.arrow(ctx, cx, y + 20, cx, Math.min(railY - 8, y + 56), { color: PL.col("accent-2"), width: 2, label: "v" });
       D.arrow(ctx, cx, y - 18, cx, Math.max(34, y - 48), { color: PL.col("warn"), width: 2, label: "Fᵈ" });
       label(ctx, 20, 18, "力平衡", config.kind === "fall" ? "mg = Fᵈ" : "量測模型", 112, c);
@@ -119,10 +122,22 @@
     } else if (["rolling", "rocket"].includes(config.kind)) {
       const x0 = 42, x1 = W - 44, y0 = H * 0.72;
       if (config.kind === "rolling") {
-        D.line(ctx, x0, H * 0.32, x1, y0, "rgba(255,255,255,0.4)", 4);
+        const AP = PL.apparatus;
+        AP.benchTop(ctx, W, H, y0 + 6);
+        // 斜面板：實體板材，圓盤沿板面滾下
+        const ang = Math.atan2(y0 - H * 0.32, x1 - x0);
+        AP.ramp(ctx, x0, y0, Math.hypot(x1 - x0, y0 - H * 0.32), ang);
         const x = x0 + (x1 - x0) * (0.18 + 0.66 * p), y = H * 0.32 + (y0 - H * 0.32) * (x - x0) / (x1 - x0);
-        D.disc(ctx, x, y - 20, 21, { fill: c, stroke: "rgba(255,255,255,0.75)", width: 2 });
-        D.line(ctx, x - 14, y - 20, x + 14, y - 20, PL.col("warn"), 2); D.arrow(ctx, x, y - 48, x + 35, y - 48, { color: PL.col("accent-2"), width: 2, label: "v" });
+        ctx.save();
+        const dg = ctx.createRadialGradient(x - 7, y - 27, 3, x, y - 20, 21);
+        dg.addColorStop(0, "rgb(198,207,219)"); dg.addColorStop(0.7, "rgb(126,136,151)"); dg.addColorStop(1, "rgb(70,78,92)");
+        ctx.fillStyle = dg;
+        ctx.beginPath(); ctx.arc(x, y - 20, 21, 0, PL.TAU); ctx.fill();
+        ctx.strokeStyle = "rgba(28,34,44,0.6)"; ctx.lineWidth = 1.2; ctx.stroke();
+        ctx.restore();
+        // 半徑標記線：轉動角度看得見，「無滑動」才有意義
+        const spin = (x - x0) / 21;
+        D.line(ctx, x, y - 20, x + Math.cos(spin) * 18, y - 20 + Math.sin(spin) * 18, PL.col("warn"), 2.4); D.arrow(ctx, x, y - 48, x + 35, y - 48, { color: PL.col("accent-2"), width: 2, label: "v" });
       } else {
         const x = W * (0.2 + 0.45 * p), y = H * (0.72 - 0.42 * p);
         D.line(ctx, 28, railY, W - 28, railY, "rgba(255,255,255,0.14)", 2);
@@ -134,10 +149,19 @@
       label(ctx, 20, 18, config.kind === "rolling" ? "無滑動條件" : "兩級分離", config.kind === "rolling" ? "v = ωR" : "Δv 疊加", 118, c);
     } else if (["rotor", "hohmann", "tidal"].includes(config.kind)) {
       if (config.kind === "rotor") {
+        const AP = PL.apparatus;
         const radius = Math.min(H, W) * 0.22, theta = time * a * 0.17;
-        D.ring(ctx, cx, cy, radius, "rgba(255,255,255,0.38)", 3);
-        D.line(ctx, cx, cy, cx + Math.cos(theta) * radius, cy + Math.sin(theta) * radius, c, 5);
-        D.disc(ctx, cx, cy, 11, { fill: PL.col("warn") });
+        AP.benchTop(ctx, W, H, cy + radius + 32);
+        ctx.save();
+        const rg = ctx.createRadialGradient(cx - radius * 0.3, cy - radius * 0.35, radius * 0.1, cx, cy, radius);
+        rg.addColorStop(0, "rgb(190,199,212)"); rg.addColorStop(0.72, "rgb(118,128,144)"); rg.addColorStop(1, "rgb(64,72,86)");
+        ctx.fillStyle = rg;
+        ctx.beginPath(); ctx.arc(cx, cy, radius, 0, PL.TAU); ctx.fill();
+        ctx.strokeStyle = "rgba(28,34,44,0.65)"; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.arc(cx, cy, radius, 0, PL.TAU); ctx.stroke();
+        ctx.restore();
+        D.line(ctx, cx, cy, cx + Math.cos(theta) * radius, cy + Math.sin(theta) * radius, PL.col("warn"), 5);
+        AP.brassDisc(ctx, cx, cy, 11);
         D.arrow(ctx, cx, cy, cx, cy - radius - 35, { color: PL.col("accent-3"), width: 2, label: "ω" });
       } else {
         const r1 = Math.min(W, H) * 0.16, r2 = r1 * (1.2 + a / (config.a[2] || 8));

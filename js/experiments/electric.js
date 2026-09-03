@@ -560,7 +560,13 @@
       const wire = closed ? "rgba(237,245,250,0.82)" : PL.col("text-faint");
       const active = closed ? MC() : PL.col("text-faint");
 
-      const line = (x1, y1, x2, y2, color, width) => D.line(ctx, x1, y1, x2, y2, color || wire, width || 2);
+      /* 導線畫成有厚度、帶陰影與高光的實物線；斷路時轉成暗灰，
+         「電路沒接通」因此在畫面上一眼看得出來。 */
+      const line = (x1, y1, x2, y2, color, width) => {
+        if (color && color !== wire) { D.line(ctx, x1, y1, x2, y2, color, width || 2); return; }
+        PL.apparatus.wire(ctx, [{ x: x1, y: y1 }, { x: x2, y: y2 }],
+          closed ? "rgb(186,54,48)" : "rgb(104,100,98)", (width || 2) + 1.2);
+      };
       const meter = (x, y, value, unit, label, color, limit) => {
         const over = value > limit + 1e-8, meterColor = over ? PL.col("danger", "#ff6b6b") : color;
         D.disc(ctx, x, y, 29, { fill: PL.col("panel-2"), stroke: meterColor, width: 2, glow: meterColor, glowSize: 8 });
@@ -578,10 +584,8 @@
         D.text(ctx, "0-" + PL.fmt(limit, 1) + " " + unit, x, y + 42, { color: PL.col("text-faint"), size: 8.5, align: "center" });
       };
       const resistor = (x, y, w, label) => {
-        ctx.save(); ctx.strokeStyle = active; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x, y);
-        for (let i = 0; i < 7; i++) ctx.lineTo(x + (i + 1) * w / 8, y + (i % 2 ? 9 : -9));
-        ctx.lineTo(x + w, y); ctx.stroke(); ctx.restore();
-        D.text(ctx, label, x + w / 2, y - 17, { color: active, size: 11, align: "center" });
+        PL.apparatus.resistorBox(ctx, x + w / 2, y, w, null, false);
+        D.text(ctx, label, x + w / 2, y - 19, { color: active, size: 11, align: "center" });
       };
 
       line(left, top, switchX - 14, top);
