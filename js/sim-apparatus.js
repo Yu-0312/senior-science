@@ -550,6 +550,114 @@
     D.rect(ctx, cx + r * 0.72 - 4, cy + r * 1.12, 8, 8, { fill: "rgb(40,46,56)", stroke: "rgba(10,14,20,0.8)", r: 2 });
   }
 
+  /*
+   * 標準電路圖符號（課本畫法）。ink 是線色；vertical 表示所在導線為鉛直走向。
+   * 這組符號與 cable/wire 的幾何外框共用座標，讓「實物圖↔電路圖」能一一對應。
+   */
+  function symWire(ctx, pts, ink, w) {
+    if (!pts || pts.length < 2) return;
+    ctx.save();
+    ctx.strokeStyle = ink; ctx.lineWidth = w || 1.8;
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke(); ctx.restore();
+  }
+  function symJunction(ctx, x, y, ink) {
+    ctx.fillStyle = ink;
+    ctx.beginPath(); ctx.arc(x, y, 2.6, 0, TAU); ctx.fill();
+  }
+  function symBattery(ctx, x, y, vertical, ink) {
+    ctx.save();
+    ctx.strokeStyle = ink; ctx.lineCap = "butt";
+    const seg = (off, len, lw) => {
+      ctx.lineWidth = lw;
+      ctx.beginPath();
+      if (vertical) { ctx.moveTo(x - len / 2, y + off); ctx.lineTo(x + len / 2, y + off); }
+      else { ctx.moveTo(x + off, y - len / 2); ctx.lineTo(x + off, y + len / 2); }
+      ctx.stroke();
+    };
+    seg(-9, 16, 2.2); seg(9, 8, 4.2);      // 長線（＋）與短粗線（−）
+    ctx.restore();
+  }
+  function symResistor(ctx, x, y, vertical, ink, label) {
+    ctx.save();
+    ctx.strokeStyle = ink; ctx.lineWidth = 1.8;
+    if (vertical) ctx.strokeRect(x - 7, y - 17, 14, 34);
+    else ctx.strokeRect(x - 17, y - 7, 34, 14);
+    ctx.restore();
+    if (label) D.text(ctx, label, x + (vertical ? 15 : 0), y + (vertical ? 0 : -14),
+      { color: ink, size: 10.5, align: vertical ? "left" : "center" });
+  }
+  function symRheostat(ctx, x, y, vertical, ink, label) {
+    symResistor(ctx, x, y, vertical, ink);
+    ctx.save();
+    ctx.strokeStyle = ink; ctx.lineWidth = 1.6;
+    const ax = vertical ? x - 15 : x - 13, ay = vertical ? y + 13 : y + 13;
+    const bx = vertical ? x + 15 : x + 13, by = vertical ? y - 13 : y - 13;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    // 箭頭頭
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    if (vertical) { ctx.lineTo(bx - 7, by + 1); ctx.lineTo(bx - 1, by + 7); }
+    else { ctx.lineTo(bx - 1, by + 7); ctx.lineTo(bx + 7, by + 1); }
+    ctx.closePath();
+    ctx.fillStyle = ink; ctx.fill();
+    ctx.restore();
+    if (label) D.text(ctx, label, x + (vertical ? 15 : 0), y + (vertical ? 0 : 16),
+      { color: ink, size: 10.5, align: vertical ? "left" : "center" });
+  }
+  function symBulb(ctx, x, y, lit, ink) {
+    ctx.save();
+    ctx.strokeStyle = lit ? "rgb(226,178,72)" : ink;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 15, 0, TAU); ctx.stroke();
+    const k = 10.5;
+    ctx.beginPath();
+    ctx.moveTo(x - k, y - k); ctx.lineTo(x + k, y + k);
+    ctx.moveTo(x + k, y - k); ctx.lineTo(x - k, y + k);
+    ctx.stroke();
+    ctx.restore();
+  }
+  function symMeter(ctx, x, y, letter, valueText, ink, tint) {
+    ctx.save();
+    ctx.fillStyle = "rgba(10,14,20,0.55)";
+    ctx.strokeStyle = tint || ink; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 15, 0, TAU); ctx.fill(); ctx.stroke();
+    D.text(ctx, letter, x, y + 4, { color: tint || ink, size: 13, align: "center", weight: "700" });
+    ctx.restore();
+    if (valueText) D.text(ctx, valueText, x, y + 30, { color: PL.col("text-dim"), size: 10, align: "center" });
+  }
+  function symSwitch(ctx, x, y, closed, vertical, ink) {
+    ctx.save();
+    ctx.strokeStyle = ink; ctx.lineWidth = 2;
+    const a = { x: x - (vertical ? 0 : 12), y: y - (vertical ? 12 : 0) };
+    const b = { x: x + (vertical ? 0 : 12), y: y + (vertical ? 12 : 0) };
+    ctx.beginPath(); ctx.arc(a.x, a.y, 2.4, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(b.x, b.y, 2.4, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(a.x, a.y);
+    if (vertical) ctx.lineTo(a.x + (closed ? 0 : 12), a.y + 12);
+    else ctx.lineTo(a.x + 12, a.y - (closed ? 0 : 12));
+    ctx.stroke();
+    ctx.restore();
+  }
+  function symFuse(ctx, x, y, blown, vertical, ink) {
+    ctx.save();
+    ctx.strokeStyle = ink; ctx.lineWidth = 1.6;
+    if (vertical) D.rect(ctx, x - 5, y - 12, 10, 24, { stroke: ink, width: 1.6, r: 1 });
+    else D.rect(ctx, x - 12, y - 5, 24, 10, { stroke: ink, width: 1.6, r: 1 });
+    ctx.beginPath();
+    if (vertical) {
+      if (blown) { ctx.moveTo(x, y - 10); ctx.lineTo(x, y - 3); ctx.moveTo(x, y + 3); ctx.lineTo(x, y + 10); }
+      else { ctx.moveTo(x, y - 10); ctx.lineTo(x, y + 10); }
+    } else {
+      if (blown) { ctx.moveTo(x - 10, y); ctx.lineTo(x - 3, y); ctx.moveTo(x + 3, y); ctx.lineTo(x + 10, y); }
+      else { ctx.moveTo(x - 10, y); ctx.lineTo(x + 10, y); }
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
   /* 導線：帶一點下垂弧度，比直角折線像實物 */
   function wire(ctx, pts, color, w) {
     if (!pts || pts.length < 2) return;
@@ -697,12 +805,12 @@
   /*
    * 讀值晶片：掛在元件旁的即時數值小卡（對標電路工坊每顆元件頭上的屬性條）。
    * (x,y) 是晶片左上角；tint 給邊框與數字上色。
+   * 底色用 panel-2 主題變數——深色主題是暗面板、淺色主題自動變白，不會出現黑洞。
    */
   function valueChip(ctx, x, y, text, tint) {
     const w = Math.max(34, text.length * 6.4 + 12), h = 17;
-    ctx.fillStyle = "rgba(10,14,20,0.62)";
-    D.rect(ctx, x, y, w, h, { fill: "rgba(10,14,20,0.62)", stroke: tint || "rgba(120,190,255,0.7)", width: 1, r: 5 });
-    D.text(ctx, text, x + w / 2, y + 12, { color: tint || "rgba(120,190,255,0.95)", size: 9.5, align: "center", weight: "700" });
+    D.rect(ctx, x, y, w, h, { fill: PL.col("panel-2", "rgba(10,14,20,0.62)"), stroke: tint || PL.col("accent-2", "rgba(120,190,255,0.7)"), width: 1, r: 5 });
+    D.text(ctx, text, x + w / 2, y + 12, { color: tint || PL.col("accent-2", "rgba(120,190,255,0.95)"), size: 9.5, align: "center", weight: "700" });
     return { x, y, w, h };
   }
 
@@ -1364,6 +1472,7 @@
     lens, screen, projectedFlame, glassPlate, curvedMirror, semiCircleGlass, protractor,
     battery, bulb, meter, wire, resistorBox, fuse,
     cable, valueChip, knifeSwitch, rheostat,
+    symWire, symJunction, symBattery, symResistor, symRheostat, symBulb, symMeter, symSwitch, symFuse,
     standRod, crossArm, weight, woodBlock, ramp, pulley, cord, bob, ruler, springScale, beaker,
     wallPost,
     cart, tickerTimer, vibrator, tuningFork, glassTube,

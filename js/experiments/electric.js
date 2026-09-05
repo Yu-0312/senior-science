@@ -41,19 +41,64 @@
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     const sQ1 = PL.ui.slider(L.controls, { label: "左電荷 q₁", min: -3, max: 3, step: 1, value: 2, unit: "", digits: 0, onInput: draw });
     const sQ2 = PL.ui.slider(L.controls, { label: "右電荷 q₂", min: -3, max: 3, step: 1, value: -2, unit: "", digits: 0, onInput: draw });
-    PL.ui.note(L.controls, "電場線由正電荷發出、進入負電荷；線越密處電場越強。");
+    /*
+     * 等勢面：實驗的名字裡有「等勢面」，畫面裡卻一直沒有它。
+     * 把電位場畫成色帶（紅＝正電位、藍＝負電位，越深電位絕對值越大），
+     * 色帶的邊界就是等勢線；電場線永遠垂直穿過它們。
+     */
+    const cBands = PL.ui.checkbox(L.controls, { label: "顯示等勢面（電位色帶）", checked: true, onChange: draw });
+    PL.ui.note(L.controls, "電場線由正電荷發出、進入負電荷；線越密處電場越強。色帶的邊界就是等勢線——電場線永遠垂直穿過等勢面。");
     const rNote = PL.ui.readout(L.readouts, { label: "組態" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const cy = H / 2, q1 = sQ1.get(), q2 = sQ2.get();
       const charges = [{ x: W * 0.36, y: cy, q: q1 }, { x: W * 0.64, y: cy, q: q2 }].filter(c => c.q !== 0);
       const E = (x, y) => { let ex = 0, ey = 0; charges.forEach(c => { const dx = x - c.x, dy = y - c.y, r2 = dx * dx + dy * dy, r = Math.sqrt(r2) + 1e-3; const e = c.q / r2; ex += e * dx / r; ey += e * dy / r; }); return { ex, ey }; };
+      // 等勢面（電位色帶）：低解析度算電位，平滑放大成連續色場
+      // （render-test 的 mock canvas 沒有 ImageData API，退回大色塊降級路徑）
+      if (cBands.get()) {
+        const cell = 6, ow = Math.ceil(W / cell), oh = Math.ceil(H / cell);
+        const off = document.createElement("canvas");
+        off.width = ow; off.height = oh;
+        const octx = off.getContext("2d");
+        const bandColor = t => t > 0 ? "rgba(255,116,92," + (t * 0.42).toFixed(3) + ")"
+                                     : "rgba(92,150,255," + (-t * 0.42).toFixed(3) + ")";
+        if (typeof octx.createImageData === "function") {
+          const img = octx.createImageData(ow, oh);
+          for (let j = 0; j < oh; j++) {
+            for (let i = 0; i < ow; i++) {
+              const x = (i + 0.5) * cell, y = (j + 0.5) * cell;
+              let V = 0;
+              charges.forEach(c => { V += c.q * 40 / (Math.hypot(x - c.x, y - c.y) + 12); });
+              const t = PL.clamp(V / 26, -1, 1);
+              const idx = (j * ow + i) * 4;
+              if (t > 0) { img.data[idx] = 255; img.data[idx + 1] = 116; img.data[idx + 2] = 92; }
+              else { img.data[idx] = 92; img.data[idx + 1] = 150; img.data[idx + 2] = 255; }
+              img.data[idx + 3] = Math.abs(t) * 105;
+            }
+          }
+          octx.putImageData(img, 0, 0);
+          ctx.drawImage(off, 0, 0, W, H);
+        } else {
+          const big = 24;
+          for (let y = 0; y < H; y += big) {
+            for (let x = 0; x < W; x += big) {
+              let V = 0;
+              charges.forEach(c => { V += c.q * 40 / (Math.hypot(x - c.x, y - c.y) + 12); });
+              const t = PL.clamp(V / 26, -1, 1);
+              if (Math.abs(t) < 0.04) continue;
+              ctx.fillStyle = bandColor(t);
+              ctx.fillRect(x, y, big, big);
+            }
+          }
+        }
+      }
       // 場線
       charges.forEach(c => {
         if (c.q === 0) return; const n = 8 + Math.abs(c.q) * 4, sgn = c.q > 0 ? 1 : -1;
         for (let i = 0; i < n; i++) {
           const a = TAU * i / n; let x = c.x + Math.cos(a) * 12, y = c.y + Math.sin(a) * 12;
-          ctx.save(); ctx.strokeStyle = "rgba(77,182,170,0.55)"; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(x, y);
+          ctx.save(); ctx.strokeStyle = "rgba(77,182,170,0.7)"; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(x, y);
           for (let s = 0; s < 260; s++) { const f = E(x, y); const m = Math.hypot(f.ex, f.ey) + 1e-6; x += sgn * f.ex / m * 4; y += sgn * f.ey / m * 4; if (x < 0 || x > W || y < 0 || y > H) break; let hit = false; charges.forEach(o => { if (o.q * c.q < 0 && Math.hypot(x - o.x, y - o.y) < 12) hit = true; }); ctx.lineTo(x, y); if (hit) break; }
           ctx.stroke(); ctx.restore();
         }
@@ -447,6 +492,7 @@
   /* 伏安法量電阻：安培計串聯、電壓計並聯，記錄 U-I 資料 */
   PL.register("iv-measurement", { build(root) {
     const L = PL.ui.layout(root);
+    const AP = PL.apparatus;
     const cv = PL.canvas.create(L.canvasWrap, 0.58);
     let records = [], feedback = "調整可變電阻後，記錄一組電壓計與安培計讀值。";
     PL.ui.section(L.controls, "量測電路");
@@ -454,6 +500,17 @@
     const sR = PL.ui.slider(L.controls, { label: "被測電阻 R", min: 2, max: 20, step: 1, value: 8, unit: "Ω", digits: 0, onInput: () => { records = []; feedback = "被測電阻已更換，請重新量測。"; draw(); } });
     const sRv = PL.ui.slider(L.controls, { label: "可變電阻 Rᵥ", min: 1, max: 40, step: 1, value: 10, unit: "Ω", digits: 0, onInput: draw });
     PL.ui.note(L.controls, "量測接線：安培計 A 與被測電阻串聯；電壓計 V 並聯在被測電阻兩端。");
+    /*
+     * 檢視切換：實物圖用新器材（電池盒、圓形電表、編織導線），
+     * 電路圖用課本符號，兩者共用同一個迴路外框。
+     */
+    PL.ui.section(L.controls, "檢視");
+    let view = "physical";
+    PL.ui.chipGroup(L.controls, {
+      value: "physical",
+      options: [{ value: "physical", label: "實物圖" }, { value: "schematic", label: "電路圖" }],
+      onChange: v => { view = v; draw(); }
+    });
     const actions = PL.ui.buttonRow(L.controls);
     PL.ui.button(actions, "記錄讀值", () => {
       const s = state();
@@ -484,37 +541,49 @@
     }
     function meter(x, y, value, max, label, unit, color) {
       const { ctx } = cv;
-      D.disc(ctx, x, y, 31, { fill: PL.col("panel-2"), stroke: color, width: 2, glow: color, glowSize: 7 });
-      D.ring(ctx, x, y, 22, PL.col("border"), 1);
-      const a = Math.PI * (1.15 + 0.7 * PL.clamp(value / max, 0, 1));
-      D.line(ctx, x, y, x + Math.cos(a) * 18, y + Math.sin(a) * 18, PL.col("warn"), 2);
-      D.text(ctx, label, x, y - 40, { color, size: 12, align: "center", weight: "700" });
-      D.text(ctx, PL.fmt(value, value < 1 ? 3 : 2) + " " + unit, x, y + 48, { color: PL.col("text-dim"), size: 10, align: "center" });
+      // 圓形金屬框電表（實物級）；frac 帶動指針
+      AP.meter(ctx, x, y, 30, PL.clamp(value / max, 0, 1), label);
+      D.text(ctx, PL.fmt(value, value < 1 ? 3 : 2) + " " + unit, x, y + 54, { color: PL.col("text-dim"), size: 10, align: "center" });
     }
     function draw() {
       const { ctx, W, H } = cv, s = state(); cv.clear(); D.bg(cv);
       const top = 58, bot = H - 42, left = 48, right = W - 46, mid = (top + bot) / 2;
       const AP = PL.apparatus, active = MC();
       AP.benchTop(ctx, W, H, bot + 34);
-      // 實物導線接成迴路，元件再壓在接點上
-      AP.wire(ctx, [{ x: left, y: bot }, { x: left, y: top }, { x: right, y: top },
-                    { x: right, y: bot }, { x: left, y: bot }], "rgb(186,54,48)", 3.4);
-      AP.battery(ctx, left - 15, mid - 30, 30, 60);
-      D.text(ctx, s.E + " V", left - 22, mid + 4, { color: PL.col("text-dim"), size: 11, align: "right", weight: "700" });
-      meter(W * 0.47, top, s.I, 1.5, "A", "A", MC());
-      const rvx = right - 54;
-      AP.resistorBox(ctx, rvx, top, 56, null, false); D.line(ctx, rvx, top - 26, rvx + 16, top - 7, PL.col("warn"), 1.8);
-      D.text(ctx, "Rᵥ=" + s.Rv + "Ω", rvx, top - 37, { color: active, size: 11, align: "center" });
-      const rx = W * 0.48;
-      AP.resistorBox(ctx, rx, bot, 62, null, false);
-      D.text(ctx, "被測 R=" + s.R + "Ω", rx, bot + 27, { color: active, size: 11, align: "center" });
-      const vx = W * 0.76, vy = mid;
-      // 電壓計的兩條並聯引線（比主迴路細，才看得出是「跨接上去」的）
-      AP.wire(ctx, [{ x: rx - 36, y: bot }, { x: rx - 36, y: vy }, { x: vx - 31, y: vy }], "rgb(58,96,168)", 2.6);
-      AP.wire(ctx, [{ x: rx + 36, y: bot }, { x: rx + 36, y: vy }, { x: vx + 31, y: vy }], "rgb(58,96,168)", 2.6);
-      meter(vx, vy, s.U, 12, "V", "V", PL.col("accent-2"));
-      D.text(ctx, "A 串聯", W * 0.47, 20, { color: PL.col("text-faint"), size: 10, align: "center" });
-      D.text(ctx, "V 並聯於被測電阻兩端", vx, H - 13, { color: PL.col("text-faint"), size: 10, align: "center" });
+      const wireColor = "rgb(186,54,48)";
+      const rvx = right - 54, rx = W * 0.48, vx = W * 0.76, vy = mid;
+
+      if (view === "schematic") {
+        // 課本符號版：同一個迴路外框，位置與實物圖一一對應
+        const ink = "rgba(34,42,54,0.92)";
+        AP.symWire(ctx, [{ x: left, y: bot }, { x: left, y: top }, { x: right, y: top },
+                          { x: right, y: bot }, { x: left, y: bot }], ink);
+        AP.symBattery(ctx, left, mid, true, ink);
+        AP.symMeter(ctx, W * 0.47, top, "A", PL.fmt(s.I, 2) + " A", ink, MC());
+        AP.symRheostat(ctx, rvx, top, false, ink, "Rᵥ=" + s.Rv + "Ω");
+        AP.symResistor(ctx, rx, bot, false, ink, "被測 R=" + s.R + "Ω");
+        // 電壓計的並聯跨接線
+        AP.symWire(ctx, [{ x: rx - 36, y: bot }, { x: rx - 36, y: vy }, { x: vx - 15, y: vy }], "rgba(58,96,168,0.9)", 1.5);
+        AP.symWire(ctx, [{ x: rx + 36, y: bot }, { x: rx + 36, y: vy }, { x: vx + 15, y: vy }], "rgba(58,96,168,0.9)", 1.5);
+        AP.symJunction(ctx, rx - 36, bot, ink); AP.symJunction(ctx, rx + 36, bot, ink);
+        AP.symMeter(ctx, vx, vy, "V", PL.fmt(s.U, 2) + " V", ink, PL.col("accent-2"));
+        D.text(ctx, "A 串聯、V 並聯——與實物圖位置一一對應", W / 2, 20, { color: PL.col("text-faint"), size: 10, align: "center" });
+      } else {
+        // 實物圖：編織導線＋電池盒＋圓形電表
+        AP.cable(ctx, [{ x: left, y: bot }, { x: left, y: top }, { x: right, y: top },
+                        { x: right, y: bot }, { x: left, y: bot }], wireColor, 3.4, 5);
+        AP.battery(ctx, left - 15, mid - 30, 30, 60);
+        meter(W * 0.47, top, s.I, 1.5, "A", "A", MC());
+        AP.resistorBox(ctx, rvx, top, 56, null, false); D.line(ctx, rvx, top - 26, rvx + 16, top - 7, PL.col("warn"), 1.8);
+        AP.valueChip(ctx, rvx - 30, top - 44, "Rᵥ=" + s.Rv + "Ω", active);
+        AP.resistorBox(ctx, rx, bot, 62, null, false);
+        AP.valueChip(ctx, rx - 52, bot + 16, "被測 R=" + s.R + "Ω", active);
+        AP.cable(ctx, [{ x: rx - 36, y: bot }, { x: rx - 36, y: vy }, { x: vx - 31, y: vy }], "rgb(58,96,168)", 2.6, 3);
+        AP.cable(ctx, [{ x: rx + 36, y: bot }, { x: rx + 36, y: vy }, { x: vx + 31, y: vy }], "rgb(58,96,168)", 2.6, 3);
+        meter(vx, vy, s.U, 12, "V", "V", PL.col("accent-2"));
+        D.text(ctx, "A 串聯", W * 0.47, 20, { color: PL.col("text-faint"), size: 10, align: "center" });
+        D.text(ctx, "V 並聯於被測電阻兩端", vx, H - 13, { color: PL.col("text-faint"), size: 10, align: "center" });
+      }
       rI.set(s.I, 3); rU.set(s.U, 2); rNowR.set(s.U / s.I, 2); rN.set(records.length, 0); note.textContent = feedback;
       chart.clear();
       const xmax = Math.max(1.3, ...records.map(p => p.I * 1.15), s.I * 1.15), ymax = Math.max(10, ...records.map(p => p.U * 1.15), s.U * 1.15);

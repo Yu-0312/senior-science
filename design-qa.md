@@ -1276,3 +1276,19 @@ console 無錯誤。BUILD 升為 20260905-3。
   課本符號（電池長短線、⊗燈泡、矩形可變電阻＋箭頭），位置一一對應、
   數值晶片兩邊同步。電子流動畫兩種檢視都保留。
 - BUILD 升為 20260905-4。
+
+## 2026-09 電學第二輪：iv-measurement 雙檢視與 efield 等勢面
+
+- 新增標準電路圖符號組（symWire/symJunction/symBattery/symResistor/
+  symRheostat/symBulb/symMeter/symSwitch/symFuse），三個電路實驗共用。
+- iv-measurement 加「實物圖/電路圖」切換：實物圖換用電池盒＋圓形金屬框
+  電表（指針連動讀值）＋編織導線；電路圖用課本符號，A 串聯、V 並聯的
+  跨接線與實心節點和實物圖位置一一對應。
+- closed-circuit-emf 的 E/r 電池標示已有教學價值，保持原圖不動；
+  resistors 的「方塊長度∝阻值、電流點密度∝電流」隱喻完整，也不硬換。
+- efield 補上等勢面（電位色帶：紅＝正、藍＝負，平滑放大；render-test
+  的 mock canvas 走大色塊降級路徑）——實驗名稱裡的「等勢面」終於存在，
+  電場線垂直穿過色帶邊界的關係可以直接目視。
+- valueChip 底色改用 panel-2 主題變數，淺色主題不再出現黑洞
+  （theme-audit 攔到的問題）。
+- BUILD 升為 20260905-4（第二版）。十個電學頁面 console 零錯誤。
