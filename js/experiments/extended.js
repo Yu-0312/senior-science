@@ -75,16 +75,16 @@
     return { ctx, W, H, wallX, cartW, ay, railY };
   }
 
-  // 牆、軌道、彈簧與小車；dx 是小車相對平衡位置的水平位移（px）
+  // 牆柱、軌道、彈簧與小車；dx 是小車相對平衡位置的水平位移（px）
+  // 彈簧一端套進牆上螺栓座、另一端勾進車側眼環， cargo 讓車頂載一塊砝碼
   function oscCart(ctx, g, eqX, dx, coils) {
     const AP = PL.apparatus, c = color();
     AP.steel(ctx, g.wallX - 10, g.railY, g.W - g.wallX - 26, 8, 4);
-    AP.steel(ctx, g.wallX - 14, g.ay - 30, 14, 72, -20);
-    AP.steel(ctx, g.wallX, g.ay - 8, 10, 26, 8);
+    const post = AP.wallPost(ctx, g.wallX - 4, g.railY - 1, g.ay - 32, g.ay);
     D.line(ctx, eqX, g.ay - 56, eqX, g.railY + 16, "rgba(120,190,255,0.5)", 1, [4, 4]);
     D.text(ctx, "x = 0", eqX, g.ay - 62, { color: PL.theme.pale(0.75), size: 10.5, align: "center" });
-    D.spring(ctx, g.wallX + 8, g.ay, eqX + dx - g.cartW / 2, g.ay, coils || 11, 11, c);
-    AP.cart(ctx, eqX + dx, g.railY, g.cartW, 36);
+    D.spring(ctx, post.x, g.ay, eqX + dx - g.cartW / 2 - 2, g.ay, coils || 11, 11, c);
+    AP.cart(ctx, eqX + dx, g.railY, g.cartW, 36, { cargo: true });
   }
 
   // 振幅 ±A 與現在位置的標線；ampPx 為目前的包絡（px）
@@ -226,15 +226,15 @@
         // 兩台車＋三條彈簧一次畫完（不走 oscCart，因為這裡有兩個平衡位置）
         const AP = PL.apparatus;
         AP.steel(ctx, g.wallX - 10, g.railY, wallR - g.wallX + 6, 8, 4);
-        AP.steel(ctx, g.wallX - 14, g.ay - 30, 14, 72, -20);
-        AP.steel(ctx, wallR, g.ay - 30, 14, 72, -20);
+        const postL = AP.wallPost(ctx, g.wallX - 4, g.railY - 1, g.ay - 32, g.ay);
+        const postR = AP.wallPost(ctx, wallR + 4, g.railY - 1, g.ay - 32, g.ay);
         D.line(ctx, c1eq, g.ay - 56, c1eq, g.railY + 16, "rgba(120,190,255,0.45)", 1, [4, 4]);
         D.line(ctx, c2eq, g.ay - 56, c2eq, g.railY + 16, "rgba(120,190,255,0.45)", 1, [4, 4]);
-        D.spring(ctx, g.wallX + 8, g.ay, c1x - g.cartW / 2, g.ay, 8, 10, c);
-        D.spring(ctx, c1x + g.cartW / 2, g.ay, c2x - g.cartW / 2, g.ay, Math.max(9, Math.round((c2x - c1x - g.cartW) / 16)), 10, PL.col("accent-3"));
-        D.spring(ctx, c2x + g.cartW / 2, g.ay, wallR - 8, g.ay, 8, 10, c);
-        AP.cart(ctx, c1x, g.railY, g.cartW, 36);
-        AP.cart(ctx, c2x, g.railY, g.cartW, 36);
+        D.spring(ctx, postL.x, g.ay, c1x - g.cartW / 2 - 2, g.ay, 8, 10, c);
+        D.spring(ctx, c1x + g.cartW / 2 + 2, g.ay, c2x - g.cartW / 2 - 2, g.ay, Math.max(9, Math.round((c2x - c1x - g.cartW) / 16)), 10, PL.col("accent-3"));
+        D.spring(ctx, c2x + g.cartW / 2 + 2, g.ay, postR.x, g.ay, 8, 10, c);
+        AP.cart(ctx, c1x, g.railY, g.cartW, 36, { cargo: true });
+        AP.cart(ctx, c2x, g.railY, g.cartW, 36, { cargo: true });
         D.text(ctx, "振子一", c1x, g.railY + 22, { color: PL.theme.pale(0.7), size: 10, align: "center" });
         D.text(ctx, "振子二", c2x, g.railY + 22, { color: PL.theme.pale(0.7), size: 10, align: "center" });
         D.text(ctx, "能量沿中間彈簧來回搬運：一台變小時另一台變大", g.W / 2, 26, { color: PL.col("text-faint"), size: 10.5, align: "center" });

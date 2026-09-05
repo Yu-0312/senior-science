@@ -635,6 +635,13 @@
     ctx.beginPath(); ctx.ellipse(cx, topY, w / 2, 2.6, 0, 0, TAU); ctx.fill();
     ctx.strokeStyle = "rgba(24,30,40,0.6)"; ctx.lineWidth = 1;
     ctx.strokeRect(cx - w / 2 + 0.5, topY + 0.5, w - 1, h - 1);
+    // 槽碼的提把缺口與下緣倒角（h 夠高才畫，避免小砝碼糊掉）
+    if (h > 18) {
+      ctx.fillStyle = "rgba(18,24,32,0.78)";
+      D.rect(ctx, cx - w * 0.22, topY + h * 0.42, w * 0.44, 3.2, { fill: "rgba(18,24,32,0.78)", r: 1.6 });
+      ctx.fillStyle = "rgba(200,210,224,0.28)";
+      ctx.fillRect(cx - w / 2 + 2, topY + h - 3, w - 4, 2);
+    }
     if (label) D.text(ctx, label, cx, topY + h / 2 + 4, { color: "#eef3fa", size: 10, align: "center", weight: "700" });
   }
 
@@ -642,19 +649,26 @@
   function woodBlock(ctx, cx, cy, w, h, ang) {
     ctx.save();
     ctx.translate(cx, cy); ctx.rotate(ang || 0);
+    const r = Math.min(3.5, w * 0.12, h * 0.18);
     const g = ctx.createLinearGradient(0, -h, 0, 0);
-    g.addColorStop(0.00, "rgb(206,164,110)");
-    g.addColorStop(0.35, "rgb(180,136,84)");
+    g.addColorStop(0.00, "rgb(210,168,112)");
+    g.addColorStop(0.35, "rgb(182,138,86)");
     g.addColorStop(1.00, "rgb(140,101,58)");
-    ctx.fillStyle = g; ctx.fillRect(-w / 2, -h, w, h);
-    // 木紋
+    ctx.fillStyle = g;
+    D.rect(ctx, -w / 2, -h, w, h, { fill: g, stroke: "rgba(84,56,26,0.72)", r });
+    // 頂緣高光：受光的上面那一條
+    ctx.strokeStyle = "rgba(255,232,196,0.5)"; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(-w / 2 + r + 1, -h + 1.4); ctx.lineTo(w / 2 - r - 1, -h + 1.4); ctx.stroke();
+    // 木紋與拼板縫
     ctx.strokeStyle = "rgba(110,76,40,0.35)"; ctx.lineWidth = 1;
     for (let i = 1; i < 4; i++) {
       const yy = -h + (h / 4) * i;
       ctx.beginPath(); ctx.moveTo(-w / 2 + 2, yy); ctx.lineTo(w / 2 - 2, yy + (i % 2 ? 1.5 : -1.5)); ctx.stroke();
     }
-    ctx.strokeStyle = "rgba(84,56,26,0.7)"; ctx.lineWidth = 1.2;
-    ctx.strokeRect(-w / 2, -h, w, h);
+    if (w > 30) {
+      ctx.strokeStyle = "rgba(96,64,32,0.4)";
+      ctx.beginPath(); ctx.moveTo(0, -h + 2.5); ctx.lineTo(0, -2.5); ctx.stroke();
+    }
     ctx.restore();
   }
 
@@ -690,7 +704,7 @@
     return { x1, y1 };
   }
 
-  /* 定滑輪 */
+  /* 定滑輪：輪體 + 輪槽 + 軸心螺栓 + 左上高光弧 */
   function pulley(ctx, cx, cy, r) {
     contactShadow(ctx, cx, cy + r + 3, r * 1.2);
     const g = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.35, r * 0.1, cx, cy, r);
@@ -701,8 +715,11 @@
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill();
     ctx.strokeStyle = "rgba(30,38,50,0.65)"; ctx.lineWidth = 1.4;
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.stroke();
+    // 繩槽：靠外緣的凹槽用兩道同心弧表現
     ctx.strokeStyle = "rgba(30,38,50,0.4)"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(cx, cy, r * 0.82, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.9, Math.PI * 1.05, Math.PI * 1.55); ctx.stroke();
     brassDisc(ctx, cx, cy, r * 0.22);
   }
 
@@ -714,8 +731,11 @@
     ctx.restore();
   }
 
-  /* 擺球（金屬球，帶高光） */
+  /* 擺球（金屬球）：頂部掛環 + 球面高光點，讓繩子有明確的接點 */
   function bob(ctx, cx, cy, r) {
+    // 掛環：畫在球體之前，開口藏在球後
+    ctx.strokeStyle = "rgb(150,160,176)"; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(cx, cy - r + 1, Math.max(2, r * 0.22), Math.PI * 0.9, Math.PI * 2.1); ctx.stroke();
     const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.08, cx, cy, r);
     g.addColorStop(0, "rgb(226,234,246)");
     g.addColorStop(0.35, "rgb(150,162,180)");
@@ -725,36 +745,126 @@
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill();
     ctx.strokeStyle = "rgba(24,30,40,0.55)"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.stroke();
+    // 環境反光點
+    ctx.fillStyle = "rgba(255,255,255,0.65)";
+    ctx.beginPath(); ctx.ellipse(cx - r * 0.32, cy - r * 0.42, r * 0.13, r * 0.09, -0.6, 0, TAU); ctx.fill();
   }
 
-  /* 力學小車：車身 + 兩個輪子。baseY 是輪子著地的高度。 */
-  function cart(ctx, cx, baseY, w, h) {
-    const r = Math.max(4, h * 0.26);
-    const bodyBot = baseY - r * 1.1;
-    contactShadow(ctx, cx, baseY + 2, w * 0.6);
-    const g = ctx.createLinearGradient(0, bodyBot - h, 0, bodyBot);
-    g.addColorStop(0.00, "rgb(228,166,86)");
-    g.addColorStop(0.30, "rgb(206,138,58)");
-    g.addColorStop(1.00, "rgb(150,96,36)");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.moveTo(cx - w / 2 + 3, bodyBot - h);
-    ctx.lineTo(cx + w / 2 - 3, bodyBot - h);
-    ctx.lineTo(cx + w / 2, bodyBot);
-    ctx.lineTo(cx - w / 2, bodyBot);
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = "rgba(90,58,20,0.65)"; ctx.lineWidth = 1.2; ctx.stroke();
-    steel(ctx, cx - w / 2 + 2, bodyBot - h - 3, w - 4, 4, 10);
+  /*
+   * 動力小車（參考真實實驗室推車的樣貌）：
+   *   金屬膠囊車身 + 頂板深色飾條 + 兩端橡膠保險桿 + 兩端眼環掛鉤
+   *   + 輪胎（帶刻紋）/輪轂/黃銅螺栓三層輪組。
+   * baseY 是輪子著地的高度；w、h 是車身的寬高。
+   * opts.cargo 會在車頂放一個木質砝碼塊（彈簧振子等實驗用）。
+   */
+  function cart(ctx, cx, baseY, w, h, opts) {
+    opts = opts || {};
+    const r = Math.max(4, Math.min(9, h * 0.26));
+    const bodyBot = baseY - r * 1.1, bodyTop = bodyBot - h;
+    const rad = Math.min(h * 0.28, w * 0.16);
+    contactShadow(ctx, cx, baseY + 2, w * 0.62);
+    // 輪組：先畫輪，車身壓在上緣（輪子只露出下半與側緣）
     [-1, 1].forEach(s => {
-      const wx = cx + s * (w / 2 - r - 2);
-      const wg = ctx.createRadialGradient(wx - r * 0.3, baseY - r - r * 0.3, r * 0.1, wx, baseY - r, r);
-      wg.addColorStop(0, "rgb(112,120,134)");
-      wg.addColorStop(0.7, "rgb(52,58,70)");
-      wg.addColorStop(1, "rgb(26,30,38)");
-      ctx.fillStyle = wg;
+      const wx = cx + s * (w * 0.30);
+      // 輪胎
+      const tg = ctx.createRadialGradient(wx - r * 0.2, baseY - r - r * 0.2, r * 0.2, wx, baseY - r, r);
+      tg.addColorStop(0, "rgb(64,72,86)");
+      tg.addColorStop(0.75, "rgb(40,46,58)");
+      tg.addColorStop(1, "rgb(24,28,36)");
+      ctx.fillStyle = tg;
       ctx.beginPath(); ctx.arc(wx, baseY - r, r, 0, TAU); ctx.fill();
-      brassDisc(ctx, wx, baseY - r, r * 0.3);
+      // 刻紋：外緣幾道短弧
+      ctx.strokeStyle = "rgba(12,16,22,0.8)"; ctx.lineWidth = 1;
+      for (let i = 0; i < 6; i++) {
+        const a = i * TAU / 6 + 0.35;
+        ctx.beginPath(); ctx.arc(wx, baseY - r, r - 1.2, a, a + 0.42); ctx.stroke();
+      }
+      // 輪轂
+      const hg = ctx.createRadialGradient(wx - r * 0.25, baseY - r - r * 0.25, r * 0.08, wx, baseY - r, r * 0.55);
+      hg.addColorStop(0, "rgb(208,216,226)");
+      hg.addColorStop(0.7, "rgb(130,140,152)");
+      hg.addColorStop(1, "rgb(74,82,96)");
+      ctx.fillStyle = hg;
+      ctx.beginPath(); ctx.arc(wx, baseY - r, r * 0.55, 0, TAU); ctx.fill();
+      brassDisc(ctx, wx, baseY - r, r * 0.2);
     });
+    // 車身：金屬膠囊
+    const g = ctx.createLinearGradient(0, bodyTop, 0, bodyBot);
+    g.addColorStop(0.00, "rgb(202,212,222)");
+    g.addColorStop(0.38, "rgb(162,172,184)");
+    g.addColorStop(1.00, "rgb(98,106,118)");
+    ctx.fillStyle = g;
+    D.rect(ctx, cx - w / 2, bodyTop, w, h, { fill: g, stroke: "rgba(28,36,48,0.72)", r: rad });
+    // 頂板飾條
+    ctx.fillStyle = "rgba(30,38,50,0.42)";
+    D.rect(ctx, cx - w / 2 + rad * 0.7, bodyTop + 2, w - rad * 1.4, 3, { fill: "rgba(30,38,50,0.42)", r: 1.5 });
+    // 兩端保險桿（深色豎條）
+    [-1, 1].forEach(s => {
+      ctx.fillStyle = "rgba(24,30,40,0.5)";
+      D.rect(ctx, cx + s * (w / 2 - 4.5) - 1.6, bodyTop + 3, 3.2, h - 6, { fill: "rgba(24,30,40,0.5)", r: 1.6 });
+    });
+    // 車身側面高光
+    ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.moveTo(cx - w / 2 + rad, bodyTop + h * 0.3); ctx.lineTo(cx + w / 2 - rad, bodyTop + h * 0.3); ctx.stroke();
+    // 兩端眼環掛鉤：彈簧、細繩的接點
+    [-1, 1].forEach(s => {
+      const hx = cx + s * (w / 2 + 2.5), hy = bodyTop + h * 0.5;
+      ctx.strokeStyle = "rgba(46,54,66,0.95)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(hx, hy, 3.6, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = "rgba(200,210,220,0.8)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(hx, hy, 3.6, Math.PI * 1.1, Math.PI * 1.8); ctx.stroke();
+      // 接座：把環繫在車身上的小墊片
+      ctx.fillStyle = "rgba(50,58,70,0.9)";
+      ctx.fillRect(cx + s * (w / 2 - 3), hy - 2, s * 5, 4);
+    });
+    // 車頂貨物（可選）：木質砝碼塊
+    if (opts.cargo) {
+      const cw = w * 0.42, chh = Math.max(8, h * 0.42);
+      woodBlock(ctx, cx, bodyTop + 1, cw, chh, 0);
+    }
+  }
+
+  /*
+   * 牆面固定柱：底座 + 立柱 + 頂蓋 + 掛簧螺栓座。
+   * (x, baseY) 是底座中心、topY 是柱頂；bossY 是彈簧/繩索的掛點高度。
+   * 回傳掛點座標，呼叫端直接把彈簧畫到回傳值上。
+   */
+  function wallPost(ctx, x, baseY, topY, bossY) {
+    // 底座與固定螺栓
+    const g = ctx.createLinearGradient(x - 10, 0, x + 10, 0);
+    g.addColorStop(0, "rgb(88,97,110)");
+    g.addColorStop(0.4, "rgb(146,156,170)");
+    g.addColorStop(1, "rgb(70,78,92)");
+    ctx.fillStyle = g;
+    D.rect(ctx, x - 10, baseY - 7, 20, 9, { fill: g, stroke: "rgba(26,34,46,0.7)", r: 2 });
+    ctx.fillStyle = "rgba(20,26,36,0.85)";
+    ctx.beginPath(); ctx.arc(x - 5.5, baseY - 2.5, 1.4, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + 5.5, baseY - 2.5, 1.4, 0, TAU); ctx.fill();
+    // 立柱
+    const cg = ctx.createLinearGradient(x - 5, 0, x + 5, 0);
+    cg.addColorStop(0, "rgb(96,106,120)");
+    cg.addColorStop(0.35, "rgb(158,168,182)");
+    cg.addColorStop(0.8, "rgb(108,118,132)");
+    cg.addColorStop(1, "rgb(64,72,86)");
+    ctx.fillStyle = cg;
+    ctx.fillRect(x - 5, topY, 10, baseY - 7 - topY);
+    ctx.strokeStyle = "rgba(26,34,46,0.55)"; ctx.lineWidth = 1;
+    ctx.strokeRect(x - 5 + 0.5, topY + 0.5, 9, baseY - 8 - topY);
+    // 頂蓋
+    ctx.fillStyle = g;
+    D.rect(ctx, x - 8, topY - 5, 16, 6, { fill: g, stroke: "rgba(26,34,46,0.7)", r: 2 });
+    // 掛簧螺栓座：彈簧端圈就是套在這顆螺栓上
+    const bg = ctx.createRadialGradient(x - 1.5, bossY - 1.5, 0.8, x, bossY, 6);
+    bg.addColorStop(0, "rgb(196,206,218)");
+    bg.addColorStop(0.75, "rgb(126,136,150)");
+    bg.addColorStop(1, "rgb(70,78,92)");
+    ctx.fillStyle = bg;
+    ctx.beginPath(); ctx.arc(x, bossY, 6, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "rgba(26,34,46,0.7)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(x, bossY, 6, 0, TAU); ctx.stroke();
+    ctx.fillStyle = "rgba(16,22,30,0.9)";
+    ctx.beginPath(); ctx.arc(x, bossY, 2, 0, TAU); ctx.fill();
+    return { x, y: bossY };
   }
 
   /* 打點計時器：外殼 + 線圈散熱條紋 + 接線柱 + 打點錘。tapeY 是紙帶通過的高度。 */
@@ -1065,6 +1175,7 @@
     lens, screen, projectedFlame, glassPlate, curvedMirror, semiCircleGlass, protractor,
     battery, bulb, meter, wire, resistorBox, fuse,
     standRod, crossArm, weight, woodBlock, ramp, pulley, cord, bob, ruler, springScale, beaker,
+    wallPost,
     cart, tickerTimer, vibrator, tuningFork, glassTube,
     barMagnet, coilWinding, ironCore, thermometer, polePiece
   };

@@ -33,10 +33,9 @@
       cv.calibrate(sc, "m");      // 尺可直接量振幅與位移
       const mx = eqX + x * sc;
 
-      // 滑軌與牆面固定座
+      // 滑軌與牆面固定柱（含掛簧螺栓座）
       AP.steel(ctx, wallX - 10, railY, W - wallX - 26, 8, 4);
-      AP.steel(ctx, wallX - 14, ay - 26, 14, 66, -20);
-      AP.steel(ctx, wallX, ay - 8, 10, 26, 8);   // 彈簧固定座
+      const post = AP.wallPost(ctx, wallX - 4, railY - 1, ay - 32, ay);
       // 平衡位置用主題藍強調（liziwuli 同款語彙）；±A 跟著 A 滑桿伸縮
       const dash = [4, 4];
       D.line(ctx, eqX, ay - 52, eqX, railY + 14, "rgba(110,180,255,0.55)", 1.2, dash);
@@ -46,8 +45,8 @@
       D.text(ctx, "+A", eqX + A * sc, ay - 52, { color: PL.theme.pale(0.55), size: 10.5, align: "center" });
       D.text(ctx, "平衡位置 x = 0", eqX, ay - 54, { color: "rgba(140,196,255,0.9)", size: 10.5, align: "center" });
 
-      // 彈簧與滑塊（掛點在車身側面中心）
-      D.spring(ctx, wallX + 8, ay, mx - cartW / 2, ay, 11, 11, MC());
+      // 彈簧（端圈套進牆上螺栓、勾進車側眼環）與滑塊
+      D.spring(ctx, post.x, ay, mx - cartW / 2 - 1, ay, 11, 11, MC());
       AP.cart(ctx, mx, railY, cartW, 34);
 
       // 力與速度箭頭：以「目前設定的最大值」歸一，長度在情況之間可比較
@@ -221,15 +220,14 @@
       const AP = PL.apparatus;
       const midY = 58, sc = (W - 120) / (2 * A_MAX), eqX = W / 2, mx = eqX + x * sc;
       const cartW = 42, railY = midY + 27;
-      // 牆、軌道與平衡位置：振子畫成真的彈簧掛車，不是幾何符號
+      // 牆柱、軌道與平衡位置：振子畫成真的彈簧掛車，不是幾何符號
       AP.steel(ctx, 28, railY, W - 52, 8, 4);
-      AP.steel(ctx, 24, midY - 24, 12, 62, -20);
-      AP.steel(ctx, 36, midY - 6, 9, 22, 8);
+      const postE = AP.wallPost(ctx, 30, railY - 1, midY - 30, midY);
       D.line(ctx, eqX, midY - 48, eqX, railY + 12, "rgba(255,255,255,0.22)", 1, [4, 4]);
       D.text(ctx, "x = 0", eqX, midY - 54, { color: PL.theme.pale(0.8), size: 10.5, align: "center" });
       D.line(ctx, eqX - A * sc, midY - 42, eqX - A * sc, railY + 6, "rgba(255,255,255,0.13)", 1, [4, 4]);
       D.line(ctx, eqX + A * sc, midY - 42, eqX + A * sc, railY + 6, "rgba(255,255,255,0.13)", 1, [4, 4]);
-      D.spring(ctx, 44, midY, mx - cartW / 2, midY, 10, 10, MC());
+      D.spring(ctx, postE.x, midY, mx - cartW / 2 - 1, midY, 10, 10, MC());
       AP.cart(ctx, mx, railY, cartW, 32);
       // 能量對位置 圖
       const bx = 40, by = 120, bw = W - 80, bh = H - by - 16;
@@ -267,11 +265,10 @@
       const midY = 56, eqX = W / 2, x = A * 26 * Math.sin(wd * t);
       const cartW = 42, railY = midY + 25;
       AP.steel(ctx, 46, railY, W - 72, 8, 4);
-      AP.steel(ctx, 36, midY - 22, 12, 58, -20);
-      AP.steel(ctx, 48, midY - 6, 9, 20, 8);
+      const postR = AP.wallPost(ctx, 42, railY - 1, midY - 26, midY);
       D.line(ctx, eqX, midY - 44, eqX, railY + 12, "rgba(255,255,255,0.22)", 1, [4, 4]);
       D.text(ctx, "x = 0", eqX, midY - 50, { color: PL.theme.pale(0.8), size: 10.5, align: "center" });
-      D.spring(ctx, 56, midY, eqX + x - cartW / 2, midY, 10, 9, MC());
+      D.spring(ctx, postR.x, midY, eqX + x - cartW / 2 - 1, midY, 10, 9, MC());
       AP.cart(ctx, eqX + x, railY, cartW, 30);
       // 共振曲線
       const bx = 44, by = 108, bw = W - 80, bh = H - by - 16;
