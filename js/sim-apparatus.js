@@ -417,18 +417,52 @@
      --------------------------------------------------------------- */
 
   /* 乾電池組 */
+  /*
+   * 電池盒（實物級）：藍色塑膠盒＋兩顆乾電池＋頂部金屬接片，
+   * 左右兩側是紅（＋）黑（−）接線柱——導線迴路正好接在這兩點。
+   * (x,y,w,h) 與舊版完全相容：x,y 為盒體左上角。
+   */
   function battery(ctx, x, y, w, h) {
+    // 盒體：藍色塑膠
     const g = ctx.createLinearGradient(0, y, 0, y + h);
-    g.addColorStop(0, "rgb(74,88,112)");
-    g.addColorStop(0.35, "rgb(44,56,76)");
-    g.addColorStop(1, "rgb(28,36,50)");
-    ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = "rgba(150,166,190,0.5)"; ctx.lineWidth = 1;
-    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-    brassDisc(ctx, x + w * 0.22, y + h / 2, 4);
-    brassDisc(ctx, x + w * 0.78, y + h / 2, 4);
-    D.text(ctx, "＋", x + w * 0.22, y + h / 2 - 8, { color: "#f0f4fa", size: 10, align: "center" });
-    D.text(ctx, "－", x + w * 0.78, y + h / 2 - 8, { color: "#f0f4fa", size: 10, align: "center" });
+    g.addColorStop(0, "rgb(96,150,214)");
+    g.addColorStop(0.3, "rgb(62,112,178)");
+    g.addColorStop(1, "rgb(34,70,128)");
+    ctx.fillStyle = g;
+    D.rect(ctx, x, y, w, h, { fill: g, stroke: "rgba(16,32,60,0.75)", r: 4 });
+    // 內腔
+    ctx.fillStyle = "rgba(12,24,48,0.55)";
+    D.rect(ctx, x + 3, y + 5, w - 6, h - 10, { fill: "rgba(12,24,48,0.55)", r: 3 });
+    // 兩顆乾電池（直立）
+    const cw = (w - 10) / 2;
+    [0, 1].forEach(i => {
+      const bx = x + 5 + i * (cw + 2), by = y + 8, ch = h - 16;
+      const cg = ctx.createLinearGradient(bx, 0, bx + cw, 0);
+      cg.addColorStop(0, "rgb(96,104,118)");
+      cg.addColorStop(0.45, "rgb(148,156,170)");
+      cg.addColorStop(1, "rgb(74,82,96)");
+      ctx.fillStyle = cg;
+      D.rect(ctx, bx, by, cw, ch, { fill: cg, stroke: "rgba(20,28,40,0.7)", r: 2.5 });
+      // 銅帽端
+      ctx.fillStyle = i === 0 ? "rgb(198,148,72)" : "rgb(120,128,142)";
+      ctx.fillRect(bx + cw * 0.25, by - 2.5, cw * 0.5, 3);
+      // 電池標籤帶
+      ctx.fillStyle = "rgba(230,236,244,0.85)";
+      ctx.fillRect(bx + 2, by + ch * 0.3, cw - 4, ch * 0.34);
+    });
+    // 頂部金屬接片把兩顆串起來
+    ctx.strokeStyle = "rgb(178,188,200)"; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(x + 5 + cw, y + 7); ctx.lineTo(x + 5 + cw + 2, y + 4); ctx.lineTo(x + w - 5 - cw, y + 4); ctx.lineTo(x + w - 5 - cw, y + 7); ctx.stroke();
+    // 左右接線柱：紅（＋）黑（−）
+    const py = y + h / 2;
+    ctx.fillStyle = "rgb(196,62,52)";
+    D.rect(ctx, x - 5, py - 4, 8, 8, { fill: "rgb(196,62,52)", stroke: "rgba(60,20,16,0.8)", r: 2 });
+    brassDisc(ctx, x - 1, py, 1.8);
+    ctx.fillStyle = "rgb(40,46,56)";
+    D.rect(ctx, x + w - 3, py - 4, 8, 8, { fill: "rgb(40,46,56)", stroke: "rgba(10,14,20,0.8)", r: 2 });
+    brassDisc(ctx, x + w + 1, py, 1.8);
+    D.text(ctx, "＋", x - 1, py - 7, { color: "#ff9d94", size: 9, align: "center", weight: "700" });
+    D.text(ctx, "－", x + w + 1, py - 7, { color: "#aeb6c4", size: 9, align: "center", weight: "700" });
   }
 
   /* 小燈泡。bright 0..1 決定發光強度。 */
@@ -458,43 +492,62 @@
     ctx.stroke();
   }
 
-  /* 指針式電表。frac 是指針在量程中的比例 0..1。 */
+  /*
+   * 指針式電表（實物級）：圓形金屬框＋米色錶面＋刻度弧＋紅色指針，
+   * 底部兩顆接線柱。frac 是指針在量程中的比例 0..1，label 是 A/V 等單位。
+   */
   function meter(ctx, cx, cy, r, frac, label) {
-    // 外殼
-    const g = ctx.createLinearGradient(0, cy - r, 0, cy + r);
-    g.addColorStop(0, "rgb(60,72,92)");
-    g.addColorStop(1, "rgb(30,38,52)");
-    ctx.fillStyle = g;
-    ctx.fillRect(cx - r * 1.15, cy - r * 1.05, r * 2.3, r * 2.1);
-    // 錶面
-    ctx.fillStyle = "rgb(244,241,232)";
-    ctx.beginPath();
-    ctx.moveTo(cx - r, cy + r * 0.42);
-    ctx.arc(cx, cy + r * 0.42, r, Math.PI, 0);
-    ctx.closePath(); ctx.fill();
-    // 刻度弧
-    ctx.strokeStyle = "rgba(40,48,60,0.8)"; ctx.lineWidth = 1;
+    // 外殼投影與圓形金屬框
+    contactShadow(ctx, cx, cy + r * 1.18, r * 1.7);
+    const bg = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.35, r * 0.15, cx, cy, r * 1.14);
+    bg.addColorStop(0, "rgb(158,168,182)");
+    bg.addColorStop(0.72, "rgb(92,102,118)");
+    bg.addColorStop(1, "rgb(44,52,66)");
+    ctx.fillStyle = bg;
+    ctx.beginPath(); ctx.arc(cx, cy, r * 1.14, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "rgba(18,26,38,0.75)"; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(cx, cy, r * 1.14, 0, TAU); ctx.stroke();
+    // 錶面（圓形，米色）
+    const face = ctx.createRadialGradient(cx - r * 0.25, cy - r * 0.3, r * 0.1, cx, cy, r);
+    face.addColorStop(0, "rgb(250,247,238)");
+    face.addColorStop(1, "rgb(226,221,206)");
+    ctx.fillStyle = face;
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.98, 0, TAU); ctx.fill();
+    // 刻度弧（主刻度帶數字、副刻度短線）
+    ctx.strokeStyle = "rgba(40,48,60,0.85)";
     for (let i = 0; i <= 10; i++) {
-      const a = Math.PI + (i / 10) * Math.PI;
-      const rr = i % 5 === 0 ? r * 0.72 : r * 0.82;
+      const a = Math.PI * 1.06 + (i / 10) * Math.PI * 0.88;
+      const major = i % 5 === 0;
+      const rr = major ? r * 0.66 : r * 0.76;
+      ctx.lineWidth = major ? 1.4 : 1;
       ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(a) * r * 0.9, cy + r * 0.42 + Math.sin(a) * r * 0.9);
-      ctx.lineTo(cx + Math.cos(a) * rr, cy + r * 0.42 + Math.sin(a) * rr);
+      ctx.moveTo(cx + Math.cos(a) * r * 0.88, cy + Math.sin(a) * r * 0.88);
+      ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
       ctx.stroke();
+      if (major) {
+        ctx.fillStyle = "rgba(40,48,60,0.9)";
+        D.text(ctx, String(i / 5), cx + Math.cos(a) * r * 0.52, cy + Math.sin(a) * r * 0.52 + 3,
+          { color: "rgba(40,48,60,0.9)", size: Math.max(6, r * 0.16), align: "center" });
+      }
     }
-    // 指針
+    // 指針（紅色，帶尾巴配重）
     const f = Math.max(0, Math.min(1, frac || 0));
-    const a = Math.PI + f * Math.PI;
-    ctx.strokeStyle = "rgb(196,58,48)"; ctx.lineWidth = 1.8;
+    const a = Math.PI * 1.06 + f * Math.PI * 0.88;
+    ctx.strokeStyle = "rgb(198,56,46)"; ctx.lineWidth = 1.8;
     ctx.beginPath();
-    ctx.moveTo(cx, cy + r * 0.42);
-    ctx.lineTo(cx + Math.cos(a) * r * 0.82, cy + r * 0.42 + Math.sin(a) * r * 0.82);
+    ctx.moveTo(cx - Math.cos(a) * r * 0.16, cy - Math.sin(a) * r * 0.16);
+    ctx.lineTo(cx + Math.cos(a) * r * 0.8, cy + Math.sin(a) * r * 0.8);
     ctx.stroke();
-    brassDisc(ctx, cx, cy + r * 0.42, 2.6);
-    if (label) D.text(ctx, label, cx, cy + r * 0.86, { color: "#0f1720", size: 9, align: "center" });
-    // 接線柱
-    brassDisc(ctx, cx - r * 0.6, cy + r * 0.95, 3.4);
-    brassDisc(ctx, cx + r * 0.6, cy + r * 0.95, 3.4);
+    // 軸心與歸零螺絲
+    brassDisc(ctx, cx, cy, Math.max(2.4, r * 0.09));
+    ctx.strokeStyle = "rgba(70,80,94,0.8)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy + r * 0.78, r * 0.07, 0, TAU); ctx.stroke();
+    if (label) D.text(ctx, label, cx, cy - r * 0.38, { color: "rgba(40,48,60,0.85)", size: Math.max(7, r * 0.2), align: "center", weight: "700" });
+    // 底部接線柱：紅黑
+    ctx.fillStyle = "rgb(196,62,52)";
+    D.rect(ctx, cx - r * 0.72 - 4, cy + r * 1.12, 8, 8, { fill: "rgb(196,62,52)", stroke: "rgba(60,20,16,0.8)", r: 2 });
+    ctx.fillStyle = "rgb(40,46,56)";
+    D.rect(ctx, cx + r * 0.72 - 4, cy + r * 1.12, 8, 8, { fill: "rgb(40,46,56)", stroke: "rgba(10,14,20,0.8)", r: 2 });
   }
 
   /* 導線：帶一點下垂弧度，比直角折線像實物 */
@@ -515,6 +568,142 @@
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y - 0.8);
     ctx.stroke();
     ctx.restore();
+  }
+
+  /*
+   * 編織導線（實物級）：每段中點帶自然下垂，深色描邊＋線芯＋高光絲，
+   * 端點是黃銅接線柱（導線真的「接」在東西上）。
+   * pts 與 wire() 同格式；sag 控制每段下垂量（px）。
+   */
+  function cable(ctx, pts, color, w, sag) {
+    if (!pts || pts.length < 2) return;
+    const lw = w || 3.6, dip = sag == null ? 4 : sag;
+    const path = off => {
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y + off);
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1], b = pts[i];
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        // 垂直於線段方向的下垂；水平段往下垂，鉛直段往側邊垂
+        const dx = b.x - a.x, dy = b.y - a.y, len = Math.max(1e-6, Math.hypot(dx, dy));
+        const nx = -dy / len, ny = dx / len;
+        const s = dip * Math.min(1, len / 120);
+        ctx.quadraticCurveTo(mx + nx * s + off * 0, my + ny * s + off, b.x, b.y + off);
+      }
+    };
+    ctx.save();
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = "rgba(0,0,0,0.30)"; ctx.lineWidth = lw + 2.2;
+    path(1.8); ctx.stroke();
+    ctx.strokeStyle = color || "rgb(186,54,48)"; ctx.lineWidth = lw;
+    path(0); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = lw * 0.32;
+    path(-lw * 0.28); ctx.stroke();
+    ctx.restore();
+    // 兩端接線柱
+    [pts[0], pts[pts.length - 1]].forEach(p => {
+      brassDisc(ctx, p.x, p.y, Math.max(2.6, lw * 0.72));
+      ctx.strokeStyle = "rgba(20,26,36,0.7)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(2.6, lw * 0.72), 0, TAU); ctx.stroke();
+    });
+  }
+
+  /*
+   * 閘刀開關（實物級）：電木底座＋黃銅閘刀＋刀柄。
+   * open01 = 0 完全閉合（水平），1 完全打開（翹起 52°）。
+   * (cx, baseY) 是底座中心；回傳兩端接線柱座標 { left, right }。
+   */
+  function knifeSwitch(ctx, cx, baseY, w, open01) {
+    const hw = w / 2;
+    contactShadow(ctx, cx, baseY + 3, w * 0.8);
+    // 電木底座
+    const bg = ctx.createLinearGradient(0, baseY - 9, 0, baseY + 3);
+    bg.addColorStop(0, "rgb(72,62,58)");
+    bg.addColorStop(1, "rgb(40,34,32)");
+    ctx.fillStyle = bg;
+    D.rect(ctx, cx - hw, baseY - 9, w, 12, { fill: bg, stroke: "rgba(16,12,10,0.8)", r: 3 });
+    // 兩個黃銅刀座（鉸鏈與觸點）
+    const jaw = x => {
+      ctx.fillStyle = "rgb(196,158,88)";
+      D.rect(ctx, x - 4, baseY - 20, 8, 15, { fill: "rgb(196,158,88)", stroke: "rgba(80,56,20,0.85)", r: 2 });
+      brassDisc(ctx, x, baseY - 18, 2.2);
+    };
+    jaw(cx - hw + 7); jaw(cx + hw - 7);
+    // 閘刀：從鉸鏈側轉起
+    const ang = -(open01 || 0) * 52 * Math.PI / 180;
+    ctx.save();
+    ctx.translate(cx - hw + 7, baseY - 17);
+    ctx.rotate(ang);
+    const lg = ctx.createLinearGradient(0, 0, w - 20, 0);
+    lg.addColorStop(0, "rgb(226,192,120)");
+    lg.addColorStop(0.5, "rgb(198,158,88)");
+    lg.addColorStop(1, "rgb(164,126,62)");
+    ctx.strokeStyle = lg; ctx.lineWidth = 5; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(w - 20, 0); ctx.stroke();
+    // 刀柄（黑色絕緣把）
+    ctx.strokeStyle = "rgb(52,46,44)"; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.moveTo(w - 20, 0); ctx.lineTo(w - 12, 0); ctx.stroke();
+    ctx.restore();
+    // 底座兩端接線柱
+    const left = { x: cx - hw + 7, y: baseY - 2 }, right = { x: cx + hw - 7, y: baseY - 2 };
+    brassDisc(ctx, left.x, left.y, 3);
+    brassDisc(ctx, right.x, right.y, 3);
+    return { left, right };
+  }
+
+  /*
+   * 滑動變阻器（實物級）：瓷管繞線＋上方金屬滑桿＋滑片，
+   * frac 0..1 決定滑片位置。(cx, baseY) 是底面中心。
+   * 回傳下方兩端接線柱與滑桿接點座標。
+   */
+  function rheostat(ctx, cx, baseY, w, frac) {
+    const hw = w / 2, tubeY = baseY - 16, rodY = baseY - 34;
+    contactShadow(ctx, cx, baseY + 3, w * 0.7);
+    // 瓷管繞線：底色＋一圈圈電阻線
+    const tg = ctx.createLinearGradient(0, tubeY - 9, 0, tubeY + 9);
+    tg.addColorStop(0, "rgb(226,218,200)");
+    tg.addColorStop(1, "rgb(186,176,156)");
+    ctx.fillStyle = tg;
+    D.rect(ctx, cx - hw + 8, tubeY - 9, w - 16, 18, { fill: tg, stroke: "rgba(80,70,52,0.7)", r: 8 });
+    ctx.strokeStyle = "rgba(122,84,52,0.85)"; ctx.lineWidth = 1.4;
+    const coils = Math.max(8, Math.round(w / 4.5));
+    for (let i = 0; i <= coils; i++) {
+      const x = cx - hw + 10 + (w - 20) * (i / coils);
+      ctx.beginPath(); ctx.moveTo(x, tubeY - 7.5); ctx.lineTo(x, tubeY + 7.5); ctx.stroke();
+    }
+    // 支腳
+    [-1, 1].forEach(s => {
+      ctx.strokeStyle = "rgb(110,120,134)"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(cx + s * (hw - 8), tubeY + 8); ctx.lineTo(cx + s * (hw - 8), baseY); ctx.stroke();
+    });
+    // 上方金屬滑桿
+    ctx.strokeStyle = "rgb(150,160,174)"; ctx.lineWidth = 3.4;
+    ctx.beginPath(); ctx.moveTo(cx - hw + 6, rodY); ctx.lineTo(cx + hw - 6, rodY); ctx.stroke();
+    // 滑片（隨 frac 移動）＋把手
+    const f = Math.max(0, Math.min(1, frac || 0));
+    const sx = cx - hw + 6 + (w - 12) * f;
+    ctx.fillStyle = "rgb(96,106,120)";
+    D.rect(ctx, sx - 4, rodY - 5, 8, 22, { fill: "rgb(96,106,120)", stroke: "rgba(24,32,44,0.8)", r: 2 });
+    brassDisc(ctx, sx, rodY - 6, 4);
+    // 四個接線柱：管兩端＋桿兩端
+    const posts = { tubeL: { x: cx - hw + 8, y: baseY - 2 }, tubeR: { x: cx + hw - 8, y: baseY - 2 }, rodL: { x: cx - hw + 6, y: rodY }, rodR: { x: cx + hw - 6, y: rodY } };
+    brassDisc(ctx, posts.tubeL.x, posts.tubeL.y, 3);
+    brassDisc(ctx, posts.tubeR.x, posts.tubeR.y, 3);
+    brassDisc(ctx, posts.rodL.x, posts.rodL.y, 3);
+    brassDisc(ctx, posts.rodR.x, posts.rodR.y, 3);
+    return { posts, slider: { x: sx, y: rodY } };
+  }
+
+  /*
+   * 讀值晶片：掛在元件旁的即時數值小卡（對標電路工坊每顆元件頭上的屬性條）。
+   * (x,y) 是晶片左上角；tint 給邊框與數字上色。
+   */
+  function valueChip(ctx, x, y, text, tint) {
+    const w = Math.max(34, text.length * 6.4 + 12), h = 17;
+    ctx.fillStyle = "rgba(10,14,20,0.62)";
+    D.rect(ctx, x, y, w, h, { fill: "rgba(10,14,20,0.62)", stroke: tint || "rgba(120,190,255,0.7)", width: 1, r: 5 });
+    D.text(ctx, text, x + w / 2, y + 12, { color: tint || "rgba(120,190,255,0.95)", size: 9.5, align: "center", weight: "700" });
+    return { x, y, w, h };
   }
 
   /* 線繞電阻：陶瓷本體 + 兩端金屬帽。vertical 時整個轉 90°。 */
@@ -1174,6 +1363,7 @@
     candle, laser,
     lens, screen, projectedFlame, glassPlate, curvedMirror, semiCircleGlass, protractor,
     battery, bulb, meter, wire, resistorBox, fuse,
+    cable, valueChip, knifeSwitch, rheostat,
     standRod, crossArm, weight, woodBlock, ramp, pulley, cord, bob, ruler, springScale, beaker,
     wallPost,
     cart, tickerTimer, vibrator, tuningFork, glassTube,

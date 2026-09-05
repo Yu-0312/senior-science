@@ -153,6 +153,22 @@
     PL.ui.section(L.controls, "保護裝置");
     const cFuse = PL.ui.checkbox(L.controls, { label: "裝上保險絲（" + FUSE_LIMIT + " A）", checked: true, onChange: onChange });
 
+    /*
+     * 檢視切換：實物圖（器材擺在桌上）與標準電路圖（課本符號）共用同一個
+     * 幾何外框，位置一一對應——學生卡在「實物連不成電路圖」的那道坎，
+     * 就靠「同一個迴路、兩種畫法、同一組數值」解開。
+     */
+    PL.ui.section(L.controls, "檢視");
+    let view = "physical";
+    PL.ui.chipGroup(L.controls, {
+      value: "physical",
+      options: [
+        { value: "physical", label: "實物圖" },
+        { value: "schematic", label: "電路圖" }
+      ],
+      onChange: v => { view = v; }
+    });
+
     const row = PL.ui.buttonRow(L.controls);
     PL.ui.button(row, "換新燈泡／保險絲", () => { burnt = false; fuseBlown = false; burnFlash = 0; }, { primary: true });
 
@@ -215,60 +231,146 @@
       const A = PL.apparatus;
       const x0 = 70, x1 = W - 78, y0 = 88, y1 = H - 74;
       const live = !c.openCircuit;
-      const wireColor = live ? "rgb(186,54,48)" : "rgb(118,110,108)";
+      const wireColor = live ? "rgb(186,54,48)" : "rgb(128,120,118)";
+      const ink = live ? "rgba(34,42,54,0.92)" : "rgba(34,42,54,0.45)";
 
       // 檯面：讓元件看起來是擺在桌上接起來的，不是符號圖
       A.benchTop(ctx, W, H, y1 + 42);
 
-      /* 導線迴路：先畫線，元件再壓在上面蓋住接點 */
-      A.wire(ctx, [{ x: x0, y: y1 }, { x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }], wireColor, 3.6);
-
-      // 電池組（左側）
       const by = (y0 + y1) / 2;
-      A.battery(ctx, x0 - 17, by - 34, 34, 68);
-      D.text(ctx, PL.fmt(c.V, 1) + " V", x0 - 24, by + 4, { color: PL.col("text-dim"), size: 12, align: "right", weight: "700" });
-
-      // 燈泡（上方）
       const bulbX = (x0 + x1) / 2, bulbY = y0;
       const brightness = burnt ? 0 : Math.min(1, c.P / BULB_MAX_POWER);
-      A.bulb(ctx, bulbX, bulbY - 6, 22, brightness);
-      if (burnt) {
-        D.line(ctx, bulbX - 12, bulbY - 18, bulbX + 12, bulbY + 6, PL.col("danger"), 2.8);
-        D.line(ctx, bulbX + 12, bulbY - 18, bulbX - 12, bulbY + 6, PL.col("danger"), 2.8);
-      }
-      D.text(ctx, burnt ? "燈泡燒毀" : PL.fmt(c.P, 1) + " W", bulbX, bulbY - 40,
-        { color: burnt ? PL.col("danger") : PL.col("warn"), size: 12, align: "center", weight: "700" });
+      // 滑桿量程從 input 元素本身讀（slider 回傳物件不直接暴露 min/max）
+      const rFrac = Math.max(0, Math.min(1,
+        (sR.get() - Number(sR.el.min)) / Math.max(1e-9, Number(sR.el.max) - Number(sR.el.min))));
 
-      // 保險絲（下方）
-      if (cFuse.get()) {
-        const fx = x0 + (x1 - x0) * 0.28;
-        A.fuse(ctx, fx, y1, fuseBlown);
-        D.text(ctx, fuseBlown ? "保險絲斷了" : FUSE_LIMIT + " A 保險絲", fx, y1 + 26,
-          { color: fuseBlown ? PL.col("danger") : PL.col("text-faint"), size: 10.5, align: "center", weight: fuseBlown ? "700" : "" });
-      }
-
-      // 電阻（右側）
-      if (wiring === "single") {
-        A.resistorBox(ctx, x1, (y0 + y1) / 2, 56, null, true);
-        D.text(ctx, PL.fmt(c.R, 1) + " Ω", x1 + 22, (y0 + y1) / 2 + 4, { color: PL.col("accent-2"), size: 11, weight: "700" });
-      } else if (wiring === "series") {
-        [0.32, 0.68].forEach(k => {
-          const yy = y0 + (y1 - y0) * k;
-          A.resistorBox(ctx, x1, yy, 50, null, true);
-          D.text(ctx, PL.fmt(c.R, 1) + " Ω", x1 + 22, yy + 4, { color: PL.col("accent-2"), size: 11, weight: "700" });
+      /* --------------------------------------------------------------
+       * 電路圖模式：課本符號 + 即時數值，與實物圖同一個外框。
+       * -------------------------------------------------------------- */
+      function drawSchematic() {
+        // 迴路導線（細黑線、直角）＋串聯支路
+        A.wire(ctx, [{ x: x0, y: y1 }, { x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }], ink, 1.8);
+        let mx = null;
+        if (wiring === "parallel") {
+          mx = x1 - 58;
+          A.wire(ctx, [{ x: x1, y: y0 + 26 }, { x: mx, y: y0 + 26 }, { x: mx, y: y1 - 26 }, { x: x1, y: y1 - 26 }], ink, 1.6);
+        }
+        // 電池符號（左）：長短線各兩組
+        ctx.strokeStyle = ink; ctx.lineWidth = 2;
+        [[-9, 15], [9, 15]].forEach(([dy, len], i) => {
+          ctx.lineWidth = i === 0 ? 2.4 : 4.2;
+          ctx.beginPath(); ctx.moveTo(x0 - len / 2, by + dy); ctx.lineTo(x0 + len / 2, by + dy); ctx.stroke();
         });
-      } else {
-        // 並聯：兩條支路並排，總電阻變小、電流變大
-        const mx = x1 - 58, cyMid = (y0 + y1) / 2;
-        A.wire(ctx, [{ x: x1, y: y0 + 26 }, { x: mx, y: y0 + 26 }, { x: mx, y: y1 - 26 }, { x: x1, y: y1 - 26 }], wireColor, 3);
-        A.resistorBox(ctx, x1, cyMid, 50, null, true);
-        A.resistorBox(ctx, mx, cyMid, 50, null, true);
-        D.text(ctx, PL.fmt(c.R, 1) + " Ω", x1 + 22, cyMid + 4, { color: PL.col("accent-2"), size: 11, weight: "700" });
-        D.text(ctx, "並聯後 " + PL.fmt(c.R / 2, 1) + " Ω", mx - 14, y0 + 18,
-          { color: PL.col("accent-2"), size: 10, align: "right", weight: "700" });
+        D.text(ctx, "＋", x0 + 14, by - 12, { color: PL.col("text-faint"), size: 10 });
+        // 開關符號（左下）
+        const swx = x0 + (x1 - x0) * 0.13;
+        ctx.strokeStyle = ink; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(swx - 14, y1); ctx.lineTo(swx - 2, y1); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(swx + 14, y1); ctx.lineTo(swx + 2, y1); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(swx - 2, y1); ctx.lineTo(swx + 10, y1 - (live ? 2 : 13)); ctx.stroke();
+        ctx.beginPath(); ctx.arc(swx - 2, y1, 2, 0, TAU); ctx.stroke();
+        ctx.beginPath(); ctx.arc(swx + 2, y1, 2, 0, TAU); ctx.stroke();
+        // 保險絲符號（下方）
+        if (cFuse.get()) {
+          const fx = x0 + (x1 - x0) * 0.28;
+          ctx.strokeStyle = ink; ctx.lineWidth = 1.8;
+          D.rect(ctx, fx - 12, y1 - 5, 24, 10, { stroke: ink, width: 1.6, r: 1 });
+          ctx.beginPath();
+          if (fuseBlown) { ctx.moveTo(fx - 10, y1 - 5); ctx.lineTo(fx - 3, y1 - 5); ctx.moveTo(fx + 3, y1 + 5); ctx.lineTo(fx + 10, y1 + 5); }
+          else { ctx.moveTo(fx - 10, y1); ctx.lineTo(fx + 10, y1); }
+          ctx.stroke();
+        }
+        // 燈泡符號（上）：圓圈＋叉
+        ctx.strokeStyle = live && !burnt ? "rgb(226,178,72)" : ink;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(bulbX, bulbY, 15, 0, TAU); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(bulbX - 10.5, bulbY - 10.5); ctx.lineTo(bulbX + 10.5, bulbY + 10.5);
+        ctx.moveTo(bulbX + 10.5, bulbY - 10.5); ctx.lineTo(bulbX - 10.5, bulbY + 10.5);
+        ctx.stroke();
+        // 可變電阻符號（右）：矩形＋斜箭頭
+        const drawRheoSym = (symX, symY, lab) => {
+          ctx.strokeStyle = ink; ctx.lineWidth = 1.8;
+          ctx.strokeRect(symX - 7, symY - 17, 14, 34);
+          ctx.beginPath();
+          ctx.moveTo(symX - 15, symY + 13); ctx.lineTo(symX + 15, symY - 13);
+          ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(symX + 15, symY - 13); ctx.lineTo(symX + 7, symY - 13); ctx.lineTo(symX + 13, symY - 6); ctx.closePath();
+          ctx.fillStyle = ink; ctx.fill();
+          D.text(ctx, lab, symX + 24, symY + 4, { color: PL.col("accent-2"), size: 11, weight: "700" });
+        };
+        if (wiring === "single") drawRheoSym(x1, by, PL.fmt(c.R, 1) + " Ω");
+        else if (wiring === "series") {
+          [0.32, 0.68].forEach(k => drawRheoSym(x1, y0 + (y1 - y0) * k, PL.fmt(c.R, 1) + " Ω"));
+        } else {
+          drawRheoSym(x1, by, PL.fmt(c.R, 1) + " Ω");
+          drawRheoSym(mx, by, PL.fmt(c.R / 2, 1) + " Ω");
+          D.text(ctx, "並聯", mx - 16, y0 + 16, { color: PL.col("text-faint"), size: 10, align: "right" });
+        }
+        // 即時數值晶片
+        A.valueChip(ctx, x0 - 6, y0 + 8, "I = " + PL.fmt(c.I, 2) + " A", "rgba(120,190,255,0.85)");
+        A.valueChip(ctx, bulbX - 30, bulbY - 58, burnt ? "燒毀" : "P = " + PL.fmt(c.P, 1) + " W", burnt ? PL.col("danger") : "rgba(255,196,110,0.9)");
+        A.valueChip(ctx, x1 - 168, y1 + 14, "Req = " + PL.fmt(c.Rtotal, 1) + " Ω", "rgba(126,222,190,0.9)");
+        D.text(ctx, "標準電路圖（與實物圖位置一一對應）", x0, y0 - 34, { color: PL.col("text-faint"), size: 10.5 });
       }
 
-      // 電子流：速度正比於電流，「電流大小」因此看得見
+      /* --------------------------------------------------------------
+       * 實物模式：器材擺在桌上（電池盒、閘刀開關、滑動變阻器、燈座）
+       * -------------------------------------------------------------- */
+      function drawPhysical() {
+        A.cable(ctx, [{ x: x0, y: y1 }, { x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }], wireColor, 3.6, 5);
+        let mx = null;
+        if (wiring === "parallel") {
+          mx = x1 - 58;
+          A.cable(ctx, [{ x: x1, y: y0 + 26 }, { x: mx, y: y0 + 26 }, { x: mx, y: y1 - 26 }, { x: x1, y: y1 - 26 }], wireColor, 3, 4);
+        }
+
+        // 電池組（左側）：藍色電池盒，接線柱朝左右
+        A.battery(ctx, x0 - 17, by - 34, 34, 68);
+
+        // 閘刀開關（左下）：斷路時閘刀翹起
+        A.knifeSwitch(ctx, x0 + (x1 - x0) * 0.13, y1 + 2, 46, c.openCircuit ? 1 : 0);
+
+        // 燈泡（上方）
+        A.bulb(ctx, bulbX, bulbY - 6, 22, brightness);
+        if (burnt) {
+          D.line(ctx, bulbX - 12, bulbY - 18, bulbX + 12, bulbY + 6, PL.col("danger"), 2.8);
+          D.line(ctx, bulbX + 12, bulbY - 18, bulbX - 12, bulbY + 6, PL.col("danger"), 2.8);
+        }
+
+        // 保險絲（下方）
+        if (cFuse.get()) {
+          const fx = x0 + (x1 - x0) * 0.28;
+          A.fuse(ctx, fx, y1, fuseBlown);
+        }
+
+        // 滑動變阻器（右側）：滑片位置就是 R 滑桿
+        const drawRheo = (rx, lab) => {
+          A.rheostat(ctx, rx, by + 9, 92, rFrac);
+          A.valueChip(ctx, rx + 24, by - 52, lab, "rgba(126,222,190,0.9)");
+        };
+        if (wiring === "single") drawRheo(x1, PL.fmt(c.R, 1) + " Ω");
+        else if (wiring === "series") {
+          [0.32, 0.68].forEach(k => {
+            const yy = y0 + (y1 - y0) * k;
+            A.resistorBox(ctx, x1, yy, 50, null, true);
+            A.valueChip(ctx, x1 + 16, yy - 30, PL.fmt(c.R, 1) + " Ω", "rgba(126,222,190,0.9)");
+          });
+        } else {
+          drawRheo(x1, PL.fmt(c.R, 1) + " Ω");
+          A.resistorBox(ctx, mx, by, 50, null, true);
+          A.valueChip(ctx, mx - 56, by - 34, "並聯 " + PL.fmt(c.R / 2, 1) + " Ω", "rgba(126,222,190,0.9)");
+        }
+
+        // 讀值晶片：I 掛在上導線、V 掛在電池盒上方、P 掛在燈泡上
+        A.valueChip(ctx, x0 + 10, y0 - 36, "I = " + PL.fmt(c.I, 2) + " A", "rgba(120,190,255,0.85)");
+        A.valueChip(ctx, x0 - 17, by - 62, PL.fmt(c.V, 1) + " V", "rgba(120,190,255,0.85)");
+        A.valueChip(ctx, bulbX - 30, bulbY - 58, burnt ? "燒毀" : "P = " + PL.fmt(c.P, 1) + " W", burnt ? PL.col("danger") : "rgba(255,196,110,0.9)");
+      }
+
+      if (view === "schematic") drawSchematic(); else drawPhysical();
+
+      // 電子流：速度正比於電流，「電流大小」因此看得見（兩種檢視都保留）
       if (live && c.I > 0.001) {
         const peri = 2 * ((x1 - x0) + (y1 - y0));
         const count = 22;
@@ -279,7 +381,7 @@
           else if (d < (x1 - x0) + (y1 - y0)) { ex = x1; ey = y0 + (d - (x1 - x0)); }
           else if (d < 2 * (x1 - x0) + (y1 - y0)) { ex = x1 - (d - (x1 - x0) - (y1 - y0)); ey = y1; }
           else { ex = x0; ey = y1 - (d - 2 * (x1 - x0) - (y1 - y0)); }
-          D.disc(ctx, ex, ey, 3, { fill: "#ffe9a8" });
+          D.disc(ctx, ex, ey, 3, { fill: "#ffe9a8", glow: "rgba(255,233,168,0.6)", glowSize: 6 });
         }
       }
 
@@ -294,7 +396,8 @@
       PL.ui.caption(cv,
         fuseBlown ? "電流超過 " + FUSE_LIMIT + " A，保險絲先斷開，燈泡被保住了——這就是保險絲存在的理由。"
           : burnt ? "功率超過額定 " + BULB_MAX_POWER + " W，燈絲燒斷。若剛才裝了保險絲，斷的會是保險絲而不是燈泡。"
-            : "電子的流動速度正比於電流；燈泡亮度正比於它消耗的功率 P = I²R。");
+            : view === "schematic" ? "同一個迴路的課本畫法：切回實物圖對照，每個符號的位置就是桌上那顆器材。"
+              : "電子的流動速度正比於電流；燈泡亮度正比於它消耗的功率 P = I²R。");
       if ((burnt || fuseBlown) && circuit().V / circuit().Rtotal > FUSE_LIMIT) {
         D.text(ctx, "換新之前先把電壓調低，否則會立刻再燒一次", W / 2, H - 22,
           { color: PL.col("warn"), size: 11.5, align: "center" });
