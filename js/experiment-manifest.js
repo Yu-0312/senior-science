@@ -93,6 +93,7 @@ window.PhysicsLabExperimentFiles = {
   "coulomb": "electric.js",
   "efield": "electric.js",
   "potential-e": "electric.js",
+  "potential-terrain": "electric.js",
   "ohms": "electric.js",
   "iv-measurement": "electric.js",
   "closed-circuit-emf": "electric.js",

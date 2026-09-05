@@ -742,6 +742,14 @@
       };
       const p1 = rod(Math.min(x1, x2 - 0.35), c, "棒1");
       const p2 = rod(Math.max(x2, x1 + 0.35), PL.col("accent-3"), "棒2");
+      // 安培力箭頭：快棒受力與運動反向（煞車）、慢棒同向（推動）——兩棒力等大反向
+      const Fnow = sB.get() * Lm * Math.abs(sB.get() * Lm * (v1 - v2) / Math.max(0.05, sR.get()));
+      const Flen = Math.min(44, 6 + Fnow * 26);
+      if (Flen > 9) {
+        const dir1 = Math.sign(v1 - v2 || 1);
+        D.arrow(ctx, p1, rail1 - 40, p1 - dir1 * Flen, rail1 - 40, { color: PL.col("danger"), width: 2.2, label: "F₁", lsize: 10 });
+        D.arrow(ctx, p2, rail1 - 40, p2 + dir1 * Flen, rail1 - 40, { color: PL.col("danger"), width: 2.2, label: "F₂", lsize: 10 });
+      }
 
       // 感應電流：迴路箭頭（只在有電流時出現，方向依相對速度）
       // 棒1向右、B 向內 ⇒ 棒1 內電流往上（畫布 −y），繞外圈回到棒2 往下

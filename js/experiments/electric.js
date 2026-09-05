@@ -154,6 +154,203 @@
     return { stop() { cv.destroy(); }, rerender: draw };
   }});
 
+  /* 電勢地形：把電位長成會起伏的山丘（對標「電勢地形」可視化）
+   *
+   * 電位是抽象的純量場，學生最難建立「空間感」。這裡把兩顆可拖曳電荷的
+   * 電位場直接長成地形：正電荷是紅色的山丘、負電荷是藍色的漏斗，
+   * 山稜線走向就是等勢線的走向。拖曳電荷時地形即時重塑；
+   * 點擊空白處放探測點，讀出該處的電位與電場。
+   */
+  PL.register("potential-terrain", { build(root) {
+    const L = PL.ui.layout(root);
+    const AP = PL.apparatus;
+    const cv = PL.canvas.create(L.canvasWrap, 0.62, 900);
+    const ctx = cv.ctx;
+    const charges = [
+      { x: 0.34, y: 0.52, q: 2 },      // x、y 是 0..1 的場域正規化座標
+      { x: 0.66, y: 0.52, q: -2 }
+    ];
+    let dragIdx = -1, probe = null;
+
+    const sQ1 = PL.ui.slider(L.controls, { label: "電荷 q₁", min: -3, max: 3, step: 1, value: 2, unit: "", digits: 0, onInput: v => { charges[0].q = v; draw(); } });
+    const sQ2 = PL.ui.slider(L.controls, { label: "電荷 q₂", min: -3, max: 3, step: 1, value: -2, unit: "", digits: 0, onInput: v => { charges[1].q = v; draw(); } });
+    PL.ui.note(L.controls, "拖曳電荷改變地形；點擊空白處放置探測點，讀出該處的電位與電場。山丘＝正電位（紅）、漏斗＝負電位（藍），地形越陡電場越強。");
+    const rV = PL.ui.readout(L.readouts, { label: "探測點電位", unit: "" });
+    const rE = PL.ui.readout(L.readouts, { label: "探測點電場", unit: "" });
+    const rCfg = PL.ui.readout(L.readouts, { label: "組態" });
+
+    /* 電位與電場（與 efield 同一套尺度） */
+    const KQ = 40;
+    const pot = (x, y) => charges.reduce((s, c) => s + c.q * KQ / (Math.hypot(x - c.x, y - c.y) + 0.08), 0);
+    const field = (x, y) => {
+      let ex = 0, ey = 0;
+      charges.forEach(c => {
+        const dx = x - c.x, dy = y - c.y, r = Math.hypot(dx, dy) + 0.02;
+        const e = c.q * KQ / (r * r);
+        ex += e * dx / r; ey += e * dy / r;
+      });
+      return { ex, ey, m: Math.hypot(ex, ey) };
+    };
+
+    /* ---------------- 互動：拖曳電荷、點擊放探測點 ---------------- */
+    /* 場內最大 |V|（互動層與繪圖共用的正規化基準） */
+    const potMax = () => {
+      let m = 1;
+      for (let j = 0; j <= 29; j++) for (let i = 0; i <= 45; i++) {
+        const v = Math.abs(pot(i / 45, j / 29));
+        if (v > m) m = v;
+      }
+      return m;
+    };
+    const geo = () => {
+      const W = cv.W, H = cv.H;
+      return {
+        fx0: W * 0.07, fx1: W * 0.93,
+        backY: H * 0.20, frontY: H * 0.64,
+        skew: -W * 0.10, heightPx: H * 0.17
+      };
+    };
+    const proj = (wx, wy, z, G) => ({
+      x: G.fx0 + wx * (G.fx1 - G.fx0) + wy * G.skew,
+      y: G.backY + wy * (G.frontY - G.backY) - z * G.heightPx
+    });
+    const unproj = (sx, sy, G) => {
+      const wy = PL.clamp((sy - G.backY) / (G.frontY - G.backY), 0.05, 0.95);
+      const wx = PL.clamp((sx - G.fx0 - wy * G.skew) / (G.fx1 - G.fx0), 0.05, 0.95);
+      return { x: wx, y: wy };
+    };
+    const canvasPos = e => {
+      const r = cv.canvas.getBoundingClientRect();
+      return { x: (e.clientX - r.left) * (cv.W / r.width), y: (e.clientY - r.top) * (cv.H / r.height) };
+    };
+    L.canvasWrap.addEventListener("pointerdown", e => {
+      const p = canvasPos(e);
+      const G = geo();
+      for (let i = 0; i < charges.length; i++) {
+        const c = charges[i];
+        if (c.q === 0) continue;
+        const z = Math.tanh(1.6 * pot(c.x, c.y) / potMax());
+        const s = proj(c.x, c.y, z, G);
+        const r = 12 + Math.abs(c.q) * 2;
+        const onSphere = Math.hypot(p.x - s.x, p.y - (s.y - 34)) < r + 6;
+        const onPole = Math.abs(p.x - s.x) < 7 && p.y > s.y - 34 && p.y < s.y + 6;
+        if (onSphere || onPole) { dragIdx = i; return; }
+      }
+      probe = unproj(p.x, p.y, G);
+      draw();
+    });
+    L.canvasWrap.addEventListener("pointermove", e => {
+      if (dragIdx < 0) return;
+      const p = canvasPos(e);
+      const G = geo();
+      const w = unproj(p.x, p.y, G);
+      charges[dragIdx].x = w.x; charges[dragIdx].y = w.y;
+      draw();
+    });
+    L.canvasWrap.addEventListener("pointerup", () => { dragIdx = -1; });
+
+    /* ---------------- 繪圖 ---------------- */
+    const heightColor = z => {
+      const t = PL.clamp(z, -1, 1);
+      if (t >= 0) {
+        const k = t;
+        return `rgb(${Math.round(70 + k * 185)},${Math.round(58 + k * 60)},${Math.round(66 - k * 10)})`;
+      }
+      const k = -t;
+      return `rgb(${Math.round(66 - k * 4)},${Math.round(70 + k * 80)},${Math.round(120 + k * 135)})`;
+    };
+    function draw() {
+      const { W, H } = cv; cv.clear(); D.bg(cv);
+      const G = geo();
+      const NX = 46, NY = 30;
+      /*
+       * 高度正規化：電位以場內最大值為基準做 tanh 軟壓縮——
+       * 若直接除固定常數，電荷附近的位會飽和到 ±1，地形變成平板。
+       * 兩段式：先求場內最大 |V|，再 z = tanh(1.6·V/Vmax)，
+       * 山頂約 0.92、遠處趨近 0，起伏的層次感就出來了。
+       */
+      let Vmax = 1;
+      const Vgrid = [];
+      for (let j = 0; j < NY; j++) {
+        const wy = j / (NY - 1);
+        const line = [];
+        for (let i = 0; i < NX; i++) {
+          const wx = i / (NX - 1);
+          const V = pot(wx, wy);
+          if (Math.abs(V) > Vmax) Vmax = Math.abs(V);
+          line.push({ wx, wy, V });
+        }
+        Vgrid.push(line);
+      }
+      const zAt = (wx, wy) => Math.tanh(1.6 * pot(wx, wy) / Vmax);
+      const rows = [];
+      for (let j = 0; j < NY; j++) {
+        const line = [];
+        for (let i = 0; i < NX; i++) {
+          const g = Vgrid[j][i];
+          const z = Math.tanh(1.6 * g.V / Vmax);
+          line.push(Object.assign(proj(g.wx, g.wy, z, G), { z, wx: g.wx, wy: g.wy }));
+        }
+        rows.push(line);
+      }
+      // 由後往前畫地形帶（畫家的演算法）：每一格用自己的四角平均上色，
+      // 紅丘到藍谷的漸變才會沿著列連續變化
+      for (let j = 1; j < NY; j++) {
+        for (let i = 0; i < NX - 1; i++) {
+          const za = rows[j - 1][i].z, zb = rows[j - 1][i + 1].z;
+          const zc = rows[j][i + 1].z, zd = rows[j][i].z;
+          ctx.beginPath();
+          ctx.moveTo(rows[j - 1][i].x, rows[j - 1][i].y);
+          ctx.lineTo(rows[j - 1][i + 1].x, rows[j - 1][i + 1].y);
+          ctx.lineTo(rows[j][i + 1].x, rows[j][i + 1].y);
+          ctx.lineTo(rows[j][i].x, rows[j][i].y);
+          ctx.closePath();
+          ctx.fillStyle = heightColor((za + zb + zc + zd) / 4);
+          ctx.fill();
+        }
+        ctx.strokeStyle = "rgba(255,255,255,0.10)"; ctx.lineWidth = 1;
+        ctx.beginPath();
+        rows[j].forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+        ctx.stroke();
+      }
+      // 電荷球一律最後畫：負電荷在漏斗裡若照深度排序會被谷壁埋住，
+      // 而它們是可拖曳的互動物件，必須永遠可見
+      charges.forEach(c => {
+        if (c.q === 0) return;
+        const z = zAt(c.x, c.y);
+        const s = proj(c.x, c.y, z, G);
+        const r = 12 + Math.abs(c.q) * 2;
+        // 從表面立一根細桿把球撐起來，埋在谷底時仍看得見位置
+        D.line(ctx, s.x, s.y, s.x, s.y - 26, "rgba(255,255,255,0.35)", 1.2);
+        D.disc(ctx, s.x, s.y - 34, r, { fill: c.q > 0 ? POS : NEG, glow: c.q > 0 ? POS : NEG, glowSize: 10 });
+        D.text(ctx, (c.q > 0 ? "+" : "−") + Math.abs(c.q), s.x, s.y - 30, { color: "#fff", size: 13, align: "center", weight: "700" });
+      });
+      // 探測點
+      if (probe) {
+        const z = zAt(probe.x, probe.y);
+        const s = proj(probe.x, probe.y, z, G);
+        const f = field(probe.x, probe.y);
+        D.line(ctx, s.x - 8, s.y, s.x + 8, s.y, PL.col("warn"), 1.6);
+        D.line(ctx, s.x, s.y - 8, s.x, s.y + 8, PL.col("warn"), 1.6);
+        if (f.m > 0.01) {
+          const len = Math.min(46, 14 + f.m * 1.6);
+          const a = Math.atan2(f.ey, f.ex);
+          D.arrow(ctx, s.x, s.y, s.x + Math.cos(a) * len, s.y + Math.sin(a) * len * 0.55,
+            { color: PL.col("warn"), width: 2, label: "E", lsize: 10 });
+        }
+        AP.valueChip(ctx, Math.min(s.x + 12, W - 150), s.y - 34,
+          "V = " + PL.fmt(pot(probe.x, probe.y), 1) + "・|E| = " + PL.fmt(f.m, 1), "rgba(255,196,110,0.9)");
+        rV.set(pot(probe.x, probe.y), 1);
+        rE.set(f.m, 1);
+      } else { rV.set("—"); rE.set("—"); }
+      rCfg.set(charges[0].q * charges[1].q < 0 ? "電偶極" : (charges[0].q === 0 || charges[1].q === 0) ? "單電荷" : "同號電荷");
+      D.text(ctx, W / 2, H - 14, "拖曳電荷重塑地形 · 點擊空白處放置探測點", { color: PL.col("text-faint"), size: 10.5, align: "center" });
+    }
+
+    cv.onResize(draw); draw();
+    return { stop() { cv.destroy(); }, rerender: draw };
+  }});
+
   /* 歐姆定律與電路 */
   /* 歐姆定律與電路 —— 旗艦改版
    *
