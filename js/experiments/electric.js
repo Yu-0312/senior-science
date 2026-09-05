@@ -975,8 +975,8 @@
          不是兩條線。極板間距隨電壓變化仍然保留。 */
       AP.steel(ctx, cx - 26, cyc - gap - 4, 52, 6, 12);
       AP.steel(ctx, cx - 26, cyc + gap - 2, 52, 6, -18);
-      AP.wire(ctx, [{ x: cx, y: cyc - gap - 4 }, { x: cx, y: cyc - 34 }], "rgb(186,54,48)", 2.4);
-      AP.wire(ctx, [{ x: cx, y: cyc + gap + 4 }, { x: cx, y: cyc + 34 }], "rgb(58,96,168)", 2.4);
+      AP.cable(ctx, [{ x: cx, y: cyc - gap - 4 }, { x: cx, y: cyc - 34 }], "rgb(186,54,48)", 2.4, 3);
+      AP.cable(ctx, [{ x: cx, y: cyc + gap + 4 }, { x: cx, y: cyc + 34 }], "rgb(58,96,168)", 2.4, 3);
       for (let i = 0; i < Math.round(V * 6); i++) { D.text(ctx, "+", cx - 20 + i * 8, cyc - gap - 4, { color: POS, size: 12 }); D.text(ctx, "−", cx - 20 + i * 8, cyc + gap + 12, { color: NEG, size: 12 }); }
       D.text(ctx, "電容器", cx, cyc + 40, { color: PL.col("text-dim"), size: 11, align: "center" });
       // V–t 與 I–t
