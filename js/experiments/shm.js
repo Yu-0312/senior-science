@@ -15,7 +15,7 @@
     const sA = PL.ui.slider(L.controls, { label: "振幅 A", min: 0.5, max: 2.5, step: 0.1, value: 1.6, unit: "m", digits: 1 });
     const row = PL.ui.buttonRow(L.controls);
     /* 播放／暫停由引擎的傳輸列統一提供（還附單步與速度），實驗不再自備，避免兩個開關互相打架。 */
-    const rT = PL.ui.readout(L.readouts, { label: "理論週期 2π√(m/k)", unit: "s" });
+    const rT = PL.ui.readout(L.readouts, { label: "週期 T", unit: "s" });
     const rTm = PL.ui.readout(L.readouts, { label: "實測週期（過零量測）", unit: "s" });
     const rX = PL.ui.readout(L.readouts, { label: "位移 x", unit: "m" });
     const rV = PL.ui.readout(L.readouts, { label: "速度 v", unit: "m/s" });

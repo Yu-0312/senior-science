@@ -222,6 +222,25 @@
     return apparatusPromise;
   }
 
+  /*
+   * 題庫（question-bank.js）也走延遲載入。
+   *
+   * 它只有「題目練習」這一區用得到，但卻是核心腳本裡最重的一份之一；
+   * 留在首屏等於讓每個只看模擬的學生都先付這筆流量。改成第一次要渲染
+   * 題目時才載（SW 仍會預先快取，第二次起等同本地）。
+   */
+  let questionBankPromise = null;
+  function ensureQuestionBank() {
+    if (window.PhysicsLabQuestionBank) return Promise.resolve(true);
+    if (!questionBankPromise) {
+      const build = (window.PhysicsLabSite && window.PhysicsLabSite.build) || "";
+      questionBankPromise = loadScript("js/question-bank.js" + (build ? "?v=" + build : ""))
+        .then(() => true)
+        .catch(err => { console.error(err); questionBankPromise = null; return false; });
+    }
+    return questionBankPromise;
+  }
+
   function ensureExperiment(id) {
     if (PL.has(id)) return ensureApparatus().then(() => true);
     const file = EXPERIMENT_FILES[id];
@@ -1381,7 +1400,11 @@
     $("#guide-formula").innerHTML = exp.formula;
     const ul = $("#guide-points"); ul.innerHTML = "";
     exp.points.forEach(p => { const li = el("li", null, ul); li.textContent = p; });
-    renderPractice(f);
+    // 題目練習要等題庫就緒；換頁競爭用與模擬同一個 token 擋掉
+    ensureQuestionBank().then(() => {
+      if (token !== openToken) return;
+      renderPractice(f);
+    });
     typeset($("#guide-formula"));
 
     /*
