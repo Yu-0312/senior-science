@@ -664,4 +664,159 @@
     cv.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
+
+  /* =========================================================================
+     雙棒導軌：電磁剎車與動量傳遞（對應經典「雙棒導軌模型」）
+     ========================================================================= */
+  PL.register("rail-rods", { build(root) {
+    const L = PL.ui.layout(root);
+    const cv = PL.canvas.create(L.canvasWrap, 0.62);
+    const AP = PL.apparatus;
+    const c = color();
+
+    const sB = PL.ui.slider(L.controls, { label: "磁場 B", min: 0.2, max: 2, step: 0.1, value: 0.8, unit: "T", digits: 1 });
+    const sR = PL.ui.slider(L.controls, { label: "迴路電阻 R", min: 0.5, max: 6, step: 0.5, value: 2, unit: "Ω", digits: 1 });
+    const sV0 = PL.ui.slider(L.controls, { label: "棒1初速 v₀", min: 1, max: 6, step: 0.5, value: 3, unit: "m/s", digits: 1, onInput: reset });
+    PL.ui.note(L.controls,
+      "棒1在磁場裡切割磁力線，迴路出現感應電流：快棒被安培力煞車、慢棒被推動。" +
+      "注意 v–t 圖上兩條線收斂到同一條水平線——那就是動量守恆算出的共同速度，" +
+      "少掉的動能變成了迴路的焦耳熱。改變 B 或 R，只改變「多久」收斂，不改變收斂到哪。");
+
+    const rEmf = PL.ui.readout(L.readouts, { label: "感應電動勢 ε", unit: "V" });
+    const rI = PL.ui.readout(L.readouts, { label: "感應電流 I", unit: "A" });
+    const rF = PL.ui.readout(L.readouts, { label: "安培力 F", unit: "N" });
+    const rQ = PL.ui.readout(L.readouts, { label: "已生焦耳熱", unit: "J" });
+
+    /* 物理參數：導軌間距 L=0.8 m，兩棒質量各 1 kg，導軌光滑 */
+    const Lm = 0.8, M1 = 1, M2 = 1;
+    const PX_PER_M = 110;                    // 導軌長度對應的像素比例
+    let v1 = 0, v2 = 0, x1 = 0, x2 = 0, t = 0, settled = 0, merged = false, vStar = 0, KE0 = 0;
+    let history = [];
+
+    function reset() {
+      v1 = sV0.get(); v2 = 0;
+      KE0 = 0.5 * M1 * v1 * v1;
+      vStar = M1 * v1 / (M1 + M2);
+      x1 = 1.2; x2 = 2.6; merged = false;      // 公尺
+      t = 0; settled = 0; history = [];
+    }
+    reset();
+
+    function drawScene() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const B = sB.get(), R = sR.get();
+      const emf = B * Lm * (v1 - v2), I = emf / R, F = B * Lm * I;
+      const rail1 = 78, rail2 = 234, rx0 = 56, rx1 = W - 40;
+      const mToPx = x => rx0 + x * PX_PER_M;
+
+      // 磁場：垂直紙面（×記號鋪滿導軌間）
+      ctx.save();
+      ctx.strokeStyle = "rgba(201,140,255,0.30)"; ctx.lineWidth = 1.4;
+      for (let y = rail1 + 22; y < rail2 - 6; y += 30) {
+        for (let x = rx0 + 24; x < rx1; x += 34) {
+          ctx.beginPath();
+          ctx.moveTo(x - 4, y - 4); ctx.lineTo(x + 4, y + 4);
+          ctx.moveTo(x + 4, y - 4); ctx.lineTo(x - 4, y + 4);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+      D.text(ctx, "B（垂直紙面向內）", rx1 - 8, rail1 - 12, { color: "rgba(201,140,255,0.75)", size: 10, align: "right" });
+
+      // 兩條導軌（鋼條）
+      AP.steel(ctx, rx0, rail1, rx1 - rx0, 7, 4);
+      AP.steel(ctx, rx0, rail2, rx1 - rx0, 7, 4);
+
+      // 導體棒：1 號（主色）、2 號（紫）
+      const rod = (xm, tint, lab) => {
+        const px = mToPx(xm);
+        const g = ctx.createLinearGradient(px - 5, 0, px + 5, 0);
+        g.addColorStop(0, "rgba(255,255,255,0.35)");
+        ctx.fillStyle = tint;
+        D.rect(ctx, px - 5, rail1 - 6, 10, rail2 - rail1 + 12, { fill: tint, stroke: "rgba(16,22,30,0.8)", r: 4 });
+        D.text(ctx, lab, px, rail2 + 24, { color: tint, size: 10.5, align: "center", weight: "700" });
+        // 速度箭頭
+        const vpx = (lab === "棒1" ? v1 : v2) * 16;
+        if (Math.abs(vpx) > 4) D.arrow(ctx, px, rail1 - 22, px + vpx, rail1 - 22, { color: tint, width: 2.2, label: "v", lsize: 10 });
+        return px;
+      };
+      const p1 = rod(Math.min(x1, x2 - 0.35), c, "棒1");
+      const p2 = rod(Math.max(x2, x1 + 0.35), PL.col("accent-3"), "棒2");
+
+      // 感應電流：迴路箭頭（只在有電流時出現，方向依相對速度）
+      // 棒1向右、B 向內 ⇒ 棒1 內電流往上（畫布 −y），繞外圈回到棒2 往下
+      if (Math.abs(I) > 0.02) {
+        const sgn = Math.sign(I);
+        const midX = (p1 + p2) / 2;
+        D.arrow(ctx, midX, rail1 - 8, midX + sgn * 26, rail1 - 8, { color: PL.col("warn"), width: 2 });
+        D.arrow(ctx, midX, rail2 + 10, midX - sgn * 26, rail2 + 10, { color: PL.col("warn"), width: 2 });
+        A_arrowVert(p1, rail1 + 14, sgn > 0 ? -1 : 1);
+        A_arrowVert(p2, rail1 + 14, sgn > 0 ? 1 : -1);
+      }
+      function A_arrowVert(x, y, dir) {
+        D.arrow(ctx, x, y, x, y + dir * 24, { color: PL.col("warn"), width: 2 });
+      }
+
+      // 讀值晶片
+      AP.valueChip(ctx, rx0 + 6, rail2 + 40, "I = " + PL.fmt(Math.abs(I), 2) + " A", "rgba(255,196,110,0.9)");
+      AP.valueChip(ctx, rx1 - 150, rail2 + 40, "F = " + PL.fmt(Math.abs(F), 2) + " N", "rgba(255,150,140,0.9)");
+
+      // v–t 圖：兩棒速度收斂到共同速度
+      const bx = 44, byB = 292, bw = W - 88, bh = H - byB - 26;
+      const g = PL.graph(cv, { x: bx, y: byB, w: bw, h: bh }, { x0: 0, x1: 14, y0: 0, y1: Math.max(1.2, sV0.get() * 1.15) });
+      g.frame({ title: "v – t：兩棒收斂到動量守恆的共同速度 v*", xlabel: "t (s)" }); g.grid(4, 2);
+      const win = history.filter(p => p[0] > t - 14);
+      if (win.length > 1) {
+        g.curve(win.map(p => [p[0] - (t - 14), p[1]]), { color: c, width: 2.1 });
+        g.curve(win.map(p => [p[0] - (t - 14), p[2]]), { color: PL.col("accent-3"), width: 2.1 });
+      }
+      g.hline(vStar, { color: PL.col("ok"), dash: [5, 4], width: 1.3 });
+      g.label(0.4, vStar, "v* = " + PL.fmt(vStar, 2) + " m/s（動量守恆）", { color: PL.col("ok"), size: 9.5 });
+      g.dot(Math.min(14, t), v1, { color: c, glow: c });
+
+      // 收斂提示
+      if (settled > 0) {
+        D.text(ctx, W / 2, 44, (merged ? "兩棒接觸" : "磁場完成動量傳遞") + "：以共同速度 v* = " + PL.fmt(vStar, 2) + " m/s 一起前進，電流歸零",
+          { color: PL.col("ok"), size: 11.5, align: "center", weight: "700" });
+        D.text(ctx, W / 2, 62, "少掉的動能 " + PL.fmt(KE0 - 0.5 * (M1 + M2) * vStar * vStar, 3) + " J 已變成迴路的焦耳熱",
+          { color: PL.col("text-faint"), size: 10.5, align: "center" });
+      }
+
+      rEmf.set(Math.abs(emf), 2); rI.set(Math.abs(I), 2); rF.set(Math.abs(F), 2);
+      const Q = Math.max(0, KE0 - 0.5 * M1 * v1 * v1 - 0.5 * M2 * v2 * v2);
+      rQ.set(Q, 3);
+    }
+
+    const anim = PL.loop(dt => {
+      if (dt) {
+        t += dt;
+        const B = sB.get(), R = sR.get();
+        const emf = B * Lm * (v1 - v2), I = emf / R, F = B * Lm * I;
+        // 安培力：快棒減速、慢棒加速（一對交互作用，靠磁場傳遞動量）
+        v1 -= (F / M1) * dt * Math.sign(v1 - v2 || 1);
+        v2 += (F / M2) * dt * Math.sign(v1 - v2 || 1);
+        x1 += v1 * dt; x2 += v2 * dt;
+        /*
+         * 磁場收斂需要的滑行距離（v₀·mR/B²L²）常常超過導軌長度，
+         * 棒1 會先追上棒2 —— 接觸瞬間是完全非彈性合併，動量守恆給出
+         * 與磁場收斂完全相同的 v*；之後一起等速前進、電流歸零。
+         */
+        if (x1 > x2 - 0.3) {
+          x1 = x2 - 0.3;
+          if (Math.abs(v1 - v2) > 0.02) { v1 = v2 = (M1 * v1 + M2 * v2) / (M1 + M2); merged = true; }
+        }
+        if (Math.abs(v1 - v2) < 0.02 && v1 > 0) {
+          if (settled === 0) v1 = v2 = vStar;
+          settled += dt;
+          if (settled > 3.4) reset();
+        } else settled = 0;
+        history.push([t, v1, v2]);
+        if (history.length > 1200) history.shift();
+      }
+      drawScene();
+    }, 45);
+
+    cv.onResize(drawScene); drawScene(); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: drawScene };
+  }});
 })();

@@ -4,7 +4,7 @@
  * 之前的寫法把版本號分別寫死在 index.html 與這份清單裡，兩邊很容易對不起來；
  * 一旦不同步，預先快取的就是永遠不會被請求到的網址，等於白做一次下載。
  */
-const BUILD = "20260905-4";
+const BUILD = "20260905-5";
 const CACHE = "physics-lab-" + BUILD;
 
 const CORE = ["./", "index.html", "licensing.html", "manifest.json"];

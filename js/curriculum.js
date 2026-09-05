@@ -524,6 +524,7 @@
     magnetism: [
       { id: "ampere-force", title: "安培力的方向與大小", interactive: I, concept: "通電直導線置於磁場中受到安培力；改變電流方向、磁場方向與夾角，觀察受力。", formula: R`\( F=BIL\sin\theta \)`, points: ["力垂直電流與磁場", "夾角 90° 時最大", "反轉電流力反向", "馬達的基礎"] },
       { id: "motional-emf", title: "動生電動勢", interactive: I, concept: "導體棒切割磁力線時，移動電荷受洛倫茲力而兩端產生電位差。", formula: R`\( \varepsilon=BLv \)`, points: ["速度越快電壓越大", "棒長越大電壓越大", "方向可用右手定則", "發電機的局部模型"] },
+      { id: "rail-rods", title: "雙棒導軌：電磁剎車與動量傳遞", interactive: I, concept: "兩根導體棒放在光滑的平行導軌上，磁場垂直紙面。棒1以初速滑動時切割磁力線，迴路產生感應電流：棒1被安培力煞車、棒2被推動，直到兩棒同速——動量守恆依然成立，減少的動能變成迴路的焦耳熱。", formula: R`\( \varepsilon=BL(v_1-v_2),\quad F=BIL,\quad m_1v_{10}=(m_1+m_2)v^* \)`, points: ["相對速度才決定感應電動勢", "安培力使快棒減速、慢棒加速", "達共同速度後電流歸零", "動能損失＝迴路焦耳熱"] },
       { id: "coil-torque", title: "通電線圈的力矩", interactive: I, concept: "線圈在磁場中兩側受安培力形成力偶，驅動轉子旋轉；改變角度觀察力矩。", formula: R`\( \tau=NIAB\sin\theta \)`, points: ["平面平行磁場時力矩最大", "法線平行磁場時力矩為零", "直流馬達需要換向", "線圈匝數增加力矩增大"] }
     ],
     modern: [

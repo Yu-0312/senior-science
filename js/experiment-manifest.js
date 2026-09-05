@@ -140,6 +140,7 @@ window.PhysicsLabExperimentFiles = {
   "nuclear-reaction": "extended.js",
   "cosmological-redshift": "extended.js",
   "blackbody": "extended.js",
+  "rail-rods": "extended.js",
   "circular": "gravity.js",
   "centripetal": "gravity.js",
   "gravitation": "gravity.js",
