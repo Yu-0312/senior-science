@@ -45,6 +45,7 @@ window.PhysicsLabExperimentFiles = {
   "hr-diagram": "advanced.js",
   "cosmic-distance-ladder": "advanced.js",
   "chase-and-meet": "chase.js",
+  "circuit-sandbox": "circuit-sandbox.js",
   "unit-conversion": "comprehensive.js",
   "motion-sensor": "comprehensive.js",
   "reaction-time": "comprehensive.js",
