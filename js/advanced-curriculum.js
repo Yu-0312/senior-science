@@ -54,7 +54,7 @@
       { id: "antenna-resonance", title: "天線共振與波長匹配", interactive: I, concept: "天線長度接近電磁波的特定分數波長時，電流分布形成共振，收發效率提高。", formula: R`\( L\approx\lambda/4,\quad c=\lambda f \)`, points: ["頻率越高波長越短", "四分之一波長天線很常見", "失配會降低收發效率", "天線方向與偏振有關"] }
     ],
     modern: [
-      { id: "quantum-transitions", title: "量子能階與躍遷光譜", interactive: I, concept: "原子電子只能處在離散能階，跨越能階時吸收或放出特定能量的光子，形成線光譜。", formula: R`\( \Delta E=hf=\frac{hc}{\lambda} \)`, points: ["能階是離散的", "向下躍遷放出光子", "波長對應能量差", "光譜可辨識元素"] },
+      { id: "quantum-transitions", title: "量子能階與躍遷光譜", interactive: I, concept: "原子電子只能處在離散能階，跨越能階時吸收或放出特定能量的光子，形成線光譜。", formula: R`\( \Delta E=hf=\frac{hc}{\lambda} \)`, points: ["能階是離散的", "向下躍遷放出光子", "波長對應能量差", "譜線間隔反映能階結構"] },
       { id: "uncertainty-principle", title: "不確定性原理與波包", interactive: I, concept: "把粒子侷限在較小區域時，波包需要更多波數成分，因此動量的不確定度會增加。", formula: R`\( \Delta x\Delta p\ge\hbar/2 \)`, points: ["不是儀器不夠精準造成", "位置越集中動量分布越寬", "量子態以機率描述", "波包展現粒子與波的連結"] },
       { id: "twins-paradox", title: "雙生子佯謬與同時性", interactive: I, concept: "高速旅行者的固有時間較短；折返使兩人的參考系不對稱，因此回到地球後旅行者較年輕。", formula: R`\( \Delta t=\gamma\Delta \tau \)`, points: ["時間膨脹由相對速度產生", "旅行者在折返時更換慣性系", "固有時間沿自身世界線累積", "GPS 需要相對論修正"] },
       { id: "radiation-shielding", title: "α、β、γ 輻射與屏蔽", interactive: I, concept: "不同輻射的穿透力與電離能力不同；選擇紙、鋁、鉛等屏蔽材料並量測偵測計數。", formula: R`\( I=I_0e^{-\mu x} \)`, points: ["α 可被紙擋住", "β 常用鋁板屏蔽", "γ 需較厚高密度材料", "安全原則是時間、距離、屏蔽"] },

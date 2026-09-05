@@ -706,46 +706,88 @@
    * 改成從「同模組其他實驗的學習重點」取材：每個選項都是真的物理敘述，
    * 只是描述的不是這一個實驗，學生必須真的分辨概念才選得出來。
    */
-  function neighbourDistractors(f, count) {
+  function neighbourDistractors(f, count, offset) {
     const siblings = f.mod.experiments.filter(e => e.id !== f.exp.id && Array.isArray(e.points) && e.points.length);
+    /*
+     * 自己實驗的學習重點一個都不能當誘答：有些主題（如光譜與能階躍遷）
+     * 的兄弟實驗會出現相同敘述，若正解與某選項一模一樣，題目就有兩個
+     * 正確答案。先把本實驗全部重點集合成 Set，取樣時跳過。
+     */
+    const own = new Set((f.exp.points || []).map(p => compactText(p, f.exp.title, 72)));
     const picked = [];
+    const shift = offset || 0;
     // 以 order 當起點等距取樣，讓同一個實驗每次進來的誘答固定，方便師生討論。
     for (let i = 0; i < siblings.length && picked.length < count; i += 1) {
-      const item = siblings[(f.order * 3 + i * 5) % siblings.length];
-      const text = compactText(item.points[(f.order + i) % item.points.length], item.title, 72);
-      if (text && !picked.includes(text)) picked.push(text);
+      const item = siblings[(f.order * 3 + shift + i * 5) % siblings.length];
+      const text = compactText(item.points[(f.order + shift + i) % item.points.length], item.title, 72);
+      if (text && !picked.includes(text) && !own.has(text)) picked.push(text);
     }
     while (picked.length < count) picked.push("這個現象與實驗中量測的物理量沒有直接關係。");
     return picked;
   }
 
+  /*
+   * 手寫題的選項洗牌。題庫裡正解固定寫在第 0 位（撰寫方便），渲染前若不洗牌，
+   * 「答案永遠是 A」等於把評量結果送給會看位置的學生。用與計算題同一套
+   * 「實驗 + 日期」種子決定順序：同一個學生同一天看到的排列固定，方便檢討。
+   */
+  function shuffleAuthoredQuestion(q, salt) {
+    const hash = questionSeed(String(salt || ""));
+    let state = (hash >>> 0) || 1;
+    const rand = () => {
+      state = (state + 0x9e3779b9) >>> 0;
+      let z = state;
+      z = Math.imul(z ^ (z >>> 16), 0x21f0aaad) >>> 0;
+      z = Math.imul(z ^ (z >>> 15), 0x735a2d97) >>> 0;
+      return ((z ^ (z >>> 15)) >>> 0) / 4294967296;
+    };
+    const options = q.options.slice();
+    let correct = q.correct;
+    // Fisher–Yates：洗選項的同時跟著搬正解索引
+    for (let i = options.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(rand() * (i + 1));
+      [options[i], options[j]] = [options[j], options[i]];
+      if (correct === i) correct = j; else if (correct === j) correct = i;
+    }
+    return Object.assign({}, q, { options, correct });
+  }
+
   function buildPracticeQuestions(f) {
     const { exp, mod } = f;
-    // 有逐題撰寫的題目就優先使用；其餘實驗仍由樣板生成。
+    // 有逐題撰寫的題目就優先使用（渲染前洗牌）；其餘實驗由樣板生成。
     const authored = window.PhysicsLabQuestionBank && window.PhysicsLabQuestionBank[exp.id];
-    if (Array.isArray(authored) && authored.length) return authored;
+    if (Array.isArray(authored) && authored.length) {
+      return authored.map((q, i) => shuffleAuthoredQuestion(q, exp.id + "#" + i));
+    }
 
     const points = Array.isArray(exp.points) && exp.points.length ? exp.points : [exp.concept || exp.title];
     const core = compactText(points[0], exp.title, 72);
     const support = compactText(points[1] || exp.concept, exp.title, 72);
     const bridge = TEXTBOOK_BRIDGES[mod.id] || {};
-    const conceptChoices = makeChoices(core, neighbourDistractors(f, 3), f.order);
-    const formulaChoices = makeChoices(
-      "先列出已知量與目標量，確認單位後再依關係式推論。",
-      [
-        "選看起來最長的公式，直接代入所有數字。",
-        "不必確認條件是否固定，先猜測答案再回填。",
-        "只比較符號外觀，不需要判斷量之間的關係。"
-      ],
+    const conceptChoices = makeChoices(core, neighbourDistractors(f, 3, 0), f.order);
+    /*
+     * 第二題改問「結論歸屬」：四句都是真的物理敘述，只有一句是這個實驗支持的。
+     * 正解取本實驗的第二個學習重點，誘答取別的實驗的重點（取樣偏移與第一題錯開，
+     * 不會出現同一句話在兩題裡重複登場）。
+     */
+    const claimChoices = makeChoices(
+      support,
+      neighbourDistractors(f, 3, 2),
       f.order + 1
     );
-    const experimentChoices = makeChoices(
-      "設定 A、B 兩組並只改變一個參數，再比較讀數或圖形。",
-      [
-        "同時改變多個參數，讓差異看起來更明顯。",
-        "只記錄最後一次讀數，省略對照組。",
-        "看到結果後才決定要記錄哪些數據。"
-      ],
+    /*
+     * 第三題改問「觀察方法」：正解是本模組的觀察建議，誘答是其他模組的——
+     * 它們也都是正確的方法，只是用在這裡會文不對題。
+     */
+    const otherBridges = Object.keys(TEXTBOOK_BRIDGES).filter(id => id !== mod.id);
+    const methodDistractors = [];
+    for (let i = 0; i < otherBridges.length && methodDistractors.length < 3; i += 1) {
+      const text = TEXTBOOK_BRIDGES[otherBridges[(f.order + i) % otherBridges.length]].observe;
+      if (!methodDistractors.includes(text)) methodDistractors.push(text);
+    }
+    const methodChoices = makeChoices(
+      bridge.observe || "固定其他條件，只改變一個量，對照讀數與圖形的變化。",
+      methodDistractors,
       f.order + 2
     );
     return [
@@ -758,21 +800,20 @@
         answer: "重點是把參數變化連回核心概念：" + core + "。若觀察結果不同，通常代表還有另一個條件沒有固定。"
       },
       {
-        type: "單選題 · 解題步驟",
-        prompt: "面對下列公式時，下列哪個解題流程最合理？",
-        formula: exp.formula,
-        options: formulaChoices.options,
-        correct: formulaChoices.correct,
-        hint: "先圈出公式中的每個符號，確認單位一致，再決定要代入、比例比較，還是看圖讀值。",
-        answer: "可先列出已知量與目標量，再固定其他量做比例推論；本題可連到：" + support + "。"
+        type: "單選題 · 結論歸屬",
+        prompt: "四位同學各自寫下一句「看完模擬後的結論」，其中只有一句是「" + exp.title + "」真正支持的。是哪一句？",
+        options: claimChoices.options,
+        correct: claimChoices.correct,
+        hint: "先把每句話裡的「因為什麼、所以什麼」圈出來，再回頭對照模擬裡實際量到的關係。",
+        answer: "本實驗支持的敘述是：「" + support + "」。其餘選句都是課程裡真實的物理，但屬於其他實驗的結論，放在這裡就是文不對題。"
       },
       {
-        type: "單選題 · 實驗設計",
-        prompt: "若要用模擬檢驗「" + (bridge.exam || "先選模型再代入條件") + "」，下列哪種操作最可靠？",
-        options: experimentChoices.options,
-        correct: experimentChoices.correct,
-        hint: "建議用 A/B 對照：A 組維持預設，B 組只改一個參數；最後比較兩組讀數或圖形形狀。",
-        answer: "理想答案要包含三件事：改了哪個量、讀數如何變、這個變化如何支持本實驗的模型。"
+        type: "單選題 · 觀察方法",
+        prompt: "想用「" + exp.title + "」的模擬把關係看清楚，下列哪一組操作建議最合適？",
+        options: methodChoices.options,
+        correct: methodChoices.correct,
+        hint: "好的觀察流程會先固定條件、一次改一個量，並把讀數或圖形的變化記下來比對。",
+        answer: "本模組的建議流程：" + (bridge.observe || "固定其他條件，只改變一個量，對照讀數與圖形的變化。") + " 其餘選項是其他主題（如光學、電路）的正確方法，用在這個實驗會量錯東西。"
       }
     ];
   }
@@ -913,12 +954,10 @@
       const selectedAnswer = savedAnswer === q.correct ? savedAnswer : (solved ? q.correct : null);
       const status = el("span", "practice-status", head); status.textContent = solved ? "答對" : "待作答";
       const prompt = el("p", "practice-question", item);
+      prompt.textContent = q.prompt;
       if (q.formula) {
-        prompt.append(document.createTextNode("面對下列公式："));
+        // 公式是題幹的輔助行，不能蓋掉題目本身問什麼
         const formula = el("span", "practice-formula", prompt); formula.innerHTML = q.formula;
-        prompt.append(document.createTextNode("下列哪個解題流程最合理？"));
-      } else {
-        prompt.textContent = q.prompt;
       }
       const choices = el("div", "practice-options", item);
       choices.setAttribute("role", "radiogroup");
@@ -1199,17 +1238,15 @@
     const total = mod.experiments.length || 1;
     const checkpoint = store.get("pl-checkpoint-" + mod.id, null);
     const answers = getPracticeAnswers();
-    const bank = window.PhysicsLabQuestionBank || {};
 
     let wrong = 0;
+    const doneSet = getPracticeDone();
     mod.experiments.forEach(exp => {
-      const questions = Array.isArray(bank[exp.id]) ? bank[exp.id] : null;
       Object.keys(answers).forEach(key => {
         if (key.indexOf(exp.id + "-q") !== 0) return;
-        const index = Number(key.slice((exp.id + "-q").length));
-        const correct = questions && questions[index] ? questions[index].correct : null;
-        // 樣板題的正解索引會隨 order 變動，這裡只用有題庫的實驗來計算答錯數。
-        if (correct != null && Number(answers[key]) !== correct) wrong += 1;
+        // 正解索引隨日期洗牌，不能拿保存的選項序號與原始題庫比對；
+        // 以「有作答紀錄但沒有答對標記」判定錯誤，與排列方式無關。
+        if (!doneSet.has(key)) wrong += 1;
       });
     });
 

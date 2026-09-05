@@ -23,9 +23,20 @@
     "banked-curve": topic("orbit", ["彎道半徑 r", 20, 200, 85, "m"], ["傾角 θ", 2, 45, 18, "°"], "設計速率", (a, b) => Math.sqrt(a * 9.8 * Math.tan(b * Math.PI / 180))),
     "satellite-energy": topic("orbit", ["軌道半徑 r", 1, 12, 4, "R⊕"], ["衛星質量 m", 100, 2000, 600, "kg"], "相對軌道速度", (a) => 7.9 / Math.sqrt(a)),
     "escape-speed": topic("orbit", ["天體質量比", 0.1, 5, 1, "M⊕"], ["天體半徑比", 0.3, 3, 1, "R⊕"], "逃逸速度", (a, b) => 11.2 * Math.sqrt(a / b)),
-    "damped-oscillation": topic("oscillation", ["初始振幅 A₀", 1, 12, 7, "cm"], ["阻尼 β", 0.05, 1, 0.3, "s⁻¹"], "5 秒後振幅", (a, b) => a * Math.exp(-5 * b)),
+    /*
+     * 阻尼 β 的上限原本只有 1 s⁻¹，畫面固定的自然頻率 ω₀ ≈ 2.8 rad/s 根本到不了臨界值，
+     * 「比較欠阻尼、臨界阻尼與過阻尼」變成只有講義寫得出來、模擬做不出來。
+     * 上限放寬到 6 s⁻¹，β 拉過 2.8 就能親眼看到不振盪的兩種歸位方式。
+     */
+    "damped-oscillation": topic("oscillation", ["初始振幅 A₀", 1, 12, 7, "cm"], ["阻尼 β", 0.05, 6, 0.3, "s⁻¹"], "5 秒後振幅", (a, b) => a * Math.exp(-5 * b)),
     "shm-phase": topic("oscillation", ["振幅 A", 1, 10, 6, "cm"], ["週期 T", 0.5, 6, 2, "s"], "最大速率", (a, b) => a * TAU / b),
-    "coupled-oscillators": topic("oscillation", ["耦合勁度", 1, 30, 12, "N/m"], ["質量 m", 0.2, 5, 1, "kg"], "交換頻率", (a, b) => Math.sqrt(a / b) / TAU),
+    /*
+     * 交換（拍）頻率原寫成 √(κ/m)/2π，那是「耦合彈簧自己的自然頻率」，不是能量
+     * 一來一回的節奏。畫面採用牆壁彈簧 k = κ 的對稱裝置，兩個正常模態為
+     * ω₁ = √(κ/m)、ω₂ = √(3κ/m)，能量完整轉移一次的頻率是模態差
+     * (ω₂ − ω₁)/2π = (√3 − 1)√(κ/m)/2π——讀數與畫面的節奏從此一致。
+     */
+    "coupled-oscillators": topic("oscillation", ["耦合勁度", 1, 30, 12, "N/m"], ["質量 m", 0.2, 5, 1, "kg"], "交換頻率", (a, b) => (Math.sqrt(3) - 1) * Math.sqrt(a / b) / TAU),
     "hydrostatic-pressure": topic("thermal", ["深度 h", 0, 30, 12, "m"], ["液體密度 ρ", 600, 1400, 1000, "kg/m³"], "表壓", (a, b) => a * b * 9.8 / 1000),
     "phase-change": topic("thermal", ["質量 m", 0.1, 4, 1, "kg"], ["加熱功率", 100, 2000, 800, "W"], "熔化時間", (a, b) => a * 334000 / b),
     "heat-engine": topic("thermal", ["高溫 Tₕ", 350, 1200, 700, "K"], ["低溫 T𝚌", 200, 600, 320, "K"], "卡諾效率", (a, b) => Math.max(0, 1 - b / a) * 100),
@@ -50,6 +61,58 @@
     D.rect(ctx, x, y, w, 27, { fill: PL.theme.shade(0.72), stroke: tint, width: 1, r: 6 });
     D.text(ctx, label, x + 9, y + 11, { color: PL.col("text-faint"), size: 8.5 });
     D.text(ctx, value, x + 9, y + 22, { color: tint, size: 10.5, weight: "700" });
+  }
+
+  /*
+   * oscillation 家族的共用舞台：左牆、滑軌、彈簧掛小車，再把下半部留給
+   * x–t 波形條。原本三個實驗共用一個「方塊加正弦」的示意場景：
+   * 阻尼實驗的振幅永遠不衰減（與物理矛盾）、耦合實驗只畫一顆振子
+   * （根本沒有耦合可看）。改成每個實驗自己的精確解動畫。
+   */
+  function oscStage(cv) {
+    const { ctx, W, H } = cv;
+    const wallX = 34, cartW = 52, ay = 78, railY = ay + 30;
+    return { ctx, W, H, wallX, cartW, ay, railY };
+  }
+
+  // 牆、軌道、彈簧與小車；dx 是小車相對平衡位置的水平位移（px）
+  function oscCart(ctx, g, eqX, dx, coils) {
+    const AP = PL.apparatus, c = color();
+    AP.steel(ctx, g.wallX - 10, g.railY, g.W - g.wallX - 26, 8, 4);
+    AP.steel(ctx, g.wallX - 14, g.ay - 30, 14, 72, -20);
+    AP.steel(ctx, g.wallX, g.ay - 8, 10, 26, 8);
+    D.line(ctx, eqX, g.ay - 56, eqX, g.railY + 16, "rgba(120,190,255,0.5)", 1, [4, 4]);
+    D.text(ctx, "x = 0", eqX, g.ay - 62, { color: PL.theme.pale(0.75), size: 10.5, align: "center" });
+    D.spring(ctx, g.wallX + 8, g.ay, eqX + dx - g.cartW / 2, g.ay, coils || 11, 11, c);
+    AP.cart(ctx, eqX + dx, g.railY, g.cartW, 36);
+  }
+
+  // 振幅 ±A 與現在位置的標線；ampPx 為目前的包絡（px）
+  function oscMarks(ctx, g, eqX, ampPx, xPx) {
+    const dash = [4, 4];
+    if (ampPx > 6) {
+      D.line(ctx, eqX - ampPx, g.ay - 48, eqX - ampPx, g.railY + 8, "rgba(255,255,255,0.15)", 1, dash);
+      D.line(ctx, eqX + ampPx, g.ay - 48, eqX + ampPx, g.railY + 8, "rgba(255,255,255,0.15)", 1, dash);
+      D.text(ctx, "−A", eqX - ampPx, g.ay - 54, { color: PL.theme.pale(0.5), size: 10, align: "center" });
+      D.text(ctx, "+A", eqX + ampPx, g.ay - 54, { color: PL.theme.pale(0.5), size: 10, align: "center" });
+    }
+    const v = xPx - eqX;
+    if (Math.abs(v) > 4) {
+      const by = g.railY + 22;
+      D.line(ctx, eqX, by, xPx, by, PL.theme.pale(0.4), 1.2);
+      D.line(ctx, eqX, by - 4, eqX, by + 4, PL.theme.pale(0.4), 1.2);
+      D.line(ctx, xPx, by - 4, xPx, by + 4, PL.theme.pale(0.4), 1.2);
+    }
+  }
+
+  // 下半部的時間波形條：win 秒的滑動窗，series 是 [{pts, color, width, dash}]
+  function oscStrip(cv, yTop, win, series, title, marks) {
+    const { ctx, W, H } = cv;
+    const g = PL.graph(cv, { x: 44, y: yTop, w: W - 88, h: H - yTop - 30 }, { x0: -win, x1: 0, y0: -1.15, y1: 1.15 });
+    g.frame({ title, xlabel: marks && marks.xlabel || "" }); g.grid(4, 2);
+    (marks && marks.lines || []).forEach(l => g.vline(l.x, { color: l.color || PL.col("text-faint"), dash: [3, 4] }));
+    if (marks && marks.winLabel != null) g.label(-win + win * 0.02, 0.94, marks.winLabel, { color: PL.col("text-faint"), size: 9 });
+    series.forEach(s => { if (s.pts.length > 1) g.curve(s.pts, { color: s.color, width: s.width || 2, dash: s.dash }); });
   }
 
   function drawScene(cv, cfg, a, b, t, value) {
@@ -82,13 +145,135 @@
       D.arrow(ctx, cabinX + cabinW / 2, cabinY + cabinH * 0.62, cabinX + cabinW / 2, cabinY + cabinH * 0.86, { color: PL.col("danger"), width: 2, label: "mg" });
       fillPill(ctx, W - 148, 20, "體重計", PL.fmt(value, 0) + " N", 126, c);
     } else if (["spring", "oscillation"].includes(cfg.kind)) {
-      const wall = 52, center = W * 0.56, dx = Math.sin(t * 2.3) * (20 + a * 1.4), my = cy;
-      D.rect(ctx, wall - 10, my - 55, 10, 110, { fill: "rgba(255,255,255,0.26)" });
-      D.spring(ctx, wall, my, center + dx - 30, my, 12, 12, c);
-      D.rect(ctx, center + dx - 30, my - 29, 60, 58, { fill: PL.col("panel-3"), stroke: c, width: 2, r: 7 });
-      D.line(ctx, center, 38, center, H - 38, "rgba(255,255,255,0.14)", 1, [4, 4]);
-      D.arrow(ctx, center + dx, my - 40, center + dx + 30 * Math.cos(t * 2.3), my - 40, { color: PL.col("accent-2"), width: 2, label: "v" });
-      fillPill(ctx, 18, 18, "振動讀值", PL.fmt(value, 2), 118, c);
+      if (cfg.kind === "spring") {
+        // 彈簧串並聯：裝置只是示意，重點在下方關係圖；沿用單振子場景但改用器材層。
+        const g = oscStage(cv);
+        const eqX = g.W * 0.56, dx = Math.sin(t * 2.3) * (20 + a * 1.4);
+        oscCart(ctx, g, eqX, dx, 12);
+        oscMarks(ctx, g, eqX, 0, eqX + dx);
+        D.text(ctx, "k₁ 與 k₂ 的效果請對照下方關係圖", g.W / 2, 30, { color: PL.col("text-faint"), size: 10.5, align: "center" });
+        fillPill(ctx, 18, 18, "等效勁度", PL.fmt(value, 2), 118, c);
+      } else if (cfg.id === "damped-oscillation") {
+        /*
+         * 阻尼振動：畫面用固定自然頻率 ω₀，位移取真實的精確解——
+         *   欠阻尼   x = A₀e^(−βt)cos(ω′t)，ω′ = √(ω₀²−β²)
+         *   臨界阻尼 x = A₀e^(−ω₀t)(1 + ω₀t)
+         *   過阻尼   x = A₀e^(−βt)(cosh γt + (β/γ)sinh γt)，γ = √(β²−ω₀²)
+         * 每個週期自動重新釋放一次，學生不必手動重設就能反覆觀察。
+         */
+        const g = oscStage(cv);
+        const W0 = 2.8, CYCLE = 14, FADE = 0.6;
+        const s = t % CYCLE, ramp = Math.min(1, s / FADE);
+        const A0 = a, beta = b;
+        let xCm, env;
+        if (beta < W0 - 1e-6) {
+          const wd = Math.sqrt(W0 * W0 - beta * beta);
+          xCm = A0 * Math.exp(-beta * s) * Math.cos(wd * s);
+          env = A0 * Math.exp(-beta * s);
+        } else if (beta > W0 + 1e-6) {
+          const ga = Math.sqrt(beta * beta - W0 * W0);
+          xCm = A0 * Math.exp(-beta * s) * (Math.cosh(ga * s) + (beta / ga) * Math.sinh(ga * s));
+          env = Math.abs(xCm);
+        } else {
+          xCm = A0 * Math.exp(-W0 * s) * (1 + W0 * s);
+          env = Math.abs(xCm);
+        }
+        xCm *= ramp;
+        const maxHalf = (g.W - g.wallX - 90 - g.cartW) / 2;
+        const sc = maxHalf / 12;                       // A₀ 滿檔 12 cm
+        const eqX = g.wallX + 76 + g.cartW / 2 + maxHalf / 2;
+        const xPx = eqX + xCm * sc, ampPx = env * sc * ramp;
+        oscCart(ctx, g, eqX, xCm * sc, 11);
+        oscMarks(ctx, g, eqX, ampPx, xPx);
+        // 阻尼狀態直接寫在畫面上，β 拉過 ω₀ 的瞬間看得到文字與運動同時改變
+        const regime = beta < W0 - 1e-6 ? ["欠阻尼", "來回振盪，振幅指數衰減"]
+          : beta > W0 + 1e-6 ? ["過阻尼", "不振盪，但比臨界阻尼更慢歸位"]
+          : ["臨界阻尼", "不振盪，以最短時間回到平衡"];
+        D.text(ctx, "β = " + PL.fmt(beta, 2) + " s⁻¹ · " + regime[0] + "（ω₀ = 2.8 s⁻¹）", g.W - 44, 26, { color: c, size: 11, align: "right", weight: "700" });
+        D.text(ctx, regime[1], g.W - 44, 42, { color: PL.col("text-faint"), size: 10, align: "right" });
+        // 波形條：0–14 s 的掃描，橘虛線是包絡 ±A₀e^(−βt)，5 s 刻度對應左側讀數
+        const pts = [];
+        for (let u = 0; u <= s; u += CYCLE / 240) {
+          let xv;
+          if (beta < W0 - 1e-6) xv = Math.cos(Math.sqrt(W0 * W0 - beta * beta) * u);
+          else if (beta > W0 + 1e-6) { const ga = Math.sqrt(beta * beta - W0 * W0); xv = Math.cosh(ga * u) + (beta / ga) * Math.sinh(ga * u); }
+          else xv = 1 + W0 * u;
+          pts.push([u - s, A0 * Math.exp(-beta * u) * xv * ramp]);
+        }
+        const envPts = [];
+        if (beta < W0 - 1e-6) for (let u = 0; u <= s; u += CYCLE / 120) envPts.push([u - s, A0 * Math.exp(-beta * u)]);
+        const norm = p => p.map(q => [q[0], q[1] / Math.max(1e-9, A0)]);
+        oscStrip(cv, 156, CYCLE, [{ pts: norm(pts), color: c, width: 2.2 }, { pts: norm(envPts), color: PL.col("warn"), width: 1.4, dash: [5, 4] }],
+          "x – t（橘虛線 = 包絡 ±A₀e^(−βt)）", { lines: [{ x: 5 - s, color: PL.col("accent-2") }], winLabel: "釋放 →" });
+        fillPill(ctx, 18, 18, "振動讀值", PL.fmt(value, 2), 118, c);
+      } else if (cfg.id === "coupled-oscillators") {
+        /*
+         * 耦合振子：兩台小車夾三條彈簧（牆—κ—車1—κ—車2—κ—牆）。
+         * 兩個正常模態 ω₁=√(κ/m)、ω₂=√(3κ/m)，從「只拉開車1」出發：
+         *   x₁ = A cos(Δt)cos(ω̄t)、x₂ = A sin(Δt)sin(ω̄t)
+         * 能量以模態差 (ω₂−ω₁) 為節奏來回搬運——波形條裡兩條曲線此消彼長。
+         */
+        const g = oscStage(cv);
+        const kap = a, m = Math.max(1e-6, b);
+        const w1 = Math.sqrt(kap / m), w2 = Math.sqrt(3 * kap / m);
+        const wm = (w1 + w2) / 2, dm = (w2 - w1) / 2;
+        const Apx = Math.min(44, (g.W - 260) / 4);
+        const x1 = Math.cos(dm * t) * Math.cos(wm * t);
+        const x2 = Math.sin(dm * t) * Math.sin(wm * t);
+        const wallR = g.W - 30;
+        const c1eq = g.wallX + 78 + g.cartW / 2, c2eq = wallR - 78 - g.cartW / 2;
+        const c1x = c1eq + x1 * Apx, c2x = c2eq + x2 * Apx;
+        // 兩台車＋三條彈簧一次畫完（不走 oscCart，因為這裡有兩個平衡位置）
+        const AP = PL.apparatus;
+        AP.steel(ctx, g.wallX - 10, g.railY, wallR - g.wallX + 6, 8, 4);
+        AP.steel(ctx, g.wallX - 14, g.ay - 30, 14, 72, -20);
+        AP.steel(ctx, wallR, g.ay - 30, 14, 72, -20);
+        D.line(ctx, c1eq, g.ay - 56, c1eq, g.railY + 16, "rgba(120,190,255,0.45)", 1, [4, 4]);
+        D.line(ctx, c2eq, g.ay - 56, c2eq, g.railY + 16, "rgba(120,190,255,0.45)", 1, [4, 4]);
+        D.spring(ctx, g.wallX + 8, g.ay, c1x - g.cartW / 2, g.ay, 8, 10, c);
+        D.spring(ctx, c1x + g.cartW / 2, g.ay, c2x - g.cartW / 2, g.ay, Math.max(9, Math.round((c2x - c1x - g.cartW) / 16)), 10, PL.col("accent-3"));
+        D.spring(ctx, c2x + g.cartW / 2, g.ay, wallR - 8, g.ay, 8, 10, c);
+        AP.cart(ctx, c1x, g.railY, g.cartW, 36);
+        AP.cart(ctx, c2x, g.railY, g.cartW, 36);
+        D.text(ctx, "振子一", c1x, g.railY + 22, { color: PL.theme.pale(0.7), size: 10, align: "center" });
+        D.text(ctx, "振子二", c2x, g.railY + 22, { color: PL.theme.pale(0.7), size: 10, align: "center" });
+        D.text(ctx, "能量沿中間彈簧來回搬運：一台變小時另一台變大", g.W / 2, 26, { color: PL.col("text-faint"), size: 10.5, align: "center" });
+        // 波形條：兩條位移曲線，互補的起伏就是「交換」；窗長至少塞得下一輪交換
+        const Tex = Math.PI / Math.max(1e-9, dm);
+        const win = Math.min(30, Math.max(Tex * 1.15, 4));
+        const pts1 = [], pts2 = [];
+        for (let u = win; u >= 0; u -= win / 240) {
+          const tt = t - u;
+          pts1.push([-u, Math.cos(dm * tt) * Math.cos(wm * tt)]);
+          pts2.push([-u, Math.sin(dm * tt) * Math.sin(wm * tt)]);
+        }
+        oscStrip(cv, 156, win, [{ pts: pts1, color: c, width: 2.1 }, { pts: pts2, color: PL.col("accent-3"), width: 2.1 }],
+          "x₁ – t（主色）與 x₂ – t（紫）：此消彼長", { winLabel: "← " + PL.fmt(win, 1) + " s" });
+        fillPill(ctx, 18, 18, "交換頻率", PL.fmt(value, 3), 118, c);
+      } else {
+        // shm-phase：單振子＋位移/速度兩條曲線，直接比出「超前 90°」
+        const g = oscStage(cv);
+        const A = a, T = Math.max(1e-6, b), w = TAU / T;
+        const xCm = A * Math.cos(w * t), vCm = -A * Math.sin(w * t);   // v÷ω，與 x 同單位
+        const maxHalf = (g.W - g.wallX - 90 - g.cartW) / 2;
+        const sc = maxHalf / 10;                                        // A 滿檔 10 cm
+        const eqX = g.wallX + 76 + g.cartW / 2 + maxHalf / 2;
+        oscCart(ctx, g, eqX, xCm * sc, 11);
+        oscMarks(ctx, g, eqX, A * sc, eqX + xCm * sc);
+        const vPx = (vCm / Math.max(1e-9, A)) * 40;
+        if (Math.abs(vPx) > 3) D.arrow(ctx, eqX + xCm * sc, g.railY + 14, eqX + xCm * sc + vPx, g.railY + 14, { color: PL.col("accent-3"), width: 2.2, label: "v÷ω", lsize: 10 });
+        D.text(ctx, "T = " + PL.fmt(T, 2) + " s · 速度超前位移 90°", g.W - 44, 26, { color: c, size: 11, align: "right", weight: "700" });
+        const xs = [], vs = [];
+        const win = Math.min(2 * T, 12);
+        for (let u = win; u >= 0; u -= win / 240) {
+          const tt = t - u;
+          xs.push([-u, Math.cos(w * tt)]);
+          vs.push([-u, -Math.sin(w * tt)]);
+        }
+        oscStrip(cv, 156, win, [{ pts: vs, color: PL.col("accent-3"), width: 1.7 }, { pts: xs, color: c, width: 2.2 }],
+          "x – t（主色）與 v÷ω – t（紫）：峰值錯開 T/4", { winLabel: "← " + PL.fmt(win, 1) + " s" });
+        fillPill(ctx, 18, 18, "最大速率", PL.fmt(value, 2), 118, c);
+      }
     } else if (cfg.kind === "orbit") {
       const cx = W * 0.47, cy2 = H * 0.54, r = Math.min(W, H) * (0.18 + 0.18 * (a - cfg.a[1]) / (cfg.a[2] - cfg.a[1]));
       D.disc(ctx, cx, cy2, 20, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 18 });
@@ -262,8 +447,10 @@
    * reflection-boundary：反射相位由「固定端／自由端」決定，與脈衝振幅無關。
    * 原本關係圖掃振幅，畫出來是一條水平線；改掃反射端，才看得到
    * 「固定端反相 180°、自由端同相 0°」這個本來就是重點的落差。
+   * damped-oscillation 同理：掃初始振幅只会得到直線，掃阻尼才看得到衰減曲線。
    */
   if (T["reflection-boundary"]) T["reflection-boundary"].sweep = "b";
+  if (T["damped-oscillation"]) T["damped-oscillation"].sweep = "b";
 
   // 同一個 kind 由多個實驗共用，但兩根滑桿的語意各不相同。
   // 把 id 帶進設定，讓畫面可以針對特定實驗做正確的呈現。

@@ -221,11 +221,19 @@
         { id: "shm-graph", title: "簡諧運動的位移–時間關係", interactive: I,
           concept: "位移隨時間呈正弦變化，速度與加速度亦為正弦函數且彼此有相位差。調整振幅、週期與相位觀察三條曲線。",
           formula: R`\( x = A\cos(\omega t + \varphi),\ v = -A\omega\sin(\omega t),\ a = -\omega^2 x \)`,
-          points: ["ω = 2π/T 為角頻率", "加速度與位移成正比反向", "速度超前位移 90°", "相位差描述超前落後"] },
+          points: ["ω = 2π/T 為角頻率", "x–t 圖的斜率代表速度", "由圖讀出振幅與週期", "初相位決定 t = 0 的位置"] },
+        { id: "shm-phase", title: "簡諧運動的相位關係", interactive: I,
+          concept: "位移、速度、加速度同頻率但相位不同；同時觀看三條曲線與旋轉相量。",
+          formula: R`\( x=A\cos\omega t,\ v=-\omega A\sin\omega t,\ a=-\omega^2x \)`,
+          points: ["速度超前位移 90°", "加速度與位移反相", "平衡點速度最大", "端點加速度最大"] },
         { id: "shm-energy", title: "簡諧運動的能量", interactive: I,
           concept: "簡諧運動中總力學能守恆，動能與位能隨位置交替變化。觀察動能與位能沿位移的分配與總和恆定。",
           formula: R`\( E = \tfrac{1}{2}kA^2,\quad K = \tfrac{1}{2}k(A^2 - x^2) \)`,
           points: ["總能與振幅平方成正比", "平衡點動能最大", "端點位能最大", "能量在動能位能間流動"] },
+        { id: "damped-oscillation", title: "阻尼振動", interactive: I,
+          concept: "摩擦或阻力會使振幅逐漸衰減；調整阻尼比較欠阻尼、臨界阻尼與過阻尼。",
+          formula: R`\( A(t)=A_0e^{-\beta t} \)`,
+          points: ["阻尼消耗機械能", "振幅隨時間衰減", "臨界阻尼最快回到平衡", "避震器的原理"] },
         { id: "resonance", title: "共振", interactive: I,
           concept: "外力頻率接近系統自然頻率時，振幅急遽增大。掃動驅動頻率，觀察振幅在共振點附近的尖峰與阻尼影響。",
           formula: R`\( f_{\text{驅動}} \approx f_0,\quad A_{max}\propto \dfrac{1}{\text{阻尼}} \)`,
@@ -485,13 +493,12 @@
       { id: "friction-thermal", title: "摩擦耗散與熱能", interactive: I, concept: "滑塊受摩擦後，機械能減少並轉為內能；調整摩擦係數比較停止距離與熱量。", formula: R`\( W_f=-f_kd,\quad Q=f_kd \)`, points: ["非保守力改變機械能", "摩擦做負功", "損失的機械能轉為內能", "能量仍守恆"] }
     ],
     gravity: [
-      { id: "banked-curve", title: "傾斜彎道與向心力", interactive: I, concept: "車在傾斜彎道上可由正向力的水平分量提供向心力；改變速度與傾角判讀是否打滑。", formula: R`\( \tan\theta=\frac{v^2}{rg} \)`, points: ["向心力指向圓心", "傾角決定設計速度", "過快或過慢需摩擦補償", "道路與賽車彎道應用"] },
+      { id: "banked-curve", title: "傾斜彎道與向心力", interactive: I, concept: "車在傾斜彎道上可由正向力的水平分量提供向心力；改變速度與傾角判讀是否打滑。", formula: R`\( \tan\theta=\frac{v^2}{rg} \)`, points: ["正向力的水平分量提供向心力", "傾角決定設計速度", "過快或過慢需摩擦補償", "道路與賽車彎道應用"] },
       { id: "satellite-energy", title: "衛星軌道能量", interactive: I, concept: "衛星的重力位能與動能隨半徑改變；圓軌道的總機械能為負值。", formula: R`\( v=\sqrt{GM/r},\quad E=-\frac{GMm}{2r} \)`, points: ["重力提供向心力", "軌道半徑越大速度越小", "束縛系統總能量為負", "地球同步衛星有特定半徑"] },
       { id: "escape-speed", title: "逃逸速度", interactive: I, concept: "從天體表面出發的物體若總能量不小於零，就能脫離重力束縛。", formula: R`\( v_e=\sqrt{\frac{2GM}{R}} \)`, points: ["忽略空氣阻力", "與發射物質量無關", "地表約 11.2 km/s", "並非離開大氣層的速度"] }
     ],
     shm: [
-      { id: "damped-oscillation", title: "阻尼振動", interactive: I, concept: "摩擦或阻力會使振幅逐漸衰減；調整阻尼比較欠阻尼、臨界阻尼與過阻尼。", formula: R`\( A(t)=A_0e^{-\beta t} \)`, points: ["阻尼消耗機械能", "振幅隨時間衰減", "臨界阻尼最快回到平衡", "避震器的原理"] },
-      { id: "shm-phase", title: "簡諧運動的相位關係", interactive: I, concept: "位移、速度、加速度同頻率但相位不同；同時觀看三條曲線與旋轉相量。", formula: R`\( x=A\cos\omega t,\ v=-\omega A\sin\omega t,\ a=-\omega^2x \)`, points: ["速度超前位移 90°", "加速度與位移反相", "平衡點速度最大", "端點加速度最大"] },
+      /* 阻尼振動與相位關係已併入主模組，讓「阻尼」在「共振」之前登場（跳階修正）。 */
       { id: "coupled-oscillators", title: "耦合振子與能量交換", interactive: I, concept: "兩個以彈簧連結的振子會週期性交換能量，形成拍與正常模態。", formula: R`\( E_1+E_2=\text{定值} \)`, points: ["能量在振子間傳遞", "總能量近似守恆", "可見拍的包絡", "正常模態有固定相位"] }
     ],
     thermal: [

@@ -46,7 +46,7 @@
       { id: "density-lab", title: "密度量測與沉浮判斷", interactive: I, concept: "密度是質量除以體積；比較物體與液體密度即可預測下沉、懸浮或漂浮。", formula: R`\( \rho=\frac{m}{V} \)`, points: ["同體積時密度大者質量較大", "密度小於液體會漂浮", "密度相同可懸浮", "可用排水量測不規則體積"] },
       { id: "atmospheric-pressure", title: "大氣壓力與馬德堡半球", interactive: I, concept: "抽出兩半球間的空氣後，外界大氣壓力造成很大的合力，顯示空氣雖看不見仍有壓力。", formula: R`\( F=\Delta P\,A \)`, points: ["大氣壓隨高度上升而降低", "壓差作用於整個面積", "真空不是吸力而是壓差結果", "吸盤與注射器是應用"] },
       { id: "surface-tension", title: "液面張力與毛細現象", interactive: I, concept: "液體表面分子受力不均而像拉緊的薄膜；細管中液面上升或下降由表面張力與潤濕性決定。", formula: R`\( h=\frac{2\gamma\cos\theta}{\rho gr} \)`, points: ["細管越細毛細高度越大", "水潤濕玻璃會上升", "表面張力可支撐小物", "清潔劑會降低表面張力"] },
-      { id: "calorimetry-mixing", title: "熱量計與混合水溫", interactive: I, concept: "熱水放熱與冷水吸熱在理想情況下相等；由平衡溫度可比較熱量與質量的關係。", formula: R`\( m_hc(T_h-T_f)=m_cc(T_f-T_c) \)`, points: ["熱量由高溫流向低溫", "平衡時溫度相同", "質量大的一方影響較明顯", "容器吸熱會造成誤差"] },
+      { id: "calorimetry-mixing", title: "熱量計與混合水溫", interactive: I, concept: "熱水放熱與冷水吸熱在理想情況下相等；由平衡溫度可比較熱量與質量的關係。", formula: R`\( m_hc(T_h-T_f)=m_cc(T_f-T_c) \)`, points: ["熱水放出的熱等於冷水吸收的熱", "平衡時溫度相同", "質量大的一方影響較明顯", "容器吸熱會造成誤差"] },
       { id: "greenhouse-radiation", title: "輻射平衡與溫室效應", interactive: I, concept: "地表吸收太陽短波後放出紅外線；溫室氣體增加會改變向外散熱效率，使平衡溫度上升。", formula: R`\( P_{\text{吸收}}=P_{\text{放射}},\quad P=\sigma AT^4 \)`, points: ["溫度由能量收支決定", "紅外線吸收會降低散熱", "這是簡化的輻射模型", "氣候還受雲、水氣與循環影響"] }
     ],
     waves: [
@@ -75,7 +75,7 @@
     ],
     modern: [
       { id: "cathode-ray-em", title: "陰極射線管與電子比電荷", interactive: I, concept: "電子先經電壓加速，再受磁場偏轉成圓弧；由半徑、磁場與加速電壓可估算電子的比電荷。", formula: R`\( \frac{e}{m}=\frac{2V}{B^2r^2} \)`, points: ["磁力提供向心力", "偏轉半徑可量測", "e/m 是電子的重要常數", "陰極射線證明電子帶負電"] },
-      { id: "spectroscopy", title: "發射光譜與元素指紋", interactive: I, concept: "原子中的電子在能階間躍遷時只能放出特定波長，形成每種元素獨特的線光譜。", formula: R`\( \Delta E=hf=\frac{hc}{\lambda} \)`, points: ["能階是離散的", "每條譜線對應一個能階差", "光譜可辨識元素", "天文學可用光譜分析恆星"] },
+      { id: "spectroscopy", title: "發射光譜與元素指紋", interactive: I, concept: "原子中的電子在能階間躍遷時只能放出特定波長，形成每種元素獨特的線光譜。", formula: R`\( \Delta E=hf=\frac{hc}{\lambda} \)`, points: ["每種元素有獨特的譜線組合", "每條譜線對應一個能階差", "比對譜線位置可辨識元素", "天文學可用光譜分析恆星"] },
       { id: "solar-cell", title: "太陽能電池與光伏轉換", interactive: I, concept: "半導體吸收光子後產生電子與電洞，內建電場將它們分離而輸出電能；照度與面積影響輸出。", formula: R`\( P_{\text{out}}=IA\eta \)`, points: ["光子能量需跨過能隙", "照度提高通常增加電流", "面積越大輸出越大", "效率受材料與溫度影響"] }
     ]
   };

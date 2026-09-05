@@ -1559,22 +1559,76 @@
       ctx.fillText(str, x, y);
       ctx.restore();
     },
+    /*
+     * 螺旋彈簧。舊版是三角波鋸齒，看起來像折線圖不像彈簧；
+     * 改成真的繞線：簧絲沿軸正弦纏繞，分背面／正面兩層上色做出前後深度，
+     * 正面再疊一道左上光源的高光，兩端留直的簧圈頭。
+     * 色階全部從主題解析後的墨色推出，深淺主題都成立。
+     */
     spring(ctx, x1, y1, x2, y2, coils, w, color) {
       const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy);
       if (!isFinite(len) || len < 0.001) return;
       const ux = dx / len, uy = dy / len, px = -uy, py = ux;
-      const n = (coils || 10) * 2, pad = 0.12;
+      const R = Math.abs(w || 8);
+      const turns = Math.max(2, coils || 10);
+      const pad = 0.10;                       // 兩端直簧頭佔整段的比例
+      const wire = Math.max(1.6, Math.min(5, R * 0.34));
+      const midX = (x1 + x2) / 2, midY = (y1 + y2) / 2;
+      const base = parseColor(ink(ctx, color || "#9aa8b8", midX, midY)) || [154, 168, 184];
+      const dark = base.map((c, i) => i < 3 ? Math.round(c * 0.52) : c);
+      const lite = base.map((c, i) => i < 3 ? Math.round(c + (255 - c) * 0.62) : c);
+      const shadowC = "rgba(" + (themeName() === "light" ? "40,58,92" : "0,0,0") + ",0.20)";
+
+      // 一個採樣步長取 0.4 rad，一整圈約 16 點，接縫看不出來
+      const step = 0.4, total = turns * TAU;
+      const pt = phi => {
+        const f = pad + (1 - 2 * pad) * (phi / total);
+        const s = R * Math.sin(phi);
+        return [x1 + dx * f + px * s, y1 + dy * f + py * s, Math.cos(phi)];
+      };
+      // runs：把連續同層的取樣段包成一條 path。front=true 畫正面。
+      const runs = front => {
+        const paths = [];
+        let cur = null;
+        for (let phi = 0; phi <= total + 1e-9; phi += step) {
+          const p = pt(Math.min(phi, total));
+          const isFront = p[2] >= 0;
+          if (isFront === front) {
+            if (!cur) cur = [p]; else cur.push(p);
+          } else {
+            if (cur && cur.length > 1) paths.push(cur);
+            cur = null;
+          }
+        }
+        if (cur && cur.length > 1) paths.push(cur);
+        return paths;
+      };
+      const strokeRuns = (paths, style, width, ox, oy) => {
+        ctx.strokeStyle = style; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round";
+        for (const run of paths) {
+          ctx.beginPath();
+          ctx.moveTo(run[0][0] + ox, run[0][1] + oy);
+          for (let i = 1; i < run.length; i++) ctx.lineTo(run[i][0] + ox, run[i][1] + oy);
+          ctx.stroke();
+        }
+      };
       ctx.save();
-      ctx.strokeStyle = ink(ctx, color || "#9aa8b8", (x1 + x2) / 2, (y1 + y2) / 2);
-      ctx.lineWidth = 2; ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      for (let i = 0; i <= n; i++) {
-        const f = pad + (1 - 2 * pad) * (i / n);
-        const bx = x1 + dx * f, by = y1 + dy * f;
-        const off = (i % 2 === 0 ? 0 : (i % 4 === 1 ? (w || 8) : -(w || 8)));
-        ctx.lineTo(bx + px * off, by + py * off);
-      }
-      ctx.lineTo(x2, y2); ctx.stroke(); ctx.restore();
+      const back = runs(false), front = runs(true);
+      // 落在背景上的整體投影，先畫才會被彈簧本體蓋住
+      ctx.save(); ctx.globalAlpha = 1; ctx.translate(2.5, 3.5);
+      strokeRuns(back, shadowC, wire * 0.9, 0, 0);
+      strokeRuns(front, shadowC, wire * 0.9, 0, 0);
+      ctx.restore();
+      // 直簧頭（兩端接點前的直線段）
+      const p0 = pt(0), p1 = pt(total);
+      ctx.strokeStyle = rgba(base, base[3]); ctx.lineWidth = wire; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(p0[0], p0[1]); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(x2, y2); ctx.stroke();
+      // 背面（暗）→ 正面（本色）→ 正面高光（往左上偏一點）
+      strokeRuns(back, rgba(dark, 0.9), wire * 0.92, 0, 0);
+      strokeRuns(front, rgba(base, base[3]), wire * 1.02, 0, 0);
+      strokeRuns(front, rgba(lite, 0.85), Math.max(1, wire * 0.30), -wire * 0.18, -wire * 0.22);
+      ctx.restore();
     },
     // 陰影漸層、儀器格線與內框，讓所有模擬共享實驗台的質感。
     bg(cv) {

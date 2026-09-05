@@ -8,41 +8,99 @@
   PL.register("spring", { build(root) {
     const L = PL.ui.layout(root);
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
-    let t = 0, hist = [];
-    const sM = PL.ui.slider(L.controls, { label: "質量 m", min: 0.5, max: 6, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: () => hist = [] });
-    const sK = PL.ui.slider(L.controls, { label: "勁度 k", min: 5, max: 60, step: 1, value: 20, unit: "N/m", digits: 0, onInput: () => hist = [] });
+    let t = 0, hist = [], prevX = null, prevCross = null, crossGaps = [];
+    const resetHist = () => { hist = []; prevX = null; prevCross = null; crossGaps = []; };
+    const sM = PL.ui.slider(L.controls, { label: "質量 m", min: 0.5, max: 6, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: resetHist });
+    const sK = PL.ui.slider(L.controls, { label: "勁度 k", min: 5, max: 60, step: 1, value: 20, unit: "N/m", digits: 0, onInput: resetHist });
     const sA = PL.ui.slider(L.controls, { label: "振幅 A", min: 0.5, max: 2.5, step: 0.1, value: 1.6, unit: "m", digits: 1 });
     const row = PL.ui.buttonRow(L.controls);
     /* 播放／暫停由引擎的傳輸列統一提供（還附單步與速度），實驗不再自備，避免兩個開關互相打架。 */
-    const rT = PL.ui.readout(L.readouts, { label: "週期 T", unit: "s" });
+    const rT = PL.ui.readout(L.readouts, { label: "理論週期 2π√(m/k)", unit: "s" });
+    const rTm = PL.ui.readout(L.readouts, { label: "實測週期（過零量測）", unit: "s" });
     const rX = PL.ui.readout(L.readouts, { label: "位移 x", unit: "m" });
     const rV = PL.ui.readout(L.readouts, { label: "速度 v", unit: "m/s" });
+    const rA = PL.ui.readout(L.readouts, { label: "加速度 a", unit: "m/s²" });
+    const rF = PL.ui.readout(L.readouts, { label: "回復力 F", unit: "N" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const m = sM.get(), k = sK.get(), A = sA.get(), w = Math.sqrt(k / m);
-      const x = A * Math.cos(w * t), v = -A * w * Math.sin(w * t);
-      const midY = 70, wallX = 40, sc = (W - 160) / 5, eqX = wallX + 90 + 2.5 * sc * 0.5;
-      cv.calibrate(sc, "m");      // 尺可直接量振幅與位移
-      // 牆與滑軌：彈簧一端固定在牆上，滑塊在軌道上運動
+      const x = A * Math.cos(w * t), v = -A * w * Math.sin(w * t), a = -w * w * x, F = -k * x;
       const AP = PL.apparatus;
-      AP.steel(ctx, wallX - 12, midY - 38, 12, 76, -20);
-      AP.steel(ctx, wallX - 12, midY + 24, W - wallX - 20, 7, 4);
+      // 幾何：牆在左，滑軌貫穿全場，平衡點讓最大振幅的滑塊兩端都撞不到牆
+      const wallX = 34, cartW = 48, ay = 66, railY = ay + 27;
+      const sc = (W - wallX - 74 - cartW) / 5;   // 位移滿檔 5 m
+      const eqX = wallX + 62 + cartW / 2 + 2.5 * sc;
+      cv.calibrate(sc, "m");      // 尺可直接量振幅與位移
       const mx = eqX + x * sc;
-      D.spring(ctx, wallX, midY, mx - 22, midY, 11, 12, MC());
-      AP.woodBlock(ctx, mx, midY + 24, 46, 46, 0);
-      // 平衡線
-      D.line(ctx, eqX, midY - 40, eqX, midY + 40, "rgba(255,255,255,0.15)", 1, [3, 3]);
-      D.arrow(ctx, mx, midY, mx + v * 12, midY, { color: PL.col("accent-2"), width: 2, label: "v" });
-      // x–t 圖
-      const bx = 40, by = 150, bw = W - 80, bh = H - by - 16, Tw = 4 * Math.PI / w;
-      const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: Tw, y0: -A, y1: A });
-      g.frame({ title: "x – t 圖", xlabel: "t (s)" }); g.grid(4, 2);
-      const pts = hist.filter(h => h[0] > t - Tw).map(h => [h[0] - (t - Tw), h[1]]);
-      if (pts.length > 1) g.curve(pts, { color: MC(), width: 2.2 });
+
+      // 滑軌與牆面固定座
+      AP.steel(ctx, wallX - 10, railY, W - wallX - 26, 8, 4);
+      AP.steel(ctx, wallX - 14, ay - 26, 14, 66, -20);
+      AP.steel(ctx, wallX, ay - 8, 10, 26, 8);   // 彈簧固定座
+      // 平衡位置用主題藍強調（liziwuli 同款語彙）；±A 跟著 A 滑桿伸縮
+      const dash = [4, 4];
+      D.line(ctx, eqX, ay - 52, eqX, railY + 14, "rgba(110,180,255,0.55)", 1.2, dash);
+      D.line(ctx, eqX - A * sc, ay - 46, eqX - A * sc, railY + 8, "rgba(255,255,255,0.13)", 1, dash);
+      D.line(ctx, eqX + A * sc, ay - 46, eqX + A * sc, railY + 8, "rgba(255,255,255,0.13)", 1, dash);
+      D.text(ctx, "−A", eqX - A * sc, ay - 52, { color: PL.theme.pale(0.55), size: 10.5, align: "center" });
+      D.text(ctx, "+A", eqX + A * sc, ay - 52, { color: PL.theme.pale(0.55), size: 10.5, align: "center" });
+      D.text(ctx, "平衡位置 x = 0", eqX, ay - 54, { color: "rgba(140,196,255,0.9)", size: 10.5, align: "center" });
+
+      // 彈簧與滑塊（掛點在車身側面中心）
+      D.spring(ctx, wallX + 8, ay, mx - cartW / 2, ay, 11, 11, MC());
+      AP.cart(ctx, mx, railY, cartW, 34);
+
+      // 力與速度箭頭：以「目前設定的最大值」歸一，長度在情況之間可比較
+      const fLen = A > 0 ? (F / (k * A)) * 62 : 0, vLen = A * w > 0 ? (v / (A * w)) * 62 : 0;
+      if (Math.abs(fLen) > 3) D.arrow(ctx, mx, ay - 30, mx + fLen, ay - 30, { color: PL.col("ok"), width: 2.4, label: "F", lsize: 11 });
+      if (Math.abs(vLen) > 3) D.arrow(ctx, mx, railY + 16, mx + vLen, railY + 16, { color: PL.col("accent-3"), width: 2.4, label: "v", lsize: 11 });
+      // 位移標註：從平衡位置量到現在位置
+      if (Math.abs(mx - eqX) > 5) {
+        const by2 = railY + 30;
+        D.line(ctx, eqX, by2, mx, by2, PL.theme.pale(0.4), 1.2);
+        D.line(ctx, eqX, by2 - 4, eqX, by2 + 4, PL.theme.pale(0.4), 1.2);
+        D.line(ctx, mx, by2 - 4, mx, by2 + 4, PL.theme.pale(0.4), 1.2);
+        D.text(ctx, "x = " + PL.fmt(x, 2) + " m", (eqX + mx) / 2, by2 + 14, { color: PL.theme.pale(0.75), size: 10.5, align: "center" });
+      }
+
+      // x–t、v÷ω–t、a÷ω²–t 三線同軸：除以 ω、ω² 後三條振幅都是 A，相位關係直接可讀
+      const bx = 40, by = 158, bw = W - 80, bh = H - by - 14, Tw = TAU / w;
+      const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: Tw, y0: -A * 1.15, y1: A * 1.15 });
+      g.frame({ title: "x（藍）・v÷ω（紫，超前 90°）・a÷ω²（橙，反相）", xlabel: "t (s)" }); g.grid(4, 2);
+      const win = hist.filter(h => h[0] > t - Tw);
+      const xs = win.map(h => [h[0] - (t - Tw), h[1]]);
+      const vs = win.map(h => [h[0] - (t - Tw), h[2] / w]);
+      const as = win.map(h => [h[0] - (t - Tw), h[3] / (w * w)]);
+      if (xs.length > 1) g.curve(as, { color: PL.col("warn"), width: 1.4, dash: [5, 4] });
+      if (xs.length > 1) g.curve(vs, { color: PL.col("accent-3"), width: 1.6 });
+      if (xs.length > 1) g.curve(xs, { color: MC(), width: 2.2 });
       g.dot(Tw, x, { color: MC(), glow: MC() });
-      rT.set(TAU / w, 2); rX.set(x, 2); rV.set(v, 2);
+      rT.set(TAU / w, 2); rX.set(x, 2); rV.set(v, 2); rA.set(a, 2); rF.set(F, 2);
+      // 實測週期：往上過零的間隔平均；至少兩個間隔才顯示，避免開場誤導
+      if (crossGaps.length >= 2) {
+        const avg = crossGaps.reduce((s, gap) => s + gap, 0) / crossGaps.length;
+        rTm.set(avg, 2);
+      } else rTm.set("測量中…");
     }
-    const anim = PL.loop(dt => { if (dt) { t += dt; const m = sM.get(), k = sK.get(), A = sA.get(), w = Math.sqrt(k / m); hist.push([t, A * Math.cos(w * t)]); if (hist.length > 900) hist.shift(); } draw(); });
+    const anim = PL.loop(dt => {
+      if (dt) {
+        t += dt;
+        const m = sM.get(), k = sK.get(), A = sA.get(), w = Math.sqrt(k / m);
+        const xn = A * Math.cos(w * t);
+        // 週期量測：x 由負轉正的瞬間是「同一相位」，相鄰兩次間隔即實測週期
+        if (prevX !== null && prevX < 0 && xn >= 0) {
+          if (prevCross !== null) {
+            const gap = t - prevCross;
+            if (gap > 0.4 * TAU / w) { crossGaps.push(gap); if (crossGaps.length > 4) crossGaps.shift(); }
+          }
+          prevCross = t;
+        }
+        prevX = xn;
+        hist.push([t, xn, -A * w * Math.sin(w * t), -w * w * xn]);
+        if (hist.length > 900) hist.shift();
+      }
+      draw();
+    });
     cv.onResize(draw); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
@@ -156,16 +214,23 @@
       const E = 0.5 * k * A * A, U = 0.5 * k * x * x, K = E - U;
       // 振子
       /*
-       * sc = (W−120)/(2A) 把比例尺綁在振幅上，於是不管 A 設多少，
-       * 振子永遠在同樣寬的範圍內來回，「振幅」這根滑桿看起來毫無作用。
-       * 下面的能量圖也一樣（x 軸 ±A、y 軸 E×1.1，兩軸都跟著 A 跑）。
-       * 一律改成以滑桿上限為準的固定比例尺。
+       * sc 以滑桿上限為準的固定比例尺：振幅變大，振子真的跑更遠。
+       * 能量圖的座標軸同樣固定，兩根滑桿的作用都看得出來。
        */
       const A_MAX = 0.5, K_MAX = 60;
-      const midY = 60, sc = (W - 120) / (2 * A_MAX), eqX = W / 2, mx = eqX + x * sc;
-      D.line(ctx, eqX, midY - 26, eqX, midY + 26, "rgba(255,255,255,0.15)", 1, [3, 3]);
-      D.spring(ctx, 40, midY, mx - 18, midY, 10, 10, MC());
-      D.rect(ctx, mx - 18, midY - 18, 36, 36, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 5 });
+      const AP = PL.apparatus;
+      const midY = 58, sc = (W - 120) / (2 * A_MAX), eqX = W / 2, mx = eqX + x * sc;
+      const cartW = 42, railY = midY + 27;
+      // 牆、軌道與平衡位置：振子畫成真的彈簧掛車，不是幾何符號
+      AP.steel(ctx, 28, railY, W - 52, 8, 4);
+      AP.steel(ctx, 24, midY - 24, 12, 62, -20);
+      AP.steel(ctx, 36, midY - 6, 9, 22, 8);
+      D.line(ctx, eqX, midY - 48, eqX, railY + 12, "rgba(255,255,255,0.22)", 1, [4, 4]);
+      D.text(ctx, "x = 0", eqX, midY - 54, { color: PL.theme.pale(0.8), size: 10.5, align: "center" });
+      D.line(ctx, eqX - A * sc, midY - 42, eqX - A * sc, railY + 6, "rgba(255,255,255,0.13)", 1, [4, 4]);
+      D.line(ctx, eqX + A * sc, midY - 42, eqX + A * sc, railY + 6, "rgba(255,255,255,0.13)", 1, [4, 4]);
+      D.spring(ctx, 44, midY, mx - cartW / 2, midY, 10, 10, MC());
+      AP.cart(ctx, mx, railY, cartW, 32);
       // 能量對位置 圖
       const bx = 40, by = 120, bw = W - 80, bh = H - by - 16;
       const E_MAX = 0.5 * K_MAX * A_MAX * A_MAX;
@@ -197,11 +262,17 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const wd = TAU * sF.get(), A = amp(wd);
-      // 被驅動振子
+      // 被驅動的振子：彈簧一端接驅動源（左牆），滑車在軌道上被推著走
+      const AP = PL.apparatus;
       const midY = 56, eqX = W / 2, x = A * 26 * Math.sin(wd * t);
-      D.rect(ctx, 40, midY - 24, 8, 48, { fill: PL.col("text-faint") });
-      D.spring(ctx, 48, midY, eqX + x - 18, midY, 10, 9, MC());
-      D.rect(ctx, eqX + x - 18, midY - 16, 36, 32, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 5 });
+      const cartW = 42, railY = midY + 25;
+      AP.steel(ctx, 46, railY, W - 72, 8, 4);
+      AP.steel(ctx, 36, midY - 22, 12, 58, -20);
+      AP.steel(ctx, 48, midY - 6, 9, 20, 8);
+      D.line(ctx, eqX, midY - 44, eqX, railY + 12, "rgba(255,255,255,0.22)", 1, [4, 4]);
+      D.text(ctx, "x = 0", eqX, midY - 50, { color: PL.theme.pale(0.8), size: 10.5, align: "center" });
+      D.spring(ctx, 56, midY, eqX + x - cartW / 2, midY, 10, 9, MC());
+      AP.cart(ctx, eqX + x, railY, cartW, 30);
       // 共振曲線
       const bx = 44, by = 108, bw = W - 80, bh = H - by - 16;
       let amax = 0; for (let f = 0.2; f <= 2; f += 0.02) amax = Math.max(amax, amp(TAU * f));
