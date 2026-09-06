@@ -2,6 +2,7 @@
 (function () {
   "use strict";
   const PL = window.PhysicsLab, D = PL.draw, TAU = PL.TAU;
+  const AP = PL.apparatus;                    // 器材層（各 kind 場景共用）
   const color = () => PL.col("m-color", "#35e0cf");
 
   function topic(kind, a, b, output, calc) {
@@ -127,14 +128,17 @@
       D.arrow(ctx, ox + length * Math.cos(angle), oy, ox + length * Math.cos(angle), oy - length * Math.sin(angle), { color: PL.col("warn"), width: 1.7, label: "y" });
       fillPill(ctx, 18, 18, "向量實驗", PL.fmt(value, 2), 112, c);
     } else if (["motion", "momentum", "impulse", "rocket", "work", "power", "energy"].includes(cfg.kind)) {
+      /* 運動家族：鋼軌＋動力小車（器材層），原本的手繪方塊＋圓點輪全面汰換 */
       const railY = H * 0.7, pos = x0 + (0.15 + 0.7 * (0.5 + 0.5 * Math.sin(t * 1.2))) * (x1 - x0);
-      D.rect(ctx, x0, railY, x1 - x0, 8, { fill: "rgba(255,255,255,0.10)", r: 4 });
-      for (let x = x0 + 12; x < x1; x += 26) D.line(ctx, x, railY, x, railY + 8, "rgba(255,255,255,0.18)", 1);
-      D.rect(ctx, pos - 25, railY - 34, 50, 25, { fill: c, stroke: "rgba(255,255,255,0.42)", r: 5 });
-      D.disc(ctx, pos - 14, railY - 6, 5, { fill: PL.col("panel-3") }); D.disc(ctx, pos + 14, railY - 6, 5, { fill: PL.col("panel-3") });
-      if (cfg.kind === "rocket") { for (let i = 0; i < 4; i++) D.line(ctx, pos - 31 - i * 8, railY - 23, pos - 42 - i * 8, railY - 23 + Math.sin(t * 8 + i) * 5, PL.col("warn"), 2); }
+      AP.steel(ctx, x0 - 8, railY, x1 - x0 + 16, 8, 4);
+      for (let m = 0; m <= 6; m++) {
+        const gx = x0 + 10 + (x1 - x0 - 20) * m / 6;
+        D.line(ctx, gx, railY + 8, gx, railY + 15, "rgba(255,255,255,0.14)", 1);
+      }
+      AP.cart(ctx, pos, railY, 54, 34);
+      if (cfg.kind === "rocket") { for (let i = 0; i < 4; i++) D.line(ctx, pos - 33 - i * 8, railY - 24, pos - 44 - i * 8, railY - 24 + Math.sin(t * 8 + i) * 5, PL.col("warn"), 2); }
       if (cfg.kind === "energy") { D.rect(ctx, 42, 48, 20, H * 0.36, { fill: c, r: 3 }); D.rect(ctx, 70, H * 0.42, 20, H * 0.42, { fill: PL.col("accent-2"), r: 3 }); }
-      D.arrow(ctx, pos, railY - 47, pos + 44, railY - 47, { color: PL.col("accent-2"), width: 2, label: "運動" });
+      D.arrow(ctx, pos + 34, railY - 46, pos + 78, railY - 46, { color: PL.col("accent-2"), width: 2, label: "運動" });
       fillPill(ctx, 18, 18, "即時量測", PL.fmt(value, 2), 118, c);
     } else if (cfg.kind === "elevator") {
       const cabinX = W * 0.38, cabinY = 48 + (0.5 + 0.5 * Math.sin(t * 1.5)) * (H * 0.33), cabinW = W * 0.25, cabinH = H * 0.3;
@@ -360,11 +364,91 @@
         for (const dy of [-32, 0, 32]) { D.line(ctx, sourceX + 12, lensY + dy * 0.35, lensX, lensY + dy, PL.col("warn"), 1.8); D.line(ctx, lensX, lensY + dy, screenX, lensY - dy * 0.7, c, 1.8); }
       }
       fillPill(ctx, 18, 18, "光學量測", PL.fmt(value, 2), 118, c);
-    } else if (["circuit", "field", "magnetic"].includes(cfg.kind)) {
+    } else if (cfg.kind === "magnetic") {
+      /*
+       * 磁學三實驗（安培力／動生電動勢／通電線圈力矩）：原本是方框加同心圓環。
+       * 改成 N/S 磁極夾著導體棒（或線圈）的實物場景，×記號表達磁場，
+       * 器材語言與 rail-rods 一致。
+       */
+      const magL = W * 0.16, magR = W * 0.84, gapY = cy - 52, gapB = cy + 52;
+      const poleFace = (x2, tint, lab) => {
+        D.rect(ctx, x2 - 14, gapY - 8, 28, gapB - gapY + 16, { fill: tint, stroke: "rgba(20,26,36,0.7)", r: 5 });
+        D.text(ctx, lab, x2, cy + 5, { color: "#fff", size: 17, align: "center", weight: "700" });
+      };
+      poleFace(magL, "#c74a44", "N"); poleFace(magR, "#3f66b8", "S");
+      for (let gx = magL + 40; gx < magR - 30; gx += 44) {
+        for (let gy = gapY + 16; gy < gapB - 8; gy += 30) {
+          D.line(ctx, gx - 3.4, gy - 3.4, gx + 3.4, gy + 3.4, "rgba(201,140,255,0.4)", 1.2);
+          D.line(ctx, gx + 3.4, gy - 3.4, gx - 3.4, gy + 3.4, "rgba(201,140,255,0.4)", 1.2);
+        }
+      }
+      D.arrow(ctx, (magL + magR) / 2 - 60, gapY - 20, (magL + magR) / 2 - 60 + 46, gapY - 20, { color: "rgba(201,140,255,0.85)", width: 2, label: "B", lsize: 11 });
+      const nA = (a - cfg.a[1]) / Math.max(1e-9, cfg.a[2] - cfg.a[1]);
+      if (cfg.id === "ampere-force" || cfg.id === "motional-emf") {
+        const rodX = magL + 90 + nA * (magR - magL - 180);
+        AP.steel(ctx, magL + 30, cy + 44, magR - magL - 60, 7, 4);
+        D.rect(ctx, rodX - 5, gapY - 2, 10, gapB - gapY + 4, { fill: c, stroke: "rgba(16,22,30,0.8)", r: 4 });
+        D.disc(ctx, rodX, gapY - 2, 4.5, { fill: "rgb(198,164,96)" });
+        D.disc(ctx, rodX, gapB + 2, 4.5, { fill: "rgb(198,164,96)" });
+        if (cfg.id === "ampere-force") {
+          const th = b * Math.PI / 180;
+          const fl = Math.sin(th) * 56;
+          D.arrow(ctx, rodX, cy, rodX, cy - Math.abs(fl) - 10, { color: PL.col("danger"), width: 2.4, label: "F = BIL·sin" + PL.fmt(b, 0) + "°", lsize: 10 });
+          D.text(ctx, "電流方向 ⊙（流出紙面）", rodX + 14, cy + 18, { color: PL.col("text-faint"), size: 9.5 });
+        } else {
+          D.arrow(ctx, rodX, cy, rodX + 44, cy, { color: PL.col("accent-2"), width: 2.2, label: "v", lsize: 11 });
+          AP.valueChip(ctx, rodX + 10, gapY + 10, "ε = BLv", "rgba(126,222,190,0.9)");
+        }
+      } else {
+        const th2 = (a - cfg.a[1]) / Math.max(1e-9, cfg.a[2] - cfg.a[1]) * Math.PI;
+        const cw2 = (magR - magL) * 0.34, chh2 = (gapB - gapY) * 0.62;
+        ctx.save();
+        ctx.translate(W * 0.5, cy);
+        ctx.rotate(-th2);
+        ctx.strokeStyle = c; ctx.lineWidth = 3.4;
+        ctx.strokeRect(-cw2 / 2, -chh2 / 2, cw2, chh2);
+        ctx.restore();
+        D.text(ctx, "線圈轉角 " + PL.fmt(a, 0) + "°", W * 0.5, cy + chh2 / 2 + 22, { color: c, size: 10.5, align: "center" });
+      }
+      fillPill(ctx, W - 154, 20, "儀表讀數", PL.fmt(value, 2), 132, c);
+    } else if (cfg.kind === "circuit") {
+      /*
+       * 電路類（基爾霍夫／電表負載）：原本是一個方框加 + 號。
+       * 改成實物迴路——電池盒、閘刀開關、電阻、編織導線、圓形電表。
+       */
+      const loopY1 = cy - 66, loopY2 = cy + 66;
+      const lx = W * 0.14, rx2 = W * 0.86;
+      AP.cable(ctx, [{ x: lx, y: loopY2 }, { x: lx, y: loopY1 }, { x: rx2, y: loopY1 }, { x: rx2, y: loopY2 }, { x: lx, y: loopY2 }], "rgb(186,54,48)", 3.4, 5);
+      AP.battery(ctx, lx - 15, cy - 30, 30, 60);
+      if (cfg.id === "kirchhoff") {
+        const node = { x: rx2 - 120, y: loopY1 };
+        AP.cable(ctx, [{ x: node.x, y: loopY1 }, { x: node.x, y: cy - 20 }, { x: node.x, y: loopY2 }], "rgb(186,54,48)", 3, 4);
+        AP.symJunction(ctx, node.x, loopY1, "rgba(34,42,54,0.92)");
+        AP.symJunction(ctx, node.x, cy - 20, "rgba(34,42,54,0.92)");
+        AP.symJunction(ctx, node.x, loopY2, "rgba(34,42,54,0.92)");
+        D.arrow(ctx, node.x - 60, loopY1 + 8, node.x - 16, loopY1 + 8, { color: PL.col("accent-2"), width: 2, label: "I₁" });
+        D.arrow(ctx, node.x + 16, cy - 20, node.x + 60, cy - 20, { color: PL.col("accent-2"), width: 2, label: "I₂" });
+        D.arrow(ctx, node.x + 16, loopY2 - 8, node.x + 60, loopY2 - 8, { color: PL.col("accent-2"), width: 2, label: "I₃" });
+        D.disc(ctx, node.x, cy - 20, 6, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 8 });
+        D.text(ctx, "節點：流入 = 流出", node.x, cy + 16, { color: PL.col("text-dim"), size: 10.5, align: "center" });
+      } else {
+        const rxc = rx2 - 90;
+        AP.resistorBox(ctx, rxc, loopY1, 56, null, false);
+        D.text(ctx, "待測 R = " + PL.fmt(a, 0) + " Ω", rxc, loopY1 - 18, { color: PL.col("accent-2"), size: 10.5, align: "center" });
+        const vmx = rxc + 46, vmy = (loopY1 + cy) / 2;
+        AP.meter(ctx, vmx + 40, vmy - 10, 24, PL.clamp(value / 100, 0, 1), "V");
+        AP.cable(ctx, [{ x: rxc - 24, y: loopY1 }, { x: rxc - 24, y: vmy - 10 }, { x: vmx + 16, y: vmy - 10 }], "rgb(58,96,168)", 2.4, 3);
+        AP.cable(ctx, [{ x: rxc + 24, y: loopY1 }, { x: rxc + 24, y: vmy - 10 }, { x: vmx + 16, y: vmy - 10 }], "rgb(58,96,168)", 2.4, 3);
+        AP.valueChip(ctx, vmx - 40, vmy + 24, "伏特計內阻 " + PL.fmt(b, 0) + " kΩ", "rgba(126,222,190,0.9)");
+      }
+      AP.knifeSwitch(ctx, lx + 110, loopY2 + 2, 46, 0);
+      AP.resistorBox(ctx, rx2 - 60, loopY2, 46, null, false);
+      AP.valueChip(ctx, lx + 6, loopY1 - 34, PL.fmt(a, 1) + (cfg.id === "kirchhoff" ? " V" : " Ω"), "rgba(120,190,255,0.9)");
+      fillPill(ctx, W - 154, 20, "儀表讀數", PL.fmt(value, 2), 132, c);
+    } else if (cfg.kind === "field") {
       const left = 70, right = W - 74, top = H * 0.3, bottom = H * 0.72;
       D.line(ctx, left, top, right, top, c, 2.2); D.line(ctx, right, top, right, bottom, c, 2.2); D.line(ctx, right, bottom, left, bottom, c, 2.2); D.line(ctx, left, bottom, left, top, c, 2.2);
       D.disc(ctx, left, cy, 21, { fill: "rgba(255,204,102,0.14)", stroke: PL.col("warn"), width: 2 }); D.text(ctx, "+", left, cy + 6, { color: PL.col("warn"), size: 18, align: "center", weight: "700" });
-      if (cfg.kind === "magnetic") { for (let i = 0; i < 7; i++) D.ring(ctx, W * 0.5, cy, 24 + i * 8, "rgba(201,140,255,0.18)", 1); D.arrow(ctx, W * 0.5, cy, W * 0.5 + 45, cy, { color: PL.col("accent-2"), width: 2, label: "B" }); }
       if (cfg.kind === "field") {
         if (cfg.id === "electrostatic-shield") {
           /*
