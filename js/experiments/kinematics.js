@@ -672,6 +672,11 @@
       D.text(ctx, "打點計時器", tx, tapeY - 58, { color: PL.col("accent-2"), size: 11, align: "center", weight: "700" });
       AP.tickerTimer(ctx, tx, tapeY, PL.fmt(1 / T, 0) + " Hz", flash > 0);
       if (flash > 0) D.disc(ctx, tx - 14, tapeY, 5, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 12 });
+      // 解剖標註：引線指向振針與限位孔（打點的兩個關鍵部位）
+      D.line(ctx, tx + 14, tapeY - 16, tx + 46, tapeY - 34, PL.col("text-faint"), 1);
+      D.text(ctx, "振針", tx + 48, tapeY - 38, { color: PL.col("text-dim"), size: 9.5 });
+      D.line(ctx, tx + 2, tapeY + 10, tx + 30, tapeY + 30, PL.col("text-faint"), 1);
+      D.text(ctx, "限位孔", tx + 32, tapeY + 34, { color: PL.col("text-dim"), size: 9.5 });
 
       /* 繩子：從小車前緣水平拉到滑輪，再垂下去接重物。滑輪把「水平的拉」轉成「垂直的落」。
          重物隨小車前進而下落——物理上兩者位移相等，但畫面上垂直空間有限，
@@ -726,6 +731,28 @@
         const px = tapeX0 + xn(k) * tsc;
         if (px <= tapeX1) D.disc(ctx, px, ty, 3.2, { fill: k === 5 ? MC() : PL.col("text"), glow: k === dots - 1 ? PL.col("warn") : null, glowSize: 10 });
       }
+      // 計數點：每 5 個間隔取一點（50 Hz 下 = 0.1 s），紅圈 O、A、B——
+      // 量測時看的不是每一個計時點，而是「計數點」，這是紙帶分析的第一課
+      const CN = 5;
+      const cntName = ["O", "A", "B", "C", "D"];
+      for (let k = 0; k <= dots; k++) {
+        if (k % CN !== 0) continue;
+        const px = tapeX0 + xn(k) * tsc;
+        if (px > tapeX1) break;
+        D.disc(ctx, px, ty, 7, { stroke: PL.col("danger"), width: 1.4 });
+        D.text(ctx, cntName[k / CN] || "", px, ty - 13, { color: PL.col("danger"), size: 10, align: "center", weight: "700" });
+      }
+      // 累計距離括號：從 O 量到每一個計數點（先量絕對位置、再相減得段距）
+      for (let m2 = 1; m2 * CN <= Math.max(0, dots - 0); m2++) {
+        const ax = tapeX0 + xn(0) * tsc, bx = tapeX0 + xn(m2 * CN) * tsc;
+        if (bx > tapeX1) break;
+        const by2 = ty - 20;
+        D.line(ctx, ax, by2, bx, by2, PL.col("danger"), 1);
+        D.line(ctx, ax, by2 - 4, ax, by2 + 4, PL.col("danger"), 1);
+        D.line(ctx, bx, by2 - 4, bx, by2 + 4, PL.col("danger"), 1);
+        D.text(ctx, "x(" + (cntName[0] || "O") + cntName[m2] + ") = " + PL.fmt(xn(m2 * CN) * 100, 1) + " cm",
+          (ax + bx) / 2, by2 - 7, { color: PL.col("danger"), size: 9.5, align: "center" });
+      }
       // 點距標註：只標已經打出來的段落，避免預告答案
       for (let k = 0; k < Math.min(5, Math.max(0, dots - 1)); k++) {
         const a1 = tapeX0 + xn(k) * tsc, a2 = tapeX0 + xn(k + 1) * tsc;
@@ -736,6 +763,8 @@
           { color: PL.col("text-faint"), size: 9, align: "center" });
       }
       if (dots > 1) D.text(ctx, "點距（cm）", tapeX0, ty + 31, { color: PL.col("text-faint"), size: 9 });
+      D.text(ctx, "紅圈＝計數點：每 5 個間隔取 1 點（0.1 s），先量 O 到各計數點的距離再相減", tapeX0, ty + 45,
+        { color: PL.col("text-faint"), size: 9.5 });
 
       /* ---------- 讀數 ---------- */
       const T2 = T * T;
@@ -747,6 +776,21 @@
       rV.set(v5, 2); rA.set(am, 2); rT.set(T, 2); rN.set(dots, 0);
       dv.set(0, delta * 100, 2); dv.set(1, am, 2); dv.set(2, a, 2); dv.set(3, err, 1);
       dv.tone(3, err < 3 ? "good" : "");
+
+      /* 步驟清單面板：跟著 demo 狀態高亮當前步驟（標準流程的四步） */
+      const steps = ["穿紙帶、掛重物", "先啟動計時器", "再釋放小車", "取帶量點距"];
+      const curStep = dots === 0 ? (t === 0 ? 0 : 1) : (dots >= N ? 3 : 2);
+      const pw = 158, ph = 4 * 24 + 12, px0 = W - pw - 14, py0 = 16;
+      D.rect(ctx, px0, py0, pw, ph, { fill: PL.theme.pale(0.06), stroke: PL.col("border"), width: 1, r: 6 });
+      D.text(ctx, "標準流程", px0 + 10, py0 + 14, { color: PL.col("text-dim"), size: 9.5, weight: "700" });
+      steps.forEach((st, si) => {
+        const sy2 = py0 + 30 + si * 24;
+        const on = si === curStep, done = si < curStep;
+        D.disc(ctx, px0 + 16, sy2 - 4, 8, { fill: on ? PL.col("warn") : done ? PL.col("ok") : PL.theme.pale(0.14) });
+        D.text(ctx, String(si + 1), px0 + 16, sy2 - 1, { color: on || done ? "#04121a" : PL.col("text-dim"), size: 9.5, align: "center", weight: "700" });
+        D.text(ctx, st, px0 + 30, sy2, { color: on ? PL.col("warn") : done ? PL.col("text") : PL.col("text-faint"), size: 10, weight: on ? "700" : "" });
+        if (on) D.text(ctx, "◀", px0 + pw - 16, sy2, { color: PL.col("warn"), size: 10 });
+      });
 
       const prog = Math.min(1, dots / (N + 1));
       if (dots === 0) {
