@@ -1983,6 +1983,17 @@
         const f = byId[currentId];
         if (e.key === "ArrowRight" && FLAT[f.order + 1]) { location.hash = "#" + FLAT[f.order + 1].exp.id; }
         if (e.key === "ArrowLeft" && FLAT[f.order - 1]) { location.hash = "#" + FLAT[f.order - 1].exp.id; }
+        // 空白鍵＝播放／暫停（PhET 慣例）：雙手留在鍵盤上就能推進 demo
+        if (e.key === " " && !e.repeat) {
+          const playBtn = document.querySelector(".sim-transport-play");
+          if (playBtn && !playBtn.hidden) { e.preventDefault(); playBtn.click(); }
+        }
+      }
+      // 「/」聚焦搜尋：從任何地方一鍵找實驗
+      if ((e.key === "/" || (e.key.toLowerCase() === "k" && (e.ctrlKey || e.metaKey))) && !e.repeat) {
+        e.preventDefault();
+        const search = $("#search-input");
+        if (search) { search.focus(); search.select(); }
       }
       if (e.key === "Escape") closeSidebarMobile();
     });
