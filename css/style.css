@@ -1337,6 +1337,26 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   background-size: 32px 32px;
 }
 .worksheet-foot { margin-top: 18px; color: var(--text-faint); font-size: 11px; }
+/* 引人入勝版學習單：任務鉤子、陷阱警告、預測圈選、步驟檢核 */
+.ws-num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: var(--m-color, var(--accent)); color: #fff; font-size: 12.5px; font-weight: 800; margin-right: 9px; flex: none; }
+.ws-mission { border: 1.5px solid var(--m-color, var(--accent)); border-radius: 10px; background: color-mix(in srgb, var(--m-color, var(--accent)) 6%, transparent); padding: 16px 18px !important; }
+.ws-hook { font-size: 14px !important; color: var(--text) !important; font-weight: 600; max-width: none !important; }
+.ws-goals { list-style: none; margin: 12px 0 0; padding: 0; }
+.ws-goals li { padding: 7px 0; color: var(--text-dim); font-size: 13px; display: flex; gap: 9px; align-items: flex-start; }
+.ws-box { flex: none; display: inline-block; width: 14px; height: 14px; border: 1.6px solid var(--text-dim); border-radius: 3px; margin-top: 2px; }
+.ws-trap { border-left: 4px solid #d9534f; background: rgba(217, 83, 79, 0.08); padding: 12px 15px; border-radius: 0 8px 8px 0; }
+.ws-trap p { color: var(--text) !important; font-size: 13px !important; }
+.ws-trap-note { color: var(--text-faint) !important; font-size: 11.5px !important; margin-top: 8px; }
+.ws-predict { margin-top: 10px; }
+.ws-pick { display: flex; gap: 10px; align-items: flex-start; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; margin: 7px 0; color: var(--text-dim); font-size: 13px; cursor: pointer; }
+.ws-pick input { margin-top: 2px; }
+.ws-pick-key { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; border: 1.4px solid var(--text-faint); font-size: 11px; font-weight: 700; }
+.ws-step { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; color: var(--text-dim); font-size: 13px; }
+@media print {
+  .ws-mission { border-color: #333; background: #f4f4f4; }
+  .ws-pick { border-color: #aaa; }
+  .ws-num { background: #333; }
+}
 .worksheet-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border-soft); }
 .worksheet-actions button {
   min-height: 40px; padding: 0 18px; border: 0; border-radius: 8px; cursor: pointer;
