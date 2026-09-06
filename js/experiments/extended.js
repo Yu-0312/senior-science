@@ -121,11 +121,30 @@
     const c = color(), cy = H * 0.52, x0 = 54, x1 = W - 46;
     const pulse = 0.5 + 0.5 * Math.sin(t * 3);
     if (cfg.kind === "vector" || cfg.kind === "force") {
+      /*
+       * 向量／分力：原本三支箭頭飄在半空。改成放在實驗台上：
+       * vector = 力桌上的向量分解（刻度紙＋直角標記）；
+       * force = 繩子以 θ 角拉木塊，水平分力就是讓木塊前進的那一份。
+       */
       const angle = b * Math.PI / 180, length = 42 + (a - cfg.a[1]) / (cfg.a[2] - cfg.a[1]) * Math.min(120, W * 0.26), ox = W * 0.43, oy = H * 0.7;
-      D.line(ctx, x0, oy, x1, oy, "rgba(255,255,255,0.13)", 1); D.line(ctx, ox, 35, ox, H - 40, "rgba(255,255,255,0.13)", 1);
-      D.arrow(ctx, ox, oy, ox + length * Math.cos(angle), oy - length * Math.sin(angle), { color: c, width: 3, label: "A" });
-      D.arrow(ctx, ox, oy, ox + length * Math.cos(angle), oy, { color: PL.col("accent-2"), width: 1.7, label: "x" });
-      D.arrow(ctx, ox + length * Math.cos(angle), oy, ox + length * Math.cos(angle), oy - length * Math.sin(angle), { color: PL.col("warn"), width: 1.7, label: "y" });
+      if (cfg.kind === "vector") {
+        D.rect(ctx, x0 - 8, oy - 132, x1 - x0 + 16, 152, { fill: PL.theme.pale(0.045), stroke: PL.col("border"), width: 1, r: 6 });
+        for (let gx = ox - 120; gx < ox + 160; gx += 30) D.line(ctx, gx, oy - 128, gx, oy + 16, "rgba(255,255,255,0.05)", 1);
+        for (let gy = oy - 120; gy < oy + 16; gy += 30) D.line(ctx, ox - 128, gy, ox + 156, gy, "rgba(255,255,255,0.05)", 1);
+      } else {
+        AP.woodBlock(ctx, ox - 60, oy + 8, 46, 30, 0);
+        D.line(ctx, ox - 34, oy - 6, ox + 10, oy - 6 - Math.sin(angle) * length * 0.55, "rgb(232,226,210)", 2);
+      }
+      D.line(ctx, x0, oy, x1, oy, "rgba(255,255,255,0.16)", 1); D.line(ctx, ox, 35, ox, H - 40, "rgba(255,255,255,0.13)", 1);
+      D.arrow(ctx, ox, oy, ox + length * Math.cos(angle), oy - length * Math.sin(angle), { color: c, width: 3, label: cfg.kind === "vector" ? "A" : "F" });
+      D.arrow(ctx, ox, oy, ox + length * Math.cos(angle), oy, { color: PL.col("accent-2"), width: 1.9, label: cfg.kind === "vector" ? "Aₓ" : "Fₓ" });
+      D.arrow(ctx, ox + length * Math.cos(angle), oy, ox + length * Math.cos(angle), oy - length * Math.sin(angle), { color: PL.col("warn"), width: 1.9, label: "Ay" });
+      ctx.save();
+      ctx.strokeStyle = PL.col("warn"); ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.arc(ox, oy, 34, -angle, 0); ctx.stroke();
+      ctx.restore();
+      D.text(ctx, PL.fmt(b, 0) + "°", ox + 42, oy - 16, { color: PL.col("warn"), size: 10 });
+      AP.valueChip(ctx, ox + length * Math.cos(angle) + 10, oy - length * Math.sin(angle) - 8, PL.fmt(value, 2), "rgba(120,190,255,0.9)");
       fillPill(ctx, 18, 18, "向量實驗", PL.fmt(value, 2), 112, c);
     } else if (["motion", "momentum", "impulse", "rocket", "work", "power", "energy"].includes(cfg.kind)) {
       /* 運動家族：鋼軌＋動力小車（器材層），原本的手繪方塊＋圓點輪全面汰換 */
@@ -308,18 +327,79 @@
       fillPill(ctx, 18, 18, "系統讀值", PL.fmt(value, 2), 118, c);
     } else if (cfg.kind === "wave") {
       /*
-       * 原本振幅寫成 18 + b*2，直接吃第二根滑桿的原始數值。
-       * 對 reflection-boundary 來說第一根才是「脈衝振幅」，所以那根滑桿沒有作用；
-       * 對 air-column-resonance 來說 b 是 100~800 Hz 的頻率，
-       * 算出來的振幅會高達一千多像素，整條波直接畫到畫面外。
-       * 改成依各滑桿自己的範圍正規化：振幅取自第一根，波長取自第二根。
+       * 波動三實驗原本共用一條正弦線，彼此語意完全不同：
+       *   reflection-boundary：脈衝打向牆壁（固定端反相、自由端同相）
+       *   sound-intensity：聲源發出的同心弧，強度隨距離衰減
+       *   air-column-resonance：音叉對空氣柱，駐波腹在管口、節在水面
+       * 改成各自專屬場景，器材語言與其他實驗一致。
        */
-      const nA = (a - cfg.a[1]) / Math.max(1e-9, cfg.a[2] - cfg.a[1]);
-      const nB = (b - cfg.b[1]) / Math.max(1e-9, cfg.b[2] - cfg.b[1]);
-      const xStart = 28, amp = 10 + nA * 34, waveLen = 18 + (1 - nB) * 34, mid = cy;
-      ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2.8; ctx.beginPath();
-      for (let x = xStart; x < W - 24; x += 2) { const y = mid + Math.sin((x - xStart) / waveLen - t * 4) * amp; x === xStart ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
-      D.line(ctx, xStart, mid, W - 24, mid, "rgba(255,255,255,0.14)", 1);
+      if (cfg.id === "reflection-boundary") {
+        const fixed = b > 0.5;
+        const amp = 14 + (a - cfg.a[1]) / Math.max(1e-9, cfg.a[2] - cfg.a[1]) * 40;
+        const wallX = 84, ropeY = cy, segs = 90, speed = 120;
+        const phase = (t * speed) % (W * 1.6);
+        const pulseAt = u => Math.exp(-Math.pow((u - phase) / 60, 2)) * amp;
+        const refl = Math.exp(-Math.pow((2 * wallX - phase) / 60, 2)) * amp * (fixed ? -1 : 1);
+        AP.steel(ctx, wallX - 16, ropeY - 52, 14, 104, -18);
+        D.text(ctx, fixed ? "固定端（牆）" : "自由端（環）", wallX - 8, ropeY - 66, { color: PL.col("text-dim"), size: 10 });
+        ctx.save(); ctx.lineWidth = 2.6;
+        ctx.strokeStyle = c; ctx.beginPath();
+        for (let i = 0; i <= segs; i++) {
+          const x = wallX + (W - wallX - 30) * i / segs;
+          const y = ropeY - pulseAt(x) - refl;
+          i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        }
+        ctx.stroke(); ctx.restore();
+        D.line(ctx, wallX, ropeY, W - 30, ropeY, "rgba(255,255,255,0.10)", 1);
+        D.text(ctx, fixed ? "反射波反相折返（繩端不動）" : "反射波同相折返（繩端自由）",
+          W / 2 + 40, ropeY + 56, { color: c, size: 11, align: "center", weight: "700" });
+      } else if (cfg.id === "sound-intensity") {
+        const r = 30 + (a - cfg.a[1]) / Math.max(1e-9, cfg.a[2] - cfg.a[1]) * (W * 0.52 - 60);
+        const amp = 0.4 + (b - cfg.b[1]) / Math.max(1e-9, cfg.b[2] - cfg.b[1]) * 0.6;
+        const spX = 96, spY = cy;
+        D.rect(ctx, spX - 34, spY - 24, 30, 48, { fill: PL.theme.pale(0.10), stroke: PL.theme.pale(0.3), r: 4 });
+        ctx.beginPath();
+        ctx.moveTo(spX - 4, spY - 14); ctx.lineTo(spX + 10, spY - 26); ctx.lineTo(spX + 10, spY + 26); ctx.lineTo(spX - 4, spY + 14);
+        ctx.closePath(); ctx.fillStyle = c; ctx.fill();
+        for (let k = 1; k * 46 < r + 40; k++) {
+          const rr = Math.min(r + 20, k * 46);
+          ctx.strokeStyle = `rgba(120,200,255,${Math.max(0.06, amp * 0.55 - k * 0.045)})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(spX + 8, spY, rr, -1.05, 1.05); ctx.stroke();
+        }
+        D.disc(ctx, spX + 8 + r, spY, 7, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 9 });
+        D.text(ctx, "探測點 " + PL.fmt(a, 0) + " m", spX + 8 + r, spY + 24, { color: PL.col("text-dim"), size: 10, align: "center" });
+        D.text(ctx, "強度 ∝ 1/r²：距離加倍，強度剩四分之一", W / 2 + 60, H - 34, { color: PL.col("text-faint"), size: 10.5, align: "center" });
+      } else {
+        // air-column-resonance：音叉＋直立水管＋水位，駐波腹在管口
+        const L = a, f = b;
+        const tubeX = W * 0.44, tubeTop = H * 0.18, tubeBot = H * 0.72;
+        const wl = 34300 / f / 2;                       // 半波長（cm）
+        const nodeCount = Math.max(1, Math.floor(L / wl));
+        D.rect(ctx, tubeX - 22, tubeTop, 44, tubeBot - tubeTop, { fill: "rgba(190,224,240,0.14)", stroke: "rgba(206,232,244,0.7)", width: 1.6, r: 8 });
+        D.rect(ctx, tubeX - 19, tubeBot - (tubeBot - tubeTop) * 0.24, 38, (tubeBot - tubeTop) * 0.24, { fill: "rgba(90,150,200,0.4)", r: 4 });
+        D.text(ctx, "水位", tubeX + 28, tubeBot - (tubeBot - tubeTop) * 0.12, { color: PL.col("text-faint"), size: 9.5 });
+        // 駐波：管口為腹（亮）、水面為節
+        ctx.save();
+        for (let k = 0; k <= nodeCount; k++) {
+          const yy = tubeTop + (tubeBot - tubeTop) * (k / Math.max(1, nodeCount));
+          ctx.strokeStyle = k === 0 ? "rgba(255,196,110,0.9)" : "rgba(120,200,255,0.55)";
+          ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          for (let s = 0; s <= 24; s++) {
+            const yy2 = tubeTop + (yy - tubeTop) * s / 24;
+            const dx2 = Math.sin(s / 24 * Math.PI) * 13 * (k % 2 ? -1 : 1) * (0.5 + 0.5 * Math.sin(t * 6));
+            s ? ctx.lineTo(tubeX + dx2, yy2) : ctx.moveTo(tubeX + dx2, yy2);
+          }
+          ctx.stroke();
+        }
+        ctx.restore();
+        // 音叉
+        D.rect(ctx, tubeX - 7, tubeTop - 44, 14, 40, { fill: "rgb(198,164,96)", stroke: "rgba(80,56,20,0.8)", r: 3 });
+        D.text(ctx, PL.fmt(f, 0) + " Hz 音叉", tubeX + 20, tubeTop - 30, { color: PL.col("text-dim"), size: 10 });
+        D.text(ctx, "管長 " + PL.fmt(L, 0) + " cm・波長 " + PL.fmt(wl * 2, 1) + " cm", tubeX + 20, tubeTop - 14, { color: c, size: 10 });
+        D.text(ctx, nodeCount + " 個節：共振時聲音最響", W * 0.72, H - 34, { color: PL.col("text-faint"), size: 10.5, align: "center" });
+      }
       fillPill(ctx, 18, 18, "波動讀值", PL.fmt(value, 2), 118, c);
     } else if (cfg.kind === "optics") {
       const sourceX = 48, lensX = W * 0.5, screenX = W - 70, lensY = cy;
