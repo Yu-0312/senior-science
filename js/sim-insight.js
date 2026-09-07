@@ -805,10 +805,39 @@
     const presets = buildPresets(context, insight);
     if (presets) host.appendChild(presets);
 
-    // 放在任務導讀之後、實驗台之前：先知道要看什麼，再開始操作
+    /*
+     * 桌面版面比例：實驗台是主角，教學鷹架是配角。
+     *
+     * 舊版把整個 host 插在任務導讀之後、實驗台之前，結果在大多數實驗上，
+     * 學生要捲過 530～800px 的預測＋挑戰＋謎題＋因果面板才看得到模擬——
+     * 實驗模型與說明結果的比例整個倒過來了。
+     *
+     * 這裡拆兩半：「先預測」是操作前的承諾，留在實驗台前面；
+     * 其餘（挑戰／謎題／關係摘要／因果／情境預設）移到實驗台與讀數之後，
+     * 學生先看到實驗跑起來，再往下看解說。手機版的 CSS order 已經是這個順序，
+     * 桌面版直接用相同的 DOM 順序，兩邊就一致了。
+     */
+    const stage = context.root.querySelector(".sim-stage");
+    const readoutPanel = context.root.querySelector(".sim-readout-panel");
+    const anchor = readoutPanel || stage;
     const brief = context.root.querySelector(".sim-learning-brief");
-    if (brief && brief.parentNode) brief.parentNode.insertBefore(host, brief.nextSibling);
-    else context.root.appendChild(host);
+    if (anchor && anchor.parentNode) {
+      // 先搬「先預測」到實驗台前，其餘面板搬到實驗台後。
+      // 用陣列複本逐筆插入，不依賴 live HTMLCollection 的 shift 語意。
+      const rest = Array.prototype.slice.call(host.children);
+      host.innerHTML = "";
+      if (predict) {
+        const pi = rest.indexOf(predict);
+        if (pi >= 0) rest.splice(pi, 1);
+        anchor.parentNode.insertBefore(predict, anchor);
+      }
+      const ref = anchor;
+      rest.forEach(node => { ref.parentNode.insertBefore(node, ref.nextSibling); });
+    } else if (brief && brief.parentNode) {
+      brief.parentNode.insertBefore(host, brief.nextSibling);
+    } else {
+      context.root.appendChild(host);
+    }
 
     refineBrief(context, insight);
 
