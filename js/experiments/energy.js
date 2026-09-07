@@ -2,6 +2,7 @@
 (function () {
   "use strict";
   const PL = window.PhysicsLab, D = PL.draw;
+  const AP = () => PL.apparatus || {};
   const MC = () => PL.col("m-color", "#81c784");
   const KEc = "#5aa2ff", PEc = "#81c784", THc = "#ff6b6b";
 
@@ -35,8 +36,10 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const F = sF.get(), th = sTh.get() * Math.PI / 180, m = MC();
       const gy = H - 50, sc = (W - 120) / 16, px = 70 + (x % 16) * sc;
-      D.line(ctx, 20, gy, W - 20, gy, PL.col("text-faint"), 2);
-      D.rect(ctx, px - 22, gy - 30, 44, 30, { fill: m, stroke: "rgba(255,255,255,0.4)", r: 5 });
+      AP().benchTop && AP().benchTop(ctx, W, H, gy + 4);
+      D.line(ctx, 20, gy, W - 20, gy, "rgba(150,140,120,0.55)", 2);
+      AP().cart ? AP().cart(ctx, px, gy, 46, 26)
+                : D.rect(ctx, px - 22, gy - 30, 44, 30, { fill: m, stroke: "rgba(255,255,255,0.4)", r: 5 });
       const fx = F * Math.cos(th), fy = F * Math.sin(th);
       D.arrow(ctx, px, gy - 15, px + fx * 5, gy - 15 - fy * 5, { color: PL.col("accent-2"), width: 2.5, label: "F" });
       D.arrow(ctx, px, gy - 15, px + fx * 5, gy - 15, { color: "#7ee0c0", width: 2, label: "F cosθ", dash: [3, 3] });
@@ -73,8 +76,10 @@
        * 同時也讓「同樣的力推更重的東西，加速度較小」有一個可以先預期的視覺線索。
        */
       const bw = 26 + m * 4, bh = 20 + m * 2.4;
-      D.line(ctx, 20, gy, W - 20, gy, PL.col("text-faint"), 2);
-      D.rect(ctx, px - bw / 2, gy - bh, bw, bh, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 4 });
+      AP().benchTop && AP().benchTop(ctx, W, H, gy + 4);
+      D.line(ctx, 20, gy, W - 20, gy, "rgba(150,140,120,0.55)", 2);
+      AP().cart ? AP().cart(ctx, px, gy, bw + 10, bh)
+                : D.rect(ctx, px - bw / 2, gy - bh, bw, bh, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 4 });
       D.text(ctx, PL.fmt(m, 1) + " kg", px, gy - bh / 2 + 4, { color: "#04121a", size: 10, align: "center", weight: "700" });
       D.arrow(ctx, px + bw / 2, gy - bh / 2, px + bw / 2 + sF.get() * 4, gy - bh / 2, { color: KEc, width: 2.2, label: "F" });
       if (sFr.get() > 0) D.arrow(ctx, px - bw / 2, gy - bh / 2, px - bw / 2 - sFr.get() * 4, gy - bh / 2, { color: THc, width: 2, label: "f" });
@@ -476,11 +481,13 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const k = sK.get(), x0 = sX.get(), m = sM.get(), Hmax = 0.5 * k * x0 * x0 / (m * g);
       const groundY = H - 30, sc = (H - 80) / (Hmax + 0.6), cx = W * 0.34;
-      D.line(ctx, cx - 50, groundY, cx + 50, groundY, PL.col("text-faint"), 2);
+      AP().benchTop && AP().benchTop(ctx, W, H, groundY + 4);
+      D.line(ctx, cx - 60, groundY, cx + 60, groundY, "rgba(150,140,120,0.55)", 2);
       const springTop = groundY - (0.6 - comp) * sc * 0.4 - 40;
       D.spring(ctx, cx, groundY, cx, springTop, 9, 10, MC());
       const by = springTop - 14 - y * sc;
-      D.rect(ctx, cx - 20, by - 20, 40, 20, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 4 });
+      AP().cart ? AP().cart(ctx, cx, by + 20, 46, 22)
+                : D.rect(ctx, cx - 20, by - 20, 40, 20, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 4 });
       // 能量長條
       const spE = 0.5 * k * comp * comp, ke = 0.5 * m * v * v, pe = m * g * y;
       energyBars(cv, W * 0.5, 50, W * 0.42, [{ label: "彈性能", v: spE, c: MC() }, { label: "動能", v: ke, c: KEc }, { label: "重力能", v: pe, c: PEc }], Math.max(spE, 0.5 * k * x0 * x0, 1));
@@ -522,9 +529,22 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const sx = (W - 60) / 20, sy = (H - 60) / 12, PX = p => 30 + p.x * sx, PY = p => H - 30 - p.y * sy;
       const pts = pathPts();
+      AP().benchTop && AP().benchTop(ctx, W, H, H - 26);
+      // 地形填充：路徑以下鋪一層山坡（與路徑同形，落到底部）
+      ctx.save();
+      ctx.beginPath();
+      pts.forEach((p, i) => { const px = PX(p), py = PY(p); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); });
+      ctx.lineTo(PX(pts[pts.length - 1]), H - 26);
+      ctx.lineTo(PX(pts[0]), H - 26);
+      ctx.closePath();
+      const hg = ctx.createLinearGradient(0, 60, 0, H - 26);
+      hg.addColorStop(0, "rgba(150,170,120,0.30)");
+      hg.addColorStop(1, "rgba(110,120,90,0.42)");
+      ctx.fillStyle = hg; ctx.fill();
+      ctx.restore();
       // 高度參考線
-      D.line(ctx, 20, PY(A), W - 20, PY(A), "rgba(255,255,255,0.08)", 1, [3, 3]);
-      D.line(ctx, 20, PY(B), W - 20, PY(B), "rgba(255,255,255,0.08)", 1, [3, 3]);
+      D.line(ctx, 20, PY(A), W - 20, PY(A), "rgba(160,170,190,0.18)", 1, [3, 3]);
+      D.line(ctx, 20, PY(B), W - 20, PY(B), "rgba(160,170,190,0.18)", 1, [3, 3]);
       ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 3; ctx.beginPath();
       pts.forEach((p, i) => { const px = PX(p), py = PY(p); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }); ctx.stroke(); ctx.restore();
       D.disc(ctx, PX(A), PY(A), 6, { fill: PL.col("accent-2") }); D.text(ctx, "A", PX(A) - 14, PY(A) + 4, { color: PL.col("accent-2"), size: 13 });

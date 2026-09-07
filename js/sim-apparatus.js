@@ -1465,9 +1465,128 @@
     ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5); ctx.stroke();
   }
 
+  /* ---------------------------------------------------------------
+     場景：天空（萬有引力、軌道、宇宙學實驗共用）
+     --------------------------------------------------------------- */
+
+  /*
+   * 決定論偽隨機：同一個實驗每次畫出的星空都要一樣，
+   * 否則每幀星星都在跳。種子取自實驗傳入的 salt。
+   */
+  function seeded(seed) {
+    let s = seed | 0 || 1;
+    return function () {
+      s = (s * 1664525 + 1013904223) | 0;
+      return ((s >>> 8) & 0xffffff) / 0xffffff;
+    };
+  }
+
+  /*
+   * 星空：遠景小星星（固定）＋兩層淡星雲霧。
+   * 主題感知：亮色主題下星星轉為深藍點，底色交給 D.bg 之後再疊。
+   */
+  function starfield(ctx, W, H, salt) {
+    const light = document.documentElement.getAttribute("data-theme") === "light";
+    const rnd = seeded(salt || 42);
+    const n = Math.round(W * H / 5200);
+    // 星雲霧：兩大團極淡的色斑，讓背景不是純色
+    const nebA = rnd() * W, nebB = rnd() * W;
+    let g = ctx.createRadialGradient(nebA, H * 0.3, 10, nebA, H * 0.3, H * 0.55);
+    g.addColorStop(0, light ? "rgba(90,130,220,0.055)" : "rgba(120,150,255,0.05)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    g = ctx.createRadialGradient(nebB, H * 0.75, 10, nebB, H * 0.75, H * 0.5);
+    g.addColorStop(0, light ? "rgba(160,110,60,0.045)" : "rgba(200,140,90,0.04)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    for (let i = 0; i < n; i++) {
+      const x = rnd() * W, y = rnd() * H, r = rnd();
+      const rr = r < 0.86 ? 0.7 : r < 0.97 ? 1.1 : 1.7;
+      const a = 0.14 + rnd() * (light ? 0.20 : 0.55);
+      ctx.fillStyle = light
+        ? `rgba(40,70,130,${a})`
+        : (r > 0.9 ? `rgba(255,235,200,${a})` : `rgba(220,230,255,${a})`);
+      ctx.beginPath(); ctx.arc(x, y, rr, 0, TAU); ctx.fill();
+    }
+  }
+
+  /*
+   * 行星：有明暗界線的球體（側光）。r 為半徑，tone 是主色 rgb 陣列。
+   * 畫地球用藍綠色調＋極冠與雲帶；畫其他天體換 tone 即可。
+   */
+  function planet(ctx, cx, cy, r, tone, kind) {
+    const [cr, cg, cb] = tone || [90, 160, 235];
+    const light = document.documentElement.getAttribute("data-theme") === "light";
+    // 本體：側光球
+    const g = ctx.createRadialGradient(cx - r * 0.42, cy - r * 0.45, r * 0.12, cx, cy, r * 1.05);
+    g.addColorStop(0, `rgb(${Math.min(255, cr + 76)},${Math.min(255, cg + 76)},${Math.min(255, cb + 70)})`);
+    g.addColorStop(0.42, `rgb(${cr},${cg},${cb})`);
+    g.addColorStop(0.78, `rgb(${Math.round(cr * 0.45)},${Math.round(cg * 0.48)},${Math.round(cb * 0.55)})`);
+    g.addColorStop(1, `rgb(${Math.round(cr * 0.22)},${Math.round(cg * 0.26)},${Math.round(cb * 0.34)})`);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill();
+    // 大氣輪廓光
+    ctx.strokeStyle = light ? "rgba(60,100,170,0.35)" : `rgba(${cr},${cg},${cb},0.45)`;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.stroke();
+    if (kind === "earth") {
+      // 陸塊：幾塊不規則綠斑（固定種子）
+      const rnd = seeded(7);
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.clip();
+      ctx.fillStyle = `rgba(${light ? "70,140,80,0.5" : "86,160,92,0.55"})`;
+      for (let i = 0; i < 5; i++) {
+        const ax = cx + (rnd() - 0.5) * r * 1.5, ay = cy + (rnd() - 0.5) * r * 1.5, ar = r * (0.22 + rnd() * 0.3);
+        ctx.beginPath();
+        for (let k = 0; k <= 9; k++) {
+          const a = k / 9 * TAU, rad = ar * (0.72 + rnd() * 0.5);
+          const px = ax + Math.cos(a) * rad, py = ay + Math.sin(a) * rad * 0.74;
+          k ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+        }
+        ctx.closePath(); ctx.fill();
+      }
+      // 雲帶
+      ctx.fillStyle = light ? "rgba(255,255,255,0.34)" : "rgba(255,255,255,0.30)";
+      for (let i = 0; i < 4; i++) {
+        const ay = cy - r * 0.7 + (i + rnd()) * r * 0.44;
+        ctx.beginPath(); ctx.ellipse(cx + (rnd() - 0.5) * r, ay, r * (0.5 + rnd() * 0.4), r * 0.1, 0, 0, TAU); ctx.fill();
+      }
+      // 極冠
+      ctx.fillStyle = "rgba(240,250,255,0.8)";
+      ctx.beginPath(); ctx.ellipse(cx, cy - r * 0.94, r * 0.4, r * 0.16, 0, 0, TAU); ctx.fill();
+      ctx.restore();
+      // 晨昏線陰影（右下暗面）：疊一層半透明黑，讓球體真的「立體」
+      const sg = ctx.createRadialGradient(cx - r * 0.5, cy - r * 0.5, r * 0.2, cx, cy, r * 1.02);
+      sg.addColorStop(0, "rgba(0,0,0,0)");
+      sg.addColorStop(0.72, "rgba(0,0,0,0)");
+      sg.addColorStop(1, light ? "rgba(30,50,90,0.35)" : "rgba(0,0,10,0.55)");
+      ctx.fillStyle = sg;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill();
+    }
+  }
+
+  /* 小型衛星體：金屬灰球＋受光面 */
+  function moonBall(ctx, cx, cy, r, tone) {
+    const [cr, cg, cb] = tone || [176, 178, 186];
+    const g = ctx.createRadialGradient(cx - r * 0.4, cy - r * 0.4, r * 0.1, cx, cy, r);
+    g.addColorStop(0, `rgb(${Math.min(255, cr + 60)},${Math.min(255, cg + 60)},${Math.min(255, cb + 56)})`);
+    g.addColorStop(0.6, `rgb(${cr},${cg},${cb})`);
+    g.addColorStop(1, `rgb(${Math.round(cr * 0.4)},${Math.round(cg * 0.42)},${Math.round(cb * 0.5)})`);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill();
+    // 幾個隕石坑
+    const rnd = seeded(Math.round(cx * 7 + r * 13));
+    ctx.fillStyle = "rgba(60,64,74,0.24)";
+    for (let i = 0; i < 3; i++) {
+      const ax = cx + (rnd() - 0.5) * r, ay = cy + (rnd() - 0.5) * r, ar = r * (0.14 + rnd() * 0.16);
+      ctx.beginPath(); ctx.arc(ax, ay, ar, 0, TAU); ctx.fill();
+    }
+  }
+
   window.PhysicsLab.apparatus = {
     steel, brass, brassDisc, contactShadow,
     bench, carrier, benchTop,
+    starfield, planet, moonBall,
     candle, laser,
     lens, screen, projectedFlame, glassPlate, curvedMirror, semiCircleGlass, protractor,
     battery, bulb, meter, wire, resistorBox, fuse,

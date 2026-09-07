@@ -2,6 +2,7 @@
 (function () {
   "use strict";
   const PL = window.PhysicsLab, D = PL.draw, TAU = PL.TAU;
+  const AP = () => PL.apparatus || {};
   const MC = () => PL.col("m-color", "#ffb74d");
   const nmColor = nm => { let r = 0, g = 0, b = 0; if (nm < 440) { r = -(nm - 440) / 60; b = 1; } else if (nm < 490) { g = (nm - 440) / 50; b = 1; } else if (nm < 510) { g = 1; b = -(nm - 510) / 20; } else if (nm < 580) { r = (nm - 510) / 70; g = 1; } else if (nm < 645) { r = 1; g = -(nm - 645) / 65; } else r = 1; return `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`; };
 
@@ -121,13 +122,31 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const m = +sM.get(), v = sV.get(), p = m * v, lamPx = PL.clamp(4000 / p, 8, 220), cy = H / 2;
-      ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 2.2; ctx.beginPath();
-      for (let x = 20; x < W - 20; x += 2) { const u = (x - W / 2) / (W * 0.28); const env = Math.exp(-(u * u)); const y = cy - 34 * env * Math.sin(TAU * (x - 20) / lamPx - t * 6); x === 20 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
-      D.disc(ctx, W / 2, cy, 9, { fill: "#5aa2ff", glow: "#5aa2ff", glowSize: 10 });
+      const waveY = x => { const u = (x - W / 2) / (W * 0.28); const env = Math.exp(-(u * u)); return cy - 34 * env * Math.sin(TAU * (x - 20) / lamPx - t * 6); };
+      // 波包填充：波形以下到中線鋪淡色，讓「波包」有實體感
+      ctx.save(); ctx.beginPath();
+      for (let x = 20; x < W - 20; x += 2) { const y = waveY(x); x === 20 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      ctx.lineTo(W - 20, cy); ctx.lineTo(20, cy); ctx.closePath();
+      const fg = ctx.createLinearGradient(0, cy - 40, 0, cy);
+      fg.addColorStop(0, "rgba(120,200,255,0.22)");
+      fg.addColorStop(1, "rgba(120,200,255,0.02)");
+      ctx.fillStyle = fg; ctx.fill(); ctx.restore();
+      // 外層光暈描邊＋內層主線
+      for (const [w, c] of [[7, "rgba(120,200,255,0.16)"], [2.4, MC()]]) {
+        ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = w; ctx.lineJoin = "round"; ctx.beginPath();
+        for (let x = 20; x < W - 20; x += 2) { const y = waveY(x); x === 20 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+        ctx.stroke(); ctx.restore();
+      }
+      // 粒子本體：有質感的金屬球（電子灰藍／質子磗紅）
+      const proton = m > 1;
+      AP().moonBall ? AP().moonBall(ctx, W / 2, cy, 10, proton ? [214, 122, 110] : [150, 172, 206])
+                    : D.disc(ctx, W / 2, cy, 9, { fill: "#5aa2ff", glow: "#5aa2ff", glowSize: 10 });
       D.arrow(ctx, W / 2, cy, W / 2 + v * 6, cy, { color: "#fff", width: 2, label: "v" });
       // 波長標示
       D.line(ctx, W / 2 - lamPx / 2, cy + 44, W / 2 + lamPx / 2, cy + 44, MC(), 1.5);
-      D.text(ctx, "λ", W / 2, cy + 40, { color: MC(), size: 12, align: "center" });
+      D.line(ctx, W / 2 - lamPx / 2, cy + 38, W / 2 - lamPx / 2, cy + 50, MC(), 1.2);
+      D.line(ctx, W / 2 + lamPx / 2, cy + 38, W / 2 + lamPx / 2, cy + 50, MC(), 1.2);
+      D.text(ctx, "λ = " + PL.fmt(4000 / p, 0) + "（相對）", W / 2, cy + 62, { color: MC(), size: 11, align: "center" });
       rLam.set(4000 / p, 1); rP.set(p, 1);
     }
     const anim = PL.loop(dt => { if (dt) t += dt; draw(); });
@@ -146,23 +165,43 @@
     const rT = PL.ui.readout(L.readouts, { label: "運動時鐘 1 秒 = 靜止", unit: "s" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      AP().starfield && AP().starfield(ctx, W, H, 99);
       const v = sV.get(), gamma = 1 / Math.sqrt(1 - v * v);
+      // 光鐘儀器化：上下「鏡面」（漸層橫條）＋金屬立柱
+      function lightClock(cx0, drift, label, color) {
+        const top = 46, bot = H - 80;
+        D.text(ctx, label, cx0 + drift / 2, top - 14, { color, size: 11, align: "center" });
+        for (const [yy, dir] of [[top, -1], [bot, 1]]) {
+          const mg = ctx.createLinearGradient(cx0 - 24, yy, cx0 + 24 + drift, yy);
+          mg.addColorStop(0, "rgba(150,170,195,0.75)");
+          mg.addColorStop(0.5, "rgba(220,232,246,0.9)");
+          mg.addColorStop(1, "rgba(150,170,195,0.75)");
+          ctx.fillStyle = mg;
+          ctx.fillRect(cx0 - 24, yy - 3, 48 + drift, 6);
+          ctx.strokeStyle = "rgba(90,105,130,0.6)"; ctx.lineWidth = 1;
+          ctx.strokeRect(cx0 - 24, yy - 3, 48 + drift, 6);
+        }
+        // 立柱
+        D.line(ctx, cx0 - 24, top, cx0 - 24, bot, "rgba(140,155,180,0.5)", 2.4);
+        D.line(ctx, cx0 + 24 + drift, top, cx0 + 24 + drift, bot, "rgba(140,155,180,0.5)", 2.4);
+      }
       // 靜止光鐘
       const c1x = W * 0.22, top = 46, bot = H - 80, ph = (t % 1);
-      D.text(ctx, "靜止光鐘", c1x, top - 14, { color: PL.col("accent-2"), size: 11, align: "center" });
-      D.line(ctx, c1x - 24, top, c1x + 24, top, PL.col("text-faint"), 3); D.line(ctx, c1x - 24, bot, c1x + 24, bot, PL.col("text-faint"), 3);
+      lightClock(c1x, 0, "靜止光鐘", PL.col("accent-2"));
       const y1 = ph < 0.5 ? PL.lerp(top, bot, ph * 2) : PL.lerp(bot, top, (ph - 0.5) * 2);
-      D.disc(ctx, c1x, y1, 5, { fill: "#ffe08a", glow: "#ffe08a", glowSize: 8 });
+      // 光子的路徑拖尾
+      ctx.save(); ctx.strokeStyle = "rgba(255,224,138,0.35)"; ctx.lineWidth = 1.6; ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(c1x, top); ctx.lineTo(c1x, bot); ctx.stroke(); ctx.restore();
+      D.disc(ctx, c1x, y1, 5, { fill: "#ffe08a", glow: "#ffe08a", glowSize: 10 });
       // 運動光鐘（光走斜線）
       const c2x = W * 0.62, drift = 90;
-      D.text(ctx, "運動光鐘（v=" + PL.fmt(v, 2) + "c）", c2x + drift / 2, top - 14, { color: MC(), size: 11, align: "center" });
+      lightClock(c2x, drift, "運動光鐘（v=" + PL.fmt(v, 2) + "c）", MC());
       const php = (t / gamma) % 1;
-      const x2 = c2x + php * drift, xr = c2x + (php < 0.5 ? php : (1 - php)) * drift * 2 * 0 + php * drift;
-      D.line(ctx, c2x - 24, top, c2x + 24, top, PL.col("text-faint"), 3); D.line(ctx, c2x - 24 + drift, bot, c2x + 24 + drift, bot, PL.col("text-faint"), 3);
       const y2 = php < 0.5 ? PL.lerp(top, bot, php * 2) : PL.lerp(bot, top, (php - 0.5) * 2);
       const mx = c2x + php * drift;
-      D.disc(ctx, mx, y2, 5, { fill: MC(), glow: MC(), glowSize: 8 });
-      D.line(ctx, c2x, top, mx, y2, "rgba(255,183,77,0.3)", 1, [3, 3]);
+      // 光走斜線的路徑（本 tick 的那一段）
+      D.line(ctx, c2x, top, mx, y2, "rgba(255,183,77,0.4)", 1.4, [3, 3]);
+      D.disc(ctx, mx, y2, 5, { fill: MC(), glow: MC(), glowSize: 10 });
       // γ 曲線
       const bx = 30, by = H - 60, bw = W - 60, bh = 44;
       const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: 1, y0: 1, y1: 7 });

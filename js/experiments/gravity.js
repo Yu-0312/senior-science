@@ -3,6 +3,8 @@
   "use strict";
   const PL = window.PhysicsLab, D = PL.draw, TAU = PL.TAU;
   const MC = () => PL.col("m-color", "#ffd54f");
+  /* 場景層：星空與行星是共用器材，延遲載入後由 PL.apparatus 取用 */
+  const AP = () => PL.apparatus || {};
 
   /* 等速圓周運動 */
   PL.register("circular", { build(root) {
@@ -17,9 +19,10 @@
     const rT = PL.ui.readout(L.readouts, { label: "週期 T", unit: "s" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      AP().starfield && AP().starfield(ctx, W, H, 11);
       const cx = W / 2, cy = H / 2, r = sR.get(), w = sW.get(), R = Math.min(W, H) * 0.34 * (r / 5) + 40;
-      D.ring(ctx, cx, cy, R, "rgba(255,255,255,0.15)", 1.5, [4, 4]);
-      D.disc(ctx, cx, cy, 4, { fill: PL.col("text-faint") });
+      D.ring(ctx, cx, cy, R, "rgba(128,150,190,0.30)", 1.5, [4, 4]);
+      AP().planet && AP().planet(ctx, cx, cy, 13, [255, 200, 92], "star");
       const bx = cx + R * Math.cos(ang), by = cy + R * Math.sin(ang);
       // 半徑
       D.line(ctx, cx, cy, bx, by, "rgba(255,255,255,0.2)", 1.5);
@@ -49,9 +52,10 @@
     const rV = PL.ui.readout(L.readouts, { label: "線速率 v", unit: "m/s" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      AP().starfield && AP().starfield(ctx, W, H, 22);
       const cx = W / 2, cy = H / 2, r = sR.get(), w = sW.get(), R = Math.min(W, H) * 0.3 * (r / 4) + 40;
-      D.ring(ctx, cx, cy, R, "rgba(255,255,255,0.12)", 1.5, [4, 4]);
-      D.disc(ctx, cx, cy, 5, { fill: PL.col("text-faint") });
+      D.ring(ctx, cx, cy, R, "rgba(128,150,190,0.26)", 1.5, [4, 4]);
+      AP().planet && AP().planet(ctx, cx, cy, 15, [120, 190, 235], "earth");
       if (!broken) {
         bx = cx + R * Math.cos(ang); by = cy + R * Math.sin(ang);
         D.line(ctx, cx, cy, bx, by, MC(), 2);
@@ -101,6 +105,7 @@
     const rNote = PL.ui.readout(L.readouts, { label: "距離加倍則" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      AP().starfield && AP().starfield(ctx, W, H, 33);
       const m1 = sM1.get(), m2 = sM2.get(), r = sR.get(), F = m1 * m2 / (r * r);
       const cy = 92, ox = 60, sc = (W - 120) / 10;
       const x1 = ox, x2 = ox + r * sc;
@@ -139,9 +144,10 @@
     reset();
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      AP().starfield && AP().starfield(ctx, W, H, 44);
       const cx = W / 2, cy = H / 2;
       // 星
-      D.disc(ctx, cx, cy, 15, { fill: MC(), glow: MC(), glowSize: 26 });
+      AP().planet && AP().planet(ctx, cx, cy, 16, [255, 204, 92], "star");
       ctx.save(); ctx.strokeStyle = "rgba(255,213,79,0.5)"; ctx.lineWidth = 1.5; ctx.beginPath();
       trail.forEach((t, i) => { const px = cx + t.x, py = cy + t.y; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }); ctx.stroke(); ctx.restore();
       D.disc(ctx, cx + p.x, cy + p.y, 7, { fill: PL.col("accent-2"), glow: PL.col("accent-2"), glowSize: 10 });
@@ -184,10 +190,21 @@
     reset();
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      AP().starfield && AP().starfield(ctx, W, H, 55);
       const cx = W / 2, cy = H / 2;
-      D.disc(ctx, cx, cy, Rp, { fill: "rgba(90,162,255,0.25)", stroke: PL.col("accent-2"), width: 2 });
-      D.disc(ctx, cx, cy, Rp * 0.6, { fill: "rgba(90,162,255,0.15)" });
-      D.text(ctx, "地球", cx, cy + 4, { color: PL.col("accent-2"), size: 12, align: "center" });
+      AP().planet ? AP().planet(ctx, cx, cy, Rp, [86, 156, 232], "earth")
+                  : D.disc(ctx, cx, cy, Rp, { fill: "rgba(90,162,255,0.25)", stroke: PL.col("accent-2"), width: 2 });
+      // 衛星本體：金屬小球＋太陽能板剪影
+      if (state !== "crash") {
+        const sx = cx + p.x, sy = cy + p.y;
+        AP().moonBall && AP().moonBall(ctx, sx, sy, 6);
+        ctx.save(); ctx.translate(sx, sy); ctx.rotate(Math.atan2(v.y, v.x));
+        ctx.fillStyle = "rgba(140,170,210,0.9)";
+        ctx.fillRect(7, -2.4, 9, 4.8);
+        ctx.strokeStyle = "rgba(80,110,150,0.9)"; ctx.lineWidth = 0.8;
+        ctx.strokeRect(7, -2.4, 9, 4.8);
+        ctx.restore();
+      }
       ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 1.5; ctx.beginPath();
       trail.forEach((t, i) => { const px = cx + t.x, py = cy + t.y; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }); ctx.stroke(); ctx.restore();
       if (state !== "crash") { D.disc(ctx, cx + p.x, cy + p.y, 6, { fill: MC(), glow: MC(), glowSize: 10 }); D.arrow(ctx, cx + p.x, cy + p.y, cx + p.x + v.x * 0.2, cy + p.y + v.y * 0.2, { color: "#fff", width: 1.6 }); }
@@ -223,10 +240,11 @@
     const rV = PL.ui.readout(L.readouts, { label: "線速率 v", unit: "m/s" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      AP().starfield && AP().starfield(ctx, W, H, 66);
       const cx = W / 2, cy = H / 2, r = sR.get(), R = 30 + r * 42;
       const w = Lmom / (m * r * r), v = w * r;
-      D.ring(ctx, cx, cy, R, "rgba(255,255,255,0.12)", 1.5, [4, 4]);
-      D.disc(ctx, cx, cy, 6, { fill: PL.col("text-faint") });
+      D.ring(ctx, cx, cy, R, "rgba(128,150,190,0.26)", 1.5, [4, 4]);
+      AP().planet && AP().planet(ctx, cx, cy, 11, [235, 170, 96], "star");
       const bx = cx + R * Math.cos(ang), by = cy + R * Math.sin(ang);
       D.line(ctx, cx, cy, bx, by, MC(), 2);
       D.arrow(ctx, cx, cy, cx + (bx - cx) * 0.4, cy + (by - cy) * 0.4, { color: PL.col("danger"), width: 2, label: "拉力" });
@@ -256,9 +274,21 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.32;
-      D.disc(ctx, cx, cy, R, { fill: "rgba(255,213,79,0.08)", stroke: MC(), width: 2 });
-      for (let k = 0; k < 6; k++) { const a = ang + k * Math.PI / 3; D.line(ctx, cx, cy, cx + R * Math.cos(a), cy + R * Math.sin(a), k === 0 ? MC() : "rgba(255,255,255,0.16)", k === 0 ? 3 : 1.5); }
-      D.disc(ctx, cx + R * Math.cos(ang), cy + R * Math.sin(ang), 7, { fill: MC(), glow: MC(), glowSize: 10 });
+      // 轉盤：金屬質感圓盤（徑向漸層）＋輻條陰影
+      const dg = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
+      dg.addColorStop(0, "rgba(255,225,160,0.30)");
+      dg.addColorStop(0.55, "rgba(214,178,98,0.16)");
+      dg.addColorStop(1, "rgba(120,96,44,0.22)");
+      ctx.fillStyle = dg;
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+      D.disc(ctx, cx, cy, R, { fill: "rgba(255,213,79,0.06)", stroke: MC(), width: 2 });
+      for (let k = 0; k < 6; k++) { const a = ang + k * Math.PI / 3; D.line(ctx, cx, cy, cx + R * Math.cos(a), cy + R * Math.sin(a), k === 0 ? MC() : "rgba(150,140,120,0.30)", k === 0 ? 3 : 1.5); }
+      // 輻端小球有質感
+      for (let k = 0; k < 6; k++) {
+        const a = ang + k * Math.PI / 3;
+        const bxp = cx + R * Math.cos(a), byp = cy + R * Math.sin(a);
+        AP().moonBall && AP().moonBall(ctx, bxp, byp, 5, [222, 184, 96]);
+      }
       D.disc(ctx, cx, cy, 6, { fill: "#fff" });
       ctx.save(); ctx.strokeStyle = PL.col("danger"); ctx.lineWidth = 2.4; ctx.beginPath(); ctx.arc(cx, cy, R + 16, -0.7, 0.7); ctx.stroke(); ctx.restore();
       D.arrow(ctx, cx + (R + 16) * Math.cos(0.7), cy + (R + 16) * Math.sin(0.7), cx + (R + 16) * Math.cos(0.86), cy + (R + 16) * Math.sin(0.86), { color: PL.col("danger"), width: 2.4, label: "τ" });
@@ -288,7 +318,16 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const r = sR.get(), cx = W / 2, cy = H * 0.46, R = Math.min(W, H) * 0.3;
-      D.ring(ctx, cx, cy, R, "rgba(255,255,255,0.12)", 1.5, [4, 4]);
+      // 軌道：雙線金屬環＋支架（比虛線圓更像「繫繞的圓周」）
+      ctx.save();
+      ctx.strokeStyle = "rgba(150,160,180,0.55)"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = "rgba(110,120,140,0.30)"; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(cx, cy, R - 5, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+      // 支柱：從環底兩側斜下到畫面底
+      D.line(ctx, cx - R * 0.5, cy + R * 0.87, cx - R * 0.62, H - 8, "rgba(150,160,180,0.5)", 3);
+      D.line(ctx, cx + R * 0.5, cy + R * 0.87, cx + R * 0.62, H - 8, "rgba(150,160,180,0.5)", 3);
       D.disc(ctx, cx, cy, 4, { fill: PL.col("text-faint") });
       let ballx, bally;
       if (mode === "circle") {

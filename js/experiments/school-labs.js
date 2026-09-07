@@ -545,7 +545,7 @@
     const sT = PL.ui.slider(L.controls, { label: "溫度 T", min: 0, max: 100, step: 5, value: 25, unit: "°C", digits: 0 });
     const row = PL.ui.buttonRow(L.controls);
     PL.ui.button(row, "記錄一筆", () => record(), { primary: true });
-    PL.ui.button(row, "清除資料", () => { metalPanel.clear(); ntcPanel.clear(); refresh(); });
+    PL.ui.button(row, "清除資料", () => { metalPanel.records.length = 0; ntcPanel.records.length = 0; refresh(); });
     PL.ui.note(L.controls,
       "從 0 °C 每 10 °C 記錄一筆到 100 °C。金屬的點會排成直線（電阻隨溫度上升），" +
       "熱敏電阻卻是一條急速下彎的曲線——這正是它能當溫度感測器的原因：同樣溫差下變化大得多。");
