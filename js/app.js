@@ -273,11 +273,11 @@
   }
 
   /* ------------------------------- 主題 ------------------------------- */
-  // 第一次造訪時沿用系統偏好，之後才以使用者的選擇為準。
+  // 第一次造訪預設亮色：實驗室場景是為明亮的實驗檯設計的，深色改成手動選項。
   function preferredTheme() {
     const saved = store.get("pl-theme", null);
     if (saved === "light" || saved === "dark") return saved;
-    return window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    return "light";
   }
 
   /*

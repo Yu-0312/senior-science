@@ -1493,8 +1493,9 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   --warn: #8a5a00;
   --danger: #c62f2f;
   --ok: #0d7a52;
-  /* 實驗台底色不用純白：留一點灰度，飽和色的線條才有東西可以襯 */
-  --sim-bg-1: #f3f7fc; --sim-bg-2: #e9f0f8;
+  /* 實驗台底色不用純白：採暖紙色調，飽和色的線條才有東西可以襯，
+     器材的木紋與金屬色也能融入「明亮的實驗檯」氛圍 */
+  --sim-bg-1: #f8f6f1; --sim-bg-2: #efe9dd;
   --hover: rgba(24, 40, 68, 0.06);
   --shadow: 0 18px 40px -20px rgba(30, 50, 90, 0.28);
 

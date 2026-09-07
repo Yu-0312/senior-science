@@ -14,7 +14,9 @@
       try {
         var saved = JSON.parse(localStorage.getItem("pl-theme"));
         if (saved !== "light" && saved !== "dark") {
-          saved = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+          // 首次造訪預設亮色：實驗室的器材與場景是為明亮的實驗檯設計的，
+          // 深色改成手動選項而不是跟著作業系統走。
+          saved = "light";
         }
         document.documentElement.setAttribute("data-theme", saved);
       } catch (e) {
