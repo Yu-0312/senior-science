@@ -4,7 +4,7 @@
  * 之前的寫法把版本號分別寫死在 index.html 與這份清單裡，兩邊很容易對不起來；
  * 一旦不同步，預先快取的就是永遠不會被請求到的網址，等於白做一次下載。
  */
-const BUILD = "20260908-01";
+const BUILD = "20260908-02";
 const CACHE = "physics-lab-" + BUILD;
 
 const CORE = ["./", "index.html", "licensing.html", "manifest.json"];
@@ -23,6 +23,7 @@ const VERSIONED = [
   "js/sim-tools.js",
   "js/sim-insight.js",
   "js/sim-a11y.js",
+  "js/sim-observe.js",
   "js/teaching-notes.js",
   "js/app.js",
 ];

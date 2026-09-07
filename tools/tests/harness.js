@@ -334,6 +334,7 @@ const CORE_ORDER = [
   "js/sim-tools.js",
   "js/sim-insight.js",
   "js/sim-a11y.js",
+  "js/sim-observe.js",
   "js/teaching-notes.js",
   "js/experiment-manifest.js"
 ];
