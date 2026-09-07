@@ -26,12 +26,17 @@
     reset();
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const AP = PL.apparatus;
       const gy = H - 46, sc = (W - 60) / TR, ox = 30;
-      D.line(ctx, ox, gy, W - 30, gy, PL.col("text-faint"), 2);
+      // 氣墊軌道：兩台力學小車在同一條軌道上對撞，車身寬度隨質量
+      AP.benchTop(ctx, W, H, gy + 10);
+      AP.steel(ctx, ox - 8, gy, W - 44 - ox, 8, -6);
       const w1 = 26 + sm1.get() * 3, w2 = 26 + sm2.get() * 3;
       const p = sm1.get() * v1 + sm2.get() * v2, K = 0.5 * sm1.get() * v1 * v1 + 0.5 * sm2.get() * v2 * v2;
-      D.rect(ctx, ox + x1 * sc - w1 / 2, gy - 30, w1, 30, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 4 }); D.text(ctx, "m₁", ox + x1 * sc, gy - 12, { color: "#04121a", size: 11, align: "center", weight: "700" });
-      D.rect(ctx, ox + x2 * sc - w2 / 2, gy - 30, w2, 30, { fill: CB, stroke: "rgba(255,255,255,0.4)", r: 4 }); D.text(ctx, "m₂", ox + x2 * sc, gy - 12, { color: "#04121a", size: 11, align: "center", weight: "700" });
+      AP.cart(ctx, ox + x1 * sc, gy, w1, 28);
+      D.text(ctx, "m₁", ox + x1 * sc, gy - 34, { color: PL.col("text-dim"), size: 11, align: "center", weight: "700" });
+      AP.cart(ctx, ox + x2 * sc, gy, w2, 28);
+      D.text(ctx, "m₂", ox + x2 * sc, gy - 34, { color: PL.col("text-dim"), size: 11, align: "center", weight: "700" });
       D.arrow(ctx, ox + x1 * sc, gy - 42, ox + x1 * sc + v1 * 6, gy - 42, { color: "#fff", width: 2, label: PL.fmt(v1, 1) });
       D.arrow(ctx, ox + x2 * sc, gy - 42, ox + x2 * sc + v2 * 6, gy - 42, { color: "#fff", width: 2, label: PL.fmt(v2, 1) });
       rP.set(p, 1); rK.set(K, 1);
@@ -222,13 +227,17 @@
     reset();
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const AP = PL.apparatus;
       const gy = H - 46, cx = W / 2;
-      D.line(ctx, 20, gy, W - 20, gy, PL.col("text-faint"), 2);
+      AP.benchTop(ctx, W, H, gy + 10);
+      AP.steel(ctx, 20, gy, W - 40, 8, -6);
       const M = sM1.get(), m = sM2.get();
       if (fired && v2 === 0) { v2 = sE.get(); v1 = -m * v2 / M; }
       const bw = 30 + M * 1.5;
-      D.rect(ctx, cx + x1 * 30 - bw / 2, gy - 30, bw, 30, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 4 }); D.text(ctx, "M", cx + x1 * 30, gy - 12, { color: "#04121a", size: 12, align: "center", weight: "700" });
-      D.disc(ctx, cx + 40 + x2 * 30, gy - 15, 8 + m, { fill: CB, glow: CB, glowSize: 8 });
+      // 砲台是一台小車，反衝時整台往後退；砲彈是金屬球
+      AP.cart(ctx, cx + x1 * 30, gy, bw, 30);
+      D.text(ctx, "M", cx + x1 * 30, gy - 36, { color: PL.col("text-dim"), size: 12, align: "center", weight: "700" });
+      AP.bob(ctx, cx + 40 + x2 * 30, gy - 18, 8 + m);
       /*
        * 「爆炸釋放（砲彈速度）」原本只在按下發射之後才影響畫面。
        * 動量守恆的重點是「兩邊的 mv 大小相等、方向相反」，
@@ -266,7 +275,10 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const px = W * 0.6, py = 40, Lpx = Math.min(H - 110, W * 0.4);
-      D.rect(ctx, px - 40, py - 8, 80, 8, { fill: PL.col("text-faint") });
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, H - 22);
+      AP.standRod(ctx, px - 126, H - 20, py - 26);
+      AP.crossArm(ctx, px - 126, py - 16, px);
       /*
        * 原本木塊固定 44×40、子彈固定半徑 5、而且子彈只在飛行中才畫出來，
        * 於是三根滑桿在按下發射之前對畫面毫無影響。
@@ -279,8 +291,8 @@
       const bw = 30 + M * 8, bh = 26 + M * 5;      // 1kg→38×31，5kg→70×51
       const br = 3 + m * 18;                        // 0.01kg→3.2，0.2kg→6.6
       const bxp = px + Lpx * Math.sin(th), byp = py + Lpx * Math.cos(th);
-      D.line(ctx, px, py, bxp, byp, "#c9d3e0", 2);
-      D.rect(ctx, bxp - bw / 2, byp - bh / 2, bw, bh, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 5 });
+      AP.cord(ctx, px, py, bxp, byp);
+      AP.woodBlock(ctx, bxp, byp + bh / 2, bw, bh, 0);
       D.text(ctx, "M = " + PL.fmt(M, 1) + " kg", bxp, byp + bh / 2 + 14,
         { color: PL.col("text-dim"), size: 10, align: "center" });
 

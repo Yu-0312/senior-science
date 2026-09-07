@@ -85,10 +85,26 @@ ids.forEach(id => {
   try { api = PL.get(id).build(root); } catch (e) { return; }
   if (!api || !api.rerender) { if (api && api.stop) api.stop(); return; }
   try { for (let i = 0; i < 5; i++) api.rerender(); } catch (e) {}   // 暖機
-  const t0 = process.hrtime.bigint();
-  const N = 40;
-  try { for (let i = 0; i < N; i++) api.rerender(); } catch (e) {}
-  const ms = Number(process.hrtime.bigint() - t0) / 1e6 / N;
+  /*
+   * 取三批的中位數，不是單批的平均。
+   *
+   * 由來：loop-track 穩定落在 7.3～7.9 ms，離 8 ms 的上限只剩零點幾毫秒。
+   * 單批平均遇到 CI 機器上的排程雜訊就會偶發超標——同一份程式碼重跑一次就綠，
+   * 於是這支測試開始產生假警報，而假警報看久了會讓人習慣忽略紅燈。
+   *
+   * 解法不是放寬門檻（8 ms 是 20 ms 影格預算裡留給 JS 的那一半，
+   * 剩下要給瀏覽器真正的光柵化，這個比例本身是對的），
+   * 而是讓量測本身不受單次雜訊影響。中位數對偶發的長暫停免疫。
+   */
+  const N = 40, BATCHES = 3;
+  const samples = [];
+  for (let b = 0; b < BATCHES; b++) {
+    const t0 = process.hrtime.bigint();
+    try { for (let i = 0; i < N; i++) api.rerender(); } catch (e) {}
+    samples.push(Number(process.hrtime.bigint() - t0) / 1e6 / N);
+  }
+  samples.sort((x, y) => x - y);
+  const ms = samples[1];
   if (ms > worst.ms) worst = { id, ms };
   if (ms > 8) slow.push(id + " " + ms.toFixed(1) + " ms");
   if (api.stop) api.stop();

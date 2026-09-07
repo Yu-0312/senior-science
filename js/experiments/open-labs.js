@@ -45,35 +45,184 @@
     const { ctx, W, H } = cv, c = accent(), cx = W / 2, cy = H * 0.52, floor = H - 42;
     cv.clear(); D.bg(cv);
     if (config.family === "manometer") {
-      const dh = Math.min(105, out * 2.4), lx = cx - 80, rx = cx + 80;
-      D.line(ctx, lx, 50, lx, floor - 25, c, 5); D.line(ctx, rx, 50, rx, floor - 25, c, 5); D.line(ctx, lx, floor - 25, rx, floor - 25, c, 5);
-      D.line(ctx, lx + 4, floor - 52 - dh / 2, lx + 4, floor - 28, PL.col("accent-2"), 9); D.line(ctx, rx - 4, floor - 52 + dh / 2, rx - 4, floor - 28, PL.col("accent-2"), 9);
-      D.arrow(ctx, lx - 55, 80, lx - 6, 80, { color: PL.col("warn"), width: 2.5, label: "P₁" }); D.arrow(ctx, rx + 55, 80, rx + 6, 80, { color: PL.col("text-dim"), width: 2.5, label: "P₂" });
+      const AP = PL.apparatus;
+      const dh = Math.min(105, out * 2.4), lx = cx - 80, rx = cx + 80, base = floor - 22;
+      AP.benchTop(ctx, W, H, base + 16);
+      // 兩根直管與底部橫管：真的 U 形管，液面差就是要量的東西
+      /* glassTube 的第五個參數是水面的 Y 座標，不是高度差。
+         第一版傳成差值，右管的水就一路灌到畫面頂端。 */
+      AP.glassTube(ctx, lx, 50, base, 22, PL.clamp(floor - 60 - dh / 2, 56, base - 6));
+      AP.glassTube(ctx, rx, 50, base, 22, PL.clamp(floor - 60 + dh / 2, 56, base - 6));
+      ctx.save();
+      const bg = ctx.createLinearGradient(0, base - 22, 0, base);
+      bg.addColorStop(0, "rgba(226,244,252,0.30)"); bg.addColorStop(1, "rgba(196,220,236,0.26)");
+      ctx.fillStyle = bg; ctx.fillRect(lx - 11, base - 22, rx - lx + 22, 22);
+      ctx.fillStyle = "rgba(90,170,206,0.42)"; ctx.fillRect(lx - 9, base - 20, rx - lx + 18, 18);
+      ctx.strokeStyle = "rgba(206,232,244,0.8)"; ctx.lineWidth = 1.4;
+      ctx.strokeRect(lx - 11, base - 22, rx - lx + 22, 22);
+      ctx.restore();
+      D.arrow(ctx, lx - 55, 80, lx - 14, 80, { color: PL.col("warn"), width: 2.5, label: "P₁" });
+      D.arrow(ctx, rx + 55, 80, rx + 14, 80, { color: PL.col("text-dim"), width: 2.5, label: "P₂" });
     } else if (["calorimetry", "conduction"].includes(config.family)) {
       if (config.family === "calorimetry") {
-        [[cx - 105, a, PL.col("warn")], [cx + 105, b, c]].forEach(item => { D.rect(ctx, item[0] - 55, cy - 55, 110, 115, { fill: "rgba(255,255,255,0.07)", stroke: item[2], width: 2, r: 8 }); D.rect(ctx, item[0] - 48, cy + 2, 96, 49, { fill: item[2] + "55", r: 4 }); D.text(ctx, PL.fmt(item[1], 0) + "°C", item[0], cy - 22, { color: item[2], size: 15, align: "center", weight: "700" }); }); D.arrow(ctx, cx - 36, cy, cx + 36, cy, { color: PL.col("danger"), width: 3, label: "熱流" });
-      } else { const x0 = 75, x1 = W - 75; D.rect(ctx, x0, cy - 22, x1 - x0, 44, { fill: "rgba(255,179,87,0.20)", stroke: c, width: 2, r: 5 }); for (let i = 0; i < 11; i++) D.line(ctx, x0 + i * (x1 - x0) / 10, cy - 18, x0 + i * (x1 - x0) / 10, cy + 18, "rgba(255,255,255,0.17)", 1); D.text(ctx, "熱端", x0, cy - 38, { color: PL.col("warn"), size: 11, align: "center" }); D.text(ctx, "冷端", x1, cy - 38, { color: c, size: 11, align: "center" }); D.arrow(ctx, x0 + 40, cy, x1 - 40, cy, { color: PL.col("warn"), width: 3, label: "P" }); }
+        const AP = PL.apparatus;
+        AP.benchTop(ctx, W, H, cy + 64);
+        // 左：加熱過的金屬塊；右：量熱器裡的水。熱從金屬流進水裡
+        AP.weight(ctx, cx - 105, cy - 26, 62, 62, PL.fmt(a, 0) + "°C");
+        D.text(ctx, "金屬塊", cx - 105, cy + 56, { color: PL.col("warn"), size: 10, align: "center" });
+        ctx.save();
+        ctx.fillStyle = "rgba(74,144,196,0.42)";
+        ctx.fillRect(cx + 105 - 46, cy + 2, 92, 52);
+        ctx.restore();
+        AP.beaker(ctx, cx + 105, cy + 60, 104, 112, 0.52);
+        AP.thermometer(ctx, cx + 141, cy - 52, cy + 42, 13, PL.clamp(b / 100, 0, 1));
+        D.text(ctx, PL.fmt(b, 0) + "°C", cx + 92, cy - 26, { color: c, size: 15, align: "center", weight: "700" });
+        D.arrow(ctx, cx - 52, cy - 4, cx + 34, cy - 4, { color: PL.col("danger"), width: 3, label: "熱流" });
+      } else {
+        const AP = PL.apparatus, x0 = 75, x1 = W - 75;
+        AP.benchTop(ctx, W, H, cy + 50);
+        // 銅棒：兩端溫度不同，棒身沿長度做紅→藍的漸層，溫度梯度看得見
+        ctx.save();
+        const rg = ctx.createLinearGradient(x0, 0, x1, 0);
+        rg.addColorStop(0, "rgb(198,96,66)");
+        rg.addColorStop(0.5, "rgb(168,132,96)");
+        rg.addColorStop(1, "rgb(108,132,158)");
+        ctx.fillStyle = rg; ctx.fillRect(x0, cy - 18, x1 - x0, 36);
+        ctx.fillStyle = "rgba(255,255,255,0.20)"; ctx.fillRect(x0, cy - 18, x1 - x0, 5);
+        ctx.strokeStyle = "rgba(30,38,50,0.55)"; ctx.lineWidth = 1;
+        ctx.strokeRect(x0, cy - 18, x1 - x0, 36);
+        ctx.restore();
+        AP.steel(ctx, x0 - 12, cy - 26, 14, 52, 6);
+        AP.steel(ctx, x1 - 2, cy - 26, 14, 52, 6);
+        D.text(ctx, "熱端", x0, cy - 36, { color: PL.col("warn"), size: 11, align: "center" });
+        D.text(ctx, "冷端", x1, cy - 36, { color: c, size: 11, align: "center" });
+        D.arrow(ctx, x0 + 46, cy, x1 - 46, cy, { color: "rgba(255,214,140,0.9)", width: 3, label: "P" });
+      }
     } else if (["seismic", "harmonic", "noise"].includes(config.family)) {
       if (config.family === "seismic") { const sx = 74, sy = floor - 32; D.disc(ctx, sx, sy, 13, { fill: PL.col("danger"), glow: PL.col("danger"), glowSize: 12 }); [0.28, 0.52, 0.78].forEach(f => D.ring(ctx, sx, sy, 32 + time * 18 * f, "rgba(90,162,255,0.25)", 1.4)); D.line(ctx, W - 90, floor - 95, W - 90, floor, c, 3); D.text(ctx, "測站", W - 90, floor + 16, { color: c, size: 10, align: "center" }); }
       else if (config.family === "harmonic") { D.line(ctx, 50, cy, W - 50, cy, "rgba(255,255,255,0.18)", 1); ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 3; ctx.beginPath(); for (let x = 50; x <= W - 50; x += 2) { const y = cy + Math.sin((x - 50) / (W - 100) * Math.PI * 2) * 58 * Math.sin(time * TAU * out / 10); x === 50 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore(); }
       else { D.line(ctx, 42, floor, W - 42, floor, "rgba(255,255,255,0.35)", 3); D.disc(ctx, 94, cy, 20, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 14 }); D.rect(ctx, cx - 12, cy - 80, 24, 160, { fill: "rgba(90,162,255,0.18)", stroke: c, width: 2, r: 3 }); for (let r = 40; r < 230; r += 35) D.ring(ctx, 94, cy, r, "rgba(255,204,102,0.17)", 1); }
     } else if (["lenses", "photometry", "prism"].includes(config.family)) {
-      if (config.family === "lenses") { const x1 = cx - 68, x2 = cx + 68; [x1, x2].forEach((x, i) => { D.line(ctx, x, 52, x, floor - 28, i ? PL.col("accent-2") : c, 4); D.text(ctx, i ? "凹" : "凸", x, 38, { color: i ? PL.col("accent-2") : c, size: 12, align: "center" }); }); D.arrow(ctx, 42, cy, x1 - 8, cy, { color: PL.col("warn"), width: 2.5, label: "光" }); D.arrow(ctx, x2 + 8, cy, W - 40, cy - 28, { color: PL.col("accent-2"), width: 2.5 }); }
-      else if (config.family === "photometry") { D.disc(ctx, cx, cy, 20, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 20 }); for (let r = 35; r < Math.min(W, H) * 0.43; r += 28) D.ring(ctx, cx, cy, r, "rgba(255,204,102,0.24)", 1.4); D.rect(ctx, Math.min(W - 65, cx + a * 18), cy - 46, 8, 92, { fill: c }); }
-      else { const size = 86; ctx.save(); ctx.beginPath(); ctx.moveTo(cx, cy - size); ctx.lineTo(cx - size * 0.88, cy + size * 0.58); ctx.lineTo(cx + size * 0.88, cy + size * 0.58); ctx.closePath(); ctx.fillStyle = "rgba(90,162,255,0.12)"; ctx.fill(); ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.stroke(); ctx.restore(); ["#a855f7", "#3b82f6", "#22c55e", "#facc15", "#ef4444"].forEach((color, i) => D.arrow(ctx, cx + 34, cy - 18 + i * 5, W - 72, cy - 72 + i * 35, { color, width: 2 })); }
+      if (config.family === "lenses") {
+        const AP = PL.apparatus, x1 = cx - 68, x2 = cx + 68, half = Math.min(72, (floor - 90) / 2);
+        AP.benchTop(ctx, W, H, floor + 4);
+        AP.bench(ctx, 46, W - 46, floor - 8, { pxPerCm: (W - 92) / 60, cm0: 0 });
+        [[x1, true, "凸"], [x2, false, "凹"]].forEach(([x, conv, lab]) => {
+          AP.carrier(ctx, x, floor - 8, cy + half);
+          AP.lens(ctx, x, cy, half, conv);
+          D.text(ctx, lab, x, cy - half - 14, { color: conv ? c : PL.col("accent-2"), size: 12, align: "center", weight: "700" });
+        });
+        D.arrow(ctx, 56, cy, x1 - 12, cy, { color: "#ffd77a", width: 2.5, label: "光" });
+        D.arrow(ctx, x2 + 12, cy, W - 54, cy - 28, { color: "#ffd77a", width: 2.5 });
+      }
+      else if (config.family === "photometry") {
+        const AP = PL.apparatus;
+        AP.benchTop(ctx, W, H, floor + 4);
+        AP.bench(ctx, 46, W - 46, floor - 8, { pxPerCm: (W - 92) / 200, cm0: 0 });
+        // 光源：真的燈泡；照度隨距離平方衰減，光屏上的亮度跟著變
+        AP.carrier(ctx, cx - 150, floor - 8, cy + 22);
+        AP.bulb(ctx, cx - 150, cy, 20, 1);
+        for (let r = 34; r < Math.min(W, H) * 0.42; r += 28) {
+          D.ring(ctx, cx - 150, cy, r, "rgba(255,204,102,0.18)", 1.3);
+        }
+        const sx = Math.min(W - 70, cx - 150 + a * 34);
+        AP.carrier(ctx, sx, floor - 8, cy + 48);
+        AP.screen(ctx, sx, cy, 22, 96, sc => {
+          const lux = Math.min(1, out / 400);
+          sc.fillStyle = "rgba(255,226,150," + (0.12 + lux * 0.72) + ")";
+          sc.fillRect(sx - 11, cy - 48, 22, 96);
+        });
+        D.text(ctx, "光屏", sx, cy - 60, { color: PL.col("text-dim"), size: 10, align: "center" });
+      }
+      else {
+        const size = 86;
+        PL.apparatus.benchTop(ctx, W, H, cy + size * 0.58 + 26);
+        // 玻璃稜鏡：折射率高的玻璃體，邊緣有高光
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - size);
+        ctx.lineTo(cx - size * 0.88, cy + size * 0.58);
+        ctx.lineTo(cx + size * 0.88, cy + size * 0.58);
+        ctx.closePath();
+        const pg = ctx.createLinearGradient(cx - size, cy - size, cx + size, cy + size);
+        pg.addColorStop(0.00, "rgba(206,236,246,0.52)");
+        pg.addColorStop(0.42, "rgba(232,248,252,0.30)");
+        pg.addColorStop(1.00, "rgba(168,204,224,0.50)");
+        ctx.fillStyle = pg; ctx.fill();
+        ctx.strokeStyle = "rgba(206,236,248,0.92)"; ctx.lineWidth = 2; ctx.stroke();
+        ctx.strokeStyle = "rgba(255,255,255,0.45)"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(cx - 6, cy - size + 16); ctx.lineTo(cx - size * 0.7, cy + size * 0.46); ctx.stroke();
+        ctx.restore();
+        ["#a855f7", "#3b82f6", "#22c55e", "#facc15", "#ef4444"].forEach((color, i) =>
+          D.arrow(ctx, cx + 34, cy - 18 + i * 5, W - 72, cy - 72 + i * 35, { color, width: 2 }));
+      }
     } else if (["divider", "rc", "electrolysis"].includes(config.family)) {
-      const top = cy - 54, bot = cy + 54, left = 78, right = W - 78; D.line(ctx, left, top, right, top, c, 2.3); D.line(ctx, left, bot, right, bot, c, 2.3); D.line(ctx, left, top, left, bot, c, 2.3); D.line(ctx, right, top, right, bot, c, 2.3);
-      if (config.family === "divider") { D.rect(ctx, cx - 110, top - 9, 74, 18, { fill: "rgba(255,204,102,0.25)", stroke: PL.col("warn"), width: 1, r: 3 }); D.rect(ctx, cx + 35, top - 9, 74, 18, { fill: "rgba(90,162,255,0.22)", stroke: c, width: 1, r: 3 }); D.arrow(ctx, cx + 72, top + 18, cx + 72, bot - 18, { color: PL.col("accent-2"), width: 2, label: "Vout" }); }
-      else if (config.family === "rc") { D.rect(ctx, cx - 118, top - 9, 86, 18, { fill: "rgba(255,204,102,0.25)", stroke: PL.col("warn"), width: 1, r: 3 }); D.line(ctx, cx + 54, top - 28, cx + 54, top + 28, PL.col("accent-2"), 3); D.line(ctx, cx + 72, top - 28, cx + 72, top + 28, PL.col("accent-2"), 3); D.text(ctx, "C", cx + 63, top - 39, { color: PL.col("accent-2"), size: 13, align: "center" }); }
+      const AP = PL.apparatus;
+      const top = cy - 54, bot = cy + 54, left = 78, right = W - 78;
+      AP.benchTop(ctx, W, H, bot + 44);
+      AP.wire(ctx, [{ x: left, y: top }, { x: right, y: top }, { x: right, y: bot },
+                    { x: left, y: bot }, { x: left, y: top }], "rgb(186,54,48)", 3);
+      AP.battery(ctx, left - 15, cy - 26, 30, 52);
+      if (config.family === "divider") {
+        AP.resistorBox(ctx, cx - 73, top, 74, null, false);
+        AP.resistorBox(ctx, cx + 72, top, 74, null, false);
+        D.arrow(ctx, cx + 72, top + 22, cx + 72, bot - 18, { color: PL.col("accent-2"), width: 2, label: "Vout" });
+      }
+      else if (config.family === "rc") {
+        AP.resistorBox(ctx, cx - 75, top, 86, null, false);
+        // 電容器：兩片有厚度的金屬極板
+        AP.steel(ctx, cx + 48, top - 28, 6, 56, 12);
+        AP.steel(ctx, cx + 68, top - 28, 6, 56, -18);
+        D.text(ctx, "C", cx + 61, top - 39, { color: PL.col("accent-2"), size: 13, align: "center" });
+      }
       else { D.rect(ctx, cx - 88, top + 14, 176, bot - top - 28, { fill: "rgba(90,162,255,0.14)", stroke: c, width: 2, r: 5 }); D.line(ctx, cx - 42, top + 18, cx - 42, bot - 18, PL.col("warn"), 3); D.line(ctx, cx + 42, top + 18, cx + 42, bot - 18, PL.col("accent-2"), 3); for (let i = 0; i < 7; i++) D.disc(ctx, cx + 54 + Math.sin(time + i) * 10, top + 26 + i * 11, 2.5, { fill: PL.col("warn") }); }
     } else if (["galvanometer", "cyclotron", "mutual"].includes(config.family)) {
-      if (config.family === "galvanometer") { D.ring(ctx, cx, cy, 92, "rgba(255,255,255,0.42)", 3); const theta = out * Math.PI / 180; D.arrow(ctx, cx, cy, cx + Math.sin(theta) * 70, cy - Math.cos(theta) * 70, { color: PL.col("danger"), width: 4, label: "N" }); }
+      if (config.family === "galvanometer") {
+        const AP = PL.apparatus;
+        AP.benchTop(ctx, W, H, cy + 116);
+        // 正切電流計：直立的圓線圈，中心放一個小羅盤
+        ctx.save();
+        const cg = ctx.createLinearGradient(cx - 100, 0, cx + 100, 0);
+        cg.addColorStop(0, "rgb(140,86,40)"); cg.addColorStop(0.4, "rgb(228,166,94)"); cg.addColorStop(1, "rgb(148,92,42)");
+        ctx.strokeStyle = cg; ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.ellipse(cx, cy, 22, 100, 0, 0, TAU); ctx.stroke();
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.ellipse(cx, cy, 16, 94, 0, 0, TAU); ctx.stroke();
+        ctx.restore();
+        AP.protractor(ctx, cx, cy, 58);
+        const theta = out * Math.PI / 180;
+        ctx.save();
+        ctx.translate(cx, cy); ctx.rotate(theta);
+        AP.barMagnet(ctx, 0, 0, 38, 7);
+        ctx.restore();
+        AP.brassDisc(ctx, cx, cy, 4);
+      }
       else if (config.family === "cyclotron") { const r = 72 + Math.sin(time * 2) * 8; D.ring(ctx, cx, cy, r, c, 2); D.ring(ctx, cx, cy, r * 0.64, PL.col("accent-2"), 2); D.disc(ctx, cx + r, cy, 7, { fill: PL.col("warn") }); D.text(ctx, "B ×", cx, cy + 5, { color: c, size: 15, align: "center" }); }
-      else { [cx - 86, cx + 86].forEach((x, i) => { for (let y = cy - 62; y <= cy + 62; y += 18) D.ring(ctx, x, y, 12, i ? PL.col("accent-2") : c, 2); }); D.arrow(ctx, cx - 35, cy, cx + 35, cy, { color: PL.col("warn"), width: 2.5, label: "Φ" }); }
+      else {
+        const AP = PL.apparatus;
+        AP.benchTop(ctx, W, H, cy + 96);
+        // 兩個繞在同一根鐵芯上的線圈：磁通從原線圈耦合到副線圈
+        AP.steel(ctx, cx - 132, cy - 12, 264, 24, -8);
+        [cx - 86, cx + 86].forEach(x => {
+          ctx.save(); ctx.translate(x, cy); ctx.rotate(Math.PI / 2);
+          AP.coilWinding(ctx, 0, 0, 116, 26, 7, true);
+          ctx.restore();
+        });
+        D.arrow(ctx, cx - 36, cy, cx + 36, cy, { color: PL.col("warn"), width: 2.5, label: "Φ" });
+        D.text(ctx, "原線圈", cx - 86, cy + 82, { color: PL.col("text-faint"), size: 10, align: "center" });
+        D.text(ctx, "副線圈", cx + 86, cy + 82, { color: PL.col("text-faint"), size: 10, align: "center" });
+      }
     } else if (["lagrangian", "barycenter", "phase", "entropy", "fourier", "fresnel", "bode", "biot", "quantum-well"].includes(config.family)) {
       if (config.family === "lagrangian") {
         const theta = a * Math.PI / 180, pivotX = cx, pivotY = 72, length = 110 + b * 55, bobX = pivotX + Math.sin(theta) * length, bobY = pivotY + Math.cos(theta) * length;
-        D.line(ctx, pivotX - 100, pivotY - 24, pivotX + 100, pivotY - 24, "rgba(255,255,255,0.40)", 5); D.disc(ctx, pivotX, pivotY, 7, { fill: PL.col("text-dim") }); D.line(ctx, pivotX, pivotY, bobX, bobY, c, 3); D.disc(ctx, bobX, bobY, 19, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 10 }); D.arrow(ctx, bobX, bobY, bobX - 38 * Math.sin(theta), bobY - 38 * Math.cos(theta), { color: PL.col("danger"), width: 2, label: "mg" }); D.ring(ctx, pivotX, pivotY, length, "rgba(90,162,255,0.14)", 1, [4, 5]);
+        const AP = PL.apparatus;
+        AP.benchTop(ctx, W, H, H - 22);
+        AP.standRod(ctx, pivotX - 122, H - 20, pivotY - 26);
+        AP.crossArm(ctx, pivotX - 122, pivotY - 16, pivotX);
+        D.ring(ctx, pivotX, pivotY, length, PL.theme.pale(0.14), 1, [4, 5]);
+        AP.cord(ctx, pivotX, pivotY, bobX, bobY);
+        AP.bob(ctx, bobX, bobY, 19);
+        D.arrow(ctx, bobX, bobY, bobX - 38 * Math.sin(theta), bobY - 38 * Math.cos(theta), { color: PL.col("danger"), width: 2, label: "mg" });
       } else if (config.family === "barycenter") {
         const span = Math.min(W * 0.64, 95 + b * 62), x1 = cx - span * a / (1 + a), x2 = cx + span / (1 + a), size1 = 22, size2 = Math.max(8, Math.min(34, 14 * Math.cbrt(a)));
         D.line(ctx, cx - span / 2 - 40, cy, cx + span / 2 + 40, cy, "rgba(255,255,255,0.18)", 1, [5, 5]); D.ring(ctx, cx, cy, 11, c, 2); D.text(ctx, "質心", cx, cy - 18, { color: c, size: 11, align: "center" }); D.disc(ctx, x1, cy, size1, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 10 }); D.disc(ctx, x2, cy, size2, { fill: PL.col("accent-2"), glow: PL.col("accent-2"), glowSize: 8 }); D.arrow(ctx, x1, cy + 42, cx, cy + 42, { color: PL.col("warn"), width: 2, label: "r₁" }); D.arrow(ctx, cx, cy + 42, x2, cy + 42, { color: PL.col("accent-2"), width: 2, label: "r₂" });

@@ -73,20 +73,66 @@
       const marker = 58 + (a / 100) * (W - 116); D.line(ctx, marker, cy - 46, marker, cy + 30, PL.col("warn"), 3); D.text(ctx, "原始值", marker, cy - 56, { color: PL.col("warn"), size: 10, align: "center" });
       label(ctx, 20, 18, "尺度換算", PL.fmt(out, 2) + " m", c);
     } else if (config.kind === "sensor") {
-      D.line(ctx, 42, ground, W - 38, ground, "rgba(255,255,255,0.30)", 3);
-      for (let x = 60; x < W - 40; x += 34) D.line(ctx, x, ground, x, ground + 7, "rgba(255,255,255,0.22)", 1);
-      const x = 68 + ((time * out * 34) % Math.max(40, W - 150)); D.rect(ctx, x, ground - 34, 58, 24, { fill: "rgba(90,162,255,0.42)", stroke: c, width: 2, r: 6 }); D.disc(ctx, x + 12, ground - 5, 7, { fill: PL.col("text-dim") }); D.disc(ctx, x + 45, ground - 5, 7, { fill: PL.col("text-dim") });
-      D.ring(ctx, 42, ground - 10, 24 + pulse * 8, "rgba(255,204,102,0.45)", 1); label(ctx, 20, 18, "位置感測", PL.fmt(out, 2) + " m/s", c);
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, ground + 8);
+      AP.steel(ctx, 40, ground, W - 78, 8, -6);
+      for (let x = 60; x < W - 40; x += 34) D.line(ctx, x, ground + 8, x, ground + 14, PL.theme.pale(0.34), 1);
+      const x = 74 + ((time * out * 34) % Math.max(40, W - 170));
+      AP.cart(ctx, x, ground, 62, 26);
+      // 超音波感測器：發射的波前一圈一圈打出去
+      AP.steel(ctx, 26, ground - 40, 26, 40, -14);
+      for (let i = 0; i < 3; i++) {
+        D.ring(ctx, 52, ground - 20, 14 + i * 13 + pulse * 8, "rgba(255,204,102,0.34)", 1.2);
+      }
+      label(ctx, 20, 18, "位置感測", PL.fmt(out, 2) + " m/s", c);
     } else if (config.kind === "reaction") {
       D.rect(ctx, 26, cy - 62, W - 52, 122, { fill: PL.theme.shade(0.48), stroke: PL.theme.pale(0.14), r: 7 });
       for (let x = 38; x < W - 30; x += 42) D.line(ctx, x, cy + 8, x + 20, cy + 8, "rgba(255,255,255,0.55)", 2);
       const carX = 64 + (time * 60 * a / 25) % (W - 170); D.rect(ctx, carX, cy - 12, 76, 26, { fill: "rgba(255,138,101,0.55)", stroke: PL.col("warn"), width: 2, r: 8 }); D.disc(ctx, carX + 17, cy + 18, 8, { fill: "#111827" }); D.disc(ctx, carX + 59, cy + 18, 8, { fill: "#111827" });
       D.line(ctx, Math.min(W - 58, carX + out * 6), cy - 44, Math.min(W - 58, carX + out * 6), cy + 48, c, 2, [5, 4]); label(ctx, 20, 18, "反應距離", PL.fmt(out, 1) + " m", c);
     } else if (config.kind === "lever") {
-      const pivotX = cx, beamY = cy; D.line(ctx, 72, beamY - 20, W - 72, beamY + 20, "rgba(255,204,102,0.82)", 8); D.line(ctx, 72, beamY - 20, W - 72, beamY + 20, "rgba(0,0,0,0.46)", 2);
-      D.rect(ctx, pivotX - 20, beamY + 20, 40, 40, { fill: "rgba(90,162,255,0.28)", stroke: c, width: 2, r: 3 }); D.arrow(ctx, 110, beamY - 72, 110, beamY - 22, { color: c, width: 3, label: "F 施" }); D.rect(ctx, W - 154, beamY - 40, 58, 40, { fill: "rgba(255,138,101,0.40)", stroke: PL.col("warn"), width: 2, r: 4 }); D.text(ctx, "負載", W - 125, beamY - 15, { color: "#fff", size: 10, align: "center" }); label(ctx, 20, 18, "槓桿平衡", PL.fmt(out, 0) + " N", c);
+      const AP = PL.apparatus, pivotX = cx, beamY = cy;
+      AP.benchTop(ctx, W, H, beamY + 62);
+      // 金屬槓桿：兩端高低差來自傾斜，桿身用漸層畫出圓桿的亮暗面
+      ctx.save();
+      const bg = ctx.createLinearGradient(0, beamY - 24, 0, beamY + 24);
+      bg.addColorStop(0, "rgb(206,214,226)"); bg.addColorStop(0.45, "rgb(140,150,166)"); bg.addColorStop(1, "rgb(80,88,102)");
+      ctx.strokeStyle = bg; ctx.lineWidth = 8; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(72, beamY - 20); ctx.lineTo(W - 72, beamY + 20); ctx.stroke();
+      ctx.restore();
+      // 三角刀口支點
+      AP.contactShadow(ctx, pivotX, beamY + 62, 44);
+      ctx.save();
+      const kg = ctx.createLinearGradient(0, beamY, 0, beamY + 58);
+      kg.addColorStop(0, "rgb(160,170,186)"); kg.addColorStop(0.5, "rgb(104,113,128)"); kg.addColorStop(1, "rgb(58,64,76)");
+      ctx.fillStyle = kg;
+      ctx.beginPath(); ctx.moveTo(pivotX, beamY + 4); ctx.lineTo(pivotX + 26, beamY + 58); ctx.lineTo(pivotX - 26, beamY + 58);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(30,38,50,0.6)"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.restore();
+      AP.steel(ctx, pivotX - 38, beamY + 56, 76, 7, 6);
+      D.arrow(ctx, 110, beamY - 72, 110, beamY - 26, { color: c, width: 3, label: "F 施" });
+      AP.weight(ctx, W - 125, beamY + 22, 56, 40, "負載");
+      label(ctx, 20, 18, "槓桿平衡", PL.fmt(out, 0) + " N", c);
     } else if (config.kind === "pulley") {
-      const px = cx, top = 76, loadY = cy + 44; D.ring(ctx, px, top, 34, "rgba(255,255,255,0.55)", 5); D.line(ctx, px - 34, top, px - 90, top, c, 3); D.line(ctx, px - 90, top, px - 90, loadY, c, 3); D.line(ctx, px + 34, top, px + 90, top, c, 3); D.line(ctx, px + 90, top, px + 90, loadY, c, 3); D.rect(ctx, px - 55, loadY, 110, 46, { fill: "rgba(255,138,101,0.38)", stroke: PL.col("warn"), width: 2, r: 4 }); D.arrow(ctx, px + 90, loadY + 20, px + 90, loadY - 38, { color: c, width: 3, label: "F" }); label(ctx, 20, 18, "滑輪組", PL.fmt(out, 0) + " N", c);
+      const AP = PL.apparatus, px = cx, top = 84, loadY = cy + 44;
+      AP.benchTop(ctx, W, H, loadY + 62);
+      // 上方橫樑：滑輪要吊在什麼東西上，學生才知道力最後傳到哪裡
+      AP.steel(ctx, px - 130, top - 40, 260, 9, 4);
+      AP.cord(ctx, px, top - 31, px, top - 14);
+      AP.pulley(ctx, px, top, 26);
+      // 支撐繩段：段數就是滑桿 b，越多段越省力
+      const segs = Math.max(1, Math.round(b));
+      for (let i = 0; i < segs; i++) {
+        const sx = px - 46 + i * (92 / Math.max(1, segs - 1 || 1));
+        AP.cord(ctx, sx, top + 20, sx, loadY);
+      }
+      AP.cord(ctx, px + 26, top, px + 96, top);
+      AP.cord(ctx, px + 96, top, px + 96, loadY + 10);
+      AP.weight(ctx, px, loadY, 110, 46, null);
+      D.arrow(ctx, px + 96, loadY + 12, px + 96, loadY - 40, { color: c, width: 3, label: "F" });
+      D.text(ctx, segs + " 段支撐繩", px, top - 50, { color: PL.col("text-faint"), size: 10, align: "center" });
+      label(ctx, 20, 18, "滑輪組", PL.fmt(out, 0) + " N", c);
     } else if (config.kind === "pressure") {
       D.rect(ctx, cx - 110, cy + 35, 220, 28, { fill: "rgba(90,162,255,0.22)", stroke: c, width: 2, r: 4 }); D.rect(ctx, cx - 52, cy - 48, 104, 70, { fill: "rgba(255,179,87,0.28)", stroke: PL.col("warn"), width: 2, r: 5 });
       for (let x = cx - 42; x <= cx + 42; x += 21) D.arrow(ctx, x, cy - 82, x, cy - 52, { color: PL.col("danger"), width: 2, label: x === cx ? "F" : "" });
@@ -111,15 +157,62 @@
       else { D.disc(ctx, cx, cy, 24 + a * 5, { fill: "rgba(255,179,87,0.38)", stroke: PL.col("warn"), width: 2, glow: PL.col("warn"), glowSize: 14 }); for (let r = 54; r < Math.min(W, H) * 0.45; r += 30) D.ring(ctx, cx, cy, r, "rgba(90,162,255,0.24)", 1.2); for (let angle = 0; angle < TAU; angle += TAU / 10) D.arrow(ctx, cx + Math.cos(angle) * 150, cy + Math.sin(angle) * 90, cx + Math.cos(angle) * 80, cy + Math.sin(angle) * 48, { color: c, width: 1.4 }); }
       label(ctx, 20, 18, config.kind === "cavendish" ? "扭秤偏轉" : config.kind === "planet" ? "星球重量" : "引力場", PL.fmt(out, 2) + " " + config.unit, c);
     } else if (["pendulum", "torsion", "phase"].includes(config.kind)) {
-      if (config.kind === "pendulum") { const px = cx, py = 44, length = Math.min(155, 75 + b * 80), angle = Math.sin(time * TAU / Math.max(0.4, out)) * 0.55; const bx = px + Math.sin(angle) * length, by = py + Math.cos(angle) * length; D.line(ctx, px, py, bx, by, "rgba(255,255,255,0.70)", 3); D.disc(ctx, bx, by, 22, { fill: c, glow: c, glowSize: 12 }); D.ring(ctx, px, py, 8, PL.col("warn"), 2); }
-      else if (config.kind === "torsion") { D.line(ctx, cx, 28, cx, cy - 42, "rgba(255,255,255,0.62)", 2); D.disc(ctx, cx, cy, 50, { fill: "rgba(90,162,255,0.16)", stroke: c, width: 2 }); D.line(ctx, cx - 38, cy + Math.sin(time * TAU / Math.max(0.3, out)) * 26, cx + 38, cy - Math.sin(time * TAU / Math.max(0.3, out)) * 26, PL.col("warn"), 4); }
+      if (config.kind === "pendulum") {
+        const AP = PL.apparatus, px = cx, py = 56;
+        const length = Math.min(150, 70 + b * 80), angle = Math.sin(time * TAU / Math.max(0.4, out)) * 0.55;
+        const bx = px + Math.sin(angle) * length, by = py + Math.cos(angle) * length;
+        AP.benchTop(ctx, W, H, H - 22);
+        AP.standRod(ctx, px - 122, H - 20, py - 26);
+        AP.crossArm(ctx, px - 122, py - 16, px);
+        AP.cord(ctx, px, py, bx, by);
+        AP.bob(ctx, bx, by, 22);
+      }
+      else if (config.kind === "torsion") {
+        const AP = PL.apparatus;
+        AP.benchTop(ctx, W, H, cy + 92);
+        AP.steel(ctx, cx - 90, 30, 180, 8, 4);          // 上方固定架
+        AP.cord(ctx, cx, 38, cx, cy - 46);              // 扭絲
+        // 轉動的圓盤：金屬盤 + 一條標記線，才看得出它在轉
+        ctx.save();
+        const dg = ctx.createRadialGradient(cx - 18, cy - 20, 6, cx, cy, 50);
+        dg.addColorStop(0, "rgb(198,207,219)"); dg.addColorStop(0.7, "rgb(128,138,153)"); dg.addColorStop(1, "rgb(72,80,94)");
+        ctx.fillStyle = dg;
+        ctx.beginPath(); ctx.arc(cx, cy, 50, 0, TAU); ctx.fill();
+        ctx.strokeStyle = "rgba(30,38,50,0.65)"; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.arc(cx, cy, 50, 0, TAU); ctx.stroke();
+        ctx.restore();
+        const tw = Math.sin(time * TAU / Math.max(0.3, out)) * 26;
+        D.line(ctx, cx - 38, cy + tw, cx + 38, cy - tw, PL.col("warn"), 4);
+        AP.brassDisc(ctx, cx, cy, 8);
+      }
       else { D.rect(ctx, 52, 36, W - 104, H - 88, { fill: "rgba(0,0,0,0.20)", stroke: "rgba(255,255,255,0.16)", r: 6 }); ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2.5; ctx.beginPath(); for (let x = 58; x < W - 58; x += 2) { const y = cy + Math.sin((x - 58) * 0.045 + time * a) * 50; x === 58 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.strokeStyle = PL.col("warn"); ctx.beginPath(); for (let x = 58; x < W - 58; x += 2) { const y = cy + Math.sin((x - 58) * 0.045 + time * b) * 30; x === 58 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore(); }
       label(ctx, 20, 18, "振動量測", PL.fmt(out, 2) + " " + config.unit, c);
     } else if (["density", "atmosphere", "surface", "calorimetry", "greenhouse"].includes(config.kind)) {
-      if (config.kind === "density") { D.rect(ctx, cx - 120, 42, 240, ground - 42, { fill: "rgba(90,162,255,0.16)", stroke: c, width: 2, r: 7 }); D.line(ctx, cx - 114, cy + 24, cx + 114, cy + 24, "rgba(90,162,255,0.62)", 2); const y = out < 1 ? 90 : out > 1 ? ground - 105 : cy; D.rect(ctx, cx - 38, y, 76, 54, { fill: "rgba(255,179,87,0.46)", stroke: PL.col("warn"), width: 2, r: 6 }); }
+      if (config.kind === "density") {
+        const AP = PL.apparatus;
+        AP.benchTop(ctx, W, H, ground - 2);
+        AP.beaker(ctx, cx, ground, 240, ground - 42, 0.72);
+        const y = out < 1 ? 96 : out > 1 ? ground - 105 : cy;
+        AP.woodBlock(ctx, cx, y + 54, 76, 54, 0);
+      }
       else if (config.kind === "atmosphere") { D.ring(ctx, cx - 70, cy, 62, "rgba(255,255,255,0.62)", 5); D.ring(ctx, cx + 70, cy, 62, "rgba(255,255,255,0.62)", 5); D.line(ctx, cx - 8, cy, cx + 8, cy, c, 4); D.arrow(ctx, cx - 135, cy, cx - 90, cy, { color: PL.col("warn"), width: 3, label: "Pₐ" }); D.arrow(ctx, cx + 135, cy, cx + 90, cy, { color: PL.col("warn"), width: 3 }); }
       else if (config.kind === "surface") { D.rect(ctx, cx - 120, cy - 8, 240, 118, { fill: "rgba(90,162,255,0.14)", stroke: c, width: 2, r: 5 }); D.line(ctx, cx - 118, cy - 8, cx + 118, cy - 8, "rgba(90,162,255,0.74)", 2); [cx - 60, cx, cx + 60].forEach((x, i) => { const rise = Math.min(72, 8 + out * (i === 1 ? 1.4 : 0.7)); D.rect(ctx, x - 7, cy - 92, 14, 84, { fill: "rgba(255,255,255,0.13)", stroke: "rgba(255,255,255,0.48)", width: 1, r: 2 }); D.line(ctx, x - 5, cy - 8 - rise, x + 5, cy - 8 - rise, PL.col("warn"), 2); }); }
-      else if (config.kind === "calorimetry") { [[cx - 100, a, PL.col("danger")], [cx + 100, b, c]].forEach(item => { D.rect(ctx, item[0] - 58, cy - 64, 116, 126, { fill: "rgba(255,255,255,0.08)", stroke: item[2], width: 2, r: 8 }); D.rect(ctx, item[0] - 51, cy + 6, 102, 49, { fill: item[2] + "55", r: 4 }); D.text(ctx, PL.fmt(item[1], 0) + "°C", item[0], cy - 24, { color: item[2], size: 15, align: "center", weight: "700" }); }); D.arrow(ctx, cx - 28, cy, cx + 28, cy, { color: PL.col("warn"), width: 3, label: "熱流" }); }
+      else if (config.kind === "calorimetry") {
+        const AP = PL.apparatus;
+        AP.benchTop(ctx, W, H, cy + 66);
+        [[cx - 104, a, "rgba(214,86,74,"], [cx + 104, b, "rgba(74,144,196,"]].forEach(item => {
+          // 水色隨溫度：熱的偏紅、冷的偏藍，杯子本身是玻璃
+          ctx.save();
+          ctx.fillStyle = item[2] + "0.42)";
+          ctx.fillRect(item[0] - 50, cy + 4, 100, 56);
+          ctx.restore();
+          AP.beaker(ctx, item[0], cy + 62, 108, 116, 0.55);
+          AP.thermometer(ctx, item[0] + 34, cy - 56, cy + 44, 13, PL.clamp(item[1] / 100, 0, 1));
+          D.text(ctx, PL.fmt(item[1], 0) + "°C", item[0] - 12, cy - 30,
+            { color: item[1] > 50 ? PL.col("danger") : c, size: 15, align: "center", weight: "700" });
+        });
+        D.arrow(ctx, cx - 30, cy - 10, cx + 30, cy - 10, { color: PL.col("warn"), width: 3, label: "熱流" });
+      }
       else { D.rect(ctx, cx - 138, 48, 276, ground - 88, { fill: "rgba(90,162,255,0.09)", stroke: c, width: 2, r: 90 }); D.disc(ctx, cx, ground - 95, 44, { fill: "rgba(90,162,255,0.38)", stroke: c, width: 2, glow: c, glowSize: 14 }); for (let i = 0; i < 7; i++) D.arrow(ctx, cx - 95 + i * 31, 76, cx - 55 + i * 24, ground - 142, { color: PL.col("warn"), width: 1.5 }); for (let i = 0; i < 5; i++) D.arrow(ctx, cx - 50 + i * 26, ground - 130, cx - 40 + i * 22, 72, { color: PL.col("danger"), width: 1.5 }); }
       label(ctx, 20, 18, "熱流 / 流體", PL.fmt(out, 2) + " " + config.unit, c);
     } else if (["string", "sound", "echo", "seismic"].includes(config.kind)) {
@@ -155,14 +248,85 @@
       label(ctx, 20, 18, "光學量測", PL.fmt(out, 2) + " " + config.unit, c);
     } else if (["induction", "heating", "house", "rlc"].includes(config.kind)) {
       if (config.kind === "induction") { D.rect(ctx, cx - 18, 48, 36, 126, { fill: "rgba(255,179,87,0.36)", stroke: PL.col("warn"), width: 2, r: 5 }); D.line(ctx, cx, 174, cx, cy - 18, "rgba(255,255,255,0.55)", 2); D.line(ctx, cx, cy - 18, cx - 48 - out, cy + 74, c, 2); D.line(ctx, cx, cy - 18, cx + 48 + out, cy + 74, c, 2); D.disc(ctx, cx - 104, cy, 24, { fill: "rgba(255,138,101,0.42)", stroke: PL.col("danger"), width: 2, glow: PL.col("danger"), glowSize: 10 }); D.text(ctx, "+", cx - 104, cy + 5, { color: "#fff", size: 15, align: "center" }); }
-      else if (config.kind === "heating") { D.line(ctx, 70, cy, W - 76, cy, c, 2.5); D.line(ctx, 70, cy, 70, cy + 84, c, 2.5); D.line(ctx, 70, cy + 84, W - 76, cy + 84, c, 2.5); D.line(ctx, W - 76, cy + 84, W - 76, cy, c, 2.5); D.ring(ctx, cx, cy, 40, PL.col("warn"), 5); for (let i = 0; i < 7; i++) D.line(ctx, cx - 24 + i * 8, cy - 20, cx - 18 + i * 8, cy + 20, PL.col("warn"), 2); for (let i = 0; i < 5; i++) D.arrow(ctx, cx - 26 + i * 13, cy - 55, cx - 15 + i * 13, cy - 88 - pulse * 10, { color: PL.col("danger"), width: 1.5 }); }
+      else if (config.kind === "heating") {
+        const AP = PL.apparatus;
+        AP.benchTop(ctx, W, H, cy + 108);
+        AP.wire(ctx, [{ x: 70, y: cy }, { x: 70, y: cy + 84 }, { x: W - 76, y: cy + 84 },
+                      { x: W - 76, y: cy }, { x: 70, y: cy }], "rgb(186,54,48)", 3.2);
+        AP.battery(ctx, 54, cy + 26, 32, 32);
+        AP.resistorBox(ctx, cx, cy, 96, null, false);
+        // 上升的熱氣：功率越大冒得越高
+        for (let i = 0; i < 5; i++) {
+          D.arrow(ctx, cx - 26 + i * 13, cy - 26, cx - 15 + i * 13, cy - 58 - pulse * 12,
+            { color: "rgba(226,110,86,0.65)", width: 1.5 });
+        }
+      }
       else if (config.kind === "house") { const rows = [[cx - 110, "照明"], [cx, "插座"], [cx + 110, "電器"]]; D.line(ctx, 52, cy - 60, W - 52, cy - 60, c, 3); D.line(ctx, 52, cy + 72, W - 52, cy + 72, c, 3); rows.forEach(item => { D.line(ctx, item[0], cy - 60, item[0], cy + 72, c, 2); D.rect(ctx, item[0] - 33, cy - 10, 66, 44, { fill: "rgba(255,255,255,0.10)", stroke: item[0] === cx ? PL.col("warn") : c, width: 1.5, r: 5 }); D.text(ctx, item[1], item[0], cy + 16, { color: "#fff", size: 10, align: "center" }); }); }
       else { D.line(ctx, 70, cy, W - 70, cy, c, 2.5); D.line(ctx, 70, cy, 70, cy + 84, c, 2.5); D.line(ctx, 70, cy + 84, W - 70, cy + 84, c, 2.5); D.line(ctx, W - 70, cy + 84, W - 70, cy, c, 2.5); D.spring(ctx, 160, cy, 278, cy, 7, 10, PL.col("accent-3")); D.ring(ctx, cx, cy, 22, PL.col("warn"), 3); D.text(ctx, "C", cx, cy + 5, { color: PL.col("warn"), size: 14, align: "center", weight: "700" }); D.rect(ctx, W - 190, cy - 18, 48, 36, { fill: "rgba(255,138,101,0.26)", stroke: PL.col("danger"), width: 2, r: 3 }); D.text(ctx, "R", W - 166, cy + 5, { color: "#fff", size: 13, align: "center" }); }
       label(ctx, 20, 18, "電路讀值", PL.fmt(out, 2) + " " + config.unit, c);
     } else if (["compass", "electromagnet", "motor"].includes(config.kind)) {
-      if (config.kind === "compass") { D.ring(ctx, cx, cy, 88, "rgba(255,255,255,0.48)", 3); for (let i = 0; i < 4; i++) D.text(ctx, ["N", "E", "S", "W"][i], cx + Math.sin(i * TAU / 4) * 73, cy - Math.cos(i * TAU / 4) * 73 + 4, { color: PL.col("text-dim"), size: 11, align: "center" }); const angle = rad(out); D.arrow(ctx, cx, cy, cx + Math.sin(angle) * 66, cy - Math.cos(angle) * 66, { color: PL.col("danger"), width: 4, label: "N" }); }
-      else if (config.kind === "electromagnet") { D.rect(ctx, cx - 110, cy - 42, 220, 84, { fill: "rgba(90,162,255,0.16)", stroke: c, width: 2, r: 9 }); for (let x = cx - 86; x <= cx + 86; x += 22) D.ring(ctx, x, cy, 28, PL.col("warn"), 3); D.text(ctx, "S", cx - 132, cy + 5, { color: PL.col("accent-2"), size: 16, align: "center", weight: "700" }); D.text(ctx, "N", cx + 132, cy + 5, { color: PL.col("danger"), size: 16, align: "center", weight: "700" }); for (let r = 45; r < 110; r += 18) D.ring(ctx, cx, cy, r, "rgba(185,139,255,0.18)", 1); }
-      else { D.ring(ctx, cx, cy, 86, "rgba(255,255,255,0.50)", 5); D.line(ctx, cx, ground, cx, cy + 86, "rgba(255,255,255,0.45)", 5); for (let i = 0; i < 3; i++) { const angle = time * (out / 100) + i * TAU / 3; D.line(ctx, cx, cy, cx + Math.cos(angle) * 72, cy + Math.sin(angle) * 72, c, 7); } D.rect(ctx, cx - 34, cy - 30, 68, 60, { fill: "rgba(255,179,87,0.22)", stroke: PL.col("warn"), width: 2, r: 5 }); }
+      if (config.kind === "compass") {
+        const AP = PL.apparatus;
+        AP.benchTop(ctx, W, H, cy + 108);
+        // 羅盤：白色錶面 + 刻度環，磁針是紅藍兩段的實體針
+        AP.protractor(ctx, cx, cy, 88);
+        for (let i = 0; i < 4; i++) {
+          D.text(ctx, ["N", "E", "S", "W"][i], cx + Math.sin(i * TAU / 4) * 62,
+            cy - Math.cos(i * TAU / 4) * 62 + 4, { color: "#28303c", size: 12, align: "center", weight: "700" });
+        }
+        const angle = rad(out);
+        ctx.save();
+        ctx.translate(cx, cy); ctx.rotate(angle);
+        AP.barMagnet(ctx, 0, 0, 58, 9);
+        ctx.restore();
+        AP.brassDisc(ctx, cx, cy, 5);
+        D.text(ctx, "磁針", cx, cy + 106, { color: PL.col("text-faint"), size: 10, align: "center" });
+      }
+      else if (config.kind === "electromagnet") {
+        const AP = PL.apparatus;
+        AP.benchTop(ctx, W, H, cy + 84);
+        // 鐵芯：一根圓柱，兩端露出來當磁極
+        AP.steel(ctx, cx - 126, cy - 14, 252, 28, -8);
+        // 繞在鐵芯上的銅線，匝數隨滑桿 a 增加而變密
+        const turns = PL.clamp(Math.round(a / 40), 4, 18);
+        AP.coilWinding(ctx, cx, cy, 172, 30, turns, true);
+        D.text(ctx, "S", cx - 142, cy + 5, { color: PL.col("accent-2"), size: 16, align: "center", weight: "700" });
+        D.text(ctx, "N", cx + 142, cy + 5, { color: PL.col("danger"), size: 16, align: "center", weight: "700" });
+        // 磁力線密度隨磁場強度
+        const rings = PL.clamp(Math.round(2 + out / 8), 2, 6);
+        for (let i = 1; i <= rings; i++) D.ring(ctx, cx, cy, 44 + i * 15, "rgba(185,139,255,0.20)", 1);
+        // 電源
+        AP.battery(ctx, cx - 20, cy + 58, 40, 26);
+        AP.wire(ctx, [{ x: cx - 40, y: cy + 30 }, { x: cx - 40, y: cy + 70 }, { x: cx - 20, y: cy + 70 }], "rgb(186,54,48)", 2.6);
+        AP.wire(ctx, [{ x: cx + 40, y: cy + 30 }, { x: cx + 40, y: cy + 70 }, { x: cx + 20, y: cy + 70 }], "rgb(58,96,168)", 2.6);
+      }
+      else {
+        const AP = PL.apparatus;
+        AP.benchTop(ctx, W, H, cy + 106);
+        // 定子磁極：轉子夾在 N、S 兩極之間，力矩從哪來看得出來
+        AP.polePiece(ctx, cx - 122, cy - 52, 26, 104, true);
+        AP.polePiece(ctx, cx + 96, cy - 52, 26, 104, false);
+        D.text(ctx, "N", cx - 109, cy + 5, { color: "#fff", size: 13, align: "center", weight: "700" });
+        D.text(ctx, "S", cx + 109, cy + 5, { color: "#fff", size: 13, align: "center", weight: "700" });
+        // 轉子：三段銅線繞組隨轉速旋轉
+        for (let i = 0; i < 3; i++) {
+          const angle = time * (out / 100) + i * TAU / 3;
+          ctx.save();
+          const wg = ctx.createLinearGradient(cx - 72, 0, cx + 72, 0);
+          wg.addColorStop(0, "rgb(140,86,40)"); wg.addColorStop(0.4, "rgb(230,168,94)"); wg.addColorStop(1, "rgb(148,92,42)");
+          ctx.strokeStyle = wg; ctx.lineWidth = 7; ctx.lineCap = "round";
+          ctx.beginPath(); ctx.moveTo(cx, cy);
+          ctx.lineTo(cx + Math.cos(angle) * 72, cy + Math.sin(angle) * 72); ctx.stroke();
+          ctx.restore();
+        }
+        // 換向器：轉軸上的兩片銅環
+        AP.brassDisc(ctx, cx, cy, 17);
+        ctx.save();
+        ctx.strokeStyle = "rgba(60,44,18,0.7)"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(cx, cy - 17); ctx.lineTo(cx, cy + 17); ctx.stroke();
+        ctx.restore();
+        AP.steel(ctx, cx - 4, cy + 17, 8, 88, -10);
+      }
       label(ctx, 20, 18, "電磁裝置", PL.fmt(out, 2) + " " + config.unit, c);
     } else if (["cathode", "spectrum", "solar"].includes(config.kind)) {
       if (config.kind === "cathode") { D.rect(ctx, 72, cy - 76, W - 144, 152, { fill: "rgba(0,0,0,0.28)", stroke: "rgba(90,162,255,0.45)", width: 2, r: 74 }); ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(108, cy); ctx.quadraticCurveTo(cx, cy - Math.min(90, a / b * 0.7), W - 112, cy); ctx.stroke(); ctx.restore(); D.disc(ctx, 108, cy, 8, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 10 }); D.text(ctx, "e⁻", 116, cy - 14, { color: PL.col("warn"), size: 11 }); }
