@@ -21,8 +21,16 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       AP().starfield && AP().starfield(ctx, W, H, 11);
       const cx = W / 2, cy = H / 2, r = sR.get(), w = sW.get(), R = Math.min(W, H) * 0.34 * (r / 5) + 40;
-      D.ring(ctx, cx, cy, R, "rgba(128,150,190,0.30)", 1.5, [4, 4]);
-      AP().planet && AP().planet(ctx, cx, cy, 13, [255, 200, 92], "star");
+      // 軌道：實線細環＋已走過的弧（淡色），「圓周」看得見
+      D.ring(ctx, cx, cy, R, "rgba(128,150,190,0.38)", 2);
+      ctx.save(); ctx.strokeStyle = "rgba(90,162,255,0.30)"; ctx.lineWidth = 6; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.arc(cx, cy, R, ang - 1.1, ang); ctx.stroke(); ctx.restore();
+      // 中心樞軸：金屬柱
+      const pg = ctx.createLinearGradient(cx - 10, 0, cx + 10, 0);
+      pg.addColorStop(0, "rgb(120,128,144)"); pg.addColorStop(0.5, "rgb(196,204,218)"); pg.addColorStop(1, "rgb(104,112,128)");
+      ctx.fillStyle = pg;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(cx - 10, cy - 16, 20, 32, 4) : ctx.rect(cx - 10, cy - 16, 20, 32); ctx.fill();
+      ctx.strokeStyle = "rgba(70,78,94,0.6)"; ctx.lineWidth = 1; ctx.stroke();
       const bx = cx + R * Math.cos(ang), by = cy + R * Math.sin(ang);
       // 半徑
       D.line(ctx, cx, cy, bx, by, "rgba(255,255,255,0.2)", 1.5);
@@ -146,8 +154,22 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       AP().starfield && AP().starfield(ctx, W, H, 44);
       const cx = W / 2, cy = H / 2;
-      // 星
+      // 星：光暈（多層）
+      const halo = ctx.createRadialGradient(cx, cy, 4, cx, cy, 60);
+      halo.addColorStop(0, "rgba(255,214,120,0.35)");
+      halo.addColorStop(0.4, "rgba(255,200,90,0.10)");
+      halo.addColorStop(1, "rgba(255,200,90,0)");
+      ctx.fillStyle = halo;
+      ctx.beginPath(); ctx.arc(cx, cy, 60, 0, Math.PI * 2); ctx.fill();
       AP().planet && AP().planet(ctx, cx, cy, 16, [255, 204, 92], "star");
+      // 近/遠點速度視覺化：離星越近，行星光尾越亮
+      const rr0 = Math.hypot(p.x, p.y);
+      const sp0 = Math.hypot(v.x, v.y);
+      const speedCol = sp0 > vc * 1.12 ? "rgba(255,120,90,0.55)" : sp0 < vc * 0.9 ? "rgba(120,160,255,0.45)" : "rgba(120,220,170,0.4)";
+      ctx.save(); ctx.strokeStyle = speedCol; ctx.lineWidth = 3; ctx.lineCap = "round";
+      const tail = trail.slice(-14);
+      tail.forEach((t2, i) => { if (i) { ctx.globalAlpha = i / tail.length; ctx.beginPath(); ctx.moveTo(cx + tail[i-1].x, cy + tail[i-1].y); ctx.lineTo(cx + t2.x, cy + t2.y); ctx.stroke(); } });
+      ctx.restore();
       ctx.save(); ctx.strokeStyle = "rgba(255,213,79,0.5)"; ctx.lineWidth = 1.5; ctx.beginPath();
       trail.forEach((t, i) => { const px = cx + t.x, py = cy + t.y; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }); ctx.stroke(); ctx.restore();
       D.disc(ctx, cx + p.x, cy + p.y, 7, { fill: PL.col("accent-2"), glow: PL.col("accent-2"), glowSize: 10 });

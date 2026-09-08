@@ -338,13 +338,26 @@
     }
     function draw() {
       const { ctx, W, H } = cv, s = state(); cv.clear(); D.bg(cv);
+      const A = PL.apparatus || {};
       const objectX = 58, screenX = W - 54, baseY = H - 38, cy = H * 0.5, span = screenX - objectX;
       const lensX = objectX + s.x / s.Dcm * span, focalPx = s.f / s.Dcm * span;
-      D.line(ctx, objectX, baseY, screenX, baseY, PL.col("text-faint"), 2);
-      for (let i = 0; i <= 6; i++) { const xx = objectX + span * i / 6; D.line(ctx, xx, baseY - 4, xx, baseY + 4, PL.col("text-faint"), 1); }
-      D.arrow(ctx, objectX, cy + 48, objectX, cy - 35, { color: PL.col("warn"), width: 3, label: "物體" });
-      D.line(ctx, screenX, 24, screenX, baseY, PL.col("accent-2"), 3); D.text(ctx, "光屏", screenX, 20, { color: PL.col("accent-2"), size: 11, align: "center" });
-      ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(lensX, 38); ctx.quadraticCurveTo(lensX - 14, cy, lensX, H - 56); ctx.quadraticCurveTo(lensX + 14, cy, lensX, 38); ctx.stroke(); ctx.restore();
+      // 金屬光具座導軌（雙軌）
+      const rg1 = ctx.createLinearGradient(0, baseY, 0, baseY + 10);
+      rg1.addColorStop(0, "rgba(150,155,168,0.55)");
+      rg1.addColorStop(0.5, "rgba(198,204,216,0.65)");
+      rg1.addColorStop(1, "rgba(118,124,138,0.55)");
+      ctx.fillStyle = rg1; ctx.fillRect(objectX - 20, baseY, span + 40, 10);
+      for (let i = 0; i <= 6; i++) { const xx = objectX + span * i / 6; D.line(ctx, xx, baseY - 4, xx, baseY + 4, "rgba(110,118,132,0.7)", 1); }
+      // 物體：蠟燭（擬真）
+      if (A.candle) A.candle(ctx, objectX, baseY, { h: 46 });
+      else D.arrow(ctx, objectX, cy + 48, objectX, cy - 35, { color: PL.col("warn"), width: 3, label: "物體" });
+      // 光屏：擬真（支架＋屏面）
+      if (A.screen) A.screen(ctx, screenX, cy, 30, 150, false);
+      else { D.line(ctx, screenX, 24, screenX, baseY, PL.col("accent-2"), 3); }
+      D.text(ctx, "光屏", screenX, 20, { color: PL.col("accent-2"), size: 11, align: "center" });
+      // 透鏡：擬真鏡片（描邊＋漸層玻璃）
+      if (A.lens) A.lens(ctx, lensX, cy, Math.min(64, H * 0.30), true);
+      else { ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(lensX, 38); ctx.quadraticCurveTo(lensX - 14, cy, lensX, H - 56); ctx.quadraticCurveTo(lensX + 14, cy, lensX, 38); ctx.stroke(); ctx.restore(); }
       [lensX - focalPx, lensX + focalPx].forEach(xx => { if (xx > objectX && xx < screenX) { D.line(ctx, xx, cy - 5, xx, cy + 5, MC(), 1); D.text(ctx, "F", xx, cy + 20, { color: MC(), size: 10, align: "center" }); } });
       if (s.valid && s.x > s.f) {
         const imageX = lensX + s.q / s.Dcm * span, imageH = -70 * s.q / s.x;
@@ -519,14 +532,35 @@
       const mmToPx = (H - 70) / (2 * half);
       const py = yMm => cy - yMm * mmToPx;
 
-      // 光具座
-      D.rect(ctx, 24, H - 30, W - 48, 5, { fill: PL.theme.pale(0.14), r: 2 });
+      // 光具座：雙軌金屬導軌
+      ctx.save();
+      const rg1 = ctx.createLinearGradient(0, H - 32, 0, H - 24);
+      rg1.addColorStop(0, "rgba(150,155,168,0.5)");
+      rg1.addColorStop(0.5, "rgba(196,202,214,0.6)");
+      rg1.addColorStop(1, "rgba(120,126,140,0.5)");
+      ctx.fillStyle = rg1; ctx.fillRect(24, H - 32, W - 48, 8);
+      ctx.restore();
 
-      // 雷射
+      // 雷射：金屬外殼（圓柱漸層）＋散熱環＋出光口
       const lamColor = wavelengthColor(sLam.get());
-      D.rect(ctx, laserX - 24, cy - 13, 44, 26, { fill: PL.theme.shade(0.35), stroke: PL.theme.pale(0.3), r: 4 });
-      D.disc(ctx, laserX + 22, cy, 5, { fill: lamColor, glow: lamColor, glowSize: 12 });
-      D.text(ctx, sLam.get() + " nm", laserX - 2, cy + 30, { color: lamColor, size: 11, align: "center", weight: "700" });
+      const lg = ctx.createLinearGradient(0, cy - 15, 0, cy + 15);
+      lg.addColorStop(0, "rgb(150,156,170)");
+      lg.addColorStop(0.35, "rgb(210,216,228)");
+      lg.addColorStop(0.7, "rgb(126,132,148)");
+      lg.addColorStop(1, "rgb(96,102,118)");
+      ctx.fillStyle = lg;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(laserX - 30, cy - 15, 54, 30, 6) : ctx.rect(laserX - 30, cy - 15, 54, 30); ctx.fill();
+      ctx.strokeStyle = "rgba(70,76,92,0.6)"; ctx.lineWidth = 1; ctx.stroke();
+      // 散熱環
+      ctx.fillStyle = "rgba(96,102,118,0.7)";
+      for (let i = 0; i < 3; i++) ctx.fillRect(laserX - 20 + i * 10, cy - 17, 4, 34);
+      // 出光口
+      const pg2 = ctx.createLinearGradient(0, cy - 7, 0, cy + 7);
+      pg2.addColorStop(0, "rgb(70,76,92)"); pg2.addColorStop(0.5, "rgb(120,128,146)"); pg2.addColorStop(1, "rgb(60,66,80)");
+      ctx.fillStyle = pg2;
+      ctx.beginPath(); ctx.arc(laserX + 24, cy, 7, 0, Math.PI * 2); ctx.fill();
+      D.disc(ctx, laserX + 24, cy, 3.4, { fill: lamColor, glow: lamColor, glowSize: 14 });
+      D.text(ctx, sLam.get() + " nm", laserX - 2, cy + 34, { color: lamColor, size: 11, align: "center", weight: "700" });
 
       // 光束（速率高時像連續光束，速率低時只剩一顆一顆）
       const beamAlpha = Math.min(0.5, sRate.get() / 400 * 0.5);
@@ -543,6 +577,14 @@
       openings.forEach(off => {
         D.rect(ctx, slitX - 5, cy + off - 5, 10, 10, { fill: PL.theme.shade(0.85), stroke: PL.theme.pale(0.26), width: 1 });
       });
+      if (mode !== "single") {
+        // 縫距標註：兩縫之間畫帶箭頭的標註線
+        const ay = Math.min(cy + slitHalf + 26, H - 60);
+        D.line(ctx, slitX + 14, cy - slitHalf, slitX + 14, cy + slitHalf, "rgba(150,120,40,0.55)", 1.2);
+        D.line(ctx, slitX + 9, cy - slitHalf, slitX + 19, cy - slitHalf, "rgba(150,120,40,0.55)", 1.2);
+        D.line(ctx, slitX + 9, cy + slitHalf, slitX + 19, cy + slitHalf, "rgba(150,120,40,0.55)", 1.2);
+        D.text(ctx, "d", slitX + 26, ay - 6, { color: "rgba(140,110,30,0.9)", size: 11, weight: "700" });
+      }
       D.text(ctx, mode === "single" ? "單縫" : "雙縫 d=" + sD.get().toFixed(2) + "mm",
         slitX, H - 40, { color: PL.col("text-dim"), size: 11, align: "center" });
 

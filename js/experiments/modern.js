@@ -30,10 +30,47 @@
     function scene() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const cy = H * 0.5, cath = 92, anode = W - 92, emit = Kmax() > 0, col = nmColor(700 - (sF.get() - 3) / 9 * 320);
-      // 入射光束
-      for (let i = 0; i < 4; i++) { const yy = cy - 48 + i * 32; D.arrow(ctx, 22, yy - 16, cath - 16, cy - 30 + i * 20, { color: col, width: 2 }); }
-      // 光陰極 / 陽極
-      D.rect(ctx, cath - 16, cy - 62, 16, 124, { fill: MC(), stroke: "rgba(255,255,255,0.3)", r: 3 }); D.text(ctx, "光陰極", cath - 8, cy + 78, { color: PL.col("text-dim"), size: 10, align: "center" });
+      // 紫外/可見光源：燈管本體（石英管）＋燈座，斜向照射
+      const lx = 20, ly = cy - 108;
+      ctx.save();
+      ctx.translate(lx + 40, ly); ctx.rotate(0.5);
+      // 燈座
+      ctx.fillStyle = "rgb(96,102,118)";
+      ctx.fillRect(-14, -10, 18, 20);
+      // 燈管：乳白玻璃
+      const tg = ctx.createLinearGradient(0, -9, 0, 9);
+      tg.addColorStop(0, "rgba(235,240,250,0.95)");
+      tg.addColorStop(0.5, "rgba(255,255,255,0.9)");
+      tg.addColorStop(1, "rgba(210,218,232,0.95)");
+      ctx.fillStyle = tg;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(4, -9, 66, 18, 8) : ctx.rect(4, -9, 66, 18); ctx.fill();
+      ctx.strokeStyle = "rgba(120,130,150,0.7)"; ctx.lineWidth = 1; ctx.stroke();
+      // 管內輝光（隨波長變色）
+      ctx.fillStyle = col;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(10, -5, 54, 10, 5) : ctx.rect(10, -5, 54, 10); ctx.fill();
+      ctx.restore();
+      // 光錐：從燈管到陰極的半透明扇形
+      ctx.save();
+      const cone = ctx.createLinearGradient(lx + 30, ly, cath - 8, cy);
+      cone.addColorStop(0, col.replace("rgb", "rgba").replace(")", ",0.30)"));
+      cone.addColorStop(1, col.replace("rgb", "rgba").replace(")", ",0.04)"));
+      ctx.fillStyle = cone;
+      ctx.beginPath();
+      ctx.moveTo(lx + 34, ly + 8);
+      ctx.lineTo(cath - 6, cy - 64);
+      ctx.lineTo(cath - 6, cy + 64);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+      // 光束箭頭（保留原本的粒子感）
+      for (let i = 0; i < 4; i++) { const yy = cy - 48 + i * 32; D.arrow(ctx, 34, yy - 22, cath - 16, cy - 30 + i * 20, { color: col, width: 2 }); }
+      // 光陰極：鋅板質感（金屬漸層）／陽極集電極
+      const zk = ctx.createLinearGradient(cath - 16, 0, cath, 0);
+      zk.addColorStop(0, "rgb(148,154,166)"); zk.addColorStop(0.5, "rgb(200,206,218)"); zk.addColorStop(1, "rgb(122,128,142)");
+      ctx.fillStyle = zk;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(cath - 16, cy - 62, 16, 124, 3) : ctx.rect(cath - 16, cy - 62, 16, 124); ctx.fill();
+      ctx.strokeStyle = "rgba(70,76,90,0.6)"; ctx.lineWidth = 1; ctx.stroke();
+      D.text(ctx, "光陰極（鋅板）", cath - 8, cy + 78, { color: PL.col("text-dim"), size: 10, align: "center" });
       D.rect(ctx, anode, cy - 62, 16, 124, { fill: "#3a4658", stroke: "rgba(255,255,255,0.3)", r: 3 }); D.text(ctx, "集電極", anode + 8, cy + 78, { color: PL.col("text-dim"), size: 10, align: "center" });
       D.line(ctx, cath, cy + 62, cath, H - 16, PL.col("text-faint"), 2); D.line(ctx, anode + 8, cy + 62, anode + 8, H - 16, PL.col("text-faint"), 2);
       D.disc(ctx, (cath + anode) / 2, H - 16, 3, { fill: PL.col("warn") }); D.text(ctx, "V", (cath + anode) / 2 + 8, H - 12, { color: PL.col("warn"), size: 11 });
@@ -88,13 +125,39 @@
     function En(n) { return -13.6 / (n * n); }
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const cx = W * 0.32, cy = H / 2;
+      const cx = W * 0.32, cy = H * 0.42;
       D.disc(ctx, cx, cy, 8, { fill: NPcol(), glow: MC(), glowSize: 12 });
-      for (let n = 1; n <= 6; n++) D.ring(ctx, cx, cy, 14 + n * 14, "rgba(255,255,255,0.12)", 1);
+      for (let n = 1; n <= 6; n++) D.ring(ctx, cx, cy, 14 + n * 14, "rgba(150,160,180,0.20)", 1);
       const R = 14 + er * 14, ea = Date.now() / 300;
       D.disc(ctx, cx + R * Math.cos(ea), cy + R * Math.sin(ea), 5, { fill: "#5aa2ff", glow: "#5aa2ff", glowSize: 8 });
       const dE = En(nf) - En(ni), lam = 1240 / Math.abs(dE);
       photons.forEach(p => { D.line(ctx, p.x - 8, p.y, p.x, p.y, nmColor(PL.clamp(lam, 380, 720)), 2); });
+      // 發射光譜條：底部黑底譜線帶，光子飛到右緣時該波長譜線亮起
+      const sbX = W * 0.20, sbW = W * 0.5, sbY = H - 42, sbH = 20;
+      ctx.save();
+      ctx.fillStyle = "#0b0d12";
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(sbX, sbY, sbW, sbH, 4) : ctx.rect(sbX, sbY, sbW, sbH); ctx.fill();
+      // 刻度 380–720nm
+      ctx.fillStyle = "rgba(200,205,215,0.7)"; ctx.font = "9px sans-serif";
+      for (const nm of [400, 500, 600, 700]) {
+        const x = sbX + (nm - 380) / 340 * sbW;
+        ctx.fillRect(x, sbY + sbH, 1, 4);
+        ctx.fillText(nm, x - 10, sbY + sbH + 13);
+      }
+      // 已發射的譜線（光子到達過右緣就永久亮一條）
+      const lineX = sbX + (PL.clamp(lam, 380, 720) - 380) / 340 * sbW;
+      if (photons.some(p => p.x > W - 60)) {
+        const lg = ctx.createLinearGradient(0, sbY, 0, sbY + sbH);
+        lg.addColorStop(0, "rgba(255,255,255,0)");
+        lg.addColorStop(0.5, nmColor(PL.clamp(lam, 380, 720)));
+        lg.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = lg;
+        ctx.fillRect(lineX - 1.6, sbY, 3.2, sbH);
+        ctx.fillStyle = nmColor(PL.clamp(lam, 380, 720));
+        ctx.fillRect(lineX - 0.6, sbY, 1.2, sbH);
+      }
+      ctx.restore();
+      D.text(ctx, "發射光譜（可見光段）", sbX, sbY - 8, { color: PL.col("text-faint"), size: 10 });
       // 能階圖
       const bx = W * 0.62, top = 30, bot = H - 30;
       for (let n = 1; n <= 6; n++) { const y = PL.lerp(bot, top, (En(n) + 13.6) / 13.6); D.line(ctx, bx, y, W - 24, y, "rgba(255,255,255,0.2)", 1.4); D.text(ctx, "n=" + n, bx - 6, y + 4, { color: PL.col("text-faint"), size: 10, align: "right" }); }

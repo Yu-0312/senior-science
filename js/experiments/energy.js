@@ -38,7 +38,7 @@
       const gy = H - 50, sc = (W - 120) / 16, px = 70 + (x % 16) * sc;
       AP().benchTop && AP().benchTop(ctx, W, H, gy + 4);
       D.line(ctx, 20, gy, W - 20, gy, "rgba(150,140,120,0.55)", 2);
-      AP().cart ? AP().cart(ctx, px, gy, 46, 26)
+      AP().cart ? AP().cart(ctx, px, gy, 62, 36)
                 : D.rect(ctx, px - 22, gy - 30, 44, 30, { fill: m, stroke: "rgba(255,255,255,0.4)", r: 5 });
       const fx = F * Math.cos(th), fy = F * Math.sin(th);
       D.arrow(ctx, px, gy - 15, px + fx * 5, gy - 15 - fy * 5, { color: PL.col("accent-2"), width: 2.5, label: "F" });
@@ -486,7 +486,7 @@
       const springTop = groundY - (0.6 - comp) * sc * 0.4 - 40;
       D.spring(ctx, cx, groundY, cx, springTop, 9, 10, MC());
       const by = springTop - 14 - y * sc;
-      AP().cart ? AP().cart(ctx, cx, by + 20, 46, 22)
+      AP().cart ? AP().cart(ctx, cx, by + 20, 58, 30)
                 : D.rect(ctx, cx - 20, by - 20, 40, 20, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 4 });
       // 能量長條
       const spE = 0.5 * k * comp * comp, ke = 0.5 * m * v * v, pe = m * g * y;
