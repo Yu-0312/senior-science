@@ -1238,17 +1238,65 @@
     const rAng = PL.ui.readout(L.readouts, { label: "出射角", unit: "°" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const cy = H / 2, plateL = 90, plateR = W * 0.62, gap = 74, v = sV.get(), E = sE.get(), K = E / (v * v) * 0.9;
+      const cy = H / 2, plateL = 128, plateR = W * 0.58, gap = 74, v = sV.get(), E = sE.get(), K = E / (v * v) * 0.9;
+      // 真空管外殼（玻璃管質感）
+      ctx.save();
+      const tube = ctx.createLinearGradient(0, cy - 120, 0, cy + 120);
+      tube.addColorStop(0, "rgba(180,196,220,0.06)");
+      tube.addColorStop(0.5, "rgba(200,214,236,0.10)");
+      tube.addColorStop(1, "rgba(180,196,220,0.06)");
+      ctx.fillStyle = tube;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(46, cy - 120, W - 110, 240, 40) : ctx.rect(46, cy - 120, W - 110, 240); ctx.fill();
+      ctx.strokeStyle = "rgba(150,170,200,0.35)"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.restore();
+      // 電子槍：燈絲＋聚焦環
+      const gunX = 66;
+      const gg = ctx.createLinearGradient(gunX - 12, 0, gunX + 20, 0);
+      gg.addColorStop(0, "rgb(96,102,118)"); gg.addColorStop(0.5, "rgb(176,184,200)"); gg.addColorStop(1, "rgb(100,108,124)");
+      ctx.fillStyle = gg;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(gunX - 12, cy - 26, 44, 52, 8) : ctx.rect(gunX - 12, cy - 26, 44, 52); ctx.fill();
+      ctx.strokeStyle = "rgba(60,66,80,0.7)"; ctx.lineWidth = 1; ctx.stroke();
+      // 燈絲（暖光）
+      ctx.strokeStyle = "rgba(255,180,90,0.9)"; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(gunX - 4, cy - 8); ctx.quadraticCurveTo(gunX + 4, cy, gunX - 4, cy + 8); ctx.stroke();
+      D.text(ctx, "電子槍", gunX + 8, cy + 44, { color: PL.col("text-dim"), size: 10, align: "center" });
+      // 偏轉板
+      const pg = ctx.createLinearGradient(0, cy - gap / 2 - 8, 0, cy - gap / 2);
+      pg.addColorStop(0, "rgb(110,116,132)"); pg.addColorStop(1, "rgb(180,188,204)");
+      ctx.fillStyle = pg;
       D.rect(ctx, plateL, cy - gap / 2 - 8, plateR - plateL, 8, { fill: POS }); D.text(ctx, "＋", plateL - 14, cy - gap / 2, { color: POS, size: 13 });
       D.rect(ctx, plateL, cy + gap / 2, plateR - plateL, 8, { fill: NEG }); D.text(ctx, "－", plateL - 14, cy + gap / 2 + 12, { color: NEG, size: 13 });
       for (let x = plateL + 20; x < plateR; x += 40) D.arrow(ctx, x, cy - gap / 2, x, cy + gap / 2, { color: "rgba(77,182,170,0.28)", width: 1 });
+      // 螢光屏：右側綠色刻度屏
+      const scrX = W - 58;
+      const sg = ctx.createLinearGradient(scrX, 0, scrX + 14, 0);
+      sg.addColorStop(0, "rgba(120,220,160,0.28)");
+      sg.addColorStop(1, "rgba(60,100,80,0.45)");
+      ctx.fillStyle = sg;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(scrX, cy - 130, 16, 260, 5) : ctx.rect(scrX, cy - 130, 16, 260); ctx.fill();
+      ctx.strokeStyle = "rgba(120,200,150,0.5)"; ctx.lineWidth = 1; ctx.stroke();
+      for (let yy = cy - 120; yy <= cy + 120; yy += 24) { D.line(ctx, scrX + 4, yy, scrX + 12, yy, "rgba(140,230,170,0.4)", 1); }
+      D.text(ctx, "螢光屏", scrX + 8, cy - 140, { color: PL.col("text-faint"), size: 10, align: "center" });
       const yR = K * (plateR - plateL) * (plateR - plateL), slope = 2 * K * (plateR - plateL);
-      ctx.save(); ctx.strokeStyle = "#ffe08a"; ctx.lineWidth = 2; ctx.beginPath();
-      for (let x = plateL; x <= W - 20; x += 2) { let y = x <= plateR ? cy + K * (x - plateL) * (x - plateL) : cy + yR + slope * (x - plateR); if (y > cy + gap / 2 && x < plateR) { y = cy + gap / 2; } x === plateL ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
-      D.arrow(ctx, 20, cy, plateL - 4, cy, { color: "#fff", width: 2, label: "v" });
-      const tt = (t * v * 26) % (W - plateL - 20), xp = plateL + tt;
+      // 電子束：亮綠螢光軌跡（外暈＋內芯）
+      ctx.save(); ctx.lineCap = "round";
+      ctx.strokeStyle = "rgba(120,255,180,0.22)"; ctx.lineWidth = 7; ctx.beginPath();
+      for (let x = plateL; x <= scrX; x += 2) { let y = x <= plateR ? cy + K * (x - plateL) * (x - plateL) : cy + yR + slope * (x - plateR); if (y > cy + gap / 2 && x < plateR) { y = cy + gap / 2; } x === plateL ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke();
+      ctx.strokeStyle = "rgba(180,255,215,0.9)"; ctx.lineWidth = 2; ctx.beginPath();
+      for (let x = plateL; x <= scrX; x += 2) { let y = x <= plateR ? cy + K * (x - plateL) * (x - plateL) : cy + yR + slope * (x - plateR); if (y > cy + gap / 2 && x < plateR) { y = cy + gap / 2; } x === plateL ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke();
+      ctx.restore();
+      D.arrow(ctx, 34, cy, plateL - 4, cy, { color: "#fff", width: 2, label: "v" });
+      const tt = (t * v * 26) % (scrX - plateL), xp = plateL + tt;
       const yp = xp <= plateR ? cy + K * (xp - plateL) * (xp - plateL) : cy + yR + slope * (xp - plateR);
       if (Math.abs(yp - cy) < gap / 2 || xp > plateR) D.disc(ctx, xp, yp, 6, { fill: "#5aa2ff", glow: "#5aa2ff", glowSize: 8 });
+      // 撞擊螢光點
+      const hitY = cy + yR + slope * (scrX - plateR);
+      if (Math.abs(hitY) < 130) {
+        ctx.fillStyle = "rgba(160,255,200,0.9)";
+        ctx.beginPath(); ctx.arc(scrX + 8, cy + hitY, 3.4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "rgba(160,255,200,0.3)";
+        ctx.beginPath(); ctx.arc(scrX + 8, cy + hitY, 8, 0, Math.PI * 2); ctx.fill();
+      }
       rY.set(Math.abs(yR), 1); rAng.set(Math.atan(slope) * 180 / Math.PI, 1);
     }
     const anim = PL.loop(dt => { if (dt) t += dt; draw(); });

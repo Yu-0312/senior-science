@@ -3,6 +3,7 @@
   "use strict";
   const PL = window.PhysicsLab, D = PL.draw, TAU = PL.TAU;
   const accent = () => PL.col("m-color", "#35e0cf");
+  const AP = () => PL.apparatus || {};
   const deg = value => value * Math.PI / 180;
 
   function visibleFilmWavelength(thickness, angle) {
@@ -213,7 +214,54 @@
       const x0 = 48, x1 = W - 42, y = cy;
       D.line(ctx, x0, y, x1, y, c, 2.4); D.line(ctx, x0, y, x0, y + 76, c, 2.4); D.line(ctx, x0, y + 76, x1, y + 76, c, 2.4); D.line(ctx, x1, y + 76, x1, y, c, 2.4);
       if (config.kind === "rl") { D.spring(ctx, W * 0.38, y, W * 0.58, y, 8, 10, PL.col("accent-3")); D.text(ctx, "L", W * 0.48, y - 16, { color: PL.col("accent-3"), size: 14, align: "center", weight: "700" }); }
-      else if (config.kind === "rectifier") { D.text(ctx, "▶|", W * 0.48, y + 6, { color: PL.col("warn"), size: 20, align: "center", weight: "700" }); }
+      else if (config.kind === "rectifier") {
+        /* 橋式整流：菱形電橋（四顆二極體）＋輸入交流波 vs 輸出脈動直流雙幕 */
+        const bx = W * 0.36, bw3 = 74, bh3 = 54, by2 = y - bh3 / 2;
+        // 菱形四頂點
+        const T = [bx, by2], Rr = [bx + bw3, y], Bo = [bx, by2 + bh3], Lc = [bx - bw3, y];
+        ctx.strokeStyle = "rgba(190,198,215,0.85)"; ctx.lineWidth = 2;
+        [[T, Rr], [Rr, Bo], [Bo, Lc], [Lc, T]].forEach(([p1, p2]) => { ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.stroke(); });
+        // 四顆二極體（三角形+橫棒）
+        const dias = [[(T[0]+Rr[0])/2, (T[1]+Rr[1])/2, 0.7], [(Rr[0]+Bo[0])/2, (Rr[1]+Bo[1])/2, -0.7], [(Bo[0]+Lc[0])/2, (Bo[1]+Lc[1])/2, 0.7], [(Lc[0]+T[0])/2, (Lc[1]+T[1])/2, -0.7]];
+        dias.forEach(([dx, dy, angd]) => {
+          ctx.save(); ctx.translate(dx, dy); ctx.rotate(angd);
+          ctx.fillStyle = PL.col("warn");
+          ctx.beginPath(); ctx.moveTo(-6, -4); ctx.lineTo(2, 0); ctx.lineTo(-6, 4); ctx.closePath(); ctx.fill();
+          ctx.fillRect(2, -4, 2, 8);
+          ctx.restore();
+        });
+        // 交流輸入（左）
+        D.text(ctx, "AC", Lc[0] - 34, y + 4, { color: PL.col("accent-2"), size: 12, align: "center", weight: "700" });
+        D.line(ctx, Lc[0] - 20, y, Lc[0], y, c, 2);
+        // 直流輸出（右）
+        D.line(ctx, Rr[0], y, Rr[0] + 20, y, c, 2);
+        D.text(ctx, "DC", Rr[0] + 34, y + 4, { color: PL.col("warn"), size: 12, align: "center", weight: "700" });
+        // 雙波形幕
+        const wx = W * 0.62, wy = y - 62, ww = W * 0.30, wh = 124;
+        ctx.fillStyle = "rgba(8,12,18,0.55)";
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(wx, wy, ww, wh, 6) : ctx.rect(wx, wy, ww, wh); ctx.fill();
+        ctx.strokeStyle = "rgba(150,165,190,0.5)"; ctx.lineWidth = 1; ctx.stroke();
+        // 輸入：正弦（藍）
+        ctx.strokeStyle = "rgba(100,160,255,0.85)"; ctx.lineWidth = 1.8; ctx.beginPath();
+        for (let x = 0; x <= ww - 16; x += 2) {
+          const yy = wy + wh / 4 + Math.sin(x * 0.09 + time * 2.4) * 20;
+          x === 0 ? ctx.moveTo(wx + 8 + x, yy) : ctx.lineTo(wx + 8 + x, yy);
+        }
+        ctx.stroke();
+        // 輸出：整流後（黃，含濾波）
+        const cf = Math.min(0.92, b / 3000);   // 電容濾波程度
+        ctx.strokeStyle = "rgba(255,204,102,0.9)"; ctx.lineWidth = 1.8; ctx.beginPath();
+        for (let x = 0; x <= ww - 16; x += 2) {
+          const raw = Math.abs(Math.sin(x * 0.09 + time * 2.4));
+          const env = cf > 0.02 ? Math.max(raw, (wy ? 1 : 1) * cf * 0.9) : raw;   // 簡化濾波：抬高谷底
+          const yy = wy + wh * 0.72 - env * 24;
+          x === 0 ? ctx.moveTo(wx + 8 + x, yy) : ctx.lineTo(wx + 8 + x, yy);
+        }
+        ctx.stroke();
+        ctx.fillStyle = "rgba(160,175,200,0.8)"; ctx.font = "9.5px sans-serif";
+        ctx.fillText("AC 入", wx + 8, wy + 14);
+        ctx.fillText("脈動 DC 出（C=" + PL.fmt(b, 0) + "μF）", wx + ww - 130, wy + 14);
+      }
       else if (config.kind === "led") {
         /*
          * 原本不管順向電壓多少，LED 都畫成同一顆會發光的圓——
@@ -284,8 +332,50 @@
           W * 0.5, levels[0] + 26, { color: c, size: 11, align: "center", weight: "700" });
       } else if (config.kind === "uncertainty") {
         const width = Math.max(18, a * 32), x0 = cx - width * 2; ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2.5; ctx.beginPath(); for (let x = 38; x < W - 38; x += 2) { const g = Math.exp(-Math.pow((x - cx) / width, 2)); const y = cy + Math.sin((x - cx) * 0.38) * g * 55; x === 38 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore(); D.line(ctx, x0, cy + 80, cx + width * 2, cy + 80, PL.col("warn"), 2); D.text(ctx, "Δx", cx, cy + 96, { color: PL.col("warn"), size: 12, align: "center" });
-      } else if (config.kind === "spacetime") {
-        const x0 = W * 0.22, y0 = H - 50, top = 34; D.line(ctx, x0, y0, x0, top, "rgba(255,255,255,0.48)", 2); D.line(ctx, x0, y0, W * 0.82, y0, "rgba(255,255,255,0.48)", 2); D.line(ctx, x0, y0, x0 + (W * 0.55) * a, top + 10, c, 3); D.line(ctx, x0 + (W * 0.55) * a, top + 10, x0, y0, PL.col("accent-2"), 3); D.text(ctx, "地球 t", x0 - 8, top, { color: PL.col("text-faint"), size: 10, align: "right" }); D.text(ctx, "旅行者", x0 + W * 0.25, top + 28, { color: c, size: 11 });
+       } else if (config.kind === "spacetime") {
+        /* 世界線圖儀器化：星空背景＋地球/太空船圖示＋雙鐘對比。
+           地球線垂直、旅行者線斜去斜回，兩鐘累積差就是雙生子悖論。 */
+        AP() && AP().starfield && AP().starfield(ctx, W, H, 77);
+        const x0 = W * 0.22, y0 = H - 50, top = 40;
+        // 座標軸
+        D.line(ctx, x0, y0, x0, top, "rgba(200,210,230,0.55)", 2);
+        D.line(ctx, x0, y0, W * 0.82, y0, "rgba(200,210,230,0.55)", 2);
+        D.text(ctx, "時間 t（地球）", x0 - 8, top - 6, { color: PL.col("text-faint"), size: 10, align: "right" });
+        D.text(ctx, "距離 →", W * 0.82, y0 + 18, { color: PL.col("text-faint"), size: 10 });
+        // 地球（左下角，藍色行星）
+        AP() && AP().planet ? AP().planet(ctx, x0, y0 - 16, 15, [86, 156, 232], "earth")
+                            : D.disc(ctx, x0, y0 - 16, 15, { fill: "rgba(90,162,255,0.5)", stroke: PL.col("accent-2"), width: 2 });
+        // 目的地星（右上）
+        const destX = x0 + (W * 0.55) * a, destY = top + 10;
+        AP() && AP().planet && AP().planet(ctx, destX, destY, 10, [255, 204, 92], "star");
+        // 旅行者世界線：去（綠）回（藍）
+        D.line(ctx, x0, y0, destX, destY, c, 3);
+        D.line(ctx, destX, destY, x0, y0, PL.col("accent-2"), 3);
+        // 太空船（在去程線上移動）
+        const prog = (time * 0.22) % 2;                 // 0→2 往返
+        const px2 = prog < 1 ? x0 + (destX - x0) * prog : destX + (x0 - destX) * (prog - 1);
+        const py2 = prog < 1 ? y0 + (destY - y0) * prog : destY + (y0 - destY) * (prog - 1);
+        ctx.save(); ctx.translate(px2, py2); ctx.rotate(prog < 1 ? Math.atan2(destY - y0, destX - x0) : Math.atan2(y0 - destY, x0 - destX));
+        // 小火箭：機身＋鼻錐＋尾焰
+        ctx.fillStyle = "rgb(214,222,238)";
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-9, -3.4, 15, 6.8, 3) : ctx.rect(-9, -3.4, 15, 6.8); ctx.fill();
+        ctx.fillStyle = "rgb(255,150,90)";
+        ctx.beginPath(); ctx.moveTo(6, -3.4); ctx.lineTo(11, 0); ctx.lineTo(6, 3.4); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = "rgba(255,190,80,0.85)";
+        ctx.beginPath(); ctx.moveTo(-9, -2); ctx.lineTo(-15 - (Math.sin(Date.now() / 90) * 0.5 + 0.5) * 4, 0); ctx.lineTo(-9, 2); ctx.closePath(); ctx.fill();
+        ctx.restore();
+        // 雙鐘對比：地球鐘 vs 旅行者鐘
+        const clockY = top + 6, cw = 150;
+        ctx.save();
+        ctx.fillStyle = "rgba(20,26,38,0.72)";
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(W * 0.62, clockY, cw, 62, 8) : ctx.rect(W * 0.62, clockY, cw, 62); ctx.fill();
+        ctx.strokeStyle = "rgba(150,160,185,0.5)"; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = "rgba(220,228,242,0.95)"; ctx.font = "700 13px sans-serif";
+        ctx.fillText("地球鐘：" + PL.fmt(b, 1) + " yr", W * 0.62 + 14, clockY + 24);
+        ctx.fillStyle = c; ctx.font = "700 13px sans-serif";
+        ctx.fillText("旅行者鐘：" + PL.fmt(out, 1) + " yr", W * 0.62 + 14, clockY + 48);
+        ctx.restore();
+        D.text(ctx, "v = " + PL.fmt(a, 2) + " c", W * 0.62, clockY - 8, { color: PL.col("text-faint"), size: 10 });
       } else if (config.kind === "radiation") {
         const sourceX = W * 0.22, shieldX = W * 0.58; D.disc(ctx, sourceX, cy, 19, { fill: PL.col("danger"), glow: PL.col("danger"), glowSize: 14 }); D.text(ctx, "γ", sourceX, cy + 5, { color: "#fff", size: 14, align: "center", weight: "700" }); D.rect(ctx, shieldX, cy - 84, 30 + a * 4, 168, { fill: "rgba(150,165,190,0.33)", stroke: c, width: 2, r: 3 }); for (let i = 0; i < 7; i++) D.line(ctx, sourceX + 24, cy - 42 + i * 14, W - 46, cy - 42 + i * 14, i < Math.round(7 * out / 100) ? PL.col("warn") : "rgba(255,204,102,0.12)", 2);
       } else if (config.kind === "binding") {

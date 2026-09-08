@@ -64,14 +64,28 @@
     const cc = PL.ui.chart(PL.ui.charts(root), { title: "迴轉半徑 r – 速率 v", cap: "r = mv/qB：定磁場下半徑與速率成正比（直線過原點）；磁場越強、半徑越小。" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      // B 進入頁面（叉叉背景）
-      ctx.save(); ctx.strokeStyle = PL.theme.pale(0.1); ctx.lineWidth = 1;
-      for (let x = 30; x < W - 20; x += 40) for (let y = 30; y < H - 20; y += 40) { ctx.beginPath(); ctx.moveTo(x - 3, y - 3); ctx.lineTo(x + 3, y + 3); ctx.moveTo(x - 3, y + 3); ctx.lineTo(x + 3, y - 3); ctx.stroke(); } ctx.restore();
-      D.text(ctx, "B 進入頁面 ⊗", W - 24, 22, { color: PL.col("text-faint"), size: 11, align: "right" });
+      // B 進入頁面：叉叉密度隨 B 變強（磁場看得見）
+      const bNorm = (sB.get() - 1) / 5;
+      const spacing = Math.round(60 - bNorm * 26);
+      ctx.save(); ctx.strokeStyle = PL.theme.pale(0.08 + bNorm * 0.10); ctx.lineWidth = 1;
+      for (let x = 30; x < W - 20; x += spacing) for (let y = 30; y < H - 20; y += spacing) { ctx.beginPath(); ctx.moveTo(x - 3.5, y - 3.5); ctx.lineTo(x + 3.5, y + 3.5); ctx.moveTo(x - 3.5, y + 3.5); ctx.lineTo(x + 3.5, y - 3.5); ctx.stroke(); } ctx.restore();
+      D.text(ctx, "B 進入頁面 ⊗  B = " + PL.fmt(sB.get(), 1) + " 單位", W - 24, 22, { color: PL.col("text-faint"), size: 11, align: "right" });
       const pos = sQ.get() === "pos", sgn = pos ? 1 : -1;
       const r = 20 + sV.get() / sB.get() * 30, cx = W / 2, cy = H / 2;
       const px = cx + r * Math.cos(ang), py = cy + r * Math.sin(ang) * sgn;
-      D.ring(ctx, cx, cy, r, "rgba(149,117,205,0.3)", 1.2, [4, 4]);
+      D.ring(ctx, cx, cy, r, "rgba(149,117,205,0.35)", 1.3, [4, 4]);
+      // 雲霧室拖尾：粒子飛過處留下凝結軌跡
+      if (!draw._trail) draw._trail = [];
+      draw._trail.push({ x: px, y: py });
+      if (draw._trail.length > 60) draw._trail.shift();
+      ctx.save(); ctx.lineCap = "round";
+      for (let i = 1; i < draw._trail.length; i++) {
+        const a = i / draw._trail.length;
+        ctx.strokeStyle = `rgba(230,236,248,${a * 0.5})`;
+        ctx.lineWidth = 1 + a * 2.2;
+        ctx.beginPath(); ctx.moveTo(draw._trail[i-1].x, draw._trail[i-1].y); ctx.lineTo(draw._trail[i].x, draw._trail[i].y); ctx.stroke();
+      }
+      ctx.restore();
       D.disc(ctx, px, py, 9, { fill: pos ? NP : SP, glow: pos ? NP : SP, glowSize: 10 });
       // 速度切線、力向心
       const vx = -Math.sin(ang) * sgn, vy = Math.cos(ang);
@@ -838,13 +852,51 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const v = sE.get() / sB.get(), r = radius(), selY = H * 0.28, selX0 = 30, selX1 = W * 0.44, entryX = selX1;
-      D.rect(ctx, selX0, selY - 22, selX1 - selX0, 44, { stroke: PL.col("text-faint"), width: 1.5, r: 4 });
+      // 速度選擇器：金屬腔體＋上下極板
+      const sel = ctx.createLinearGradient(0, selY - 22, 0, selY + 22);
+      sel.addColorStop(0, "rgba(160,168,184,0.18)");
+      sel.addColorStop(0.5, "rgba(200,208,222,0.10)");
+      sel.addColorStop(1, "rgba(160,168,184,0.18)");
+      ctx.fillStyle = sel;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(selX0, selY - 22, selX1 - selX0, 44, 5) : ctx.rect(selX0, selY - 22, selX1 - selX0, 44); ctx.fill();
+      ctx.strokeStyle = PL.col("text-faint"); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(selX0, selY - 22, selX1 - selX0, 44, 5) : ctx.rect(selX0, selY - 22, selX1 - selX0, 44); ctx.stroke();
+      // 極板：上正下負
+      D.rect(ctx, selX0 + 14, selY - 22, selX1 - selX0 - 28, 5, { fill: "rgba(214,120,110,0.7)" });
+      D.rect(ctx, selX0 + 14, selY + 17, selX1 - selX0 - 28, 5, { fill: "rgba(110,140,214,0.7)" });
+      D.text(ctx, "+", selX0 + 4, selY - 12, { color: PL.col("danger"), size: 12 });
+      D.text(ctx, "−", selX0 + 4, selY + 18, { color: PL.col("accent-2"), size: 12 });
       D.text(ctx, "速度選擇器 (E⊥B)", selX0, selY - 30, { color: PL.col("text-dim"), size: 10 });
+      // 磁場分析區：紫底＋叉叉
+      const regionH = H - selY - 34, regionW = W - entryX - 26;
+      const bg2 = ctx.createLinearGradient(0, selY, 0, selY + regionH);
+      bg2.addColorStop(0, "rgba(149,117,205,0.09)");
+      bg2.addColorStop(1, "rgba(149,117,205,0.16)");
+      ctx.fillStyle = bg2;
+      ctx.fillRect(entryX, selY, regionW, regionH);
+      ctx.save(); ctx.strokeStyle = "rgba(190,170,230,0.30)"; ctx.lineWidth = 1;
+      for (let x = entryX + 22; x < W - 30; x += 34) for (let y = selY + 22; y < selY + regionH - 8; y += 34) { ctx.beginPath(); ctx.moveTo(x - 3, y - 3); ctx.lineTo(x + 3, y + 3); ctx.moveTo(x - 3, y + 3); ctx.lineTo(x + 3, y - 3); ctx.stroke(); }
+      ctx.restore();
       D.text(ctx, "磁場分析區 ⊗", entryX + 10, 18, { color: PL.col("text-faint"), size: 10 });
       ctx.save(); ctx.strokeStyle = "rgba(149,117,205,0.3)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(entryX, selY + r, r, -Math.PI / 2, Math.PI / 2); ctx.stroke(); ctx.restore();
       D.line(ctx, entryX, selY, entryX, H - 18, PL.col("text-faint"), 2);
-      D.disc(ctx, entryX, selY + 2 * r, 5, { fill: MC(), glow: MC() }); D.text(ctx, "落點", entryX + 10, selY + 2 * r + 4, { color: MC(), size: 10 });
+      // 偵測屏：底部金屬屏＋撞擊亮點＋刻度
+      const detY = H - 20;
+      const dg = ctx.createLinearGradient(0, detY - 5, 0, detY + 5);
+      dg.addColorStop(0, "rgb(120,126,140)"); dg.addColorStop(0.5, "rgb(190,196,210)"); dg.addColorStop(1, "rgb(100,106,120)");
+      ctx.fillStyle = dg; ctx.fillRect(entryX, detY - 5, regionW, 10);
+      ctx.strokeStyle = "rgba(60,66,80,0.7)"; ctx.lineWidth = 1; ctx.strokeRect(entryX, detY - 5, regionW, 10);
+      const landX = entryX + 2 * r;
+      ctx.fillStyle = "rgba(255,220,120,0.95)";
+      ctx.beginPath(); ctx.arc(landX, detY, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,220,120,0.35)";
+      ctx.beginPath(); ctx.arc(landX, detY, 8, 0, Math.PI * 2); ctx.fill();
+      D.disc(ctx, entryX, selY + 2, 5, { fill: MC(), glow: MC() }); D.text(ctx, "離子源", entryX + 10, selY - 8, { color: MC(), size: 10 });
       let ix, iy; if (phase === "sel") { ix = selX0 + x; iy = selY; } else { ix = entryX + r * Math.sin(ang); iy = selY + r - r * Math.cos(ang); }
+      // 離子拖尾
+      ctx.save(); ctx.strokeStyle = "rgba(120,180,255,0.4)"; ctx.lineWidth = 2; ctx.beginPath();
+      if (phase === "sel") { ctx.moveTo(selX0, selY); ctx.lineTo(ix, iy); } else { ctx.arc(entryX, selY + r, r, -Math.PI / 2, -Math.PI / 2 + ang); }
+      ctx.stroke(); ctx.restore();
       D.disc(ctx, ix, iy, 6, { fill: "#5aa2ff", glow: "#5aa2ff", glowSize: 8 });
       rV.set(v, 2); rR.set(r / 8, 2); rLand.set(PL.fmt(2 * r / 8, 1));
     }

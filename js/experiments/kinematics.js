@@ -88,14 +88,31 @@
       const h = sH.get(), g = sG.get(), m = MC();
       const tFall = Math.sqrt(2 * h / g);
       const groundY = H - 34, topY = 30, scale = (groundY - topY) / h;
+      const px0 = 130;
+      const AP = PL.apparatus;
       cv.calibrate(scale, "m");   // 讓可拖曳的尺能直接量落下高度
-      D.line(ctx, 40, groundY, W - 130, groundY, PL.col("text-faint"), 2);
+      // 地面：淡色地坪＋建築輪廓（釋放樓層意象）
+      AP && AP.benchTop && AP.benchTop(ctx, W, H, groundY + 2);
+      D.line(ctx, 40, groundY, W - 130, groundY, "rgba(150,140,120,0.6)", 2);
+      // 釋放平台（頂部橫桿＋支架）
+      ctx.save();
+      ctx.strokeStyle = "rgba(150,160,180,0.7)"; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(px0 - 34, topY - 6); ctx.lineTo(px0 + 34, topY - 6); ctx.stroke();
+      ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.moveTo(px0 - 26, topY - 4); ctx.lineTo(px0 - 26, topY + 6); ctx.stroke();
+      ctx.restore();
       const fallen = 0.5 * g * t * t; const y = Math.min(h, fallen);
-      const px = 130, py = topY + y * scale;
+      const py = topY + y * scale;
       // 頻閃殘影（等時間間隔）
-      strobe.forEach(sy => D.disc(ctx, px, topY + sy * scale, 6, { fill: "rgba(255,255,255,0.10)" }));
-      D.disc(ctx, px, py, 12, { fill: m, glow: m, glowSize: 16 });
-      D.arrow(ctx, px, py + 16, px, py + 16 + Math.min(46, g * t * 2.4), { color: PL.col("accent-2"), width: 2, label: "v" });
+      strobe.forEach(sy => D.disc(ctx, px0, topY + sy * scale, 7, { fill: "rgba(150,160,185,0.16)" }));
+      // 落地陰影
+      const shA = Math.max(0.06, 0.3 - (h - y) / h * 0.26);
+      ctx.fillStyle = `rgba(60,60,60,${shA})`;
+      ctx.beginPath(); ctx.ellipse(px0, groundY + 3, 14 + (h - y) / h * 4, 3.4, 0, 0, Math.PI * 2); ctx.fill();
+      // 金屬球（擬真）
+      if (AP && AP.moonBall) AP.moonBall(ctx, px0, py, 13, [186, 190, 200]);
+      else D.disc(ctx, px0, py, 12, { fill: m, glow: m, glowSize: 16 });
+      D.arrow(ctx, px0, py + 18, px0, py + 18 + Math.min(46, g * t * 2.4), { color: PL.col("accent-2"), width: 2, label: "v" });
       // 高度刻度
       for (let hh = 0; hh <= h; hh += Math.max(5, Math.round(h / 8 / 5) * 5)) { const yy = topY + (h - hh) * scale; D.line(ctx, 44, yy, 52, yy, PL.col("text-faint"), 1); D.text(ctx, hh + "", 40, yy + 3, { color: PL.col("text-faint"), size: 9, align: "right" }); }
 

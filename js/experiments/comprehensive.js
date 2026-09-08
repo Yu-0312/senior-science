@@ -140,7 +140,45 @@
     } else if (config.kind === "truss") {
       const x0 = 72, y0 = cy + 58, span = W - 144, steps = 6; D.line(ctx, x0, y0, x0 + span, y0, c, 3); for (let i = 0; i < steps; i++) { const xa = x0 + i * span / steps, xb = x0 + (i + 1) * span / steps, xm = (xa + xb) / 2; D.line(ctx, xa, y0, xm, y0 - 78, PL.col("warn"), 2); D.line(ctx, xm, y0 - 78, xb, y0, PL.col("accent-2"), 2); } D.rect(ctx, cx - 42, y0 - 132, 84, 36, { fill: "rgba(255,138,101,0.38)", stroke: PL.col("warn"), width: 2, r: 4 }); D.arrow(ctx, cx, y0 - 182, cx, y0 - 139, { color: PL.col("danger"), width: 3, label: "載重" }); label(ctx, 20, 18, "桁架內力", PL.fmt(out, 0) + " N", c);
     } else if (config.kind === "rocket") {
-      const y = ground - 18 - ((time * Math.max(0, out) * 2) % Math.max(20, H - 150)); const rx = cx; D.rect(ctx, rx - 18, y, 36, 94, { fill: "rgba(225,235,255,0.62)", stroke: c, width: 2, r: 8 }); ctx.save(); ctx.fillStyle = PL.col("warn"); ctx.beginPath(); ctx.moveTo(rx - 18, y + 12); ctx.lineTo(rx, y - 28); ctx.lineTo(rx + 18, y + 12); ctx.closePath(); ctx.fill(); ctx.restore(); for (let i = 0; i < 6; i++) D.line(ctx, rx - 10 + i * 4, y + 98, rx - 12 + i * 5, y + 120 + pulse * 18, i % 2 ? PL.col("warn") : PL.col("danger"), 2); D.line(ctx, 36, ground + 4, W - 36, ground + 4, "rgba(255,255,255,0.28)", 3); label(ctx, 20, 18, "水火箭", PL.fmt(out, 1) + " m/s²", c);
+      /* 水火箭擬真：寶特瓶瓶身（曲線輪廓）＋鼻錐＋三片尾翼＋水柱噴流＋發射架 */
+      const y = ground - 18 - ((time * Math.max(0, out) * 2) % Math.max(20, H - 150));
+      const rx = cx, bw2 = 21, bh2 = 58;
+      // 發射架（地面）
+      D.line(ctx, 36, ground + 4, W - 36, ground + 4, "rgba(150,140,120,0.5)", 3);
+      D.line(ctx, rx - 34, ground + 2, rx, ground - 26, "rgba(150,160,180,0.6)", 3);
+      D.line(ctx, rx + 34, ground + 2, rx, ground - 26, "rgba(150,160,180,0.6)", 3);
+      // 水霧噴流（推力越大越長）
+      if (out > 0.3) {
+        for (let i = 0; i < 9; i++) {
+          const jy = y + bh2 + 22 + i * 9 + pulse * 3;
+          const spread = 3 + i * 2.2;
+          ctx.fillStyle = i % 2 ? "rgba(120,180,255,0.5)" : "rgba(200,230,255,0.55)";
+          ctx.beginPath(); ctx.ellipse(rx + (i % 3 - 1) * 2, jy, spread, 5, 0, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      // 瓶身：圓柱漸層（半透明寶特瓶）
+      const bg3 = ctx.createLinearGradient(rx - bw2, 0, rx + bw2, 0);
+      bg3.addColorStop(0, "rgba(160,200,235,0.75)");
+      bg3.addColorStop(0.3, "rgba(226,240,252,0.9)");
+      bg3.addColorStop(0.65, "rgba(190,220,245,0.8)");
+      bg3.addColorStop(1, "rgba(140,180,215,0.78)");
+      ctx.fillStyle = bg3;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(rx - bw2, y + 16, bw2 * 2, bh2, 12) : ctx.rect(rx - bw2, y + 16, bw2 * 2, bh2); ctx.fill();
+      ctx.strokeStyle = "rgba(80,120,160,0.6)"; ctx.lineWidth = 1.4; ctx.stroke();
+      // 瓶內水位
+      ctx.fillStyle = "rgba(80,150,230,0.55)";
+      ctx.fillRect(rx - bw2 + 2, y + 16 + bh2 * 0.45, bw2 * 2 - 4, bh2 * 0.5);
+      // 瓶肩曲線接鼻錐
+      ctx.fillStyle = "rgba(240,80,70,0.9)";
+      ctx.beginPath(); ctx.moveTo(rx - bw2 + 2, y + 18);
+      ctx.quadraticCurveTo(rx - 8, y + 6, rx, y - 24);
+      ctx.quadraticCurveTo(rx + 8, y + 6, rx + bw2 - 2, y + 18);
+      ctx.closePath(); ctx.fill();
+      // 尾翼 ×3（前二後一）
+      ctx.fillStyle = "rgba(245,140,90,0.92)";
+      ctx.beginPath(); ctx.moveTo(rx - bw2 + 1, y + 34); ctx.lineTo(rx - bw2 - 13, y + 64); ctx.lineTo(rx - bw2 + 1, y + 62); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(rx + bw2 - 1, y + 34); ctx.lineTo(rx + bw2 + 13, y + 64); ctx.lineTo(rx + bw2 - 1, y + 62); ctx.closePath(); ctx.fill();
+      label(ctx, 20, 18, "水火箭", PL.fmt(out, 1) + " m/s²", c);
     } else if (config.kind === "crumple") {
       D.line(ctx, 34, ground, W - 34, ground, "rgba(255,255,255,0.28)", 3); const x = cx - 85; D.rect(ctx, x, ground - 68, 142, 46, { fill: "rgba(255,138,101,0.38)", stroke: PL.col("warn"), width: 2, r: 8 }); D.rect(ctx, x + 108, ground - 58, 34, 26, { fill: "rgba(255,204,102,0.45)", stroke: c, width: 1.5, r: 4 }); D.spring(ctx, x + 142, ground - 45, x + 205, ground - 45, 7, 8, c); D.line(ctx, x + 210, ground - 100, x + 210, ground + 2, "rgba(255,255,255,0.62)", 5); D.arrow(ctx, x + 55, ground - 115, x + 55, ground - 75, { color: PL.col("danger"), width: 3, label: "F" }); label(ctx, 20, 18, "平均緩衝力", PL.fmt(out, 1) + " kN", c);
     } else if (config.kind === "skate") {
@@ -236,12 +274,130 @@
         D.text(ctx, "振幅越大，波前畫得越粗、喇叭越大", W - 118, cy - 12,
           { color: PL.col("text-faint"), size: 9.5, align: "center" });
       }
-      else if (config.kind === "echo") { D.rect(ctx, W - 112, 42, 28, ground - 42, { fill: "rgba(255,255,255,0.22)", stroke: "rgba(255,255,255,0.55)", r: 3 }); D.disc(ctx, 100, cy, 16, { fill: c, glow: c, glowSize: 12 }); const r = (time * b * 0.35) % (W - 210); D.ring(ctx, 100, cy, r, "rgba(255,204,102,0.42)", 2); D.line(ctx, 100, cy, W - 112, cy, "rgba(255,255,255,0.20)", 1, [4, 4]); }
-      else { D.rect(ctx, 46, ground - 30, W - 92, 26, { fill: "rgba(90,162,255,0.22)", stroke: c, width: 2, r: 5 }); D.rect(ctx, cx - 65, ground - 105, 130, 75, { fill: "rgba(255,255,255,0.12)", stroke: PL.col("warn"), width: 2, r: 6 }); const sway = Math.sin(time * a) * Math.min(36, out * 14); D.line(ctx, cx, ground - 30, cx + sway, ground - 105, PL.col("danger"), 4); D.ring(ctx, cx, ground - 18, 16 + b * 5, "rgba(90,162,255,0.38)", 2); }
+      else if (config.kind === "echo") {
+        /* 超音波儀器化：手持探頭（斜握）＋聲波弧＋障礙物＋A-scan 回波螢幕 */
+        // 探頭本體
+        ctx.save(); ctx.translate(96, cy - 34); ctx.rotate(-0.18);
+        const pg3 = ctx.createLinearGradient(0, -16, 0, 16);
+        pg3.addColorStop(0, "rgb(150,158,176)"); pg3.addColorStop(0.5, "rgb(205,212,226)"); pg3.addColorStop(1, "rgb(112,120,138)");
+        ctx.fillStyle = pg3;
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-30, -16, 60, 32, 8) : ctx.rect(-30, -16, 60, 32); ctx.fill();
+        ctx.strokeStyle = "rgba(70,78,94,0.7)"; ctx.lineWidth = 1; ctx.stroke();
+        // 探頭面（發射窗）
+        ctx.fillStyle = "rgba(90,140,220,0.85)";
+        ctx.fillRect(26, -13, 7, 26);
+        // 線纜
+        ctx.strokeStyle = "rgba(80,88,104,0.85)"; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(-30, 0); ctx.quadraticCurveTo(-58, -30, -86, -18); ctx.stroke();
+        ctx.restore();
+        // 聲波弧（往外+回來）
+        const r2 = (time * b * 0.35) % (W - 210);
+        for (let k = 0; k < 3; k++) {
+          D.ring(ctx, 128, cy - 6, Math.max(4, r2 - k * 16), `rgba(255,204,102,${0.42 - k * 0.12})`, 2);
+        }
+        // 障礙物：牆面質感
+        ctx.fillStyle = "rgba(150,158,176,0.4)";
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(W - 112, 42, 28, ground - 42, 3) : ctx.rect(W - 112, 42, 28, ground - 42); ctx.fill();
+        ctx.strokeStyle = "rgba(210,218,232,0.6)"; ctx.lineWidth = 1.5; ctx.stroke();
+        for (let y = 54; y < ground - 20; y += 26) D.line(ctx, W - 108, y, W - 88, y, "rgba(255,255,255,0.14)", 1);
+        // 路徑虛線
+        D.line(ctx, 128, cy - 6, W - 112, cy - 6, "rgba(255,255,255,0.22)", 1, [4, 4]);
+        // A-scan 螢幕（右上）：發射脈衝+回波尖峰
+        const sX = W * 0.60, sY = 42, sW2 = W * 0.30, sH2 = 74;
+        ctx.fillStyle = "#060a10";
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(sX, sY, sW2, sH2, 6) : ctx.rect(sX, sY, sW2, sH2); ctx.fill();
+        ctx.strokeStyle = "rgba(110,220,160,0.5)"; ctx.lineWidth = 1; ctx.stroke();
+        ctx.strokeStyle = "rgba(120,230,170,0.9)"; ctx.lineWidth = 1.8; ctx.beginPath();
+        const frac = r2 / (W - 210);
+        for (let x = 0; x <= sW2 - 12; x += 2) {
+          const fpos = x / (sW2 - 12);
+          let y = 0;
+          if (fpos < 0.06) y = -Math.sin(fpos / 0.06 * Math.PI) * 22;                    // 發射脈衝
+          if (Math.abs(fpos - frac) < 0.03) y = -Math.pow(Math.cos((fpos - frac) / 0.03 * Math.PI / 2), 2) * 26;  // 回波
+          const px3 = sX + 6 + x, py3 = sY + sH2 / 2 + y;
+          x === 0 ? ctx.moveTo(px3, py3) : ctx.lineTo(px3, py3);
+        }
+        ctx.stroke();
+        ctx.fillStyle = "rgba(150,230,180,0.85)"; ctx.font = "10px sans-serif";
+        ctx.fillText("A-scan 回波", sX + 8, sY + sH2 - 8);
+        D.text(ctx, "超音波探頭", 96, cy + 44, { color: PL.col("text-faint"), size: 10, align: "center" });
+      }
+      else {
+        /* 地震波與隔震：左＝地面震源波形，右＝建築剖面＋隔震層（橡膠墊）＋搖擺回饋 */
+        // 地面
+        D.rect(ctx, 30, ground - 16, W - 60, 18, { fill: "rgba(140,150,130,0.30)", r: 3 });
+        // 震源（左）：振動頻率 a 越高，地面上箭頭抖越快
+        const shake = Math.sin(time * a * TAU * 0.35) * Math.min(14, 4 + out * 4);
+        D.arrow(ctx, 150 + shake, ground - 34, 150 + shake, ground - 12, { color: PL.col("danger"), width: 3, label: "地面振動" });
+        // 建築（右）：樓層
+        const bldX = W * 0.58, bldW = 128, floors = 4, fh = 30;
+        const sway = Math.sin(time * a) * Math.min(30, out * 13);
+        // 隔震層：兩層橡膠墊（黑）＋鉛芯（灰）
+        const isoH = 12;
+        ctx.fillStyle = "rgba(50,54,64,0.85)";
+        ctx.fillRect(bldX - bldW / 2 - 6, ground - 16 - isoH, bldW + 12, isoH);
+        ctx.fillStyle = "rgba(150,158,176,0.9)";
+        ctx.fillRect(bldX - 14, ground - 16 - isoH + 2, 28, isoH - 4);
+        // 建築本體（隨 sway 頂部平移→傾斜）
+        ctx.save();
+        ctx.translate(bldX, ground - 16 - isoH);
+        const tilt = sway / 900;
+        ctx.rotate(tilt);
+        for (let f = 0; f < floors; f++) {
+          const fy = -(f + 1) * fh;
+          ctx.fillStyle = f % 2 ? "rgba(214,222,238,0.30)" : "rgba(170,186,215,0.30)";
+          ctx.fillRect(-bldW / 2, fy - fh + 3, bldW, fh - 4);
+          ctx.strokeStyle = "rgba(190,200,225,0.65)"; ctx.lineWidth = 1.2;
+          ctx.strokeRect(-bldW / 2, fy - fh + 3, bldW, fh - 4);
+          // 窗
+          ctx.fillStyle = "rgba(255,214,120,0.35)";
+          for (let w2 = 0; w2 < 4; w2++) ctx.fillRect(-bldW / 2 + 12 + w2 * 30, fy - fh + 10, 18, 12);
+        }
+        ctx.restore();
+        // 反應放大警示
+        if (out > 2) D.text(ctx, "接近共振！", bldX, ground - 16 - isoH - floors * fh - 26, { color: PL.col("danger"), size: 13, align: "center", weight: "700" });
+        // 隔震標註
+        D.text(ctx, "隔震層", bldX - bldW / 2 - 44, ground - 16 - isoH / 2, { color: PL.col("text-faint"), size: 10, align: "right" });
+      }
       label(ctx, 20, 18, "波動量測", PL.fmt(out, 2) + " " + config.unit, c);
     } else if (["pinhole", "rgb", "fiber", "eye", "camera"].includes(config.kind)) {
       if (config.kind === "pinhole") { D.rect(ctx, cx - 6, 42, 12, ground - 100, { fill: "rgba(255,255,255,0.23)", stroke: "rgba(255,255,255,0.48)", r: 2 }); D.disc(ctx, cx, cy, 3, { fill: PL.col("warn") }); D.rect(ctx, W - 100, 72, 10, ground - 130, { fill: "rgba(90,162,255,0.26)", stroke: c, width: 2, r: 2 }); D.line(ctx, 100, cy - 52, cx, cy, PL.col("warn"), 1.8); D.line(ctx, 100, cy + 52, cx, cy, PL.col("warn"), 1.8); D.line(ctx, cx, cy, W - 95, cy + 56, c, 1.8); D.line(ctx, cx, cy, W - 95, cy - 56, c, 1.8); D.rect(ctx, 82, cy - 66, 34, 132, { fill: "rgba(255,179,87,0.34)", stroke: PL.col("warn"), width: 2, r: 4 }); }
-      else if (config.kind === "rgb") { const centers = [[cx - 56, cy - 18, "rgba(255,72,72,0.46)"], [cx + 56, cy - 18, "rgba(85,255,126,0.46)"], [cx, cy + 54, "rgba(88,132,255,0.46)"]]; centers.forEach(item => D.disc(ctx, item[0], item[1], 76, { fill: item[3] })); D.disc(ctx, cx, cy + 2, 18 + out * 0.38, { fill: "rgba(255,255,255,0.80)", glow: "#ffffff", glowSize: 16 }); }
+      else if (config.kind === "rgb") {
+        /* 螢幕混色兩種呈現：左＝三束光投影重疊（加法混色），右＝子像素放大鏡 */
+        const R = a / 100, G = b / 100, B2 = 0.42;
+        const gl = (x, y, r, cr, cg, cb, al) => {
+          const g2 = ctx.createRadialGradient(x, y, r * 0.1, x, y, r);
+          g2.addColorStop(0, `rgba(${cr},${cg},${cb},${al})`);
+          g2.addColorStop(0.65, `rgba(${cr},${cg},${cb},${al * 0.55})`);
+          g2.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+          ctx.fillStyle = g2;
+          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        };
+        // 左：光束投影（強度→透明度）
+        gl(cx - 90, cy - 10, 86, 255, 70, 70, 0.16 + R * 0.5);
+        gl(cx + 10, cy - 10, 86, 80, 255, 120, 0.16 + G * 0.5);
+        gl(cx - 40, cy + 62, 86, 90, 135, 255, 0.16 + B2 * 0.5);
+        // 重疊中心：白點亮度=感知亮度
+        D.disc(ctx, cx - 40, cy + 10, 16 + out * 0.34, { fill: `rgba(255,255,255,${0.55 + out * 0.004})`, glow: "#ffffff", glowSize: 18 });
+        // 右：螢幕子像素放大鏡
+        const mzX = W * 0.66, mzY = cy - 10, mzW = 190, mzH = 150;
+        ctx.fillStyle = "#05070c";
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(mzX, mzY, mzW, mzH, 10) : ctx.rect(mzX, mzY, mzW, mzH); ctx.fill();
+        ctx.strokeStyle = "rgba(160,175,200,0.6)"; ctx.lineWidth = 2; ctx.stroke();
+        // RGB 條紋子像素：亮度跟滑桿
+        const cellW = 26;
+        for (let x = mzX + 10; x < mzX + mzW - 12; x += cellW) {
+          for (let y = mzY + 10; y < mzY + mzH - 10; y += 12) {
+            ctx.fillStyle = `rgba(255,60,60,${0.12 + R * 0.85})`;  ctx.fillRect(x, y, 6, 10);
+            ctx.fillStyle = `rgba(60,255,110,${0.12 + G * 0.85})`; ctx.fillRect(x + 7, y, 6, 10);
+            ctx.fillStyle = `rgba(90,130,255,${0.12 + B2 * 0.85})`; ctx.fillRect(x + 14, y, 6, 10);
+          }
+        }
+        ctx.fillStyle = "rgba(230,236,248,0.9)"; ctx.font = "10px sans-serif";
+        ctx.fillText("螢幕子像素（放大）", mzX + 8, mzY + mzH + 16);
+        // 光源圖示
+        D.text(ctx, "投影混色", cx - 100, cy - 108, { color: PL.col("text-faint"), size: 10 });
+      }
       else if (config.kind === "fiber") { ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 16; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(62, cy); ctx.bezierCurveTo(W * 0.32, cy - 92, W * 0.58, cy + 98, W - 62, cy); ctx.stroke(); ctx.strokeStyle = "rgba(255,204,102,0.85)"; ctx.lineWidth = 3; ctx.stroke(); ctx.restore(); for (let x = 86; x < W - 76; x += 36) D.disc(ctx, x, cy + Math.sin(x * 0.035 + time) * 18, 3, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 7 }); }
       else if (config.kind === "eye") { D.ring(ctx, cx, cy, 82, "rgba(255,255,255,0.55)", 3); D.disc(ctx, cx - 14, cy, 33, { fill: "rgba(90,162,255,0.25)", stroke: c, width: 2 }); D.ring(ctx, cx + 55, cy, 17, PL.col("warn"), 3); D.line(ctx, 58, cy - 42, cx - 42, cy - 12, PL.col("warn"), 1.8); D.line(ctx, 58, cy + 42, cx - 42, cy + 12, PL.col("warn"), 1.8); D.line(ctx, cx + 20, cy - 18, cx + 56, cy, c, 1.8); D.line(ctx, cx + 20, cy + 18, cx + 56, cy, c, 1.8); }
       else { D.rect(ctx, cx - 118, cy - 84, 236, 168, { fill: "rgba(0,0,0,0.32)", stroke: c, width: 3, r: 8 }); D.ring(ctx, cx, cy, 48 / Math.max(1, a / 3), PL.col("warn"), 6); D.rect(ctx, cx - 50, cy - 34, 100, 68, { fill: "rgba(90,162,255," + Math.min(0.65, out * 0.42) + ")", stroke: c, width: 1.5, r: 2 }); D.text(ctx, "曝光", cx, cy + 6, { color: "#fff", size: 12, align: "center", weight: "700" }); }
