@@ -2003,3 +2003,18 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   .sim-derived { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
   .sim-causality-row { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* 觀察點入口徽章 */
+.sim-observe-badge {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 10px; padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warn) 7%, var(--panel-solid));
+  font-size: 12px; color: var(--text-dim);
+}
+.sim-observe-badge-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--warn); flex: 0 0 auto;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 22%, transparent);
+}
