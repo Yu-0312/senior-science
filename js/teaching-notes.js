@@ -491,6 +491,11 @@
       { name: "零點偏移", tone: "b", note: "<strong>系統誤差</strong>：平均值整體偏移，重複量測無法消除，必須校正儀器。" },
       { name: "解析度", tone: "c", note: "讀數只能落在刻度上，貢獻約 r/√12 的儀器不確定度。" }
     ]},
+    "regression-lab": { title: "最小平方法在估什麼", rows: [
+      { name: "資料點數", tone: "a", note: "點少時斜率亂跳；點多了 k̂ 會在真值附近收斂——精確度來自樣本數。" },
+      { name: "雜訊 σ", tone: "b", note: "隨機雜訊讓估計<strong>不精確</strong>，但不會系統性偏高偏低（不失準）。" },
+      { name: "彎曲 c", tone: "c", note: "殘差若出現 U 形，是<strong>模型選錯</strong>，不是再擬合一次就能解決。" }
+    ]},
     "freefall": { title: "誰決定落體的快慢", rows: [
       { name: "高度 h", tone: "a", note: "決定落地時間與速率：t = √(2h/g)、v = √(2gh)。高度變四倍，時間與速率都只變兩倍。" },
       { name: "重力 g", tone: "a", note: "同樣決定時間與速率。到月球（g 約 1.6）同樣的高度會落得慢很多。" },

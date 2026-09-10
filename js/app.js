@@ -16,6 +16,66 @@
   const byId = {};
   FLAT.forEach((f, i) => { f.order = i; byId[f.exp.id] = f; });
   const LEARNING_PATHS = Array.isArray(C.learningPaths) ? C.learningPaths : [];
+
+  /*
+   * 學段標記：這個實驗在哪一級。
+   * 國中／高中是課綱本體；大學延伸是「銜接用的先修直覺」，必須在頁面上講清楚，
+   * 否則自學的高中生會以為自己必須先學完拉格朗日量才能玩這個網站。
+   */
+  function levelForExperiment(id) {
+    let universityNote = "";
+    let seniorNote = "";
+    let juniorNote = "";
+    LEARNING_PATHS.forEach(path => {
+      (path.stages || []).forEach(stage => {
+        if (!(stage.ids || []).includes(id)) return;
+        if (stage.kind === "university") universityNote = stage.note || "大學普通物理先修直覺";
+        if (stage.kind === "senior") seniorNote = stage.note || "高中課綱核心";
+        if (stage.kind === "junior") juniorNote = stage.note || "國中打底";
+      });
+    });
+    if (universityNote) {
+      return {
+        kind: "university",
+        label: "大學延伸",
+        hint: "高中課綱之後的銜接：用同一個現象多走一步。不需要先修大學課程，當成「以後會學到什麼」即可。" +
+          (universityNote ? " " + universityNote : "")
+      };
+    }
+    if (seniorNote || juniorNote) {
+      return {
+        kind: "senior",
+        label: "高中課綱",
+        hint: "對應 108 課綱高中物理。" + (seniorNote || juniorNote)
+      };
+    }
+    return {
+      kind: "senior",
+      label: "高中課綱",
+      hint: "以課綱核心概念為主；路徑中若有大學延伸步驟會另外標示。"
+    };
+  }
+
+  function paintLevelBadge(id) {
+    const host = $("#exp-header") || document.querySelector(".exp-header");
+    if (!host) return;
+    const old = host.querySelector(".exp-level-badge");
+    if (old) old.remove();
+    const info = levelForExperiment(id);
+    const badge = el("span", "exp-level-badge is-" + info.kind);
+    badge.textContent = info.label;
+    badge.title = info.hint;
+    badge.setAttribute("role", "note");
+    badge.setAttribute("aria-label", info.label + "。" + info.hint);
+    const title = $("#exp-title");
+    if (title && title.parentNode) title.parentNode.insertBefore(badge, title.nextSibling);
+    else host.appendChild(badge);
+    const oldHint = host.querySelector(".exp-level-hint");
+    if (oldHint) oldHint.remove();
+    const hint = el("p", "exp-level-hint is-" + info.kind);
+    hint.textContent = info.hint;
+    if (title && title.parentNode) title.parentNode.insertBefore(hint, badge.nextSibling);
+  }
   let activeLearningPath = LEARNING_PATHS[0] ? LEARNING_PATHS[0].id : "";
   const TEXTBOOK_BRIDGES = {
     kinematics: { junior: "國中自然：速率、平均速度與運動記錄", senior: "高中物理：直線運動、向量與運動圖像", next: "大學普通物理：運動的微分與積分描述", observe: "固定其他條件，只改變一個初始量，對照位置、速度、加速度與圖形。", exam: "遇到題目先選定參考方向，再用圖形的斜率或面積把文字情境翻成物理量。" },
@@ -1360,6 +1420,7 @@
       "第 " + (f.indexInMod + 1) + " 個實驗";
     $("#exp-title").textContent = exp.title;
     $("#exp-lead").textContent = exp.concept;
+    paintLevelBadge(id);
     renderExperimentLearningPath(id);
     renderLearningOutput(f);
 

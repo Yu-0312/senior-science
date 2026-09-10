@@ -424,11 +424,12 @@
     const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.58, 900);
 
-    const N = 12;                      // 資料點數
-    const B_TRUE = 2.0;                // 真實截距
+    const N_MAX = 12;
+    const B_TRUE = 2.0;
     let seed = 20260726;
+    let pts = [];                    // 學生實際累積的資料點
+    let nextX = 1;
 
-    /* splitmix32：相鄰種子也能給出不相關的序列，換一組雜訊才會真的不一樣 */
     function rng(s) {
       return function () {
         s |= 0; s = (s + 0x9e3779b9) | 0;
@@ -437,21 +438,20 @@
         return ((t = t ^ (t >>> 15)) >>> 0) / 4294967296;
       };
     }
-    /* Box–Muller：把均勻亂數轉成常態分布，量測雜訊才是真的高斯雜訊 */
     function gauss(r) {
       const u = Math.max(1e-9, r()), v = r();
       return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
     }
 
-    PL.ui.section(L.controls, "真實模型");
-    const sK = PL.ui.slider(L.controls, { label: "真實斜率 k", min: 0.2, max: 4, step: 0.05, value: 1.8, digits: 2, onInput: draw });
+    PL.ui.section(L.controls, "真實模型（學生看不到這條線，直到打開顯示）");
+    const sK = PL.ui.slider(L.controls, { label: "真實斜率 k", min: 0.2, max: 4, step: 0.05, value: 1.8, digits: 2, onInput: () => clearPts() });
     PL.ui.section(L.controls, "量測條件");
-    const sNoise = PL.ui.slider(L.controls, { label: "量測雜訊 σ", min: 0, max: 2, step: 0.05, value: 0.65, digits: 2, onInput: draw });
-    const sBend = PL.ui.slider(L.controls, { label: "偏離直線的彎曲 c", min: 0, max: 0.15, step: 0.005, value: 0, digits: 3, onInput: draw });
+    const sNoise = PL.ui.slider(L.controls, { label: "量測雜訊 σ", min: 0, max: 2, step: 0.05, value: 0.65, digits: 2, onInput: () => clearPts() });
+    const sBend = PL.ui.slider(L.controls, { label: "偏離直線的彎曲 c", min: 0, max: 0.15, step: 0.005, value: 0, digits: 3, onInput: () => clearPts() });
 
     PL.ui.section(L.controls, "顯示");
     const layers = PL.ui.chipGroup(L.controls, {
-      multi: true, value: ["resid", "true"],
+      multi: true, value: ["resid"],
       options: [
         { value: "resid", label: "殘差線" },
         { value: "true", label: "真實直線" }
@@ -460,39 +460,58 @@
     });
 
     const row = PL.ui.buttonRow(L.controls);
-    PL.ui.button(row, "重新取樣", () => { seed = (seed + 7919) | 0; draw(); }, { primary: true });
-    PL.ui.button(row, "重設", () => { sK.set(1.8); sNoise.set(0.65); sBend.set(0); seed = 20260726; draw(); });
+    const bOne = PL.ui.button(row, "量測一點", () => measureOnce(), { primary: true });
+    PL.ui.button(row, "自動補滿 12 點", () => {
+      while (pts.length < N_MAX) measureOnce(true);
+      draw();
+    });
+    PL.ui.button(row, "清除資料", () => clearPts());
+    PL.ui.button(row, "換一組雜訊", () => { seed = (seed + 7919) | 0; clearPts(); });
 
     PL.ui.note(L.controls,
-      "先把「量測雜訊 σ」拉到 0：所有點會落在同一條直線上，殘差 RMS 變成 0，" +
-      "擬合斜率會剛好等於你設定的真實斜率。" +
-      "接著慢慢加大 σ，反覆按「重新取樣」——擬合斜率會在真值附近上下跳，" +
-      "但不會系統性偏高或偏低，這就是「隨機雜訊不會讓估計失準，只會讓它不精確」。" +
-      "最後把「彎曲 c」拉起來：點看起來還是很像一條線，" +
-      "但下方的殘差圖會出現明顯的 U 形——殘差一旦有規律，就代表直線這個模型本身選錯了。");
+      "每按一次「量測一點」就多一筆資料。點少時擬合斜率會亂跳；" +
+      "點多了斜率會在真值附近穩定。把雜訊拉到 0，點會完全落在直線上。" +
+      "把彎曲拉起來：殘差圖若出現 U 形，代表直線模型本身不對。");
 
+    const rCount = PL.ui.readout(L.readouts, { label: "已記錄點數", unit: "點" });
     const rSlope = PL.ui.readout(L.readouts, { label: "擬合斜率 k̂" });
     const rInt = PL.ui.readout(L.readouts, { label: "擬合截距 b̂" });
     const rRms = PL.ui.readout(L.readouts, { label: "殘差 RMS" });
     const rR2 = PL.ui.readout(L.readouts, { label: "決定係數 R²" });
     const rBias = PL.ui.readout(L.readouts, { label: "k̂ 與真值的差" });
+    const rTask = PL.ui.readout(L.readouts, { label: "任務進度" });
 
     const cc = PL.ui.chart(PL.ui.charts(root), {
       title: "殘差圖（資料點與擬合線的垂直差）",
-      cap: "殘差應該隨機散布在零線兩側、看不出規律。若出現 U 形或倒 U 形，" +
-        "表示資料本身不是直線關係，這時候再怎麼調整擬合線都沒有用，該換模型。"
+      cap: "殘差應該隨機散布在零線兩側。若出現 U 形，表示資料不是直線關係。"
     });
 
-    /* 產生資料並解最小平方——這裡是真的在算，不是套公式湊數字 */
+    function clearPts() {
+      pts = [];
+      nextX = 1;
+      draw();
+    }
+    function measureOnce(silent) {
+      if (pts.length >= N_MAX) return;
+      const k = sK.get(), sigma = sNoise.get(), bend = sBend.get();
+      const r = rng(seed + pts.length * 17);
+      const x = nextX++;
+      const y = k * x + B_TRUE + bend * (x - (N_MAX + 1) / 2) * (x - (N_MAX + 1) / 2) + sigma * gauss(r);
+      pts.push([x, y]);
+      if (!silent) draw();
+    }
+    function taskText() {
+      const n = pts.length;
+      if (n === 0) return "尚未量測：按「量測一點」開始";
+      if (n < 3) return "點太少，斜率還很不穩";
+      if (n < 8) return "再量幾點，看 k̂ 如何收斂";
+      return "點數足夠：比較 k̂ 與真實斜率";
+    }
+
     function fit() {
       const k = sK.get(), sigma = sNoise.get(), bend = sBend.get();
-      const r = rng(seed);
-      const pts = [];
-      for (let i = 0; i < N; i += 1) {
-        const x = i + 1;
-        // 彎曲項讓資料偏離直線，但保持整體仍像一條線，只有殘差圖看得出來
-        const y = k * x + B_TRUE + bend * (x - (N + 1) / 2) * (x - (N + 1) / 2) + sigma * gauss(r);
-        pts.push([x, y]);
+      if (pts.length < 2) {
+        return { k, sigma, bend, pts, kHat: NaN, bHat: NaN, resid: [], rms: 0, r2: 1 };
       }
       const n = pts.length;
       const mx = pts.reduce((s, p) => s + p[0], 0) / n;
@@ -514,23 +533,49 @@
       const c = accent();
       const box = { x: 54, y: 24, w: W - 96, h: H - 74 };
 
-      const xs = f.pts.map(p => p[0]), ys = f.pts.map(p => p[1]);
-      const y0 = Math.min(...ys, f.bHat), y1 = Math.max(...ys, f.kHat * N + f.bHat);
+      if (!f.pts.length) {
+        D.text(ctx, "最小平方法：自己量點，看直線怎麼被「拉」出來", W / 2, H * 0.34,
+          { color: PL.col("text"), size: 15, align: "center", weight: "700" });
+        D.text(ctx, "按「量測一點」開始；點越多，斜率估計越穩", W / 2, H * 0.34 + 26,
+          { color: PL.col("text-faint"), size: 12, align: "center" });
+        D.text(ctx, "目前設定：k=" + PL.fmt(sK.get(), 2) + " · σ=" + PL.fmt(sNoise.get(), 2) +
+          " · 彎曲 c=" + PL.fmt(sBend.get(), 3), W / 2, H * 0.34 + 48,
+          { color: PL.col("text-dim"), size: 11, align: "center" });
+        const g0 = PL.graph(cv, box, { x0: 0, x1: N_MAX + 1, y0: 0, y1: 12 });
+        g0.frame({ xlabel: "自變量 x", ylabel: "量測值 y" });
+        g0.grid(6, 4);
+        // 預覽第一點可能落點（跟著 σ 張開的區間）
+        if (layers.has("true")) {
+          g0.curve([[0, B_TRUE], [N_MAX + 1, sK.get() * (N_MAX + 1) + B_TRUE]],
+            { color: PL.col("text-faint"), width: 1.5, dash: [6, 5] });
+        }
+        const sigma = sNoise.get();
+        const y1p = sK.get() * 1 + B_TRUE;
+        if (sigma > 0.02) {
+          g0.curve([[0.6, y1p - 2 * sigma], [1.4, y1p - 2 * sigma]],
+            { color: PL.col("warn"), width: 1.2 });
+          g0.curve([[0.6, y1p + 2 * sigma], [1.4, y1p + 2 * sigma]],
+            { color: PL.col("warn"), width: 1.2 });
+        }
+        rCount.set(0, 0); rSlope.set("—"); rInt.set("—"); rRms.set("—"); rR2.set("—"); rBias.set("—");
+        rTask.set(taskText());
+        return;
+      }
+
+      const ys = f.pts.map(p => p[1]);
+      const y0 = Math.min(...ys, isFinite(f.bHat) ? f.bHat : ys[0]);
+      const y1 = Math.max(...ys, isFinite(f.bHat) ? f.kHat * N_MAX + f.bHat : ys[0]);
       const pad = Math.max(0.6, (y1 - y0) * 0.14);
-      const g = PL.graph(cv, box, { x0: 0, x1: N + 1, y0: y0 - pad, y1: y1 + pad });
+      const g = PL.graph(cv, box, { x0: 0, x1: N_MAX + 1, y0: y0 - pad, y1: y1 + pad });
       g.frame({ xlabel: "自變量 x", ylabel: "量測值 y" });
       g.grid(6, 4);
 
-      // 真實直線：讓學生看得到「擬合線並不等於真值，只是最好的估計」
       if (layers.has("true")) {
-        g.curve([[0, f.k * 0 + B_TRUE], [N + 1, f.k * (N + 1) + B_TRUE]],
+        g.curve([[0, B_TRUE], [N_MAX + 1, f.k * (N_MAX + 1) + B_TRUE]],
           { color: PL.col("text-faint"), width: 1.6, dash: [6, 5] });
-        g.label(0.4, f.k * (N + 1) + B_TRUE, "真實直線 y = kx + b",
-          { color: PL.col("text-faint"), size: 9.5 });
       }
 
-      // 殘差線：每個點到擬合線的垂直距離，最小平方法要讓這些長度的平方和最小
-      if (layers.has("resid")) {
+      if (layers.has("resid") && isFinite(f.kHat)) {
         f.pts.forEach((p, i) => {
           const yHat = f.kHat * p[0] + f.bHat;
           D.line(ctx, g.X(p[0]), g.Y(p[1]), g.X(p[0]), g.Y(yHat),
@@ -538,25 +583,36 @@
         });
       }
 
-      // 擬合線
-      g.curve([[0, f.bHat], [N + 1, f.kHat * (N + 1) + f.bHat]], { color: c, width: 2.4 });
+      if (isFinite(f.kHat)) {
+        g.curve([[0, f.bHat], [N_MAX + 1, f.kHat * (N_MAX + 1) + f.bHat]], { color: c, width: 2.4 });
+      }
       f.pts.forEach(p => g.dot(p[0], p[1], { color: PL.col("accent-2"), r: 4 }));
+      D.text(ctx, "已記錄 " + f.pts.length + " 點", box.x + 8, box.y + 16,
+        { color: PL.col("text-faint"), size: 11 });
+      if (isFinite(f.kHat)) {
+        D.text(ctx, "ŷ = " + PL.fmt(f.kHat, 2) + " x + " + PL.fmt(f.bHat, 2),
+          box.x + box.w - 8, box.y + 16, { color: c, size: 12, align: "right", weight: "700" });
+      }
 
-      D.text(ctx, "ŷ = " + PL.fmt(f.kHat, 2) + " x + " + PL.fmt(f.bHat, 2),
-        box.x + box.w - 8, box.y + 16, { color: c, size: 12, align: "right", weight: "700" });
-
-      PL.ui.caption(cv, f.sigma === 0 && f.bend === 0
-        ? "沒有雜訊時每個點都落在同一條直線上，殘差全為零，擬合斜率剛好等於真實斜率。"
-        : f.bend > 0.02
-          ? "資料其實是彎的。直線仍然可以擬合，但殘差圖會露出馬腳——殘差有規律就代表模型不對。"
-          : "擬合線不會通過每一個點；最小平方法找的是「讓所有殘差平方和最小」的那一條。");
+      rCount.set(f.pts.length, 0);
+      rSlope.set(isFinite(f.kHat) ? f.kHat : "—", 3);
+      rInt.set(isFinite(f.bHat) ? f.bHat : "—", 3);
+      rRms.set(f.rms, 3);
+      rR2.set(f.r2, 4);
+      rBias.set(isFinite(f.kHat) ? f.kHat - f.k : "—", 3);
+      rTask.set(taskText());
     }
 
     function residualChart(f) {
       cc.clear();
+      if (f.pts.length < 2) {
+        D.text(cc.ctx, "至少量 2 點才會有殘差", cc.W / 2, cc.H / 2,
+          { color: PL.col("text-faint"), size: 12, align: "center" });
+        return;
+      }
       const m = Math.max(0.35, Math.max(...f.resid.map(Math.abs)) * 1.35);
       const g = PL.graph(cc, { x: 50, y: 16, w: cc.W - 66, h: cc.H - 40 },
-        { x0: 0, x1: N + 1, y0: -m, y1: m });
+        { x0: 0, x1: N_MAX + 1, y0: -m, y1: m });
       g.frame({ xlabel: "x", ylabel: "殘差" });
       g.grid(6, 4);
       g.hline(0, { color: PL.col("text-faint"), width: 1.4 });
@@ -571,11 +627,6 @@
       const f = fit();
       scene(f);
       residualChart(f);
-      rSlope.set(f.kHat, 3);
-      rInt.set(f.bHat, 3);
-      rRms.set(f.rms, 3);
-      rR2.set(f.r2, 4);
-      rBias.set(f.kHat - f.k, 3);
     }
 
     cv.onResize(draw); cc.onResize(draw);

@@ -581,6 +581,33 @@ body.checkpoint-active { overflow: hidden; }
 .exp-learning-path { max-width: 980px; margin-top: 18px; padding-top: 13px; border-top: 1px solid var(--border-soft); }
 .exp-path-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin-bottom: 9px; }
 .exp-path-eyebrow { color: var(--m-ink, var(--m-color, var(--accent))); font-size: 11px; font-weight: 800; letter-spacing: 1px; }
+
+/* 學段徽章：大學延伸必須一眼看出，避免高中生誤以為門檻過高 */
+.exp-level-badge {
+  display: inline-block; margin: 6px 0 0; padding: 3px 10px;
+  border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: 0.4px;
+  border: 1px solid transparent;
+}
+.exp-level-badge.is-senior {
+  color: var(--m-ink, var(--accent));
+  background: color-mix(in srgb, var(--m-color, var(--accent)) 14%, transparent);
+  border-color: color-mix(in srgb, var(--m-color, var(--accent)) 35%, transparent);
+}
+.exp-level-badge.is-university {
+  color: #e8d4ff;
+  background: color-mix(in srgb, #c795ff 22%, transparent);
+  border-color: color-mix(in srgb, #c795ff 50%, transparent);
+}
+[data-theme="light"] .exp-level-badge.is-university { color: #5a2d8a; }
+.exp-level-hint {
+  margin: 8px 0 0; max-width: 52em;
+  color: var(--text-faint); font-size: 12px; line-height: 1.6;
+}
+.exp-level-hint.is-university {
+  color: var(--text-dim);
+  border-left: 3px solid #c795ff;
+  padding-left: 10px;
+}
 .exp-path-summary { color: var(--text-faint); font-size: 11px; white-space: nowrap; }
 .exp-path-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .exp-path-step {
