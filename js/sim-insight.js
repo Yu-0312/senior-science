@@ -371,7 +371,13 @@
           : r.readout.label + " ∝ " + r.slider.label + formatExponent(r.exponent);
       }
       const cta = el("p", "sim-predict-cta", result);
-      cta.textContent = "現在自己拉一次滑桿，確認畫面上的變化和這個數字一致。";
+      if (correct) {
+        cta.textContent = "現在自己拉一次滑桿，確認畫面上的變化和這個數字一致。";
+      } else {
+        // 猜錯時不要只說「你錯了」，給一條可執行的檢查路徑
+        cta.textContent = "先別急著改口：只拉「" + r.slider.label + "」，眼睛鎖定「" +
+          r.readout.label + "」的讀數，看它到底往上還是往下。讀數不會說謊。";
+      }
       Array.from(choices.children).forEach(b => {
         b.disabled = true;
         if (b.dataset.key === r.direction) b.classList.add("is-correct");
@@ -443,6 +449,39 @@
     const meterFill = el("div", "sim-challenge-fill", meter);
     const live = el("p", "sim-challenge-live", panel);
     live.setAttribute("aria-live", "polite");
+
+    /*
+     * 分層提示：卡住時先給方向，再給操作，最後才揭曉數值。
+     * 直接把答案貼出來，學生就不會自己動手找了。
+     */
+    const hintBtn = el("button", "sim-hint-btn", panel);
+    hintBtn.type = "button";
+    hintBtn.textContent = "卡住了？看提示";
+    hintBtn.setAttribute("aria-expanded", "false");
+    const hintBody = el("div", "sim-hint-body", panel);
+    hintBody.hidden = true;
+    let hintLevel = 0;
+    const hints = [
+      "先只動「" + r.slider.label + "」這一根，其他滑桿先不要碰——控制變因。",
+      "往" + (r.direction === "up" ? "大" : r.direction === "peak" ? "中間偏大" : "小") +
+        "的方向推「" + r.slider.label + "」，盯著「" + r.readout.label + "」的讀數。",
+      "目標大約是 " + fmtValue(target) + unit + "。目前讀數見上方；差太多就繼續微調。"
+    ];
+    hintBtn.addEventListener("click", () => {
+      if (hintLevel >= hints.length) return;
+      const line = el("p", "sim-hint-line", hintBody);
+      line.textContent = "提示 " + (hintLevel + 1) + "：" + hints[hintLevel];
+      hintBody.hidden = false;
+      hintBtn.setAttribute("aria-expanded", "true");
+      hintLevel += 1;
+      if (hintLevel >= hints.length) {
+        hintBtn.textContent = "提示已全部展開";
+        hintBtn.disabled = true;
+      } else {
+        hintBtn.textContent = "再給下一層提示（" + hintLevel + "/" + hints.length + "）";
+      }
+    });
+    if (cleared) hintBtn.hidden = true;
 
     function update() {
       const value = r.readout.number != null ? r.readout.number : numeric(r.readout.value);

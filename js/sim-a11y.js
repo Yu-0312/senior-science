@@ -1,15 +1,6 @@
 /*
  * sim-a11y.js — 模擬的無障礙描述層
- *
- * 目標：讓使用螢幕報讀器、只用鍵盤、或暫時看不清畫面的人，
- * 打開任一個實驗都能立刻知道「這是什麼、怎麼開始、目前讀數是多少」。
- *
- * 與一般 a11y 補丁的差別：
- *   1. 不只給 canvas 一個 aria-label，而是把「操作方式」寫成可讀的文字
- *      （播放鍵在哪、沒有播放時按哪顆、靜態實驗怎麼互動）。
- *   2. 傳輸列每顆按鈕都有明確的 name / 狀態，切換時用 aria-live 播報。
- *   3. 文字版讀數 + 即時播報，調整參數後一定聽得到結果。
- *   4. 沒有滑桿、只有按鈕的實驗同樣提供完整說明，不會整段跳過。
+ * canvas 對報讀器是空白方塊；這裡提供：操作說明、文字版讀數、即時播報。
  */
 (function () {
   "use strict";
@@ -46,10 +37,6 @@
     }).join("，");
   }
 
-  /*
-   * 這支實驗「要怎麼開始」——沒有這段，報讀器使用者會停在
-   * 「我按了播放怎麼沒反應」或「這頁是不是壞了」。
-   */
   function howToStart(root, context) {
     const playBtn = root.querySelector(".sim-transport-play");
     const playHint = root.querySelector(".sim-transport-hint");
@@ -67,28 +54,27 @@
 
     const lines = [];
     if (hasPlay) {
-      lines.push("按「播放」開始模擬，再按一次可暫停。" +
-        (hasStep ? "「單步」可前進 1/60 秒逐格觀察。" : "") +
-        (hasReset ? "「全部重設」可把參數與計時歸零。" : ""));
+      lines.push("按「播放」開始／暫停。" +
+        (hasStep ? "「單步」可逐格觀察。" : "") +
+        (hasReset ? "「全部重設」可歸零。" : ""));
     } else if (trigger) {
-      lines.push("這個實驗沒有播放鍵。到參數區按「" + trigger + "」開始。" +
-        (hasStep ? "開始後可用「單步」逐格觀察。" : "") +
-        (hasReset ? "「全部重設」可重新準備一次。" : ""));
+      lines.push("沒有播放鍵：到參數區按「" + trigger + "」開始。" +
+        (hasStep ? "開始後可用「單步」逐格看。" : ""));
     } else if (playHint && !playHint.hidden && playHint.textContent) {
       lines.push(playHint.textContent.replace(/^[▶\s]+/, "") + "。");
     } else {
-      lines.push("調整參數區的控制項，畫面與讀數會即時更新。" +
-        (hasReset ? "改亂了可按「全部重設」。" : ""));
+      lines.push("調整參數區控制項，畫面與讀數會即時更新。" +
+        (hasReset ? "改亂了按「全部重設」。" : ""));
     }
 
     if (context.sliders && context.sliders.length) {
-      lines.push("可調參數共 " + context.sliders.length + " 項，用 Tab 選到後以左右方向鍵調整。");
+      lines.push("可調參數 " + context.sliders.length + " 項；Tab 選到後用左右鍵調整。");
     }
     const buttons = Array.from(root.querySelectorAll(".sim-controls button"))
       .filter(b => !b.disabled && b.type !== "submit");
     if (buttons.length) {
       const names = buttons.slice(0, 6).map(b => b.textContent.trim()).filter(Boolean);
-      if (names.length) lines.push("參數區按鈕：" + names.join("、") + "。");
+      if (names.length) lines.push("按鈕：" + names.join("、") + "。");
     }
     return lines.join("");
   }
@@ -228,8 +214,7 @@
     paintList();
 
     const hint = el("p", "sim-a11y-hint", details);
-    hint.textContent = "鍵盤：Tab 移動到控制項；方向鍵微調滑桿；Home／End 跳到最小／最大值；" +
-      "Enter 或 Space 按下按鈕。調整後會自動播報新的讀數。";
+    hint.textContent = "鍵盤：Tab 移動；方向鍵微調；Home／End 最小／最大；Enter/Space 按鈕。";
 
     /* -----------------------------------------------------------------
        3. 即時播報

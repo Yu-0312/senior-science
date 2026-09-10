@@ -1417,6 +1417,8 @@
     if (outputs) {
       const existing = outputs.querySelector(".worksheet-link-row");
       if (existing) existing.remove();
+      const oldKeys = outputs.querySelector(".sim-shortcuts");
+      if (oldKeys) oldKeys.remove();
       const row = el("div", "worksheet-link-row", outputs);
       const link = el("a", "worksheet-link", row);
       link.href = "p/worksheet-" + encodeURIComponent(exp.id) + ".html";
@@ -1425,6 +1427,10 @@
       link.textContent = "列印這個實驗的學習單";
       const note = el("span", "worksheet-link-note", row);
       note.textContent = "含資料記錄表格、作圖區與由圖求值欄位，可直接發給學生";
+
+      /* 鍵盤捷徑：自學與上台都用得到，寫在實驗頁而不是藏進說明書 */
+      const keys = el("p", "sim-shortcuts", outputs);
+      keys.textContent = "鍵盤：空白鍵 播放／暫停 · S 單步 · R 全部重設 · ← → 切換實驗 · / 搜尋";
     }
 
     // 上一個 / 下一個
@@ -1987,6 +1993,15 @@
         if (e.key === " " && !e.repeat) {
           const playBtn = document.querySelector(".sim-transport-play");
           if (playBtn && !playBtn.hidden) { e.preventDefault(); playBtn.click(); }
+        }
+        // R＝全部重設；S＝單步。自學與上台都少一次滑鼠移動
+        if ((e.key === "r" || e.key === "R") && !e.repeat) {
+          const resetBtn = document.querySelector(".sim-transport-reset");
+          if (resetBtn && !resetBtn.hidden) { e.preventDefault(); resetBtn.click(); }
+        }
+        if ((e.key === "s" || e.key === "S") && !e.repeat) {
+          const stepBtn = document.querySelector(".sim-transport-btn");
+          if (stepBtn && !stepBtn.hidden && !stepBtn.disabled) { e.preventDefault(); stepBtn.click(); }
         }
       }
       // 「/」聚焦搜尋：從任何地方一鍵找實驗
