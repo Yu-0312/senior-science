@@ -1583,6 +1583,70 @@
     }
   }
 
+  /* 數位碼錶：實驗課計時用，readout 由實驗自己疊文字 */
+  function stopwatch(ctx, cx, cy, r) {
+    // 錶殼
+    const shell = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+    shell.addColorStop(0, "rgb(210,218,228)");
+    shell.addColorStop(0.5, "rgb(140,150,164)");
+    shell.addColorStop(1, "rgb(92,100,114)");
+    ctx.fillStyle = shell;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "rgba(40,48,58,0.55)"; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.stroke();
+    // 錶面
+    const face = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.35, r * 0.1, cx, cy, r * 0.78);
+    face.addColorStop(0, "rgb(248,250,252)");
+    face.addColorStop(1, "rgb(210,218,228)");
+    ctx.fillStyle = face;
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.78, 0, TAU); ctx.fill();
+    // 頂冠與側鈕
+    brass(ctx, cx - 4, cy - r - 8, 8, 10);
+    ctx.fillStyle = "rgb(120,130,145)";
+    ctx.fillRect(cx + r - 2, cy - 4, 7, 8);
+    // 顯示窗
+    D.rect(ctx, cx - r * 0.55, cy - r * 0.22, r * 1.1, r * 0.42, {
+      fill: "#122018", stroke: "rgba(40,48,58,0.4)", r: 3
+    });
+  }
+
+  /* 十字夾／三爪夾：夾在鐵架橫桿上固定器材 */
+  function clampHead(ctx, x, y, length, angle) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle || 0);
+    brass(ctx, -5, -5, 10, 10);
+    steel(ctx, 4, -2.5, length || 28, 5, 8);
+    // 開口鉗爪
+    ctx.strokeStyle = "rgb(70,80,94)"; ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo((length || 28) - 2, -2);
+    ctx.lineTo((length || 28) + 8, -8);
+    ctx.moveTo((length || 28) - 2, 2);
+    ctx.lineTo((length || 28) + 8, 8);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* 實驗紀錄板：斜靠在桌邊的數據紙，增強「這是實驗課」的現場感 */
+  function dataPad(ctx, x, y, w, h) {
+    ctx.save();
+    ctx.translate(x + w / 2, y + h / 2);
+    ctx.rotate(-0.06);
+    ctx.translate(-(x + w / 2), -(y + h / 2));
+    // 紙張
+    ctx.fillStyle = "rgba(242,238,228,0.92)";
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = "rgba(120,112,98,0.45)"; ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    // 橫格線
+    ctx.strokeStyle = "rgba(140,150,170,0.35)";
+    for (let ly = y + 10; ly < y + h - 4; ly += 7) {
+      ctx.beginPath(); ctx.moveTo(x + 6, ly); ctx.lineTo(x + w - 6, ly); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   window.PhysicsLab.apparatus = {
     steel, brass, brassDisc, contactShadow,
     bench, carrier, benchTop,
@@ -1595,6 +1659,7 @@
     standRod, crossArm, weight, woodBlock, ramp, pulley, cord, bob, ruler, springScale, beaker,
     wallPost,
     cart, tickerTimer, vibrator, tuningFork, glassTube,
-    barMagnet, coilWinding, ironCore, thermometer, polePiece
+    barMagnet, coilWinding, ironCore, thermometer, polePiece,
+    stopwatch, clampHead, dataPad
   };
 })();

@@ -497,8 +497,24 @@
     setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
-  /* ----------------------------- 版面 ----------------------------- */
-  function layout(root) {
+  /* ----------------------------- 版面 -----------------------------
+   * layout(root, opts) 允許個別實驗宣告自己需要哪些區塊。
+   * 不需要的區塊直接不建立 DOM，而不是先塞滿再用 CSS 藏起來——
+   * 學生畫面上就不會出現空白面板或空標題。
+   *
+   * opts:
+   *   brief: false          不要任務導讀
+   *   procedure: false      不要實驗流程（連同命令列的流程按鈕）
+   *   instrument: false     不要畫布底部的儀器識別條
+   *   controls: "side"|"bottom"|"none"
+   *     side   預設：參數在右側
+   *     bottom 參數整列移到畫布下方（適合需要寬畫面的實驗）
+   *     none   完全不建參數面板（實驗自行把控制項放到其他容器）
+   *   readouts: "panel"|"none"  是否建立量測讀數面板
+   *   chrome: "full"|"quiet"    full 保留 LIVE MODEL 等儀器語彙；quiet 只留標題
+   */
+  function layout(root, opts) {
+    opts = opts || {};
     root.innerHTML = "";
     root.classList.add("lab-sim");
     const profile = root._labProfile || profileFor(root.dataset && root.dataset.simId);
@@ -507,6 +523,15 @@
     root._labReadouts = [];
     const workflow = workflowFor(profile);
     const brief = learningBriefFor(profile);
+    const wantBrief = opts.brief !== false;
+    const wantProcedure = opts.procedure !== false;
+    const wantInstrument = opts.instrument !== false;
+    const controlsMode = opts.controls === "bottom" || opts.controls === "none" ? opts.controls : "side";
+    const wantReadouts = opts.readouts !== "none";
+    const quietChrome = opts.chrome === "quiet";
+    root.dataset.labLayout = controlsMode;
+    if (!wantBrief) root.dataset.labNoBrief = "1";
+    if (!wantProcedure) root.dataset.labNoProcedure = "1";
     const commandBar = el("div", "sim-command-bar", root);
     const commandTitle = el("div", "sim-command-title", commandBar);
     const stageLabel = el("span", "sim-command-stage", commandTitle); stageLabel.textContent = profile.stage;
@@ -525,52 +550,64 @@
     const exportBtn = el("button", "sim-command", commandTools); exportBtn.type = "button"; exportBtn.textContent = "匯出讀數";
     const screenBtn = el("button", "sim-command", commandTools); screenBtn.type = "button"; screenBtn.textContent = "截取主畫面";
     const fullBtn = el("button", "sim-command sim-command-full", commandTools); fullBtn.type = "button"; fullBtn.textContent = "全螢幕";
+    if (!wantProcedure) {
+      guideBtn.hidden = true;
+      stepBtn.hidden = true;
+    }
 
-    const learningBrief = el("section", "sim-learning-brief", root);
-    const briefHead = el("div", "sim-learning-brief-head", learningBrief);
-    const briefKicker = el("span", "sim-learning-brief-kicker", briefHead); briefKicker.textContent = "任務導讀";
-    const briefTitle = el("span", "sim-learning-brief-title", briefHead); briefTitle.textContent = "先知道要看什麼，再開始操作";
-    const goal = el("p", "sim-learning-goal", learningBrief); goal.textContent = brief.goal;
-    const briefSteps = el("dl", "sim-learning-steps", learningBrief);
-    [["怎麼做", brief.action], ["盯住什麼", brief.observe], ["做完能說", brief.conclude]].forEach(([label, text]) => {
-      const item = el("div", "sim-learning-step", briefSteps);
-      const term = el("dt", null, item); term.textContent = label;
-      const desc = el("dd", null, item); desc.textContent = text;
-    });
-
-    const procedure = el("section", "sim-procedure", root);
-    const procedureHead = el("div", "sim-procedure-head", procedure);
-    const procedureTitle = el("span", "sim-panel-title", procedureHead); procedureTitle.textContent = "實驗流程";
-    const procedureState = el("span", "sim-procedure-state", procedureHead); procedureState.textContent = "準備中";
-    const procedureSteps = el("ol", "sim-procedure-steps", procedure);
-    const procedureNote = el("p", "sim-procedure-note", procedure); procedureNote.textContent = "每一步都會對應下方可操作的參數、模擬或量測讀數。";
-    let activeStep = -1;
-    const paintSteps = () => {
-      procedureSteps.innerHTML = "";
-      workflow.forEach((text, index) => {
-        const item = el("li", "sim-procedure-step" + (index === activeStep ? " active" : ""), procedureSteps);
-        const number = el("span", "sim-step-number", item); number.textContent = String(index + 1);
-        const copy = el("span", "sim-step-copy", item); copy.textContent = text;
+    const learningBrief = wantBrief ? el("section", "sim-learning-brief", root) : null;
+    if (learningBrief) {
+      const briefHead = el("div", "sim-learning-brief-head", learningBrief);
+      const briefKicker = el("span", "sim-learning-brief-kicker", briefHead); briefKicker.textContent = "任務導讀";
+      const briefTitle = el("span", "sim-learning-brief-title", briefHead); briefTitle.textContent = "先知道要看什麼，再開始操作";
+      const goal = el("p", "sim-learning-goal", learningBrief); goal.textContent = brief.goal;
+      const briefSteps = el("dl", "sim-learning-steps", learningBrief);
+      [["怎麼做", brief.action], ["盯住什麼", brief.observe], ["做完能說", brief.conclude]].forEach(([label, text]) => {
+        const item = el("div", "sim-learning-step", briefSteps);
+        const term = el("dt", null, item); term.textContent = label;
+        const desc = el("dd", null, item); desc.textContent = text;
       });
-      procedureState.textContent = activeStep < 0 ? "準備中" : "第 " + (activeStep + 1) + " / " + workflow.length + " 步";
-    };
+    }
+
+    const procedure = wantProcedure ? el("section", "sim-procedure", root) : null;
+    let activeStep = -1;
     const setProcedureStep = step => {
+      if (!procedure) return;
       activeStep = Math.max(0, Math.min(workflow.length - 1, step));
       paintSteps();
     };
-    root._labSetProcedureStep = setProcedureStep;
-    paintSteps();
+    let paintSteps = () => {};
+    if (procedure) {
+      const procedureHead = el("div", "sim-procedure-head", procedure);
+      const procedureTitle = el("span", "sim-panel-title", procedureHead); procedureTitle.textContent = "實驗流程";
+      const procedureState = el("span", "sim-procedure-state", procedureHead); procedureState.textContent = "準備中";
+      const procedureSteps = el("ol", "sim-procedure-steps", procedure);
+      const procedureNote = el("p", "sim-procedure-note", procedure); procedureNote.textContent = "每一步都會對應下方可操作的參數、模擬或量測讀數。";
+      paintSteps = () => {
+        procedureSteps.innerHTML = "";
+        workflow.forEach((text, index) => {
+          const item = el("li", "sim-procedure-step" + (index === activeStep ? " active" : ""), procedureSteps);
+          const number = el("span", "sim-step-number", item); number.textContent = String(index + 1);
+          const copy = el("span", "sim-step-copy", item); copy.textContent = text;
+        });
+        procedureState.textContent = activeStep < 0 ? "準備中" : "第 " + (activeStep + 1) + " / " + workflow.length + " 步";
+      };
+      root._labSetProcedureStep = setProcedureStep;
+      paintSteps();
+    }
 
-    guideBtn.addEventListener("click", () => {
-      const visible = root.classList.toggle("show-procedure");
-      guideBtn.setAttribute("aria-expanded", String(visible));
-      if (visible && activeStep < 0) setProcedureStep(0);
-    });
-    stepBtn.addEventListener("click", () => {
-      root.classList.add("show-procedure"); guideBtn.setAttribute("aria-expanded", "true");
-      setProcedureStep((activeStep + 1) % workflow.length);
-      procedure.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    });
+    if (wantProcedure) {
+      guideBtn.addEventListener("click", () => {
+        const visible = root.classList.toggle("show-procedure");
+        guideBtn.setAttribute("aria-expanded", String(visible));
+        if (visible && activeStep < 0) setProcedureStep(0);
+      });
+      stepBtn.addEventListener("click", () => {
+        root.classList.add("show-procedure"); guideBtn.setAttribute("aria-expanded", "true");
+        setProcedureStep((activeStep + 1) % workflow.length);
+        if (procedure) procedure.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
+    }
     focusBtn.addEventListener("click", () => {
       const focused = root.classList.toggle("is-focused");
       focusBtn.setAttribute("aria-pressed", String(focused));
@@ -631,33 +668,50 @@
     const resetBtn = el("button", "sim-transport-reset", transport);
     resetBtn.type = "button"; resetBtn.textContent = "全部重設";
     resetBtn.title = "把所有參數、資料與計時歸零";
+    /*
+     * 沒有播放鍵時，原本放播放鍵的位置改成一句「怎麼開始」。
+     * 學生第一眼會看傳輸列最左側——那裡空著或只剩「全部重設」時，
+     * 他們會以為實驗壞掉。提示固定放在同一個位置。
+     */
+    const playHint = el("p", "sim-transport-hint", transport);
+    playHint.hidden = true;
 
     // 建置結束後由 finishBuild() 接上實際的迴圈
-    root._labTransport = { transport, playBtn, stepBtnT, speedBtns, timeLabel, resetBtn, transportSpacer };
+    root._labTransport = { transport, playBtn, stepBtnT, speedBtns, timeLabel, resetBtn, transportSpacer, playHint };
 
     const stage = el("div", "sim-stage", root);
     const visual = el("section", "sim-visual-panel", stage);
     const visualHead = el("div", "sim-panel-head", visual);
     const visualTitle = el("span", "sim-panel-title", visualHead); visualTitle.textContent = profile.stage;
-    const visualState = el("span", "sim-live", visualHead); visualState.textContent = "LIVE MODEL";
+    if (!quietChrome) {
+      const visualState = el("span", "sim-live", visualHead); visualState.textContent = "LIVE MODEL";
+    }
     const canvasWrap = el("div", "sim-canvas-wrap", visual);
     canvasWrap._labProfile = profile;
-    const instrumentStrip = el("div", "sim-instrument-strip", visual);
-    const instrumentCode = el("span", "sim-instrument-code", instrumentStrip); instrumentCode.textContent = profile.code + " · " + (profile.moduleNo ? "模組" + profile.moduleNo : "物理模型");
-    const instrumentMode = el("span", "sim-instrument-mode", instrumentStrip); instrumentMode.textContent = "即時量測 / 可調參數";
+    const instrumentStrip = wantInstrument ? el("div", "sim-instrument-strip", visual) : null;
+    if (instrumentStrip) {
+      const instrumentCode = el("span", "sim-instrument-code", instrumentStrip); instrumentCode.textContent = profile.code + " · " + (profile.moduleNo ? "模組" + profile.moduleNo : "物理模型");
+      const instrumentMode = el("span", "sim-instrument-mode", instrumentStrip); instrumentMode.textContent = "即時量測 / 可調參數";
+    }
 
-    const controlDeck = el("section", "sim-control-deck", stage);
-    const controlHead = el("div", "sim-panel-head", controlDeck);
-    const controlTitle = el("span", "sim-panel-title", controlHead); controlTitle.textContent = "實驗參數";
-    const controlHint = el("span", "sim-panel-hint", controlHead); controlHint.textContent = "可即時調整";
-    const controls = el("div", "sim-controls", controlDeck);
+    const controlDeck = controlsMode !== "none" ? el("section", "sim-control-deck", stage) : null;
+    let controls = null;
+    if (controlDeck) {
+      const controlHead = el("div", "sim-panel-head", controlDeck);
+      const controlTitle = el("span", "sim-panel-title", controlHead); controlTitle.textContent = "實驗參數";
+      const controlHint = el("span", "sim-panel-hint", controlHead); controlHint.textContent = "可即時調整";
+      controls = el("div", "sim-controls", controlDeck);
+    }
 
-    const readoutPanel = el("section", "sim-readout-panel", root);
-    const readoutHead = el("div", "sim-readout-head", readoutPanel);
-    const readoutTitle = el("span", "sim-panel-title", readoutHead); readoutTitle.textContent = "量測讀數";
-    const readoutHint = el("span", "sim-panel-hint", readoutHead); readoutHint.textContent = "模型計算";
-    const readouts = el("div", "sim-readouts", readoutPanel);
-    return { root, profile, workflow, brief, learningBrief, commandBar, procedure, setProcedureStep, stage, visual, canvasWrap, instrumentStrip, controlDeck, controls, readoutPanel, readouts };
+    const readoutPanel = wantReadouts ? el("section", "sim-readout-panel", root) : null;
+    let readouts = null;
+    if (readoutPanel) {
+      const readoutHead = el("div", "sim-readout-head", readoutPanel);
+      const readoutTitle = el("span", "sim-panel-title", readoutHead); readoutTitle.textContent = "量測讀數";
+      const readoutHint = el("span", "sim-panel-hint", readoutHead); readoutHint.textContent = "模型計算";
+      readouts = el("div", "sim-readouts", readoutPanel);
+    }
+    return { root, profile, workflow, brief, learningBrief, commandBar, procedure, setProcedureStep, stage, visual, canvasWrap, instrumentStrip, controlDeck, controls, readoutPanel, readouts, options: opts };
   }
 
   /* --------------------------- 響應式畫布 --------------------------- */
@@ -954,6 +1008,8 @@
      */
     if (o.trigger && buildContext) {
       buildContext.hasTrigger = true;
+      // 記住觸發鈕的文字（發射／釋放…），供傳輸列提示「從這裡開始」
+      if (!buildContext.triggerLabel) buildContext.triggerLabel = label;
       const ctx = buildContext;
       b.addEventListener("click", () => {
         onClick();
@@ -1754,16 +1810,80 @@
     // 沒有動畫迴圈的實驗（純靜態圖解）不需要播放控制，只留重設。
     const animated = loops.length > 0;
     /*
-     * 這支實驗有自己的觸發鈕（發射／釋放／開始）時，就把傳輸列的「播放/暫停」藏起來。
-     * 使用者回報那兩顆看起來是重複的開始鍵；保留實驗自己那顆語意明確的，
-     * 傳輸列只留單步、速度與全部重設——單步仍可在停住時逐格檢視。
+     * 哪些傳輸列控制項要出現
+     *   · 播放／暫停：只有「連續動畫、且沒有自己的觸發鈕」才需要。
+     *     自帶發射／釋放的實驗，開始鍵在參數區；再放一顆播放是重複開關。
+     *     純靜態實驗調整滑桿就會重畫，也沒有播放可言。
+     *   · 單步／速度／時間：有動畫迴圈才需要。
+     *   · 全部重設：幾乎永遠有用，保留。
+     *   · 沒有播放鍵時，播放鍵的位置改成一句「怎麼開始」的提示。
      */
-    const selfTriggered = animated && context.hasTrigger;
+    const selfTriggered = !!(animated && context.hasTrigger);
+    const showPlay = animated && !selfTriggered;
     ui.transport.hidden = false;
-    ui.playBtn.hidden = !animated || selfTriggered;
+    ui.playBtn.hidden = !showPlay;
     ui.stepBtnT.hidden = !animated;
     ui.timeLabel.hidden = !animated;
     Array.from(ui.transport.querySelectorAll(".sim-speed")).forEach(node => { node.hidden = !animated; });
+
+    /* 沒有播放鍵 → 在同一個位置告訴學生怎麼開始 */
+    if (ui.playHint) {
+      if (showPlay) {
+        ui.playHint.hidden = true;
+        ui.playHint.textContent = "";
+      } else {
+        const trigger = context.triggerLabel || "開始";
+        let text;
+        if (selfTriggered) {
+          text = "從這裡開始：按參數區的「" + trigger + "」";
+          if (animated) text += " · 可用「單步」逐格看";
+        } else if (!animated) {
+          text = "調整參數，畫面與讀數會即時更新";
+          const hasReset = !!ui.resetBtn && !ui.resetBtn.hidden;
+          if (hasReset) text += " · 改亂了按「全部重設」";
+        } else {
+          text = "按下參數區的按鈕開始這個實驗";
+        }
+        ui.playHint.textContent = text;
+        ui.playHint.hidden = false;
+      }
+    }
+
+    /* -----------------------------------------------------------------
+       建置後清掉這次實驗用不到的區塊
+       layout() 已可依 opts 不建立面板；這裡再掃一次實際產物，
+       把「有容器但內容為空」的殘影收掉，避免空白面板佔位。
+       ----------------------------------------------------------------- */
+    const stage = root.querySelector(".sim-stage");
+    const controlDeck = root.querySelector(".sim-control-deck");
+    const readoutPanel = root.querySelector(".sim-readout-panel");
+    const controlsEl = root.querySelector(".sim-controls");
+    if (controlsEl && controlDeck && !controlsEl.children.length) {
+      controlDeck.hidden = true;
+      if (stage) stage.classList.add("is-solo");
+    }
+    if (readoutPanel) {
+      const readoutGrid = readoutPanel.querySelector(".sim-readouts");
+      if (!readoutGrid || !readoutGrid.children.length) readoutPanel.hidden = true;
+    }
+    // 命令列：這支實驗用不到的指令直接不顯示
+    const commandButtons = Array.from(root.querySelectorAll(".sim-command-tools .sim-command"));
+    const hideCommand = (text) => {
+      const node = commandButtons.find(b => b.textContent === text);
+      if (node) node.hidden = true;
+    };
+    if (!root._labReadouts || !root._labReadouts.length) hideCommand("匯出讀數");
+    // 沒有畫布（理論上不該發生）就不要提供截圖
+    if (!root.querySelector(".sim-visual-panel canvas")) hideCommand("截取主畫面");
+    // 沒有鷹架區塊時，分步演示沒有東西可以推進
+    if (!root.querySelector(".sim-procedure")) {
+      hideCommand("實驗指南");
+      hideCommand("分步演示");
+    }
+    // 專注模式會藏掉參數與讀數；沒有參數也沒有讀數時這顆沒有意義
+    if (controlDeck && controlDeck.hidden && readoutPanel && readoutPanel.hidden) {
+      hideCommand("專注模式");
+    }
 
     const primary = loops[0] || null;
     const anyRunning = () => loops.some(l => l.running);
@@ -1822,11 +1942,10 @@
 
     /*
      * 進場不自動播放（依 PhET 訪談結論）。
-     * 建置期要求過自動播放的實驗，這裡改成停在第一格，並讓播放鍵抖動一下
-     * 指出「從這裡開始」——也就是 PhET 說的 wiggle-me。
-     * 但自帶觸發鈕的實驗已經把播放鍵藏起來了，就別抖一顆看不見的按鈕。
+     * 只有「真的顯示播放鍵」的實驗才 wiggle；自帶觸發鈕或靜態實驗
+     * 已經在旁邊寫了怎麼開始，不需要抖一顆看不見的按鈕。
      */
-    if (animated && !selfTriggered && loops.some(l => l.armed)) {
+    if (showPlay && loops.some(l => l.armed)) {
       root.classList.add("show-wiggle");
       ui.playBtn.classList.add("wiggle");
       setTimeout(stopWiggle, 6000);

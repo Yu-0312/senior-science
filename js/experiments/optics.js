@@ -23,7 +23,7 @@
    * 螢幕上就該是這些東西——角度與光路疊在器材上面，而不是取代它。
    */
   PL.register("snell", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     const sTh = PL.ui.slider(L.controls, { label: "入射角 θ₁", min: 0, max: 89, step: 1, value: 35, unit: "°", digits: 0, onInput: draw });
     const sN1 = PL.ui.slider(L.controls, { label: "介質1 折射率 n₁", min: 1, max: 2.4, step: 0.05, value: 1, unit: "", digits: 2, onInput: draw });
@@ -85,7 +85,8 @@
    * 垂直與水平共用同一個 pxPerCm，因此可以呼叫 calibrate() 讓尺真的能量。
    */
   PL.register("lens", { build(root) {
-    const L = PL.ui.layout(root);
+    // 光具座需要橫向寬畫面：參數整列移到畫布下方，透鏡、物與像才放得下
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet", instrument: false });
     const cv = PL.canvas.create(L.canvasWrap, 0.58);
     const BENCH_CM = 120, LENS_CM = 45, OBJ_H_CM = 12;
     const sType = PL.ui.select(L.controls, { label: "透鏡", value: "conv", options: [{ value: "conv", label: "凸透鏡（會聚）" }, { value: "div", label: "凹透鏡（發散）" }], onChange: draw });
@@ -219,7 +220,7 @@
 
   /* 面鏡成像 —— 同樣改成光具座上的實物配置，單位為公分 */
   PL.register("mirror", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet", instrument: false });
     const cv = PL.canvas.create(L.canvasWrap, 0.58);
     const BENCH_CM = 120, MIRROR_CM = 104, OBJ_H_CM = 12;
     const sType = PL.ui.select(L.controls, { label: "面鏡", value: "concave", options: [{ value: "concave", label: "凹面鏡（會聚）" }, { value: "convex", label: "凸面鏡（發散）" }], onChange: draw });
@@ -296,7 +297,7 @@
 
   /* 凸透鏡位移法：固定物屏距，找出兩個清晰成像位置 */
   PL.register("lens-displacement", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet", instrument: false });
     const cv = PL.canvas.create(L.canvasWrap, 0.58);
     let recorded = [], feedback = "將透鏡移到光屏成像最清晰的位置，再記錄位置。";
     PL.ui.section(L.controls, "物屏與透鏡");
@@ -399,7 +400,7 @@
    * 因此「把光子速率降到 1」與「打開偵測器」都必須有立即、明確的反應。
    */
   PL.register("double-slit", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet", instrument: false });
     const cv = PL.canvas.create(L.canvasWrap, 0.56, 880);
 
     let hits = [];            // 螢幕上累積的光子落點（單位：mm，以中心為 0）
@@ -719,7 +720,7 @@
 
   /* 單狹縫繞射 */
   PL.register("diffraction", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.6);
     const sA = PL.ui.slider(L.controls, { label: "狹縫寬 a", min: 20, max: 120, step: 5, value: 60, unit: "", digits: 0, onInput: draw });
     const sLam = PL.ui.slider(L.controls, { label: "波長 λ", min: 400, max: 700, step: 10, value: 550, unit: "nm", digits: 0, onInput: draw });
@@ -750,7 +751,7 @@
 
   /* 偏振 */
   PL.register("polarization", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.5);
     const sTh = PL.ui.slider(L.controls, { label: "兩偏振片夾角 θ", min: 0, max: 180, step: 1, value: 45, unit: "°", digits: 0, onInput: draw });
     PL.ui.note(L.controls, "馬呂士定律：通過第二片後強度 I = I₀cos²θ；兩片垂直（90°）時全暗。");
@@ -772,7 +773,7 @@
 
   /* 色散與稜鏡 */
   PL.register("dispersion", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
     const sTh = PL.ui.slider(L.controls, { label: "入射角", min: 20, max: 70, step: 1, value: 45, unit: "°", digits: 0, onInput: draw });
     PL.ui.note(L.controls, "折射率隨波長不同：紫光偏折最多、紅光最少，白光因此散成光譜。");
@@ -800,7 +801,7 @@
 
   /* 繞射光柵 */
   PL.register("grating", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.6);
     const sN = PL.ui.slider(L.controls, { label: "光柵刻線", min: 100, max: 600, step: 20, value: 300, unit: "線/mm", digits: 0, onInput: draw });
     const sLam = PL.ui.slider(L.controls, { label: "波長 λ", min: 400, max: 700, step: 10, value: 550, unit: "nm", digits: 0, onInput: draw });

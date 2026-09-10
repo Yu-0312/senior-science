@@ -1,20 +1,15 @@
 /*
  * sim-a11y.js — 模擬的無障礙描述層
  *
- * 現況：整個實驗的內容都畫在 <canvas> 上，對螢幕報讀器而言那是一個空白方塊。
- * 使用報讀器的學生打開實驗，能聽到的只有滑桿名稱，完全不知道畫面在演什麼、
- * 讀數是多少、調整參數之後發生了什麼變化。245 個實驗全部如此。
+ * 目標：讓使用螢幕報讀器、只用鍵盤、或暫時看不清畫面的人，
+ * 打開任一個實驗都能立刻知道「這是什麼、怎麼開始、目前讀數是多少」。
  *
- * PhET 的做法叫「Interactive Description」：為模擬提供一份會隨狀態更新的
- * 文字描述，讓非視覺的使用經驗和視覺的一樣完整。他們有 89 個模擬做到這件事。
- *
- * 這裡用同樣的概念，但做法上有一個關鍵優勢——探測引擎已經知道每個實驗的
- * 滑桿、讀數與物理關係，因此描述可以自動生成，245 個實驗一次到位：
- *
- *   1. 畫布本身給一段摘要（這是什麼實驗、目前的關鍵讀數）
- *   2. 調整參數後，用 aria-live 播報「改了什麼、哪個讀數跟著變成多少」
- *   3. 另外提供一份「文字版讀數」表格，讓報讀器使用者可以逐項瀏覽
- *   4. 鍵盤使用者不需要滑鼠也能完成整個量測流程
+ * 與一般 a11y 補丁的差別：
+ *   1. 不只給 canvas 一個 aria-label，而是把「操作方式」寫成可讀的文字
+ *      （播放鍵在哪、沒有播放時按哪顆、靜態實驗怎麼互動）。
+ *   2. 傳輸列每顆按鈕都有明確的 name / 狀態，切換時用 aria-live 播報。
+ *   3. 文字版讀數 + 即時播報，調整參數後一定聽得到結果。
+ *   4. 沒有滑桿、只有按鈕的實驗同樣提供完整說明，不會整段跳過。
  */
 (function () {
   "use strict";
@@ -22,8 +17,6 @@
   if (!PL || !PL._hooks) return;
 
   const el = PL.el;
-
-  const numeric = r => (r && r.number != null ? r.number : null);
 
   function readoutSentence(readouts) {
     const parts = readouts
@@ -46,12 +39,81 @@
     return lines.join("");
   }
 
-  /* 目前所有參數的文字敘述，供摘要與播報使用 */
   function parameterSentence(sliders) {
     return sliders.map(s => {
       const value = PL.fmt(s.read(), s.digits);
       return s.label + " " + value + (s.unit ? " " + s.unit : "");
     }).join("，");
+  }
+
+  /*
+   * 這支實驗「要怎麼開始」——沒有這段，報讀器使用者會停在
+   * 「我按了播放怎麼沒反應」或「這頁是不是壞了」。
+   */
+  function howToStart(root, context) {
+    const playBtn = root.querySelector(".sim-transport-play");
+    const playHint = root.querySelector(".sim-transport-hint");
+    const stepBtn = root.querySelector(".sim-transport-btn");
+    const resetBtn = root.querySelector(".sim-transport-reset");
+    const trigger = context.triggerLabel ||
+      (function () {
+        const b = root.querySelector(".sim-controls .btn-primary");
+        return b ? b.textContent.trim() : "";
+      })();
+
+    const hasPlay = playBtn && !playBtn.hidden;
+    const hasStep = stepBtn && !stepBtn.hidden;
+    const hasReset = resetBtn && !resetBtn.hidden;
+
+    const lines = [];
+    if (hasPlay) {
+      lines.push("按「播放」開始模擬，再按一次可暫停。" +
+        (hasStep ? "「單步」可前進 1/60 秒逐格觀察。" : "") +
+        (hasReset ? "「全部重設」可把參數與計時歸零。" : ""));
+    } else if (trigger) {
+      lines.push("這個實驗沒有播放鍵。到參數區按「" + trigger + "」開始。" +
+        (hasStep ? "開始後可用「單步」逐格觀察。" : "") +
+        (hasReset ? "「全部重設」可重新準備一次。" : ""));
+    } else if (playHint && !playHint.hidden && playHint.textContent) {
+      lines.push(playHint.textContent.replace(/^[▶\s]+/, "") + "。");
+    } else {
+      lines.push("調整參數區的控制項，畫面與讀數會即時更新。" +
+        (hasReset ? "改亂了可按「全部重設」。" : ""));
+    }
+
+    if (context.sliders && context.sliders.length) {
+      lines.push("可調參數共 " + context.sliders.length + " 項，用 Tab 選到後以左右方向鍵調整。");
+    }
+    const buttons = Array.from(root.querySelectorAll(".sim-controls button"))
+      .filter(b => !b.disabled && b.type !== "submit");
+    if (buttons.length) {
+      const names = buttons.slice(0, 6).map(b => b.textContent.trim()).filter(Boolean);
+      if (names.length) lines.push("參數區按鈕：" + names.join("、") + "。");
+    }
+    return lines.join("");
+  }
+
+  function paintTransportNames(root, context) {
+    const playBtn = root.querySelector(".sim-transport-play");
+    const playHint = root.querySelector(".sim-transport-hint");
+    const stepBtn = root.querySelector(".sim-transport-btn");
+    const resetBtn = root.querySelector(".sim-transport-reset");
+    const speed = root.querySelector(".sim-speed");
+    const time = root.querySelector(".sim-transport-time");
+
+    if (playBtn) {
+      const running = !!(context.loops && context.loops.some(l => l.running));
+      playBtn.setAttribute("aria-label", running ? "暫停模擬" : "播放模擬");
+      playBtn.setAttribute("aria-pressed", running ? "true" : "false");
+    }
+    if (playHint && !playHint.hidden) {
+      playHint.setAttribute("role", "note");
+      playHint.setAttribute("aria-label", "操作提示：" + playHint.textContent);
+    }
+    if (stepBtn) stepBtn.setAttribute("aria-label", "單步：前進 1/60 秒後暫停");
+    if (resetBtn) resetBtn.setAttribute("aria-label", "全部重設：參數、資料與計時歸零");
+    if (speed) speed.setAttribute("aria-label", "播放速度");
+    if (time) time.setAttribute("aria-label", "目前模擬時間");
   }
 
   PL._hooks.onBuilt((context, api) => {
@@ -72,42 +134,83 @@
     })();
 
     const title = experiment ? experiment.title : (profile.stage || "互動模擬");
+    const concept = experiment && experiment.concept ? experiment.concept : "";
+    const howTo = howToStart(root, context);
+
+    /* 傳輸列按鈕：沒有明確 name 時，報讀器只會唸「按鈕」 */
+    paintTransportNames(root, context);
+
+    /* 主要地標加上可讀名稱 */
+    const visual = root.querySelector(".sim-visual-panel");
+    if (visual) {
+      visual.setAttribute("role", "region");
+      visual.setAttribute("aria-label", title + "實驗畫面");
+    }
+    const controlDeck = root.querySelector(".sim-control-deck");
+    if (controlDeck) {
+      controlDeck.setAttribute("role", "region");
+      controlDeck.setAttribute("aria-label", "實驗參數");
+    }
+    const readoutPanel = root.querySelector(".sim-readout-panel");
+    if (readoutPanel) {
+      readoutPanel.setAttribute("role", "region");
+      readoutPanel.setAttribute("aria-label", "量測讀數");
+    }
+    const transport = root.querySelector(".sim-transport");
+    if (transport) {
+      transport.setAttribute("role", "group");
+      transport.setAttribute("aria-label", "時間控制");
+    }
 
     /* -----------------------------------------------------------------
-       1. 畫布的文字替代
-       canvas 預設對報讀器完全不可見，至少要說明「這是什麼、現在如何」。
+       1. 畫布的文字替代：是什麼 + 怎麼開始 + 現在讀數
        ----------------------------------------------------------------- */
+    let a11yPanelId = "";
     if (canvas) {
       canvas.setAttribute("role", "img");
       const describe = () => {
         const text = title + "的互動模擬。" +
-          (experiment && experiment.concept ? experiment.concept + " " : "") +
+          (concept ? concept + " " : "") +
+          howTo + " " +
           "目前參數：" + (sliders.length ? parameterSentence(sliders) : "無可調參數") + "。" +
           "目前讀數：" + readoutSentence(readouts) + "。" +
           relationSentence(insight) +
-          "本模擬的完整數值可在下方的「文字版讀數」中逐項閱讀。";
+          "完整數值與操作說明見「操作說明與文字版讀數」。";
         canvas.setAttribute("aria-label", text);
       };
       describe();
       context.describeCanvas = describe;
     }
 
-    if (!sliders.length && !readouts.length) return;
-
     /* -----------------------------------------------------------------
-       2. 文字版讀數
-       把畫布上的數字用真正的 DOM 呈現一份，報讀器才能逐項瀏覽，
-       同時也方便所有人複製數值去做紀錄。
+       2. 操作說明 + 文字版讀數
+       即使這支實驗沒有滑桿也沒有讀數（只有按鈕），仍然要建立說明，
+       否則「只有發射鍵」的實驗對報讀器完全沒有指引。
        ----------------------------------------------------------------- */
     const panel = el("section", "sim-a11y");
-    panel.setAttribute("aria-label", "文字版讀數與操作說明");
+    a11yPanelId = "lab-a11y-" + (context.id || "sim");
+    panel.id = a11yPanelId;
+    panel.setAttribute("aria-label", "操作說明與文字版讀數");
+
     const details = el("details", "sim-a11y-details", panel);
     const summary = el("summary", null, details);
-    summary.textContent = "文字版讀數（適合螢幕報讀器與紀錄用）";
+    summary.textContent = "操作說明與文字版讀數（螢幕報讀器必讀）";
+
+    const howBlock = el("div", "sim-a11y-howto", details);
+    const howTitle = el("p", "sim-a11y-howto-title", howBlock);
+    howTitle.textContent = "怎麼使用這個實驗";
+    const howBody = el("p", "sim-a11y-howto-body", howBlock);
+    howBody.textContent = howTo;
 
     const list = el("dl", "sim-a11y-list", details);
     function paintList() {
       list.innerHTML = "";
+      if (!sliders.length && !readouts.length) {
+        const row = el("div", "sim-a11y-row", list);
+        const dt = el("dt", null, row); dt.textContent = "狀態";
+        const dd = el("dd", null, row); dd.textContent = "本實驗以按鈕操作，詳見上方說明。";
+        return;
+      }
       sliders.forEach(s => {
         const row = el("div", "sim-a11y-row", list);
         const dt = el("dt", null, row); dt.textContent = s.label;
@@ -125,13 +228,11 @@
     paintList();
 
     const hint = el("p", "sim-a11y-hint", details);
-    hint.textContent = "鍵盤操作：用 Tab 移到參數上，左右方向鍵可微調、Home 與 End 可直接跳到最小值與最大值。" +
-      "調整後下方會自動播報新的讀數。";
+    hint.textContent = "鍵盤：Tab 移動到控制項；方向鍵微調滑桿；Home／End 跳到最小／最大值；" +
+      "Enter 或 Space 按下按鈕。調整後會自動播報新的讀數。";
 
     /* -----------------------------------------------------------------
        3. 即時播報
-       報讀器使用者調整滑桿後，必須聽到「結果變成什麼」，
-       否則操作是沒有回饋的。節流避免拖曳時洗版。
        ----------------------------------------------------------------- */
     const live = el("p", "sim-a11y-live", panel);
     live.setAttribute("aria-live", "polite");
@@ -142,9 +243,12 @@
       clearTimeout(announceTimer);
       announceTimer = setTimeout(() => {
         paintList();
+        paintTransportNames(root, context);
         if (context.describeCanvas) context.describeCanvas();
-        const prefix = changed ? changed.label + " 設為 " +
-          PL.fmt(changed.read(), changed.digits) + (changed.unit ? " " + changed.unit : "") + "。" : "";
+        const prefix = changed && changed.label
+          ? changed.label + " 設為 " +
+            PL.fmt(changed.read(), changed.digits) + (changed.unit ? " " + changed.unit : "") + "。"
+          : "";
         live.textContent = prefix + readoutSentence(readouts) + "。";
       }, 350);
     }
@@ -154,16 +258,55 @@
       s.el.addEventListener("change", () => announce(s));
     });
 
-    // 播放狀態改變後也要播報一次目前的數值
-    const transport = root.querySelector(".sim-transport-play");
-    if (transport) transport.addEventListener("click", () => announce(null));
+    // 傳輸列：播放／暫停／單步／重設都要讓使用者知道發生了什麼
+    const playBtn = root.querySelector(".sim-transport-play");
+    if (playBtn) {
+      playBtn.addEventListener("click", () => {
+        paintTransportNames(root, context);
+        const running = !!(context.loops && context.loops.some(l => l.running));
+        clearTimeout(announceTimer);
+        announceTimer = setTimeout(() => {
+          paintList();
+          if (context.describeCanvas) context.describeCanvas();
+          live.textContent = (running ? "模擬播放中。" : "模擬已暫停。") + readoutSentence(readouts) + "。";
+        }, 200);
+      });
+    }
+    const stepBtn = root.querySelector(".sim-transport-btn");
+    if (stepBtn) {
+      stepBtn.addEventListener("click", () => {
+        clearTimeout(announceTimer);
+        announceTimer = setTimeout(() => {
+          paintList();
+          live.textContent = "已單步前進 1/60 秒。" + readoutSentence(readouts) + "。";
+        }, 200);
+      });
+    }
     const resetBtn = root.querySelector(".sim-transport-reset");
-    if (resetBtn) resetBtn.addEventListener("click", () => {
-      clearTimeout(announceTimer);
-      announceTimer = setTimeout(() => {
-        paintList();
-        live.textContent = "已重設所有參數。" + readoutSentence(readouts) + "。";
-      }, 350);
+    if (resetBtn) {
+      resetBtn.addEventListener("click", () => {
+        clearTimeout(announceTimer);
+        announceTimer = setTimeout(() => {
+          paintList();
+          paintTransportNames(root, context);
+          if (context.describeCanvas) context.describeCanvas();
+          live.textContent = "已重設所有參數。" + readoutSentence(readouts) + "。";
+        }, 350);
+      });
+    }
+
+    // 實驗自己的觸發鈕（發射／釋放／開始）
+    Array.from(root.querySelectorAll(".sim-controls button")).forEach(btn => {
+      const label = btn.textContent.trim();
+      if (!label || label === "重設" || label === "清除資料") return;
+      btn.addEventListener("click", () => {
+        clearTimeout(announceTimer);
+        announceTimer = setTimeout(() => {
+          paintList();
+          if (context.describeCanvas) context.describeCanvas();
+          live.textContent = "已按下「" + label + "」。" + readoutSentence(readouts) + "。";
+        }, 280);
+      });
     });
 
     /*
@@ -178,13 +321,17 @@
       if (acc >= 1.5) { acc = 0; paintList(); }
     };
 
+    // 畫布指向操作說明，報讀器讀完圖像後可直接跳到說明
+    if (canvas && a11yPanelId) canvas.setAttribute("aria-describedby", a11yPanelId);
+
     // 放在讀數面板之後：先操作、再看數值，順序才自然
-    const readoutPanel = root.querySelector(".sim-readout-panel");
     if (readoutPanel && readoutPanel.parentNode) {
       readoutPanel.parentNode.insertBefore(panel, readoutPanel.nextSibling);
+    } else if (controlDeck && controlDeck.parentNode) {
+      controlDeck.parentNode.insertBefore(panel, controlDeck.nextSibling);
     } else {
       root.appendChild(panel);
     }
-    context.a11y = { announce, paintList, panel };
+    context.a11y = { announce, paintList, panel, howTo };
   });
 })();

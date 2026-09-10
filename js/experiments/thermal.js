@@ -6,7 +6,7 @@
 
   /* 浮力與阿基米德原理 */
   PL.register("buoyancy", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     let bob = 0;
     const sObj = PL.ui.slider(L.controls, { label: "物體密度 ρ物", min: 200, max: 2000, step: 50, value: 600, unit: "kg/m³", digits: 0 });
@@ -44,7 +44,7 @@
 
   /* 彈簧秤示重差量浮力 */
   PL.register("spring-scale-buoyancy", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
     PL.ui.section(L.controls, "浸入量測");
     const sRho = PL.ui.slider(L.controls, { label: "物體密度 ρ物", min: 1200, max: 8000, step: 100, value: 2700, unit: "kg/m³", digits: 0, onInput: draw });
@@ -100,7 +100,7 @@
 
   /* 白努利原理 */
   PL.register("bernoulli", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.6);
     const rho = 1000; let parts = [];
     const sV = PL.ui.slider(L.controls, { label: "入口流速 v₁", min: 1, max: 6, step: 0.5, value: 3, unit: "m/s", digits: 1 });
@@ -152,7 +152,7 @@
    * 壓力急遽上升並顯示警示。
    */
   PL.register("gas", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.6, 840);
 
     const BOX_W = 1.0, BOX_H = 0.62;      // 容器的模型尺寸（無單位，僅作幾何用）
@@ -388,7 +388,7 @@
 
   /* 氣體定律（波以耳 / 查理） */
   PL.register("gas-laws", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     const sProc = PL.ui.select(L.controls, { label: "過程", value: "iso", options: [{ value: "iso", label: "等溫（波以耳）" }, { value: "isobar", label: "等壓（查理）" }], onChange: draw });
     const sDrive = PL.ui.slider(L.controls, { label: "調整", min: 0.4, max: 1.6, step: 0.02, value: 1, unit: "×", digits: 2, onInput: draw });
@@ -425,7 +425,7 @@
 
   /* 熱平衡與比熱 */
   PL.register("heat", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.56);
     let T1, T2, running = false;
     const s1 = PL.ui.slider(L.controls, { label: "物體1 溫度", min: 0, max: 100, step: 1, value: 80, unit: "°C", digits: 0, onInput: reset });
@@ -500,7 +500,7 @@
 
   /* 熱力學第一定律 */
   PL.register("thermo1", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.56);
     const sQ = PL.ui.slider(L.controls, { label: "吸收熱量 Q", min: -50, max: 100, step: 5, value: 60, unit: "J", digits: 0, onInput: draw });
     const sW = PL.ui.slider(L.controls, { label: "對外作功 W", min: -50, max: 100, step: 5, value: 40, unit: "J", digits: 0, onInput: draw });

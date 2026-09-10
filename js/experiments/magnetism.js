@@ -7,7 +7,7 @@
 
   /* 載流導線的磁場 */
   PL.register("current-field", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     let t = 0;
     const sI = PL.ui.slider(L.controls, { label: "電流 I", min: 1, max: 10, step: 0.5, value: 5, unit: "A", digits: 1 });
@@ -51,7 +51,7 @@
 
   /* 磁場與勞侖茲力 */
   PL.register("lorentz", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     let ang = 0;
     PL.ui.section(L.controls, "粒子與磁場");
@@ -118,7 +118,7 @@
    * 並且讓「停住就沒電」這件事立刻看得到。
    */
   PL.register("induction", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.56, 860);
 
     let x = -1.2, v = 0, t = 0, mode = "manual", auto = 1;
@@ -341,7 +341,7 @@
 
   /* 楞次定律 */
   PL.register("lenz", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.56);
     let t = 0;
     const sMode = PL.ui.select(L.controls, { label: "磁鐵動作", value: "approach", options: [{ value: "approach", label: "N 極接近線圈" }, { value: "leave", label: "N 極遠離線圈" }] });
@@ -383,7 +383,7 @@
    * Φ 的山頂正好對上 e 的零點，這比任何文字說明都有效。
    */
   PL.register("ac-generator", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.56, 900);
     let t = 0, hist = [];
 
@@ -594,7 +594,7 @@
    *   · 空載 → 電流幾乎為零，但電壓照樣有
    */
   PL.register("transformer", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.52, 880);
     let t = 0;
 
@@ -799,7 +799,7 @@
 
   /* 電磁波與電磁波譜 */
   PL.register("em-wave", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
     let t = 0; const c = 3e8;
     const sP = PL.ui.slider(L.controls, { label: "波長 λ（10ˣ 公尺）", min: -13, max: 3, step: 0.1, value: -6.3, unit: "", digits: 1 });
@@ -836,7 +836,7 @@
 
   /* 質譜儀（速度選擇器） */
   PL.register("mass-spec", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.7);
     let x = 0, ang = 0, phase = "sel";
     const sE = PL.ui.slider(L.controls, { label: "選擇器電場 E", min: 1, max: 8, step: 0.5, value: 4, unit: "", digits: 1, onInput: reset });

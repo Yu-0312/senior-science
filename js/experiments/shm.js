@@ -6,7 +6,7 @@
 
   /* 彈簧振子 */
   PL.register("spring", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet", instrument: false });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
     let t = 0, hist = [], prevX = null, prevCross = null, crossGaps = [];
     const resetHist = () => { hist = []; prevX = null; prevCross = null; crossGaps = []; };
@@ -106,7 +106,7 @@
 
   /* 單擺 */
   PL.register("pendulum", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet", instrument: false });
     const cv = PL.canvas.create(L.canvasWrap, 0.72);
     let t = 0;
     const sL = PL.ui.slider(L.controls, { label: "擺長 L", min: 0.5, max: 4, step: 0.1, value: 2, unit: "m", digits: 1 });
@@ -142,7 +142,7 @@
 
   /* 簡諧運動的位移–時間關係 */
   PL.register("shm-graph", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     let t = 0;
     const sA = PL.ui.slider(L.controls, { label: "振幅 A", min: 0.5, max: 2, step: 0.1, value: 1.5, unit: "m", digits: 1 });
@@ -199,7 +199,7 @@
 
   /* 簡諧運動的能量 */
   PL.register("shm-energy", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     let t = 0;
     const sA = PL.ui.slider(L.controls, { label: "振幅 A", min: 0.5, max: 2, step: 0.1, value: 1.5, unit: "m", digits: 1 });
@@ -248,7 +248,7 @@
 
   /* 共振 */
   PL.register("resonance", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     let t = 0; const w0 = 2 * Math.PI * 1.0; // 自然頻率 f0 = 1 Hz
     const sF = PL.ui.slider(L.controls, { label: "驅動頻率 f", min: 0.2, max: 2, step: 0.02, value: 0.6, unit: "Hz", digits: 2 });

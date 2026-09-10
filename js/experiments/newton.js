@@ -10,7 +10,7 @@
 
   /* 慣性與牛頓第一定律 */
   PL.register("inertia", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.52);
     let x = 0, v = 0;
     const sV = PL.ui.slider(L.controls, { label: "推出初速", min: 2, max: 14, step: 0.5, value: 8, unit: "m/s", digits: 1 });
@@ -75,7 +75,7 @@
 
   /* 牛頓第二定律 F = ma */
   PL.register("newton2", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.52);
     let x = 0, v = 0, t = 0;
     const reset = () => { x = 0; v = 0; t = 0; };
@@ -110,7 +110,7 @@
 
   /* 斜面受力 */
   PL.register("incline", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
     let s = 0, v = 0;
     const reset = () => { s = 0; v = 0; };
@@ -167,7 +167,7 @@
 
   /* 靜摩擦與動摩擦 */
   PL.register("friction", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
     let x = 0, v = 0;
     const sF = PL.ui.slider(L.controls, { label: "施力 F", min: 0, max: 30, step: 0.5, value: 6, unit: "N", digits: 1, onInput: draw });
@@ -220,7 +220,7 @@
 
   /* 連接體與張力（阿特午機） */
   PL.register("atwood", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.72);
     let y = 0, v = 0;
     const reset = () => { y = 0; v = 0; };
@@ -258,7 +258,7 @@
 
   /* 牛頓第三定律 */
   PL.register("newton3", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.5);
     let phase = "idle", x1 = 0, x2 = 0, v1 = 0, v2 = 0, pt = 0;
     const sF = PL.ui.slider(L.controls, { label: "互推力 F", min: 4, max: 24, step: 1, value: 12, unit: "N", digits: 0 });
@@ -335,7 +335,7 @@
    * 單位是實驗課要求的東西，模擬器自己就該做對。
    */
   PL.register("torque-equilibrium", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.56);
     const G = 9.8;
     let ang = 0;
@@ -505,7 +505,7 @@
 
   /* 力的合成與分解（力桌） */
   PL.register("force-table", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.72);
     const sF1 = PL.ui.slider(L.controls, { label: "F₁ 大小", min: 1, max: 8, step: 0.5, value: 5, unit: "N", digits: 1, onInput: draw });
     const sA1 = PL.ui.slider(L.controls, { label: "F₁ 方向", min: 0, max: 360, step: 5, value: 30, unit: "°", digits: 0, onInput: draw });
@@ -536,7 +536,7 @@
 
   /* 虎克定律與彈簧 */
   PL.register("hookes-law", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.72);
     const sM = PL.ui.slider(L.controls, { label: "懸掛質量 m", min: 0, max: 5, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: draw });
     const sK = PL.ui.slider(L.controls, { label: "彈簧勁度 k", min: 20, max: 200, step: 10, value: 100, unit: "N/m", digits: 0, onInput: draw });
@@ -580,7 +580,7 @@
   }});
   /* 題型：水平推力壓住鉛直牆面的摩擦力 */
   PL.register("wall-friction", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.58);
     let y = 0, v = 0, released = false;
     PL.ui.section(L.controls, "典型情境");
@@ -676,7 +676,7 @@
 
   /* 題型：推動下方物體時，上方物體受靜摩擦帶動 */
   PL.register("stacked-block-friction", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.58);
     let xTop = 0, xBottom = 0, vTop = 0, vBottom = 0, released = false;
     PL.ui.section(L.controls, "疊放物體參數");
@@ -741,7 +741,7 @@
 
   /* 題型：兩條繩子共同懸掛重物 */
   PL.register("two-rope-equilibrium", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.58);
     PL.ui.section(L.controls, "懸掛條件");
     const sM = PL.ui.slider(L.controls, { label: "重物質量 m", min: 0.5, max: 12, step: 0.5, value: 4, unit: "kg", digits: 1, onInput: draw });
@@ -797,7 +797,7 @@
 
   /* 題型：輸送帶與物體的相對滑動 */
   PL.register("conveyor-friction", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.58);
     let v = 0, t = 0, x = 0, running = false;
     PL.ui.section(L.controls, "輸送帶與物體");
@@ -864,7 +864,7 @@
   }});
   /* 段考題型：沿斜面外力改變時的摩擦力方向 */
   PL.register("incline-applied-force", { build(root) {
-    const L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.61);
+    const L = PL.ui.layout(root, { chrome: "quiet" }), cv = PL.canvas.create(L.canvasWrap, 0.61);
     let forceDirection = "up";
     PL.ui.section(L.controls, "斜面與外力");
     const sM = PL.ui.slider(L.controls, { label: "物體質量 m", min: 0.5, max: 5, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: draw });
@@ -940,7 +940,7 @@
 
   /* 段考題型：桌面物體與懸掛物的連接體 */
   PL.register("table-hanger", { build(root) {
-    const L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.62);
+    const L = PL.ui.layout(root, { chrome: "quiet" }), cv = PL.canvas.create(L.canvasWrap, 0.62);
     let y = 0, v = 0, released = false;
     PL.ui.section(L.controls, "連接體參數");
     const sTable = PL.ui.slider(L.controls, { label: "桌上物體 mₜ", min: 0.5, max: 6, step: 0.5, value: 3, unit: "kg", digits: 1, onInput: reset });
@@ -978,7 +978,7 @@
 
   /* 段考題型：均勻繩跨過光滑桌邊 */
   PL.register("rope-over-edge", { build(root) {
-    const L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.60);
+    const L = PL.ui.layout(root, { chrome: "quiet" }), cv = PL.canvas.create(L.canvasWrap, 0.60);
     let portion = 0.25, v = 0, elapsed = 0, released = false;
     PL.ui.section(L.controls, "均勻繩條件");
     const sPortion = PL.ui.slider(L.controls, { label: "初始垂落比例 x / L", min: 0.05, max: 0.85, step: 0.01, value: 0.25, unit: "", digits: 2, onInput: reset });

@@ -107,7 +107,7 @@
      模組六 · 單擺測重力加速度 g
      ================================================================== */
   PL.register("pendulum-measure-g", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     const G_TRUE = 9.80;
     let t = 0, swings = 0, lastSign = 1;
@@ -214,9 +214,15 @@
 
       // 碼錶
       const boxW = 132, boxX = W - boxW - 16, boxY = 16;
-      D.rect(ctx, boxX, boxY, boxW, 54, { fill: PL.theme.shade(0.45), stroke: PL.theme.pale(0.25), r: 6 });
-      D.text(ctx, "累積全振動", boxX + 10, boxY + 19, { color: PL.col("text-faint"), size: 10 });
-      D.text(ctx, Math.floor(swings) + " / " + sN.get() + " 次", boxX + 10, boxY + 40, { color: MC(), size: 17, weight: "700" });
+      if (AP.stopwatch) {
+        AP.stopwatch(ctx, boxX + 28, boxY + 28, 22);
+        D.text(ctx, "累積全振動", boxX + 56, boxY + 18, { color: PL.col("text-faint"), size: 10 });
+        D.text(ctx, Math.floor(swings) + " / " + sN.get() + " 次", boxX + 56, boxY + 40, { color: MC(), size: 16, weight: "700" });
+      } else {
+        D.rect(ctx, boxX, boxY, boxW, 54, { fill: PL.theme.shade(0.45), stroke: PL.theme.pale(0.25), r: 6 });
+        D.text(ctx, "累積全振動", boxX + 10, boxY + 19, { color: PL.col("text-faint"), size: 10 });
+        D.text(ctx, Math.floor(swings) + " / " + sN.get() + " 次", boxX + 10, boxY + 40, { color: MC(), size: 17, weight: "700" });
+      }
 
       PL.ui.caption(cv, "小角度（此處 8°）下 T = 2π√(L/g)，與擺錘質量、振幅無關。");
     }
@@ -234,7 +240,7 @@
      模組六 · 彈簧振子測彈性常數 k
      ================================================================== */
   PL.register("spring-measure-k", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
     const K_TRUE = 24;              // N/m，學生要求出來的目標
     let t = 0;
@@ -293,6 +299,7 @@
         // 兩座鐵架並排：同一根彈簧、同一顆砝碼，只差在量的方式
         AP.standRod(ctx, col.x - 74, H - 20, topY - 22);
         AP.crossArm(ctx, col.x - 74, topY - 12, col.x);
+        if (AP.clampHead) AP.clampHead(ctx, col.x, topY - 4, 16, 0);
         D.spring(ctx, col.x, topY, col.x, bottom, 9, 11, MC());
         AP.weight(ctx, col.x, bottom, 44, 30, m.toFixed(2) + " kg");
         D.text(ctx, col.tag, col.x, H - 30, { color: PL.col("text-faint"), size: 11, align: "center" });
@@ -323,7 +330,7 @@
      模組二 · 斜面法測靜摩擦係數
      ================================================================== */
   PL.register("incline-friction-coefficient", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
     const SURFACES = {
       wood: { label: "木塊 / 木板", mu: 0.42 },
@@ -440,7 +447,7 @@
      模組十 · 導線電阻與長度、截面積（電阻率 ρ）
      ================================================================== */
   PL.register("wire-resistivity", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.5);
     const MATERIALS = {
       copper: { label: "銅", rho: 1.68e-8, color: "#e08a4a" },
@@ -536,7 +543,7 @@
      模組十 · 溫度對電阻的影響（金屬 vs 熱敏電阻）
      ================================================================== */
   PL.register("resistance-vs-temperature", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.56);
     const R0 = 100, ALPHA = 0.00393;        // 白金 Pt100：R = R0(1 + αΔT)
     const B = 3500, RT25 = 100;             // NTC 熱敏電阻：R = R25·exp(B(1/T − 1/298))
@@ -671,7 +678,7 @@
      模組七 · 牛頓冷卻定律
      ================================================================== */
   PL.register("newton-cooling", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.54);
     let t = 0, curve = [];
 
@@ -803,7 +810,7 @@
      模組九 · 凸透鏡成像規律（1/v – 1/u 作圖求焦距）
      ================================================================== */
   PL.register("lens-focal-measurement", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.5);
     const F_TRUE = 0.15;             // 公尺；學生要量出來的焦距
 
@@ -917,7 +924,7 @@
      模組八 · 共鳴管測聲速
      ================================================================== */
   PL.register("resonance-tube-sound-speed", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
     const V_TRUE = 343;              // 25 °C 空氣中的聲速
     const TUBE_R = 0.02;             // 管半徑，用於端點修正

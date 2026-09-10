@@ -711,6 +711,36 @@ button.exp-path-step:hover { border-color: var(--m-ink, var(--m-color, var(--acc
   background: linear-gradient(135deg, color-mix(in srgb, var(--sim-bg-1) 90%, var(--m-color, var(--accent)) 10%), var(--panel-solid));
   box-shadow: inset 0 1px 0 var(--edge-hi), 0 16px 36px -30px rgba(0, 0, 0, 0.9);
 }
+/* 參數整列移到畫布下方：適合需要橫向寬畫面的實驗（光具座、軌道、長時間軸） */
+.lab-sim[data-lab-layout="bottom"] .sim-stage {
+  grid-template-columns: minmax(0, 1fr);
+}
+.lab-sim[data-lab-layout="bottom"] .sim-control-deck { order: 2; }
+.lab-sim[data-lab-layout="bottom"] .sim-visual-panel { order: 1; }
+/* 下方參數列改成多欄，避免一根很矮的控制條佔滿整寬 */
+.lab-sim[data-lab-layout="bottom"] .sim-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px 14px;
+  align-items: start;
+}
+.lab-sim[data-lab-layout="bottom"] .sim-controls > .ctrl-section,
+.lab-sim[data-lab-layout="bottom"] .sim-controls > .ctrl-note,
+.lab-sim[data-lab-layout="bottom"] .sim-controls > .ctrl-note-collapsible,
+.lab-sim[data-lab-layout="bottom"] .sim-controls > .btn-row,
+.lab-sim[data-lab-layout="bottom"] .sim-controls > .chip-row,
+.lab-sim[data-lab-layout="bottom"] .sim-controls > .sim-presets {
+  grid-column: 1 / -1;
+}
+/* 建置後發現沒有控制項／讀數時整塊收起，不留空白面板 */
+.sim-stage.is-solo { grid-template-columns: minmax(0, 1fr); }
+.sim-control-deck[hidden],
+.sim-readout-panel[hidden],
+.sim-command[hidden],
+.sim-learning-brief[hidden],
+.sim-procedure[hidden] { display: none !important; }
+.lab-sim[data-lab-no-brief="1"] .sim-learning-brief { display: none; }
+.lab-sim[data-lab-no-procedure="1"] .sim-procedure { display: none; }
 .sim-command-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; padding: 9px 10px 9px 12px;
   border: 1px solid var(--sim-edge); border-radius: 8px; background: linear-gradient(90deg, color-mix(in srgb, var(--panel-solid) 86%, var(--m-color, var(--accent)) 14%), var(--panel-solid));
@@ -841,7 +871,9 @@ button.exp-path-step:hover { border-color: var(--m-ink, var(--m-color, var(--acc
 }
 .sim-transport[hidden] { display: none; }
 .sim-transport-play {
-  min-width: 74px; min-height: 34px; padding: 0 14px; border: 0; border-radius: 6px; cursor: pointer;
+  /* 播放鍵固定在傳輸列最左側，寬度不隨文字（播放／暫停）跳動 */
+  min-width: 78px; min-height: 34px; padding: 0 14px; border: 0; border-radius: 6px; cursor: pointer;
+  flex: 0 0 auto;
   background: var(--m-color, var(--accent)); color: #08131c; font: inherit; font-size: 13px; font-weight: 800;
 }
 .sim-transport-play.is-playing { background: var(--warn); }
@@ -866,6 +898,17 @@ button.exp-path-step:hover { border-color: var(--m-ink, var(--m-color, var(--acc
 .sim-transport-spacer { flex: 1 1 auto; min-width: 0; }
 .sim-transport-time { color: var(--text-faint); font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .sim-transport-time[hidden] { display: none; }
+/* 沒有播放鍵時，播放鍵的位置改成「怎麼開始」的一句提示 */
+.sim-transport-hint {
+  margin: 0; flex: 1 1 auto; min-width: 0;
+  color: var(--text-dim); font-size: 12px; line-height: 1.45;
+}
+.sim-transport-hint[hidden] { display: none; }
+.sim-transport-hint::before {
+  content: "▶";
+  display: inline-block; margin-right: 6px;
+  color: var(--m-color, var(--accent)); font-size: 10px; vertical-align: 1px;
+}
 
 /* wiggle-me：模擬進場後停在第一格，用一次性的抖動指出「從這裡開始」。
    PhET 的定義是「引起注意但不干擾」，所以只跑幾次就停。 */
@@ -986,6 +1029,18 @@ body.is-offline .topbar { position: sticky; }
 .sim-a11y-details > summary::before { content: "▸ "; color: var(--text-faint); }
 .sim-a11y-details[open] > summary::before { content: "▾ "; }
 .sim-a11y-details > summary:hover { color: var(--m-ink, var(--m-color, var(--accent))); }
+/* 操作說明：沒有播放鍵的實驗，這段是「怎麼開始」的唯一文字來源 */
+.sim-a11y-howto {
+  margin: 0; padding: 10px 12px 6px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.sim-a11y-howto-title {
+  margin: 0 0 4px; color: var(--m-ink, var(--m-color, var(--accent)));
+  font-size: 11px; font-weight: 800; letter-spacing: 0.4px;
+}
+.sim-a11y-howto-body {
+  margin: 0; color: var(--text); font-size: 12.5px; line-height: 1.7;
+}
 .sim-a11y-list { display: grid; gap: 4px; margin: 0; padding: 0 12px 10px; }
 .sim-a11y-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 10px; padding: 5px 0; border-top: 1px solid var(--border-soft); }
 .sim-a11y-row:first-child { border-top: 0; }

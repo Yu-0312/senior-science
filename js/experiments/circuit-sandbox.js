@@ -17,7 +17,7 @@
   const MC = () => PL.col("m-color", "#4fc3f7");
 
   PL.register("circuit-sandbox", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66, 900);
     const ctx = cv.ctx;                          // 供各繪圖輔助函式共用
     let view = "physical";          // physical | schematic

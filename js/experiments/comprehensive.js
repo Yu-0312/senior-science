@@ -502,7 +502,7 @@
 
   Object.keys(LABS).forEach(id => {
     PL.register(id, { build(root) {
-      const config = LABS[id], L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.59, 920);
+      const config = LABS[id], L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" }), cv = PL.canvas.create(L.canvasWrap, 0.59, 920);
       const decimal = param => param[6] == null ? 2 : param[6];
       const step = param => param[5] == null ? (param[2] - param[1]) / 100 : param[5];
       PL.ui.section(L.controls, "操作條件");

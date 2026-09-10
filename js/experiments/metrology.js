@@ -58,7 +58,8 @@
   }
 
   PL.register("vernier-micrometer", { build(root) {
-    const L = PL.ui.layout(root);
+    // 量具整尺要橫向鋪開：參數移到畫布下方
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet", instrument: false });
     const cv = PL.canvas.create(L.canvasWrap, 0.42, 900);
 
     let tool = "vernier";        // vernier | micrometer

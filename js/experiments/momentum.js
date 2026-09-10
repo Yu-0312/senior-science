@@ -7,7 +7,7 @@
 
   /* 一維碰撞 */
   PL.register("collision", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.5);
     const TR = 24; // 軌道長 m
     let x1, x2, v1, v2, collided;
@@ -61,7 +61,7 @@
 
   /* 動量守恆（動量向量與長條） */
   PL.register("momentum-cons", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.6);
     const TR = 24; let x1, x2, v1, v2, collided;
     const sm1 = PL.ui.slider(L.controls, { label: "質量 m₁", min: 1, max: 6, step: 0.5, value: 4, unit: "kg", digits: 1, onInput: reset });
@@ -114,7 +114,7 @@
 
   /* 衝量與動量定理 */
   PL.register("impulse", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
     let t = 0, v = 0, x = 0;
     const reset = () => { t = 0; v = 0; x = 0; };
@@ -152,7 +152,7 @@
 
   /* 二維碰撞 */
   PL.register("collision2d", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     let p1, p2, done;
     const sB = PL.ui.slider(L.controls, { label: "瞄準參數 b", min: -1, max: 1, step: 0.05, value: 0.4, unit: "×R", digits: 2, onInput: reset });
@@ -211,7 +211,7 @@
 
   /* 反衝與爆炸 */
   PL.register("recoil", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.5);
     let x1, x2, v1, v2, fired;
     const sM1 = PL.ui.slider(L.controls, { label: "砲身質量 M", min: 4, max: 30, step: 1, value: 16, unit: "kg", digits: 0, onInput: reset });
@@ -262,7 +262,7 @@
 
   /* 彈道擺 */
   PL.register("ballistic-pendulum", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     const g = 9.8, Lp = 2; let phase = "ready", bx = 0, th = 0, V = 0, hmax = 0, t = 0;
     const sm = PL.ui.slider(L.controls, { label: "子彈質量 m", min: 0.01, max: 0.2, step: 0.01, value: 0.05, unit: "kg", digits: 2 });

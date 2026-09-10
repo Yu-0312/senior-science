@@ -21,7 +21,8 @@
   const CAR_B = "#5b8dd6";      // 乙：前車
 
   PL.register("chase-and-meet", { build(root) {
-    const L = PL.ui.layout(root);
+    // 道路與三張時間圖都要橫向空間
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.34, 960);
 
     const T_MAX = 12;                 // 觀察時間長度（s）

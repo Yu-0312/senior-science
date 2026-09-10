@@ -19,7 +19,7 @@
 
   /* 功與功率 */
   PL.register("work-power", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.52);
     let x = 0, W_ = 0;
     const reset = () => { x = 0; W_ = 0; };
@@ -53,7 +53,7 @@
 
   /* 功能定理 */
   PL.register("work-energy", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.56);
     let x = 0, v = 0, Wnet = 0;
     const reset = () => { x = 0; v = 0; Wnet = 0; };
@@ -103,7 +103,7 @@
    *   · 可以換軌道形狀，因為守恆與路徑無關才是重點
    */
   PL.register("energy-track", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.56, 860);
     const g = 9.8;
 
@@ -463,7 +463,7 @@
 
   /* 重力位能與彈性位能 */
   PL.register("potential", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.72);
     const g = 9.8; let phase = "ready", y = 0, v = 0, comp = 0;
     const sX = PL.ui.slider(L.controls, { label: "彈簧壓縮量 x", min: 0.1, max: 0.6, step: 0.05, value: 0.4, unit: "m", digits: 2, onInput: r });
@@ -507,7 +507,7 @@
 
   /* 保守力與非保守力 */
   PL.register("conservative", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.6);
     const m = 1, g = 9.8; let s = 0;
     const sPath = PL.ui.select(L.controls, { label: "選擇路徑", value: "diag", options: [{ value: "diag", label: "路徑一：直線" }, { value: "L", label: "路徑二：先下後平" }, { value: "arc", label: "路徑三：繞遠弧線" }], onChange: () => { s = 0; } });

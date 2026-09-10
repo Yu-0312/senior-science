@@ -252,7 +252,7 @@
 
   Object.entries(LABS).forEach(([id, config]) => {
     PL.register(id, { build(root) {
-      const L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.58, 920);
+      const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" }), cv = PL.canvas.create(L.canvasWrap, 0.58, 920);
       const digits = param => param[6] == null ? 2 : param[6];
       const a = PL.ui.slider(L.controls, { label: config.a[0], min: config.a[1], max: config.a[2], value: config.a[3], step: config.a[5], unit: config.a[4], digits: digits(config.a), onInput: render });
       const b = PL.ui.slider(L.controls, { label: config.b[0], min: config.b[1], max: config.b[2], value: config.b[3], step: config.b[5], unit: config.b[4], digits: digits(config.b), onInput: render });

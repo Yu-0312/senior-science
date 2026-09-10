@@ -8,7 +8,7 @@
 
   /* 光電效應 */
   PL.register("photoelectric", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.5, 860);
     let electrons = [], acc = 0, Wf = 2.3;
     PL.ui.section(L.controls, "光源");
@@ -111,7 +111,7 @@
 
   /* 波耳原子模型與原子光譜 */
   PL.register("bohr", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     let ni = 3, nf = 2, er = 3, photons = [];
     const sNi = PL.ui.slider(L.controls, { label: "初始能階 nᵢ", min: 2, max: 6, step: 1, value: 3, unit: "", digits: 0, onInput: v => { ni = v; } });
@@ -174,7 +174,7 @@
 
   /* 物質波（德布羅意） */
   PL.register("matter-wave", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.5);
     let t = 0;
     const sV = PL.ui.slider(L.controls, { label: "速度 v", min: 1, max: 10, step: 0.5, value: 4, unit: "×10⁶ m/s", digits: 1 });
@@ -219,7 +219,7 @@
 
   /* 狹義相對論（時間膨脹光鐘） */
   PL.register("relativity", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.56);
     let t = 0;
     const sV = PL.ui.slider(L.controls, { label: "速度 v", min: 0, max: 0.99, step: 0.01, value: 0.6, unit: "c", digits: 2, onInput: draw });
@@ -280,7 +280,7 @@
 
   /* 原子核與放射性半衰期 */
   PL.register("halflife", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.6);
     const N0 = 144; let t = 0, nuclei = [];
     const sT = PL.ui.slider(L.controls, { label: "半衰期 T½", min: 1, max: 6, step: 0.5, value: 3, unit: "s", digits: 1, onInput: reset });
@@ -316,7 +316,7 @@
 
   /* 大霹靂與哈伯定律 */
   PL.register("hubble", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.68, 920);
     const distances = [12, 28, 47, 76, 108, 145, 190, 248, 312];
     let galaxies = [];
@@ -378,7 +378,7 @@
 
   /* 密立根油滴實驗 */
   PL.register("millikan", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.72);
     const e = 1.6e-19, g = 9.8, d = 0.01; let y = 0, n = 3, mass = 3e-15;
     const sV = PL.ui.slider(L.controls, { label: "電壓 V", min: 0, max: 600, step: 5, value: 200, unit: "V", digits: 0 });
@@ -407,7 +407,7 @@
 
   /* 拉塞福散射（金箔實驗） */
   PL.register("rutherford", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     let alphas = [], hi = null;
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     const sZ = PL.ui.slider(L.controls, { label: "原子核電荷 Z", min: 20, max: 90, step: 5, value: 79, unit: "", digits: 0 });

@@ -8,7 +8,7 @@
 
   /* 等速圓周運動 */
   PL.register("circular", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     let ang = 0;
     const sR = PL.ui.slider(L.controls, { label: "半徑 r", min: 1, max: 5, step: 0.5, value: 3, unit: "m", digits: 1 });
@@ -47,7 +47,7 @@
 
   /* 向心力（繩繫小球，可斷繩） */
   PL.register("centripetal", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     let ang = 0, broken = false, fx = 0, fy = 0, bx = 0, by = 0;
     const sM = PL.ui.slider(L.controls, { label: "質量 m", min: 0.2, max: 3, step: 0.1, value: 1, unit: "kg", digits: 1 });
@@ -103,7 +103,7 @@
 
   /* 萬有引力定律 */
   PL.register("gravitation", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
     const sM1 = PL.ui.slider(L.controls, { label: "質量 m₁", min: 1, max: 10, step: 0.5, value: 5, unit: "", digits: 1, onInput: draw });
     const sM2 = PL.ui.slider(L.controls, { label: "質量 m₂", min: 1, max: 10, step: 0.5, value: 3, unit: "", digits: 1, onInput: draw });
@@ -137,7 +137,7 @@
 
   /* 行星軌道與克卜勒定律 */
   PL.register("orbit", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet", instrument: false });
     const cv = PL.canvas.create(L.canvasWrap, 0.72);
     const GM = 972000, r0 = 120; const vc = Math.sqrt(GM / r0);
     let p, v, trail;
@@ -196,7 +196,7 @@
 
   /* 人造衛星與脫離速度 */
   PL.register("satellite", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet", instrument: false });
     const cv = PL.canvas.create(L.canvasWrap, 0.72);
     const GM = 640000, Rp = 46; const vcs = Math.sqrt(GM / Rp), vesc = Math.sqrt(2) * vcs;
     let p, v, trail, state;
@@ -251,7 +251,7 @@
 
   /* 角動量守恆 */
   PL.register("angular-momentum", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     const m = 1, Lmom = 1 * 3 * 2; // L = m v r（固定）
     let ang = 0;
@@ -281,7 +281,7 @@
 
   /* 剛體轉動與轉動慣量 */
   PL.register("rotation", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     let w = 0, ang = 0;
     const sTau = PL.ui.slider(L.controls, { label: "外加力矩 τ", min: 0, max: 12, step: 0.5, value: 6, unit: "N·m", digits: 1 });
@@ -323,7 +323,7 @@
 
   /* 鉛直圓周運動 */
   PL.register("vertical-circle", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.8);
     const g = 9.8, m = 1; let beta = 0, dir = 1, mode = "circle", px = 0, py = 0, vx = 0, vy = 0;
     const sV = PL.ui.slider(L.controls, { label: "最低點速率 v₀", min: 2, max: 10, step: 0.5, value: 7, unit: "m/s", digits: 1, onInput: reset });

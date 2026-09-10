@@ -6,7 +6,7 @@
 
   /* 橫波與縱波 */
   PL.register("wave-types", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.6);
     let t = 0;
     const sType = PL.ui.select(L.controls, { label: "波的種類", value: "trans", options: [{ value: "trans", label: "橫波（如繩波）" }, { value: "long", label: "縱波（如聲波）" }] });
@@ -49,7 +49,7 @@
 
   /* 波的疊加與干涉 */
   PL.register("superposition", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.7);
     let t = 0;
     const sA1 = PL.ui.slider(L.controls, { label: "波1 振幅", min: 5, max: 25, step: 1, value: 16, unit: "", digits: 0 });
@@ -79,7 +79,7 @@
 
   /* 弦上的駐波 */
   PL.register("standing-wave", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.56);
     let t = 0;
     const sN = PL.ui.slider(L.controls, { label: "諧波 n", min: 1, max: 6, step: 1, value: 3, unit: "", digits: 0 });
@@ -138,7 +138,7 @@
    * 這裡的反應是波前疊成一個馬赫錐，也就是音爆。
    */
   PL.register("doppler", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.58, 880);
 
     const C_SOUND = 340;             // 空氣中的聲速（m/s）
@@ -333,7 +333,7 @@
 
   /* 拍 */
   PL.register("beats", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.56);
     let t = 0;
     const sF1 = PL.ui.slider(L.controls, { label: "頻率 f₁", min: 4, max: 12, step: 0.1, value: 8, unit: "Hz", digits: 1 });
@@ -358,7 +358,7 @@
 
   /* 聲音的共鳴（共鳴管） */
   PL.register("resonance-tube", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.5);
     let t = 0; const v = 343;
     const sType = PL.ui.select(L.controls, { label: "管型", value: "closed", options: [{ value: "closed", label: "閉管（一端封閉）" }, { value: "open", label: "開管（兩端開口）" }] });

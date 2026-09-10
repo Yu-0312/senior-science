@@ -6,7 +6,7 @@
 
   /* 等加速度直線運動 */
   PL.register("uniform-accel", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.7);
     const TMAX = 8;
     let t = 0, hist = [];
@@ -70,7 +70,7 @@
 
   /* 自由落體 */
   PL.register("freefall", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     let t = 0, landed = false, strobe = [];
     const reset = () => { t = 0; landed = false; strobe = []; };
@@ -151,7 +151,8 @@
    *     而且此時「質量」突然變得有影響，這是真空版本永遠看不到的事。
    */
   PL.register("projectile", { build(root) {
-    const L = PL.ui.layout(root);
+    // 軌跡需要橫向寬畫面；參數移到下方，避免右側欄把射程壓扁
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.52, 860);
     const g = 9.8;
 
@@ -446,7 +447,7 @@
 
   /* 相對運動：過河船 */
   PL.register("relative-motion", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.6);
     let t = 0;
     const reset = () => { t = 0; };
@@ -492,7 +493,7 @@
 
   /* 運動圖形分析 x-t / v-t / a-t */
   PL.register("vt-graph", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.78);
     const TMAX = 6;
     const sV = PL.ui.slider(L.controls, { label: "初速 v₀", min: -6, max: 12, step: 0.5, value: 3, unit: "m/s", digits: 1, onInput: draw });
@@ -547,7 +548,7 @@
    * 下半是同一條紙帶攤平後的樣子，也就是學生真正拿去量的那張紙。
    */
   PL.register("ticker-tape", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66, 900);
 
     const N = 13;              // 觀察的打點間隔數

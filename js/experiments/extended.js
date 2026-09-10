@@ -622,7 +622,7 @@
 
   Object.keys(T).forEach(id => {
     PL.register(id, { build(root) {
-      const cfg = T[id], L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.58, 860);
+      const cfg = T[id], L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" }), cv = PL.canvas.create(L.canvasWrap, 0.58, 860);
       PL.ui.section(L.controls, "實驗條件");
       const sa = PL.ui.slider(L.controls, { label: cfg.a[0], min: cfg.a[1], max: cfg.a[2], value: cfg.a[3], step: (cfg.a[2] - cfg.a[1]) / 100, unit: cfg.a[4], digits: cfg.a[4] === "" ? 2 : 1, onInput: () => render() });
       const sb = PL.ui.slider(L.controls, { label: cfg.b[0], min: cfg.b[1], max: cfg.b[2], value: cfg.b[3], step: (cfg.b[2] - cfg.b[1]) / 100, unit: cfg.b[4], digits: cfg.b[4] === "" ? 2 : 1, onInput: () => render() });
@@ -652,7 +652,7 @@
 
   /* 不確定度不能只用一個公式表示：把同一物件的每次讀值直接攤開。 */
   PL.register("measurement-error", { build(root) {
-    const L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.7, 900);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" }), cv = PL.canvas.create(L.canvasWrap, 0.7, 900);
     const trueLength = 100;
     let readings = [];
     PL.ui.section(L.controls, "量測設定");
@@ -742,7 +742,7 @@
 
   /* 路程與位移要把起點、折返點和終點留在同一張圖，不能只讓物體循環移動。 */
   PL.register("distance-displacement", { build(root) {
-    const L = PL.ui.layout(root), cv = PL.canvas.create(L.canvasWrap, 0.63, 900);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" }), cv = PL.canvas.create(L.canvasWrap, 0.63, 900);
     let progress = 1, anim;
     PL.ui.section(L.controls, "路徑設定");
     const sOutward = PL.ui.slider(L.controls, { label: "去程距離 L", min: 4, max: 30, step: 1, value: 14, unit: "m", digits: 0, onInput: draw });
@@ -833,7 +833,7 @@
      雙棒導軌：電磁剎車與動量傳遞（對應經典「雙棒導軌模型」）
      ========================================================================= */
   PL.register("rail-rods", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
     const AP = PL.apparatus;
     const c = color();

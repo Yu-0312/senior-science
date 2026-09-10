@@ -42,8 +42,52 @@ R.section("讀數要有可被報讀的文字版本");
   const api = PL.get("pendulum").build(root);
   const live = root.querySelectorAll(".sim-readouts").length > 0;
   R.ok(live, "讀數區存在");
-  const table = root.querySelectorAll("TABLE").length + root.querySelectorAll(".sim-a11y-table").length;
-  R.ok(true, "文字版讀數節點數 " + table + "（0 表示以 aria-label 提供）");
+  const howto = root.querySelector(".sim-a11y-howto-body");
+  R.ok(!!howto && howto.textContent.length > 10,
+    "有操作說明：" + (howto ? howto.textContent.slice(0, 40) + "…" : "無"));
+  if (api && api.stop) api.stop();
+}
+
+R.section("沒有播放鍵的實驗，操作說明要寫出怎麼開始");
+{
+  const checks = [
+    ["projectile", /發射/],
+    ["efield", /調整參數|滑桿|參數/],
+    ["satellite", /播放/]
+  ];
+  const bad = [];
+  checks.forEach(([id, re]) => {
+    const root = document.createElement("div"); root.dataset = { simId: id };
+    let api;
+    try { api = PL.get(id).build(root); } catch (e) { bad.push(id + " 建置失敗"); return; }
+    const howto = root.querySelector(".sim-a11y-howto-body");
+    const text = howto ? howto.textContent : "";
+    if (!text) bad.push(id + "（沒有操作說明）");
+    else if (!re.test(text)) bad.push(id + "（說明不夠具體：" + text.slice(0, 50) + "）");
+    const canvas = root.querySelector("canvas");
+    if (canvas && !/怎麼|按|調整/.test(canvas.getAttribute("aria-label") || "")) {
+      bad.push(id + "（canvas aria-label 缺操作指引）");
+    }
+    if (api && api.stop) api.stop();
+  });
+  R.ok(bad.length === 0, "自帶觸發／靜態／連續動畫三種都有指引", bad.join("\n      "));
+}
+
+R.section("傳輸列按鈕要有可讀的 name");
+{
+  const root = document.createElement("div"); root.dataset = { simId: "satellite" };
+  const api = PL.get("satellite").build(root);
+  const play = root.querySelector(".sim-transport-play");
+  const step = root.querySelector(".sim-transport-btn");
+  const reset = root.querySelector(".sim-transport-reset");
+  R.ok(!!play && /播放/.test(play.getAttribute("aria-label") || play.textContent),
+    "播放鍵有明確名稱");
+  R.ok(!!step && /單步/.test(step.getAttribute("aria-label") || step.textContent),
+    "單步鍵有明確名稱");
+  R.ok(!!reset && /重設/.test(reset.getAttribute("aria-label") || reset.textContent),
+    "重設鍵有明確名稱");
+  const live = root.querySelector(".sim-a11y-live");
+  R.ok(!!live && live.getAttribute("aria-live") === "polite", "有 aria-live 播報區");
   if (api && api.stop) api.stop();
 }
 

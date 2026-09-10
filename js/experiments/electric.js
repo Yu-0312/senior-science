@@ -7,7 +7,7 @@
 
   /* 庫侖定律 */
   PL.register("coulomb", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
     const sQ1 = PL.ui.slider(L.controls, { label: "電荷 q₁", min: -5, max: 5, step: 0.5, value: 3, unit: "μC", digits: 1, onInput: draw });
     const sQ2 = PL.ui.slider(L.controls, { label: "電荷 q₂", min: -5, max: 5, step: 0.5, value: -2, unit: "μC", digits: 1, onInput: draw });
@@ -37,7 +37,7 @@
 
   /* 電場線與等勢面 */
   PL.register("efield", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     const sQ1 = PL.ui.slider(L.controls, { label: "左電荷 q₁", min: -3, max: 3, step: 1, value: 2, unit: "", digits: 0, onInput: draw });
     const sQ2 = PL.ui.slider(L.controls, { label: "右電荷 q₂", min: -3, max: 3, step: 1, value: -2, unit: "", digits: 0, onInput: draw });
@@ -112,7 +112,7 @@
 
   /* 電位與電位能（平行板均勻電場） */
   PL.register("potential-e", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.6);
     let tp = 0.5;
     const sV = PL.ui.slider(L.controls, { label: "電壓 V", min: 20, max: 200, step: 10, value: 100, unit: "V", digits: 0, onInput: draw });
@@ -162,7 +162,7 @@
    * 點擊空白處放探測點，讀出該處的電位與電場。
    */
   PL.register("potential-terrain", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const AP = PL.apparatus;
     const cv = PL.canvas.create(L.canvasWrap, 0.62, 900);
     const ctx = cv.ctx;
@@ -364,7 +364,7 @@
    *   - 可以切換串聯與並聯，直接比較總電阻與各支路電流
    */
   PL.register("ohms", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.58, 820);
     let t = 0, burnt = false, fuseBlown = false, burnFlash = 0;
 
@@ -688,7 +688,7 @@
 
   /* 伏安法量電阻：安培計串聯、電壓計並聯，記錄 U-I 資料 */
   PL.register("iv-measurement", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const AP = PL.apparatus;
     const cv = PL.canvas.create(L.canvasWrap, 0.58);
     let records = [], feedback = "調整可變電阻後，記錄一組電壓計與安培計讀值。";
@@ -798,7 +798,7 @@
 
   /* 閉合電路：伏安法、安阻法、伏阻法與內電阻量測 */
   PL.register("closed-circuit-emf", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.6);
     let closed = true, method = "va", records = [], feedback = "", guideStep = 0;
 
@@ -1041,7 +1041,7 @@
    *   · 每顆電阻上標出它自己分到的電壓，串聯時可以直接看到分壓
    */
   PL.register("resistors", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.56);
     let flow = 0;
     const sCfg = PL.ui.select(L.controls, { label: "接法", value: "series", options: [{ value: "series", label: "串聯" }, { value: "parallel", label: "並聯" }], onChange: draw });
@@ -1151,7 +1151,7 @@
 
   /* 電容器充放電 */
   PL.register("capacitor", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     let t = 0, mode = "charge";
     const sR = PL.ui.slider(L.controls, { label: "電阻 R", min: 1, max: 10, step: 0.5, value: 4, unit: "kΩ", digits: 1, onInput: () => t = 0 });
@@ -1194,7 +1194,7 @@
 
   /* 惠斯登電橋 */
   PL.register("wheatstone", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     const sR1 = PL.ui.slider(L.controls, { label: "R₁", min: 1, max: 20, step: 1, value: 6, unit: "Ω", digits: 0, onInput: draw });
     const sR2 = PL.ui.slider(L.controls, { label: "R₂", min: 1, max: 20, step: 1, value: 4, unit: "Ω", digits: 0, onInput: draw });
@@ -1228,7 +1228,7 @@
 
   /* 帶電粒子在電場中的偏轉 */
   PL.register("e-deflection", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.56);
     let t = 0;
     const sV = PL.ui.slider(L.controls, { label: "入射速度 v", min: 2, max: 10, step: 0.5, value: 6, unit: "", digits: 1 });

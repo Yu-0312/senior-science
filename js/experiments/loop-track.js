@@ -23,7 +23,7 @@
   const PE_C = "#81c784";        // 位能
 
   PL.register("loop-track", { build(root) {
-    const L = PL.ui.layout(root);
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.52, 900);
 
     let s = 0;                   // 沿軌道走過的弧長（m）
@@ -218,25 +218,62 @@
       }
       D.text(ctx, "高度 / m", 26, PY(worldH) - 8, { color: PL.col("text-faint"), size: 9 });
 
-      // 軌道：斜坡＋平段＋圓環，畫成有枕木的雙軌
-      ctx.save();
-      ctx.strokeStyle = PL.theme.pale(0.5); ctx.lineWidth = 3; ctx.lineCap = "round";
-      ctx.beginPath();
+      // 軌道：斜坡＋平段＋圓環 —— 雙鋼軌 + 枕木 + 支撐柱
+      // 每影格只重畫「跟著球動」的部分；鋼軌與柱子用靜態圖層，改參數時才重畫。
       const total = loopEnd();
-      for (let i = 0; i <= 300; i++) {
-        const p = pointAt(total * i / 300);
-        i ? ctx.lineTo(PX(p.x), PY(p.y)) : ctx.moveTo(PX(p.x), PY(p.y));
+      if (!draw._railKey || draw._railKey !== [sR.get(), sH.get(), W, H, sc, ox, oy].join("|")) {
+        draw._railKey = [sR.get(), sH.get(), W, H, sc, ox, oy].join("|");
+        draw._rails = document.createElement("canvas");
+        draw._rails.width = Math.round(W * cv.dpr);
+        draw._rails.height = Math.round(H * cv.dpr);
+        const rctx = draw._rails.getContext("2d");
+        rctx.setTransform(cv.dpr, 0, 0, cv.dpr, 0, 0);
+        rctx.strokeStyle = "rgba(70,82,98,0.9)";
+        rctx.lineWidth = 5; rctx.lineCap = "round";
+        rctx.beginPath();
+        for (let i = 0; i <= 160; i++) {
+          const p = pointAt(total * i / 160);
+          i ? rctx.lineTo(PX(p.x), PY(p.y)) : rctx.moveTo(PX(p.x), PY(p.y));
+        }
+        rctx.stroke();
+        rctx.strokeStyle = "rgba(168,182,200,0.85)";
+        rctx.lineWidth = 2.2;
+        rctx.beginPath();
+        for (let i = 0; i <= 160; i++) {
+          const p = pointAt(total * i / 160);
+          const q = pointAt(Math.min(total, total * i / 160 + total / 200));
+          const dx = q.x - p.x, dy = q.y - p.y, len = Math.hypot(dx, dy) || 1;
+          const oxn = -dy / len * 0.012, oyn = dx / len * 0.012;
+          i ? rctx.lineTo(PX(p.x + oxn), PY(p.y + oyn)) : rctx.moveTo(PX(p.x + oxn), PY(p.y + oyn));
+        }
+        rctx.stroke();
+        // 枕木
+        rctx.strokeStyle = "rgba(90,100,118,0.75)";
+        rctx.lineWidth = 1.6;
+        for (let i = 0; i <= 36; i++) {
+          const a = total * i / 36, p = pointAt(a), q = pointAt(Math.min(total, a + total / 200));
+          const dx = q.x - p.x, dy = q.y - p.y, len = Math.hypot(dx, dy) || 1;
+          const nx = -dy / len * 0.055, ny = dx / len * 0.055;
+          rctx.beginPath();
+          rctx.moveTo(PX(p.x - nx), PY(p.y - ny));
+          rctx.lineTo(PX(p.x + nx), PY(p.y + ny));
+          rctx.stroke();
+        }
+        // 立柱
+        rctx.strokeStyle = "rgba(86,96,112,0.55)";
+        rctx.lineWidth = 2.4;
+        rctx.fillStyle = "rgba(70,78,92,0.7)";
+        for (let i = 4; i <= 32; i += 3) {
+          const p = pointAt(total * i / 36);
+          if (p.part === "loop" || p.y < 0.04) continue;
+          rctx.beginPath();
+          rctx.moveTo(PX(p.x), PY(p.y) + 2);
+          rctx.lineTo(PX(p.x), PY(0));
+          rctx.stroke();
+          rctx.fillRect(PX(p.x) - 3, PY(0) - 2, 6, 3);
+        }
       }
-      ctx.stroke();
-      ctx.restore();
-      // 枕木
-      for (let i = 0; i <= 60; i++) {
-        const a = total * i / 60, p = pointAt(a), q = pointAt(Math.min(total, a + total / 300));
-        const dx = q.x - p.x, dy = q.y - p.y, len = Math.hypot(dx, dy) || 1;
-        const nx = -dy / len * 0.05, ny = dx / len * 0.05;
-        D.line(ctx, PX(p.x - nx), PY(p.y - ny), PX(p.x + nx), PY(p.y + ny),
-          PL.theme.pale(0.22), 1.4);
-      }
+      if (draw._rails) ctx.drawImage(draw._rails, 0, 0, W, H);
 
       // 釋放高度線與 h_min 線
       D.line(ctx, PX(0) - 10, PY(sH.get()), PX(RAMP_LEN() * 0.5), PY(sH.get()),
