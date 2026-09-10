@@ -370,6 +370,16 @@
   };
 
   /*
+   * 實驗方法類：不確定度、最小平方、量綱、變因控制…
+   * 這些放在運動學／近代模組裡，但畫面語彙不該是「運動量測台」。
+   */
+  const METHODS_PROFILE = { family: "methods", stage: "實驗方法台", code: "LAB" };
+  const METHOD_IDS = new Set([
+    "measurement-error", "regression-lab", "error-propagation",
+    "dimensional-analysis", "experimental-design", "geiger-statistics"
+  ]);
+
+  /*
    * 課程條目查詢
    *
    * 每個實驗在課程地圖裡本來就寫好了 concept（這在教什麼）與 points（學習重點），
@@ -412,7 +422,9 @@
   function profileFor(id) {
     const modules = window.PhysicsLabCurriculum && window.PhysicsLabCurriculum.modules;
     const module = modules && modules.find(m => m.experiments.some(e => e.id === id));
-    const stage = STAGE_BY_MODULE[module && module.id] || { family: "general", stage: "互動量測台", code: "PHY" };
+    const stage = METHOD_IDS.has(id)
+      ? METHODS_PROFILE
+      : (STAGE_BY_MODULE[module && module.id] || { family: "general", stage: "互動量測台", code: "PHY" });
     return Object.assign({ id: id || "", moduleId: module && module.id, moduleNo: module && module.no, moduleTitle: module && module.title }, stage);
   }
 
@@ -427,6 +439,7 @@
 
   function actionFor(profile) {
     const actions = {
+      methods: "先設定條件，再一筆一筆記錄；不要只調滑桿就當量測完成。",
       mechanics: "先調整一個初始條件或外力，再啟動模型；每次只改變一個變因。",
       orbital: "先設定速度或距離，再比較軌跡與指向圓心的量。",
       thermal: "先選定系統邊界，再只改變一個狀態量，追蹤熱量與溫度。",
@@ -478,6 +491,7 @@
   function workflowFor(profile) {
     const subject = profile.moduleTitle || "這個主題";
     const steps = {
+      methods: ["設定量測條件", "一筆一筆記錄讀值", "用平均、離散或殘差判讀"],
       mechanics: ["設定物體與初始條件", "啟動模型並觀察運動", "對照讀數與圖表驗證關係"],
       orbital: ["設定初始條件與尺度", "觀察軌跡或場的演化", "比較模型預測與量測值"],
       thermal: ["設定系統狀態與邊界", "改變熱學條件並觀察交換", "以資料判讀守恆或狀態變化"],
@@ -1838,7 +1852,15 @@
           text = "從這裡開始：按參數區的「" + trigger + "」";
           if (animated) text += " · 可用「單步」逐格看";
         } else if (!animated) {
-          text = "調整參數，畫面與讀數會即時更新";
+          // 靜態但有主操作鈕（量測一點／記錄一筆…）時，提示不能只寫「調滑桿」
+          const primaryBtn = Array.from(root.querySelectorAll(".sim-controls .btn-primary, .sim-controls .btn"))
+            .map(b => (b.textContent || "").trim())
+            .find(t => t && t !== "重設" && t !== "清除資料" && t !== "清除紀錄" && t.length <= 12);
+          if (primaryBtn) {
+            text = "從這裡開始：按參數區的「" + primaryBtn + "」";
+          } else {
+            text = "調整參數，畫面與讀數會即時更新";
+          }
           const hasReset = !!ui.resetBtn && !ui.resetBtn.hidden;
           if (hasReset) text += " · 改亂了按「全部重設」";
         } else {

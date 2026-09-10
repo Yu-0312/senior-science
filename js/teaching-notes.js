@@ -496,6 +496,11 @@
       { name: "雜訊 σ", tone: "b", note: "隨機雜訊讓估計<strong>不精確</strong>，但不會系統性偏高偏低（不失準）。" },
       { name: "彎曲 c", tone: "c", note: "殘差若出現 U 形，是<strong>模型選錯</strong>，不是再擬合一次就能解決。" }
     ]},
+    "geiger-statistics": { title: "放射性計數為何每次都不一樣", rows: [
+      { name: "平均計數率", tone: "a", note: "決定平均 N；時間窗越長，N 越大。" },
+      { name: "隨機衰變", tone: "b", note: "單一原子何時衰變不可預測；多次量測的離散大約是 √N。" },
+      { name: "相對誤差", tone: "c", note: "s/N ≈ 1/√N：計數越多，相對誤差越小——所以長時間量測比較準。" }
+    ]},
     "freefall": { title: "誰決定落體的快慢", rows: [
       { name: "高度 h", tone: "a", note: "決定落地時間與速率：t = √(2h/g)、v = √(2gh)。高度變四倍，時間與速率都只變兩倍。" },
       { name: "重力 g", tone: "a", note: "同樣決定時間與速率。到月球（g 約 1.6）同樣的高度會落得慢很多。" },

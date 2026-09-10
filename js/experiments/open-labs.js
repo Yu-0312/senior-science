@@ -251,6 +251,8 @@
   }
 
   Object.entries(LABS).forEach(([id, config]) => {
+    // 蓋革統計改為下方專屬實作：一秒一秒計數，σ≈√N 要自己跑出來
+    if (id === "geiger-statistics") return;
     PL.register(id, { build(root) {
       const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" }), cv = PL.canvas.create(L.canvasWrap, 0.58, 920);
       const digits = param => param[6] == null ? 2 : param[6];
@@ -283,4 +285,145 @@
       return { stop() { animation.stop(); cv.destroy(); chart.destroy(); }, rerender: render };
     }});
   });
+
+  /*
+   * 蓋革統計：一秒一秒計數
+   * σ≈√N 這種統計關係，滑桿算公式學生不會有感；
+   * 按「計數 10 秒」累積多次，相對誤差自己會縮小。
+   */
+  PL.register("geiger-statistics", { build(root) {
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
+    const cv = PL.canvas.create(L.canvasWrap, 0.62, 820);
+    let rate = 15;                 // 次/s
+    let windowSec = 10;            // 每次量測的時間窗（s）
+    let trials = [];               // 每次量測的總計數
+    let seed = 20260810;
+
+    function rng() {
+      seed = (seed + 0x9e3779b9) | 0;
+      let t = seed ^ (seed >>> 16); t = Math.imul(t, 0x21f0aaad);
+      t = t ^ (t >>> 15); t = Math.imul(t, 0x735a2d97);
+      return ((t = t ^ (t >>> 15)) >>> 0) / 4294967296;
+    }
+    function poisson(lambda) {
+      // Knuth：λ 不大時夠用
+      const Llim = Math.exp(-lambda);
+      let k = 0, p = 1;
+      do { k += 1; p *= rng(); } while (p > Llim);
+      return k - 1;
+    }
+
+    PL.ui.section(L.controls, "量測條件");
+    const sRate = PL.ui.slider(L.controls, { label: "平均計數率 R", min: 0.5, max: 50, step: 0.5, value: 15, unit: "次/s", digits: 1, onInput: () => clearTrials() });
+    const sWin = PL.ui.slider(L.controls, { label: "每次量測時間窗", min: 1, max: 60, step: 1, value: 10, unit: "s", digits: 0, onInput: () => clearTrials() });
+    const row = PL.ui.buttonRow(L.controls);
+    const bCount = PL.ui.button(row, "計數一次", () => countOnce(), { primary: true });
+    PL.ui.button(row, "連續計數 8 次", () => {
+      for (let i = 0; i < 8; i++) countOnce(true);
+      draw();
+    });
+    PL.ui.button(row, "清除紀錄", () => clearTrials());
+    PL.ui.note(L.controls,
+      "每一次「計數一次」都是一段真實時間窗內的隨機衰變。" +
+      "次數越多，相對標準差 ≈ 1/√N 越小——這是統計漲落，不是儀器壞掉。");
+
+    const rN = PL.ui.readout(L.readouts, { label: "本次計數 N", unit: "次" });
+    const rMean = PL.ui.readout(L.readouts, { label: "多次平均 N̄", unit: "次" });
+    const rS = PL.ui.readout(L.readouts, { label: "實測標準差 s", unit: "次" });
+    const rTheory = PL.ui.readout(L.readouts, { label: "理論 √N̄", unit: "次" });
+    const rRel = PL.ui.readout(L.readouts, { label: "相對標準差 s/N̄", unit: "%" });
+    const rTask = PL.ui.readout(L.readouts, { label: "任務進度" });
+
+    const chart = PL.ui.chart(PL.ui.charts(root), {
+      title: "各次計數與 √N 誤差棒",
+      cap: "每次量測的計數會上下跳動；跳動幅度大約是 √N。量測時間越長，N 越大，相對誤差越小。"
+    });
+
+    function clearTrials() {
+      rate = sRate.get();
+      windowSec = sWin.get();
+      trials = [];
+      draw();
+    }
+    function countOnce(silent) {
+      rate = sRate.get();
+      windowSec = sWin.get();
+      trials.push(poisson(rate * windowSec));
+      if (!silent) draw();
+    }
+    function stats() {
+      if (!trials.length) return null;
+      const mean = trials.reduce((s, v) => s + v, 0) / trials.length;
+      const s2 = trials.length > 1
+        ? trials.reduce((s, v) => s + (v - mean) ** 2, 0) / (trials.length - 1) : 0;
+      const s = Math.sqrt(s2);
+      return { mean, s, theory: Math.sqrt(Math.max(mean, 0)), last: trials[trials.length - 1] };
+    }
+
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const st = stats();
+      rate = sRate.get(); windowSec = sWin.get();
+
+      // 蓋革管示意
+      const tubeX = 70, tubeY = 48, tubeW = 110, tubeH = 54;
+      D.rect(ctx, tubeX, tubeY, tubeW, tubeH, { fill: PL.theme.shade(0.55), stroke: accent(), width: 2, r: 8 });
+      D.rect(ctx, tubeX + 8, tubeY + 10, tubeW - 16, tubeH - 20, { fill: "rgba(20,28,40,0.55)", r: 4 });
+      D.text(ctx, "蓋革計數器", tubeX + tubeW / 2, tubeY - 8, { color: PL.col("text-dim"), size: 10, align: "center" });
+      D.text(ctx, st ? "N = " + st.last : "N = —", tubeX + tubeW / 2, tubeY + tubeH / 2 + 5,
+        { color: accent(), size: 16, align: "center", weight: "700" });
+      D.text(ctx, "R = " + PL.fmt(rate, 1) + " 次/s · 窗 " + windowSec + " s", tubeX, tubeY + tubeH + 18,
+        { color: PL.col("text-faint"), size: 10 });
+
+      if (!trials.length) {
+        D.text(ctx, "放射性衰變是隨機的：同一條件每次計數都會不一樣", W / 2, H * 0.52,
+          { color: PL.col("text"), size: 13, align: "center", weight: "700" });
+        D.text(ctx, "按「計數一次」開始；連續多做幾次，看 σ 是不是 ≈ √N", W / 2, H * 0.52 + 24,
+          { color: PL.col("text-faint"), size: 11, align: "center" });
+        rN.set("—"); rMean.set("—"); rS.set("—"); rTheory.set("—"); rRel.set("—");
+        rTask.set("尚未計數：按「計數一次」開始");
+        return;
+      }
+
+      const box = { x: 220, y: 40, w: W - 250, h: H - 90 };
+      const maxN = Math.max(10, ...trials.map(v => v * 1.25));
+      const g = PL.graph(cv, box, { x0: 0, x1: Math.max(8, trials.length + 1), y0: 0, y1: maxN });
+      g.frame({ xlabel: "第幾次量測", ylabel: "計數 N" });
+      g.grid(Math.min(8, trials.length), 4);
+      if (st) {
+        g.hline(st.mean, { color: accent(), width: 2 });
+        g.hline(st.mean + st.s, { color: PL.col("warn"), width: 1.4, dash: [5, 4] });
+        g.hline(Math.max(0, st.mean - st.s), { color: PL.col("warn"), width: 1.4, dash: [5, 4] });
+        D.text(ctx, "平均 N̄ = " + PL.fmt(st.mean, 1) + "，誤差棒 ≈ ±s", box.x + 8, box.y + 16,
+          { color: accent(), size: 10 });
+      }
+      trials.forEach((v, i) => g.dot(i + 1, v, { color: PL.col("accent-2"), r: 4 }));
+
+      chart.clear();
+      const cg = PL.graph(chart, { x: 46, y: 16, w: chart.W - 62, h: chart.H - 40 },
+        { x0: 0, x1: Math.max(8, trials.length + 1), y0: 0, y1: maxN });
+      cg.frame({ xlabel: "次序", ylabel: "N" });
+      cg.grid(5, 4);
+      trials.forEach((v, i) => cg.dot(i + 1, v, { color: PL.col("accent-2"), r: 4 }));
+      if (st) {
+        cg.hline(st.mean, { color: accent(), width: 2 });
+        cg.curve([[0.5, st.mean + st.s], [trials.length + 0.5, st.mean + st.s]],
+          { color: PL.col("warn"), width: 1.3, dash: [5, 4] });
+        cg.curve([[0.5, Math.max(0, st.mean - st.s)], [trials.length + 0.5, Math.max(0, st.mean - st.s)]],
+          { color: PL.col("warn"), width: 1.3, dash: [5, 4] });
+      }
+
+      rN.set(st.last, 0);
+      rMean.set(st.mean, 1);
+      rS.set(st.s, 2);
+      rTheory.set(st.theory, 2);
+      rRel.set(st.mean > 0 ? st.s / st.mean * 100 : 0, 1);
+      rTask.set(trials.length < 4
+        ? "已計數 " + trials.length + " 次，再多做幾次比較 s 與 √N"
+        : "s ≈ " + PL.fmt(st.s, 1) + "，√N̄ ≈ " + PL.fmt(st.theory, 1) + "——統計漲落的量級");
+    }
+
+    cv.onResize(draw); chart.onResize(draw); draw();
+    return { stop() { cv.destroy(); chart.destroy(); }, rerender: draw };
+  }});
 })();

@@ -731,6 +731,7 @@ button.exp-path-step:hover { border-color: var(--m-ink, var(--m-color, var(--acc
 .lab-sim[data-lab-family="circuit"] { --lab-stage: #57d889; }
 .lab-sim[data-lab-family="magnetism"] { --lab-stage: #c98cff; }
 .lab-sim[data-lab-family="modern"] { --lab-stage: #ed8fb9; }
+.lab-sim[data-lab-family="methods"] { --lab-stage: #f0b429; }
 .sim-stage {
   /*
    * 實驗台內部同樣要等高：畫布面板高、參數面板矮，
