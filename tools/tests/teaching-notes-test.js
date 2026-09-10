@@ -104,17 +104,4 @@ R.section("全站沒有缺口");
     missing.slice(0, 8).join("、"));
 }
 
-R.section("教師課堂卡：提問／迷思／時間會掛上 DOM");
-{
-  const s = open("pendulum-measure-g");
-  const data = PL.teaching.teacherCardData({ id: "pendulum-measure-g", profile: {} });
-  R.ok(!!data && data.questions.length >= 2, "有建議提問");
-  R.ok(!!data && data.misconceptions.length >= 1, "有常見迷思");
-  R.ok(!!data && data.minutes >= 5, "有建議時間");
-  const card = s.root.querySelector(".sim-teacher-card");
-  R.ok(!!card, "課堂卡已掛到實驗 DOM");
-  R.ok(!!card && /提問/.test(card.textContent), "課堂卡含提問");
-  if (s.api && s.api.stop) s.api.stop();
-}
-
 R.done();

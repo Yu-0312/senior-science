@@ -646,234 +646,38 @@
     ]
   };
 
-  /* 教師課堂卡：演示模式上台用的提問／迷思／時間 */
-  const TEACHER = {
-    "pendulum-measure-g": {
-      minutes: 15,
-      questions: [
-        "為什麼要量 20 次全振動再除以 20？",
-        "擺長從哪裡量到哪裡？量到球頂 g 會偏大還是偏小？",
-        "T 和擺錘質量有關嗎？怎麼用模擬驗證？"
-      ],
-      misconceptions: [
-        "擺長＝線長（錯：要加球半徑，量到球心）",
-        "週期和質量有關（錯：小角度下無關）",
-        "振幅大比較好量（錯：>10° 系統誤差變大）"
-      ]
-    },
-    "spring-measure-k": {
-      minutes: 15,
-      questions: [
-        "F–x 圖的斜率代表什麼？單位？",
-        "為什麼要先記原始讀數？不歸零會怎樣？",
-        "如何判斷超過彈性限度？"
-      ],
-      misconceptions: [
-        "伸長量從桌面量起（錯：以不掛重時指針為基準）",
-        "k 隨掛重改變（錯：限度內 k 是常數）"
-      ]
-    },
-    "lens": {
-      minutes: 12,
-      questions: [
-        "u < f 時光屏上還接得到像嗎？",
-        "放大率由哪兩個量決定？"
-      ],
-      misconceptions: [
-        "凸透鏡永遠成實像（錯：u < f 成虛像）",
-        "光屏接不到就沒有像（錯：虛像仍存在）"
-      ]
-    },
-    "loop-track": {
-      minutes: 12,
-      questions: [
-        "為什麼臨界高度是 2.5R 而不是 2R？",
-        "多出來的 0.5R 買到了什麼？"
-      ],
-      misconceptions: [
-        "爬到環頂就過得去（錯：還要 √(gR)）",
-        "臨界高度和質量有關（錯：與 m 無關）"
-      ]
-    },
-    "double-slit": {
-      minutes: 15,
-      questions: [
-        "光子速率降到 1，前 20 顆看起來像什麼？",
-        "縫上裝偵測器，條紋會怎樣？"
-      ],
-      misconceptions: [
-        "光子同時通過兩縫（是量子疊加，非古典同時）",
-        "條紋是光子碰撞造成（錯：單光子也會累積）"
-      ]
-    },
-    "projectile": {
-      minutes: 10,
-      questions: [
-        "有空氣阻力時最遠射角還是 45° 嗎？",
-        "為什麼真空版看不到質量影響？"
-      ],
-      misconceptions: [
-        "水平鉛直永遠互不影響（有阻力時會耦合）"
-      ]
-    },
-    "incline-friction-coefficient": {
-      minutes: 12,
-      questions: [
-        "臨界角和質量有關嗎？怎麼證明？",
-        "tanθc 為什麼就是 μs？"
-      ],
-      misconceptions: [
-        "質量越大 μ 越大（錯：μ 是表面性質）"
-      ]
-    },
-    "iv-measurement": {
-      minutes: 15,
-      questions: [
-        "為什麼要多組資料才算 R？",
-        "U–I 圖斜率的物理意義？"
-      ],
-      misconceptions: [
-        "電阻隨電壓改變（歐姆性導體近似常數）"
-      ]
-    }
-  };
-
-  function lessonFromCurriculum(id) {
-    const C = window.PhysicsLabCurriculum;
-    if (!C || !C.modules) return null;
-    for (const m of C.modules) {
-      const e = (m.experiments || []).find(x => x.id === id);
-      if (e) return { module: m, exp: e };
-    }
-    return null;
-  }
-
-  function teacherCardData(ctx) {
-    const id = ctx.id;
-    const base = TEACHER[id] || {};
-    const info = lessonFromCurriculum(id);
-    const points = info && Array.isArray(info.exp.points) ? info.exp.points : [];
-    const questions = (base.questions && base.questions.length)
-      ? base.questions
-      : points.slice(0, 3).map(p => "請學生說明：" + p + "——你是從畫面上哪個現象看出來的？");
-    const misconceptions = (base.misconceptions && base.misconceptions.length)
-      ? base.misconceptions
-      : points.slice(3, 5).map(p => "提醒：" + p);
-    const minutes = base.minutes || (points.length >= 4 ? 12 : 8);
-    const title = info && info.exp.title ? info.exp.title : (ctx.profile && ctx.profile.stage) || "實驗";
-    const concept = info && info.exp.concept ? info.exp.concept : "";
-    const formula = info && info.exp.formula ? String(info.exp.formula) : "";
-    return { title, concept, formula, minutes, questions, misconceptions, points };
-  }
-
-  function attachTeacherCard(ctx) {
-    const data = teacherCardData(ctx);
-    const host = ctx.root.querySelector(".sim-readout-panel")
-      || ctx.root.querySelector(".sim-stage")
-      || ctx.root;
-    const card = PL.el("section", "sim-teacher-card");
-    card.setAttribute("aria-label", "教師課堂卡");
-    if (!document.body.classList.contains("demo-mode")) card.classList.add("is-collapsed");
-
-    const head = PL.el("div", "sim-teacher-head", card);
-    const title = PL.el("span", "sim-teacher-title", head);
-    title.textContent = "課堂卡 · " + data.title;
-    const meta = PL.el("span", "sim-teacher-meta", head);
-    meta.textContent = "建議 " + data.minutes + " 分鐘";
-
-    const toggle = PL.el("button", "sim-teacher-toggle", head);
-    toggle.type = "button";
-    toggle.textContent = card.classList.contains("is-collapsed") ? "展開" : "收合";
-    toggle.setAttribute("aria-expanded", card.classList.contains("is-collapsed") ? "false" : "true");
-    toggle.addEventListener("click", () => {
-      const open = card.classList.toggle("is-collapsed");
-      // is-collapsed = 收合
-      toggle.textContent = open ? "展開" : "收合";
-      toggle.setAttribute("aria-expanded", open ? "false" : "true");
-    });
-
-    const body = PL.el("div", "sim-teacher-body", card);
-    if (data.concept) {
-      const c = PL.el("p", "sim-teacher-concept", body);
-      c.textContent = "這節課在教：" + data.concept;
-    }
-    if (data.formula) {
-      const f = PL.el("p", "sim-teacher-formula", body);
-      f.textContent = "關鍵式：" + data.formula.replace(/\\\(|\\\)|\\\[|\\\]/g, "");
-    }
-
-    if (data.questions.length) {
-      const qs = PL.el("div", "sim-teacher-block", body);
-      const qt = PL.el("p", "sim-teacher-block-title", qs);
-      qt.textContent = "建議提問（投出去給全班想）";
-      const ul = PL.el("ul", "sim-teacher-list", qs);
-      data.questions.forEach(q => {
-        const li = PL.el("li", null, ul); li.textContent = q;
-      });
-    }
-    if (data.misconceptions.length) {
-      const ms = PL.el("div", "sim-teacher-block", body);
-      const mt = PL.el("p", "sim-teacher-block-title", ms);
-      mt.textContent = "常見迷思（對照糾正）";
-      const ul = PL.el("ul", "sim-teacher-list is-misconception", ms);
-      data.misconceptions.forEach(q => {
-        const li = PL.el("li", null, ul); li.textContent = q;
-      });
-    }
-
-    const actions = PL.el("div", "sim-teacher-actions", card);
-    const printBtn = PL.el("button", "sim-teacher-action", actions);
-    printBtn.type = "button";
-    printBtn.textContent = "列印課堂卡";
-    printBtn.addEventListener("click", () => {
-      card.classList.remove("is-collapsed");
-      try { window.print(); } catch (e) { /* jsdom / 無列印環境 */ }
-    });
-    const csvBtn = PL.el("button", "sim-teacher-action", actions);
-    csvBtn.type = "button";
-    csvBtn.textContent = "匯出目前讀數 CSV";
-    csvBtn.title = "收集全班同一組參數下的讀數，用於課堂討論";
-    csvBtn.addEventListener("click", () => {
-      const rows = [
-        ["實驗", ctx.id || ""],
-        ["名稱", data.title],
-        ["匯出時間", new Date().toLocaleString("zh-TW")],
-        ["模式", document.body.classList.contains("demo-mode") ? "教師演示" : "完整"]
-      ];
-      (ctx.sliders || []).forEach(s => {
-        rows.push(["參數 · " + s.label, PL.fmt(s.read(), s.digits) + (s.unit ? " " + s.unit : "")]);
-      });
-      (ctx.readouts || []).forEach(r => {
-        rows.push(["讀數 · " + r.label, (r.value || "—") + (r.unit ? " " + r.unit : "")]);
-      });
-      data.questions.forEach((q, i) => rows.push(["提問 " + (i + 1), q]));
-      const csv = rows.map(row => row.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\n");
-      const link = document.createElement("a");
-      const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
-      link.href = url;
-      link.download = "classroom-" + (ctx.id || "sim") + ".csv";
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 0);
-    });
-
-    // 放在讀數面板之後；沒有讀數就放在 stage 後
-    if (host && host.parentNode) {
-      host.parentNode.insertBefore(card, host.nextSibling);
-    } else {
-      ctx.root.appendChild(card);
-    }
-    ctx.teacherCard = card;
-  }
-
   /* =====================================================================
      掛載
      ===================================================================== */
+  /*
+   * 演示模式只加一行「示範重點」。
+   * 上台要的是：畫面乾淨、讀數大、知道下一句要問什麼——不是一整包備課資料。
+   */
+  function attachDemoTip(ctx) {
+    if (!document.body.classList.contains("demo-mode")) return;
+    const C = window.PhysicsLabCurriculum;
+    if (!C || !C.modules) return;
+    let exp = null;
+    for (const m of C.modules) {
+      exp = m.experiments.find(x => x.id === ctx.id);
+      if (exp) break;
+    }
+    if (!exp) return;
+    const tipText = (exp.points && exp.points[0]) || exp.concept || "";
+    if (!tipText) return;
+    const host = ctx.root.querySelector(".sim-readout-panel") || ctx.root;
+    const tip = PL.el("p", "sim-demo-tip");
+    tip.textContent = "示範重點：" + tipText;
+    if (host.parentNode) host.parentNode.insertBefore(tip, host);
+    else ctx.root.appendChild(tip);
+  }
+
   function attach(ctx, api) {
     const id = ctx.id;
     const r = reader(ctx);
     let vd = null, poll = 0;
 
-    try { attachTeacherCard(ctx); } catch (e) { console.warn("課堂卡掛載失敗", e); }
+    try { attachDemoTip(ctx); } catch (e) {}
 
     const cz = CAUSALITY[id];
     if (cz && !(ctx.root.querySelector && ctx.root.querySelector(".sim-causality"))) {
@@ -927,9 +731,4 @@
   PL._hooks.onBuilt((ctx, api) => {
     try { attach(ctx, api); } catch (e) { console.warn("教學補充掛載失敗：" + ctx.id, e); }
   });
-
-  // 供測試與其他模組取用
-  if (!PL.teaching) PL.teaching = {};
-  PL.teaching.teacherCardData = teacherCardData;
-  PL.teaching.TEACHER = TEACHER;
 })();
