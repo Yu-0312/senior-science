@@ -650,43 +650,113 @@
     }});
   });
 
-  /* 不確定度不能只用一個公式表示：把同一物件的每次讀值直接攤開。 */
+  /*
+   * 不確定度是抽象概念：滑桿一拉就「算出 N 筆」學生不會有量測感。
+   * 改成任務式：一按一筆，自己決定要不要再量，看平均值與離散如何收斂。
+   */
   PL.register("measurement-error", { build(root) {
     const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" }), cv = PL.canvas.create(L.canvasWrap, 0.7, 900);
-    const trueLength = 100;
-    let readings = [];
-    PL.ui.section(L.controls, "量測設定");
-    const sCount = PL.ui.slider(L.controls, { label: "重複量測次數 N", min: 3, max: 24, step: 1, value: 8, unit: "次", digits: 0, onInput: resample });
-    const sResolution = PL.ui.slider(L.controls, { label: "尺的解析度 r", min: 0.1, max: 5, step: 0.1, value: 1, unit: "mm", digits: 1, onInput: resample });
-    const sBias = PL.ui.slider(L.controls, { label: "零點偏移 b", min: -2, max: 2, step: 0.1, value: 0, unit: "mm", digits: 1, onInput: resample });
+    const trueLength = 100;                 // mm，模擬裡的真值（學生看不到直到揭曉）
+    let readings = [];                      // 學生實際記錄的每一筆
+    let revealed = false;
+
+    PL.ui.section(L.controls, "任務：量這支金屬棒");
+    const sResolution = PL.ui.slider(L.controls, { label: "尺的解析度 r", min: 0.1, max: 5, step: 0.1, value: 1, unit: "mm", digits: 1, onInput: () => { clearRecords(); } });
+    const sBias = PL.ui.slider(L.controls, { label: "零點偏移 b（系統誤差）", min: -2, max: 2, step: 0.1, value: 0, unit: "mm", digits: 1, onInput: () => { clearRecords(); } });
+    const sTarget = PL.ui.slider(L.controls, { label: "建議至少量幾次", min: 3, max: 20, step: 1, value: 5, unit: "次", digits: 0 });
+
     const row = PL.ui.buttonRow(L.controls);
-    PL.ui.button(row, "重新量測", resample, { primary: true });
-    PL.ui.button(row, "清除零點偏移", () => { sBias.set(0); resample(); });
-    PL.ui.note(L.controls, "綠點是每一次讀值，虛線是真實長度，藍線是平均值。提高量測次數會讓平均值更穩定；但零點偏移是系統誤差，重複量測也不會自動消失。");
+    const bOnce = PL.ui.button(row, "量測一次", () => measureOnce(), { primary: true });
+    const bFill = PL.ui.button(row, "一次補滿到建議次數", () => {
+      const target = Math.round(sTarget.get());
+      while (readings.length < target) measureOnce(true);
+      draw();
+    });
+    const bClear = PL.ui.button(row, "清除紀錄", () => { clearRecords(); });
+    PL.ui.note(L.controls,
+      "每按一次「量測一次」就當作你真的讀了一次尺。" +
+      "點會越堆越多，平均值會越來越穩；但零點偏移造成的整體偏移，量再多次也不會消失。");
+
+    const rCount = PL.ui.readout(L.readouts, { label: "已記錄筆數", unit: "筆" });
     const rMean = PL.ui.readout(L.readouts, { label: "平均值 x̄", unit: "mm" });
     const rSpread = PL.ui.readout(L.readouts, { label: "讀值離散 s", unit: "mm" });
     const rUncertainty = PL.ui.readout(L.readouts, { label: "合成不確定度 u", unit: "mm" });
     const rDifference = PL.ui.readout(L.readouts, { label: "平均值與真值差", unit: "mm" });
     const rReport = PL.ui.readout(L.readouts, { label: "建議報告結果" });
+    const rTask = PL.ui.readout(L.readouts, { label: "任務進度" });
 
     function normal() {
       const u = Math.max(1e-8, Math.random()), v = Math.max(1e-8, Math.random());
       return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v);
     }
     function stats() {
+      if (!readings.length) return { mean: NaN, spread: 0 };
       const mean = readings.reduce((sum, value) => sum + value, 0) / readings.length;
-      const variance = readings.length > 1 ? readings.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (readings.length - 1) : 0;
+      const variance = readings.length > 1
+        ? readings.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (readings.length - 1)
+        : 0;
       return { mean, spread: Math.sqrt(variance) };
     }
-    function resample() {
-      const count = Math.round(sCount.get()), resolution = sResolution.get(), bias = sBias.get();
-      readings = Array.from({ length: count }, () => Math.round((trueLength + bias + normal() * resolution * 0.72) / resolution) * resolution);
+    function measureOnce(silent) {
+      const resolution = sResolution.get(), bias = sBias.get();
+      // 均勻量化到尺的刻度：讀數只能是解析度的整數倍
+      const raw = trueLength + bias + normal() * resolution * 0.72;
+      const snapped = Math.round(raw / resolution) * resolution;
+      readings.push(snapped);
+      if (!silent) draw();
+    }
+    function clearRecords() {
+      readings = [];
+      revealed = false;
       draw();
     }
+    function taskState() {
+      const target = Math.round(sTarget.get());
+      const n = readings.length;
+      if (n === 0) return "尚未量測：按「量測一次」開始";
+      if (n < target) return "已量 " + n + " 筆，建議至少 " + target + " 筆再報告";
+      if (Math.abs(sBias.get()) > 0.05) return "筆數足夠，但零點未校正——平均值會整體偏移";
+      return "筆數足夠：可寫成 x̄ ± u 交作業";
+    }
+
     function draw() {
-      if (!readings.length) return;
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const resolution = sResolution.get(), bias = sBias.get(), result = stats();
+      const target = Math.round(sTarget.get());
+      rCount.set(readings.length, 0);
+      rTask.set(taskState());
+
+      if (!readings.length) {
+        D.text(ctx, "同一支金屬棒：用尺讀長度", W / 2, H * 0.34, { color: PL.col("text"), size: 16, align: "center", weight: "700" });
+        D.text(ctx, "按「量測一次」——每一次都當作你真的讀了一格刻度", W / 2, H * 0.34 + 26,
+          { color: PL.col("text-faint"), size: 12, align: "center" });
+        D.text(ctx, "目前設定：解析度 " + PL.fmt(resolution, 1) + " mm · 零點偏移 " + PL.fmt(bias, 1) +
+          " mm · 建議至少 " + target + " 筆", W / 2, H * 0.34 + 48,
+          { color: PL.col("text-dim"), size: 11, align: "center" });
+        // 靜態示意：尺（刻度密疏跟解析度）與棒（位置跟零點偏移）
+        const x0 = 80, x1 = W - 80, y = H * 0.55;
+        D.rect(ctx, x0, y, x1 - x0, 36, { fill: "rgba(255,255,255,0.05)", stroke: "rgba(255,255,255,0.2)", r: 4 });
+        // 解析度越粗，刻度越疏
+        const ticks = PL.clamp(Math.round(40 * (1 / Math.max(0.1, resolution))), 8, 40);
+        for (let i = 0; i <= ticks; i++) {
+          const x = x0 + (x1 - x0) * i / ticks, major = i % 5 === 0;
+          D.line(ctx, x, y, x, y + (major ? 18 : 10), "rgba(255,255,255,0.36)", 1);
+        }
+        // 棒中心隨零點偏移左右微移（放大 8 倍才看得出來）
+        const shift = bias * 8;
+        D.rect(ctx, x0 + (x1 - x0) * 0.42 + shift, y + 6, (x1 - x0) * 0.16, 14,
+          { fill: "rgba(255,204,102,0.55)", stroke: PL.col("warn"), r: 3 });
+        D.text(ctx, "待測金屬棒", x0 + (x1 - x0) * 0.5 + shift, y + 16, { color: "#151b27", size: 9, align: "center", weight: "700" });
+        // 建議次數進度格
+        const gx = x0, gy = y + 56, cell = Math.min(22, (x1 - x0) / Math.max(8, target));
+        D.text(ctx, "建議量測進度", gx, gy - 6, { color: PL.col("text-faint"), size: 9 });
+        for (let i = 0; i < target; i++) {
+          D.rect(ctx, gx + i * (cell + 3), gy, cell, 8, { fill: PL.theme.pale(0.10), r: 2 });
+        }
+        rMean.set("—"); rSpread.set("—"); rUncertainty.set("—"); rDifference.set("—"); rReport.set("量測後出現");
+        return;
+      }
+
       const standardError = result.spread / Math.sqrt(readings.length);
       const instrumentUncertainty = resolution / Math.sqrt(12);
       const uncertainty = Math.sqrt(standardError * standardError + instrumentUncertainty * instrumentUncertainty);
@@ -694,8 +764,10 @@
       const min = trueLength - halfRange, max = trueLength + halfRange;
       const x0 = 60, x1 = W - 42, mapX = value => x0 + (value - min) / (max - min) * (x1 - x0);
 
-      D.text(ctx, "同一支金屬棒：每次用尺讀到的長度", x0, 25, { color: PL.col("text"), size: 12, weight: "700" });
-      D.text(ctx, "真實長度僅供本模擬對照", x1, 25, { color: PL.col("text-faint"), size: 9, align: "right" });
+      D.text(ctx, "任務：量這支金屬棒（已記錄 " + readings.length + " 筆）", x0, 25, { color: PL.col("text"), size: 12, weight: "700" });
+      D.text(ctx, revealed ? "真值 " + trueLength + " mm（僅供對照）" : "真值尚未揭曉", x1, 25, { color: PL.col("text-faint"), size: 9, align: "right" });
+
+      // 尺與棒
       D.rect(ctx, x0, 42, x1 - x0, 34, { fill: "rgba(255,255,255,0.05)", stroke: "rgba(255,255,255,0.2)", r: 4 });
       for (let value = Math.ceil(min); value <= Math.floor(max); value++) {
         const x = mapX(value), major = value % 2 === 0;
@@ -705,38 +777,52 @@
       D.rect(ctx, mapX(trueLength - 1.7), 48, Math.max(10, mapX(trueLength + 1.7) - mapX(trueLength - 1.7)), 14, { fill: "rgba(255,204,102,0.55)", stroke: PL.col("warn"), r: 3 });
       D.text(ctx, "待測金屬棒", mapX(trueLength), 58, { color: "#151b27", size: 8.5, align: "center", weight: "700" });
 
+      // 散布：每一筆是一顆綠點，按記錄順序排開
       const scatterTop = H * 0.28, scatterBottom = H * 0.51;
       D.rect(ctx, x0, scatterTop, x1 - x0, scatterBottom - scatterTop, { fill: "rgba(7,11,17,0.35)", stroke: "rgba(255,255,255,0.15)", r: 5 });
-      D.text(ctx, "每次讀值", x0 + 10, scatterTop + 17, { color: PL.col("text-faint"), size: 9 });
-      D.line(ctx, mapX(trueLength), scatterTop + 25, mapX(trueLength), scatterBottom - 12, PL.col("warn"), 1.8, [4, 4]);
+      D.text(ctx, "每次讀值（你自己按出來的）", x0 + 10, scatterTop + 17, { color: PL.col("text-faint"), size: 9 });
+      if (revealed) D.line(ctx, mapX(trueLength), scatterTop + 25, mapX(trueLength), scatterBottom - 12, PL.col("warn"), 1.8, [4, 4]);
       D.line(ctx, mapX(result.mean), scatterTop + 25, mapX(result.mean), scatterBottom - 12, PL.col("accent-2"), 2);
       readings.forEach((value, index) => {
         const rowIndex = index % 4, y = scatterTop + 48 + rowIndex * ((scatterBottom - scatterTop - 68) / 3);
         D.disc(ctx, mapX(value), y, 5, { fill: color(), glow: color(), glowSize: 7 });
         D.text(ctx, String(index + 1), mapX(value), y - 9, { color: PL.col("text-faint"), size: 8, align: "center" });
       });
-      D.text(ctx, "真值", mapX(trueLength), scatterBottom - 2, { color: PL.col("warn"), size: 9, align: "center" });
       D.text(ctx, "平均值", mapX(result.mean), scatterTop + 19, { color: PL.col("accent-2"), size: 9, align: "center" });
+      if (revealed) D.text(ctx, "真值", mapX(trueLength), scatterBottom - 2, { color: PL.col("warn"), size: 9, align: "center" });
 
+      // 直方圖
       const histTop = H * 0.64, histBottom = H - 42, binCount = 10, binWidth = (max - min) / binCount;
       const bins = Array.from({ length: binCount }, () => 0);
       readings.forEach(value => { const bin = PL.clamp(Math.floor((value - min) / binWidth), 0, binCount - 1); bins[bin] += 1; });
       const maxBin = Math.max(1, ...bins), barWidth = (x1 - x0) / binCount;
-      D.text(ctx, "讀值分布：點越集中，隨機誤差越小", x0, histTop - 14, { color: PL.col("text"), size: 11, weight: "700" });
+      D.text(ctx, "讀值分布：筆數越多，平均值越穩", x0, histTop - 14, { color: PL.col("text"), size: 11, weight: "700" });
       D.line(ctx, x0, histBottom, x1, histBottom, "rgba(255,255,255,0.42)", 1);
       bins.forEach((count, index) => {
         const height = (histBottom - histTop) * count / maxBin;
         D.rect(ctx, x0 + index * barWidth + 3, histBottom - height, Math.max(3, barWidth - 6), height, { fill: "rgba(53,224,207,0.52)", stroke: color(), r: 2 });
       });
-      D.line(ctx, mapX(trueLength), histTop, mapX(trueLength), histBottom, PL.col("warn"), 1.5, [4, 4]);
+      if (revealed) D.line(ctx, mapX(trueLength), histTop, mapX(trueLength), histBottom, PL.col("warn"), 1.5, [4, 4]);
       D.line(ctx, mapX(result.mean), histTop, mapX(result.mean), histBottom, PL.col("accent-2"), 2);
-      const biasText = Math.abs(bias) < 0.05 ? "零點已校正：重複量測主要處理隨機誤差" : "零點偏移 " + PL.fmt(bias, 1) + " mm：平均值整體偏移，重複量測無法消除";
+      const biasText = Math.abs(bias) < 0.05
+        ? "零點已校正：重複量測在處理隨機誤差"
+        : "零點偏移 " + PL.fmt(bias, 1) + " mm：系統誤差，量再多次也不會消失";
       D.text(ctx, biasText, W / 2, H - 16, { color: Math.abs(bias) < 0.05 ? PL.col("text-faint") : PL.col("danger"), size: 9.5, align: "center" });
 
-      rMean.set(result.mean, 2); rSpread.set(result.spread, 2); rUncertainty.set(uncertainty, 2); rDifference.set(result.mean - trueLength, 2);
+      rMean.set(result.mean, 2);
+      rSpread.set(result.spread, 2);
+      rUncertainty.set(uncertainty, 2);
+      rDifference.set(result.mean - trueLength, 2);
       rReport.set(PL.fmt(result.mean, 1) + " ± " + PL.fmt(uncertainty, 1) + " mm");
     }
-    cv.onResize(draw); resample();
+
+    PL.ui.button(row, "揭曉真值", () => {
+      if (!readings.length) return;
+      revealed = true;
+      draw();
+    });
+
+    cv.onResize(draw); draw();
     return { stop() { cv.destroy(); }, rerender: draw };
   }});
 
