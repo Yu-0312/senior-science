@@ -527,6 +527,25 @@
         rms: Math.sqrt(sse / n), r2: sst > 0 ? 1 - sse / sst : 1 };
     }
 
+    /*
+     * 真實模型：y = kx + B + c·(x−mid)²
+     * 彎曲 c 只影響資料生成、畫布上完全看不出來的話，
+     * 這根滑桿對學生就是擺設（meaning-audit 也會判死）。
+     * 空資料狀態一律畫出含彎曲的模型曲線，讓 c 一動就看得見。
+     */
+    function trueY(x, k, bend) {
+      const mid = (N_MAX + 1) / 2;
+      return k * x + B_TRUE + bend * (x - mid) * (x - mid);
+    }
+    function modelCurve(k, bend) {
+      const ptsC = [];
+      for (let i = 0; i <= 24; i++) {
+        const x = (N_MAX + 1) * i / 24;
+        ptsC.push([x, trueY(x, k, bend)]);
+      }
+      return ptsC;
+    }
+
     function scene(f) {
       const { ctx, W, H } = cv;
       cv.clear(); D.bg(cv);
@@ -541,13 +560,29 @@
         D.text(ctx, "目前設定：k=" + PL.fmt(sK.get(), 2) + " · σ=" + PL.fmt(sNoise.get(), 2) +
           " · 彎曲 c=" + PL.fmt(sBend.get(), 3), W / 2, H * 0.34 + 48,
           { color: PL.col("text-dim"), size: 11, align: "center" });
-        const g0 = PL.graph(cv, box, { x0: 0, x1: N_MAX + 1, y0: 0, y1: 12 });
+        const k0 = sK.get(), bend0 = sBend.get();
+        const yLin0 = trueY(0, k0, 0), yLin1 = trueY(N_MAX + 1, k0, 0);
+        const yMod0 = trueY(0, k0, bend0), yMod1 = trueY(N_MAX + 1, k0, bend0);
+        const midY = trueY((N_MAX + 1) / 2, k0, bend0);
+        const y0g = Math.min(yLin0, yLin1, yMod0, yMod1, midY) - 1;
+        const y1g = Math.max(yLin0, yLin1, yMod0, yMod1, midY) + 1;
+        const g0 = PL.graph(cv, box, { x0: 0, x1: N_MAX + 1, y0: y0g, y1: y1g });
         g0.frame({ xlabel: "自變量 x", ylabel: "量測值 y" });
         g0.grid(6, 4);
-        // 預覽第一點可能落點（跟著 σ 張開的區間）
-        if (layers.has("true")) {
-          g0.curve([[0, B_TRUE], [N_MAX + 1, sK.get() * (N_MAX + 1) + B_TRUE]],
-            { color: PL.col("text-faint"), width: 1.5, dash: [6, 5] });
+        // 純直線參考（c=0）
+        g0.curve([[0, yLin0], [N_MAX + 1, yLin1]],
+          { color: PL.col("text-faint"), width: 1.4, dash: [6, 5] });
+        // 含彎曲的真實模型：c 改變時曲率立刻可見
+        g0.curve(modelCurve(k0, bend0),
+          { color: bend0 > 0.002 ? PL.col("warn") : c, width: 2.2 });
+        if (bend0 > 0.002) {
+          // 中點偏離量：把「彎曲造成了什麼」標出來
+          const midX = (N_MAX + 1) / 2;
+          const yLineMid = k0 * midX + B_TRUE;
+          const yBentMid = trueY(midX, k0, bend0);
+          D.line(ctx, g0.X(midX), g0.Y(yLineMid), g0.X(midX), g0.Y(yBentMid), PL.col("warn"), 2);
+          D.text(ctx, "Δ=" + PL.fmt(yBentMid - yLineMid, 2), g0.X(midX) + 6, g0.Y((yLineMid + yBentMid) / 2),
+            { color: PL.col("warn"), size: 10 });
         }
         const sigma = sNoise.get();
         const y1p = sK.get() * 1 + B_TRUE;
@@ -571,8 +606,13 @@
       g.grid(6, 4);
 
       if (layers.has("true")) {
-        g.curve([[0, B_TRUE], [N_MAX + 1, f.k * (N_MAX + 1) + B_TRUE]],
-          { color: PL.col("text-faint"), width: 1.6, dash: [6, 5] });
+        // 真實模型含彎曲項；只畫直線會把 c 的作用藏起來
+        g.curve(modelCurve(f.k, f.bend),
+          { color: f.bend > 0.002 ? PL.col("warn") : PL.col("text-faint"), width: 1.8, dash: f.bend > 0.002 ? null : [6, 5] });
+        if (f.bend <= 0.002) {
+          g.curve([[0, B_TRUE], [N_MAX + 1, f.k * (N_MAX + 1) + B_TRUE]],
+            { color: PL.col("text-faint"), width: 1.4, dash: [6, 5] });
+        }
       }
 
       if (layers.has("resid") && isFinite(f.kHat)) {

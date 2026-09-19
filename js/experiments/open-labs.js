@@ -366,19 +366,52 @@
       rate = sRate.get(); windowSec = sWin.get();
 
       // 蓋革管示意
+      // 管內凹槽用 theme.shade（主題衍生表面），不能寫死深色——
+      // 寫死的 rgba(20,28,40,0.55) 在淺色主題下就是一塊刺眼黑洞。
       const tubeX = 70, tubeY = 48, tubeW = 110, tubeH = 54;
       D.rect(ctx, tubeX, tubeY, tubeW, tubeH, { fill: PL.theme.shade(0.55), stroke: accent(), width: 2, r: 8 });
-      D.rect(ctx, tubeX + 8, tubeY + 10, tubeW - 16, tubeH - 20, { fill: "rgba(20,28,40,0.55)", r: 4 });
+      D.rect(ctx, tubeX + 8, tubeY + 10, tubeW - 16, tubeH - 20, { fill: PL.theme.shade(0.82), stroke: PL.theme.pale(0.16), width: 1, r: 4 });
       D.text(ctx, "蓋革計數器", tubeX + tubeW / 2, tubeY - 8, { color: PL.col("text-dim"), size: 10, align: "center" });
       D.text(ctx, st ? "N = " + st.last : "N = —", tubeX + tubeW / 2, tubeY + tubeH / 2 + 5,
         { color: accent(), size: 16, align: "center", weight: "700" });
       D.text(ctx, "R = " + PL.fmt(rate, 1) + " 次/s · 窗 " + windowSec + " s", tubeX, tubeY + tubeH + 18,
         { color: PL.col("text-faint"), size: 10 });
 
+      /*
+       * 預期計數量尺：滑桿一動就必須看見圖形變化。
+       * meaning-audit 只比圖形不算文字——若 R／時間窗只改讀數字串，
+       * 畫面雜湊不變，這兩根滑桿就等於擺設。
+       * 幾何量：量尺長度 ∝ √(N̄)，誤差帶高度 ∝ σ=√N̄，
+       * 刻度密度跟著 R 走。三者都由滑桿直接決定。
+       */
+      const nExp = Math.max(0, rate * windowSec);
+      const sigmaExp = Math.sqrt(nExp);
+      const scaleMax = Math.sqrt(50 * 60); // 滑桿上界 R×窗 的量級
+      const railX = tubeX, railY = tubeY + tubeH + 32, railW = Math.min(200, W * 0.28), railH = 16;
+      const fillRatio = PL.clamp(Math.sqrt(nExp) / scaleMax, 0.02, 1);
+      D.text(ctx, "預期 N̄ = R × 窗", railX, railY - 6, { color: PL.col("text-faint"), size: 9 });
+      D.rect(ctx, railX, railY, railW, railH, { fill: PL.theme.shade(0.45), stroke: PL.theme.pale(0.22), width: 1, r: 3 });
+      D.rect(ctx, railX + 1, railY + 1, Math.max(2, (railW - 2) * fillRatio), railH - 2,
+        { fill: accent(), r: 2 });
+      // σ 誤差帶：在量尺末端畫豎向鬚線，高度 ∝ √N̄
+      const capX = railX + (railW - 2) * fillRatio + 1;
+      const whisker = PL.clamp(sigmaExp / scaleMax * 48, 2, 28);
+      D.line(ctx, capX, railY + railH / 2 - whisker, capX, railY + railH / 2 + whisker, PL.col("warn"), 2);
+      // 計數率刻度：每秒一格，R 越大刻度越密
+      const tickN = Math.round(rate);
+      const tickTop = railY + railH + 6;
+      D.line(ctx, railX, tickTop + 8, railX + railW, tickTop + 8, PL.theme.pale(0.2), 1);
+      for (let i = 0; i < tickN; i++) {
+        const tx = railX + railW * (i + 0.5) / tickN;
+        D.line(ctx, tx, tickTop + 2, tx, tickTop + 8, PL.col("accent-2"), 1.2);
+      }
+      D.text(ctx, "σ ≈ " + PL.fmt(sigmaExp, 1) + "（√N̄）", railX, tickTop + 20,
+        { color: PL.col("warn"), size: 9.5 });
+
       if (!trials.length) {
         D.text(ctx, "放射性衰變是隨機的：同一條件每次計數都會不一樣", W / 2, H * 0.52,
           { color: PL.col("text"), size: 13, align: "center", weight: "700" });
-        D.text(ctx, "按「計數一次」開始；連續多做幾次，看 σ 是不是 ≈ √N", W / 2, H * 0.52 + 24,
+        D.text(ctx, "拉動 R 或時間窗，預期量尺會立刻變長／變短；再按「計數一次」驗證", W / 2, H * 0.52 + 24,
           { color: PL.col("text-faint"), size: 11, align: "center" });
         rN.set("—"); rMean.set("—"); rS.set("—"); rTheory.set("—"); rRel.set("—");
         rTask.set("尚未計數：按「計數一次」開始");
