@@ -1,20 +1,41 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#5be39a"/>
-      <stop offset="1" stop-color="#2fb673"/>
+    <!-- 米色底：溫潤的紙感，不用漸層避免搶走主體 -->
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4eee2"/>
+      <stop offset="1" stop-color="#e8dfcf"/>
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <!-- 錐形燒瓶（實驗室）：瓶口、瓶身、瓶底 -->
-  <g stroke="#06170e" stroke-width="24" fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M228 118 V210 L150 372 Q141 400 170 400 H342 Q371 400 362 372 L284 210 V118"/>
-    <path d="M212 118 H300"/>
+  <!-- 實驗桌：黑白線稿，米色底 -->
+  <g fill="none" stroke="#1a1a1a" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 桌面厚板 -->
+    <rect x="58" y="242" width="396" height="28" rx="6" fill="#1a1a1a" stroke="none"/>
+    <!-- 前緣裙板 -->
+    <path d="M86 270 V292 H426 V270"/>
+    <!-- 桌腳 -->
+    <path d="M112 292 V398"/>
+    <path d="M400 292 V398"/>
+    <!-- 下層置物板 -->
+    <path d="M112 342 H400"/>
+    <!-- 置物板上的三支試管 -->
+    <path d="M230 342 V318"/>
+    <path d="M256 342 V306"/>
+    <path d="M282 342 V322"/>
   </g>
-  <!-- 瓶內液體 -->
-  <path d="M190 300 H322 L349 372 Q356 390 337 390 H175 Q156 390 163 372 Z" fill="#06170e"/>
-  <!-- 氣泡（用底色綠當鏤空） -->
-  <circle cx="234" cy="350" r="14" fill="#43cf85"/>
-  <circle cx="276" cy="364" r="10" fill="#43cf85"/>
-  <circle cx="252" cy="332" r="8" fill="#43cf85"/>
+  <!-- 桌上錐形瓶（線稿＋底部液體） -->
+  <g fill="none" stroke="#1a1a1a" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M200 242 V186 L168 242"/>
+    <path d="M232 242 V186"/>
+    <path d="M190 186 H220"/>
+  </g>
+  <path d="M180 220 H220 L230 242 H170 Z" fill="#1a1a1a"/>
+  <!-- 桌上燒杯（線稿＋液體） -->
+  <g fill="none" stroke="#1a1a1a" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M300 242 V200 H348 V242"/>
+    <path d="M348 212 H366"/>
+  </g>
+  <path d="M308 218 H340 V242 H308 Z" fill="#1a1a1a"/>
+  <!-- 燒杯液面高光：白線，在黑液體上拉出層次 -->
+  <path d="M310 218 H338" stroke="#ffffff" stroke-width="7" stroke-linecap="round" fill="none"/>
 </svg>

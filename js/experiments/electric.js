@@ -179,6 +179,17 @@
     const rE = PL.ui.readout(L.readouts, { label: "探測點電場", unit: "" });
     const rCfg = PL.ui.readout(L.readouts, { label: "組態" });
 
+    /* 因果面板：電位是「高度」、電場是「坡度」——方向永遠指向下坡 */
+    PL.ui.causality(L.canvasWrap.parentNode, {
+      title: "誰決定誰：電位 vs 電場",
+      rows: [
+        { name: "電荷量 → 地形高度", tone: "a", note: "q 越大，山丘／漏斗越高／越深。電位 V 是純量場，只有大小沒有方向。" },
+        { name: "地形陡度 → 電場大小", tone: "b", note: "|E| = |dV/dr|：坡越陡電場越強；走在平坦的等高線上電場幾乎為零。" },
+        { name: "下坡方向 → 電場方向", tone: "c", note: "E = −∇V，永遠指向下坡（電位降低最快的方向），且垂直穿過等勢面。" },
+        { name: "沿等高線走 → V 不變", tone: "d", note: "同一條等高線上的電位相同；移動電荷沿等高線不需做功，電場力不做功。" }
+      ]
+    });
+
     /* 電位與電場（與 efield 同一套尺度） */
     const KQ = 40;
     const pot = (x, y) => charges.reduce((s, c) => s + c.q * KQ / (Math.hypot(x - c.x, y - c.y) + 0.08), 0);

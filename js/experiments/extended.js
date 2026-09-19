@@ -665,6 +665,21 @@
     const sBias = PL.ui.slider(L.controls, { label: "零點偏移 b（系統誤差）", min: -2, max: 2, step: 0.1, value: 0, unit: "mm", digits: 1, onInput: () => { clearRecords(); } });
     const sTarget = PL.ui.slider(L.controls, { label: "建議至少量幾次", min: 3, max: 20, step: 1, value: 5, unit: "次", digits: 0 });
 
+    /* 情境預設：課本會點名的量測情境——理想尺、精密尺、未校零、粗解析度 */
+    PL.ui.presets(L.controls, {
+      label: "量測情境",
+      options: [
+        { label: "理想尺 r=1mm", hint: "解析度中等、零點已校正——對照基準",
+          apply: () => { sResolution.set(1); sBias.set(0); sTarget.set(5); clearRecords(); } },
+        { label: "精密尺 r=0.1mm", hint: "解析度極細：讀值幾乎不散開，但系統誤差仍在",
+          apply: () => { sResolution.set(0.1); sBias.set(0); sTarget.set(5); clearRecords(); } },
+        { label: "未校零 +2mm", hint: "零點偏移＝系統誤差：量再多次平均值仍偏離真值",
+          apply: () => { sResolution.set(1); sBias.set(2); sTarget.set(8); clearRecords(); } },
+        { label: "粗尺 r=5mm", hint: "解析度粗：每一筆讀值都只能落在 5 mm 格點上",
+          apply: () => { sResolution.set(5); sBias.set(0); sTarget.set(8); clearRecords(); } }
+      ]
+    });
+
     const row = PL.ui.buttonRow(L.controls);
     const bOnce = PL.ui.button(row, "量測一次", () => measureOnce(), { primary: true });
     const bFill = PL.ui.button(row, "一次補滿到建議次數", () => {
