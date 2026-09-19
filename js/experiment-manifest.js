@@ -253,6 +253,7 @@ window.PhysicsLabExperimentFiles = {
   "gas-laws": "thermal.js",
   "heat": "thermal.js",
   "thermo1": "thermal.js",
+  "heat-engine-principle": "thermal.js",
   "wave-types": "waves.js",
   "superposition": "waves.js",
   "standing-wave": "waves.js",

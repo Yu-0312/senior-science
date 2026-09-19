@@ -86,7 +86,7 @@
       title: "熱與能量",
       description: "從溫度與熱傳遞，走到能量流動及不可逆過程。",
       stages: [
-        { level: "國中打底", kind: "junior", note: "先分辨溫度、熱與物態變化，讀懂日常熱現象。", ids: ["gas-laws", "heat", "phase-change"] },
+        { level: "國中打底", kind: "junior", note: "先分辨溫度、熱與物態變化，並用試管噴塞理解內能如何轉成機械能。", ids: ["gas-laws", "heat", "phase-change", "heat-engine-principle"] },
         { level: "高中建模", kind: "senior", note: "用熱力學第一定律、熱傳遞與熱機描述能量帳。", ids: ["thermo1", "heat-transfer", "heat-engine"] },
         { level: "大學延伸", kind: "university", note: "把能量守恆延伸為熵與不可逆方向的觀點。", ids: ["entropy-mixing"] }
       ]

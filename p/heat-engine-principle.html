@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>熱機原理：試管噴塞與內能做功｜物理實驗室 · 流體與熱學</title>
+<meta name="description" content="國中經典熱機演示：酒精燈加熱試管中的少量水，水汽化使管內氣體壓力升高；當壓力剛好足以克服塞子阻力時，氣體膨脹把塞子推出，部分內能轉為塞子的機械能。噴出後管口的白霧是水蒸氣遇冷液化的小液滴，不是水蒸氣本身。這說明熱機的做功原理與能量由化學能→內能→機械能的轉換，但不是能連續循環工作的完整熱機。" />
+<link rel="canonical" href="https://senior-science.vercel.app/p/heat-engine-principle.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="熱機原理：試管噴塞與內能做功｜物理實驗室 · 流體與熱學" />
+<meta property="og:description" content="國中經典熱機演示：酒精燈加熱試管中的少量水，水汽化使管內氣體壓力升高；當壓力剛好足以克服塞子阻力時，氣體膨脹把塞子推出，部分內能轉為塞子的機械能。噴出後管口的白霧是水蒸氣遇冷液化的小液滴，不是水蒸氣本身。這說明熱機的做功原理與能量由化學能→內能→機械能的轉換，但不是能連續循環工作的完整熱機。" />
+<meta property="og:locale" content="zh_TW" />
+<meta property="og:url" content="https://senior-science.vercel.app/p/heat-engine-principle.html" />
+<meta name="theme-color" content="#0e1013" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<link rel="icon" type="image/svg+xml" href="../icons/icon.svg?v=20260919-05" />
+<link rel="apple-touch-icon" href="../icons/icon-192.png?v=20260919-05" />
+<link rel="stylesheet" href="../css/style.css?v=20260919-05" />
+<script>
+(function () {
+  try {
+    var saved = JSON.parse(localStorage.getItem("pl-theme"));
+    if (saved !== "light" && saved !== "dark") {
+      saved = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    }
+    document.documentElement.setAttribute("data-theme", saved);
+  } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+})();
+</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"LearningResource","name":"熱機原理：試管噴塞與內能做功","description":"國中經典熱機演示：酒精燈加熱試管中的少量水，水汽化使管內氣體壓力升高；當壓力剛好足以克服塞子阻力時，氣體膨脹把塞子推出，部分內能轉為塞子的機械能。噴出後管口的白霧是水蒸氣遇冷液化的小液滴，不是水蒸氣本身。這說明熱機的做功原理與能量由化學能→內能→機械能的轉換，但不是能連續循環工作的完整熱機。","inLanguage":"zh-Hant","learningResourceType":"互動模擬","educationalLevel":"選修力學二與熱學","isAccessibleForFree":true,"license":"https://creativecommons.org/licenses/by-nc-sa/4.0/","url":"https://senior-science.vercel.app/p/heat-engine-principle.html"}</script>
+</head>
+<body class="static-page">
+<header class="license-topbar">
+  <a class="license-home" href="../index.html"><span class="license-home-mark" aria-hidden="true">PH</span>物理實驗室</a>
+  <div class="license-topbar-actions">
+    <a class="license-toplink" href="../experiments.html">全部實驗</a>
+    <a class="license-toplink" href="../licensing.html">授權</a>
+  </div>
+</header>
+<main class="license-page">
+  <p class="license-kicker">模組七 · 流體與熱學</p>
+  <h1>熱機原理：試管噴塞與內能做功</h1>
+  <p class="license-lead">國中經典熱機演示：酒精燈加熱試管中的少量水，水汽化使管內氣體壓力升高；當壓力剛好足以克服塞子阻力時，氣體膨脹把塞子推出，部分內能轉為塞子的機械能。噴出後管口的白霧是水蒸氣遇冷液化的小液滴，不是水蒸氣本身。這說明熱機的做功原理與能量由化學能→內能→機械能的轉換，但不是能連續循環工作的完整熱機。</p>
+  <div class="license-meta">
+    <span>選修力學二與熱學</span>
+    <span>互動模擬</span>
+    <span>繁體中文</span>
+  </div>
+
+  <section class="license-section">
+    <h2>關鍵公式</h2>
+    <p class="static-formula">化學能內能機械能; ΔU=Q-W</p>
+  </section>
+
+  <section class="license-section">
+    <h2>學習重點</h2>
+    <ul>
+      <li>熱傳遞改變內能：吸熱時管氣內能上升</li>
+      <li>壓力剛好克服塞子阻力才會噴出（臨界條件）</li>
+      <li>氣體膨脹做功時自身內能下降、塞子獲得機械能</li>
+      <li>白霧是液化小液滴，不是水蒸氣</li>
+      <li>台灣108：國中自然『物質與能量／能源』內能與熱機簡介</li>
+      <li>高中銜接：必修能量守恆定性 → 選修熱力學 → heat-engine 效率</li>
+      <li>這是一次性演示，完整熱機還需要循環與排熱</li>
+    </ul>
+  </section>
+
+  <section class="license-section">
+    <h2>動手操作</h2>
+    <p>這個主題有可即時操作的模擬：調整參數、用碼錶與量角器量測、記錄資料並自動作圖求出物理量。</p>
+    <div class="license-cta">
+      <a class="static-cta" href="../index.html#heat-engine-principle">開啟「熱機原理：試管噴塞與內能做功」互動模擬</a>
+      <a href="worksheet-heat-engine-principle.html">列印學習單</a>
+    </div>
+  </section>
+
+  <nav class="license-section static-nav">
+    <a href="continuity-hydraulic.html">← 連續方程與液壓機</a>
+    <a href="density-lab.html">密度量測與沉浮判斷 →</a>
+  </nav>
+</main>
+</body>
+</html>

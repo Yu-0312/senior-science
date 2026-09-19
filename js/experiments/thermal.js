@@ -525,4 +525,259 @@
     cv.onResize(draw); draw();
     return { stop() { cv.destroy(); }, rerender: draw };
   }});
+
+  /*
+   * 熱機原理：試管噴塞（國中經典演示，教學模型對齊公開國中實驗設計）
+   *
+   * 不是卡諾效率，而是「受熱氣體膨脹做功 → 內能變機械能」：
+   *   酒精燈加熱 → 水汽化、管內壓力升高 → 壓力剛好克服塞子阻力 → 塞子射出
+   *   → 氣體對外做功、內能下降 → 管口白霧（水蒸氣遇冷液化，不是蒸氣本身）
+   * 台灣 108：國中自然「物質與能量／能源」內能與熱機簡介；
+   * 高中必修能量守恆定性 → 選修熱力學 → 本站 heat-engine（效率與卡諾）。
+   */
+  PL.register("heat-engine-principle", { build(root) {
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
+    const cv = PL.canvas.create(L.canvasWrap, 0.72, 920);
+    const AP = PL.apparatus;
+
+    /* 0待加熱 1加熱 2壓力升高 3膨脹做功 4白霧消散 —— 一次性，不自動循環 */
+    let stage = 0, U = 0, corkX = 0, corkV = 0, fog = 0, bubble = 0, elapsed = 0, heatIn = 0;
+
+    function reset() {
+      stage = 0; U = 0; corkX = 0; corkV = 0; fog = 0; bubble = 0; elapsed = 0; heatIn = 0;
+      draw();
+    }
+
+    PL.ui.section(L.controls, "演示條件");
+    const sHeat = PL.ui.slider(L.controls, {
+      label: "酒精燈加熱功率", min: 0, max: 100, step: 5, value: 70, unit: "%", digits: 0, onInput: reset
+    });
+    const sWater = PL.ui.slider(L.controls, {
+      label: "試管內水量", min: 5, max: 40, step: 1, value: 15, unit: "mL", digits: 0, onInput: reset
+    });
+    const sFriction = PL.ui.slider(L.controls, {
+      label: "塞子緊度（阻力）", min: 20, max: 90, step: 5, value: 45, unit: "", digits: 0, onInput: reset
+    });
+
+    PL.ui.presets(L.controls, {
+      label: "演示情境",
+      options: [
+        { label: "課本標準", hint: "中火、少量水、中等塞子緊度",
+          apply: () => { sHeat.set(70); sWater.set(15); sFriction.set(45); reset(); } },
+        { label: "弱火慢熱", hint: "加熱慢，更久才升壓噴出",
+          apply: () => { sHeat.set(30); sWater.set(20); sFriction.set(45); reset(); } },
+        { label: "強火快噴", hint: "火力大，很快超過塞子阻力",
+          apply: () => { sHeat.set(95); sWater.set(12); sFriction.set(35); reset(); } },
+        { label: "塞子很緊", hint: "阻力大：累積更久，噴出更猛",
+          apply: () => { sHeat.set(75); sWater.set(18); sFriction.set(80); reset(); } }
+      ]
+    });
+
+    PL.ui.note(L.controls,
+      "播放後依序觀察：火焰與氣泡 → 壓力條爬升 → 塞子射出 → 管口白霧。" +
+      "白霧不是水蒸氣，是液化小液滴。這是一次性演示，不會自己重來。");
+
+    const rStage = PL.ui.readout(L.readouts, { label: "目前階段" });
+    const rU = PL.ui.readout(L.readouts, { label: "管氣內能（相對）" });
+    const rP = PL.ui.readout(L.readouts, { label: "壓力進度" });
+    const rWork = PL.ui.readout(L.readouts, { label: "塞子機械能" });
+    const rFog = PL.ui.readout(L.readouts, { label: "白霧強度" });
+    PL.ui.button(PL.ui.buttonRow(L.controls), "重設", reset);
+
+    PL.ui.causality(L.canvasWrap.parentNode, {
+      title: "熱機原理：能量怎麼走",
+      rows: [
+        { name: "火焰 → 內能", tone: "a", note: "化學能先變成熱；熱傳遞使水與管氣內能上升——這是吸熱，不是做功。" },
+        { name: "內能 → 機械能", tone: "b", note: "壓力剛好克服塞子阻力時，氣體膨脹推塞子：對外做功，自身內能下降。" },
+        { name: "白霧 ≠ 水蒸氣", tone: "c", note: "水蒸氣看不見。白霧是做功後溫度下降，水蒸氣遇冷液化成的小液滴。" },
+        { name: "不是連續熱機", tone: "d", note: "噴一次就結束；完整熱機需要循環、排熱與持續供熱，這只是做功原理演示。" }
+      ]
+    });
+
+    PL.ui.procedure(L.controls, {
+      title: "觀察步驟（先預測再看）",
+      steps: [
+        "先看<strong>火焰與水量</strong>，預測：加熱越強、塞子越緊，噴出會更早還是更晚？",
+        "盯著<strong>壓力條</strong>：要累積到超過塞子阻力線才會噴，不是瞬間滿。",
+        "塞子<strong>射出的同一瞬間</strong>管口出現白霧——內能正在變成機械能。",
+        "白霧幾秒內消散：液滴散開／蒸發，不是「蒸氣變回水」一句話能帶過。",
+        "按重設換一組參數，比較壓力爬升速度與噴出時機。"
+      ],
+      rule: "常見迷思：①把白霧當成水蒸氣；②以為內能全部變成塞子動能——" +
+        "器壁吸熱、散熱與聲響都會分走能量，轉換效率永遠小於 100%。"
+    });
+
+    const verdict = PL.ui.verdict(L.readouts.parentNode || L.readouts, { label: "—", tone: "a" });
+    const derived = PL.ui.derived(L.canvasWrap.parentNode, [
+      { label: "已輸入熱（化學→內能）", unit: "", hint: "∝ 加熱功率 × 時間" },
+      { label: "噴出前壓力進度", unit: "%", hint: "U 相對阻力門檻" },
+      { label: "噴出後剩餘內能", unit: "", hint: "做功後下降，不是歸零" }
+    ]);
+
+    const thr = () => sFriction.get();
+    const stageName = s => ["待加熱", "加熱中：氣泡", "壓力升高", "膨脹做功：塞子射出", "白霧消散"][s] || "—";
+
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const heat = sHeat.get(), water = sWater.get(), th = thr();
+      const pRatio = PL.clamp(U / Math.max(th, 1), 0, 1.2);
+
+      /* 左：實驗台 */
+      const baseY = H - 46;
+      const tubeW = 58, tubeH = Math.min(240, H * 0.54);
+      const tubeX = W * 0.20, tubeBot = baseY - 70, tubeTop = tubeBot - tubeH;
+      if (AP && AP.benchTop) AP.benchTop(ctx, W, H, baseY + 6);
+
+      D.line(ctx, tubeX - 52, baseY, tubeX - 52, tubeTop + 24, PL.theme.pale(0.35), 4);
+      D.line(ctx, tubeX - 52, tubeTop + 40, tubeX - 10, tubeTop + 40, PL.theme.pale(0.3), 3);
+
+      ctx.save();
+      ctx.translate(tubeX, tubeBot);
+      ctx.rotate(-0.1);
+      D.rect(ctx, -tubeW / 2, -tubeH, tubeW, tubeH, {
+        fill: PL.theme.pale(0.05), stroke: PL.theme.pale(0.42), width: 2.5, r: 10
+      });
+      const waterH = tubeH * (0.16 + water / 40 * 0.40);
+      D.rect(ctx, -tubeW / 2 + 5, -waterH, tubeW - 10, waterH - 4, {
+        fill: "rgba(90,162,255,0.32)", stroke: PL.col("accent-2"), width: 1, r: 4
+      });
+      if (stage === 1 || stage === 2) {
+        const n = Math.round(3 + heat / 18);
+        for (let i = 0; i < n; i++) {
+          const ph = (bubble + i * 0.37) % 1;
+          D.disc(ctx, (i % 2 ? 1 : -1) * (3 + (i * 7) % 12), -waterH + ph * waterH * 0.85,
+            2 + (i % 3), { fill: "rgba(230,240,255,0.8)" });
+        }
+      }
+      // 壓力色帶（幾何隨 U 變化）
+      const pressH = Math.max(3, (tubeH - waterH - 24) * pRatio * 0.4);
+      D.rect(ctx, -tubeW / 2 + 7, -tubeH + 10, tubeW - 14, pressH,
+        { fill: "rgba(229,115,115," + (0.12 + pRatio * 0.5) + ")" });
+
+      const corkW = 20 + sFriction.get() * 0.12, corkH = 24;
+      let cx0 = 0, cy0 = -tubeH - 2;
+      if (stage >= 3) { cx0 = corkX; cy0 = -tubeH - 2 - corkX * 0.4; }
+      else if (stage === 2) cx0 = Math.sin(elapsed * 26) * 1.6;
+      D.rect(ctx, -corkW / 2 + cx0, cy0 - corkH / 2, corkW, corkH,
+        { fill: "#c4a574", stroke: "rgba(40,30,20,0.55)", width: 1.5, r: 3 });
+
+      if (fog > 0.02) {
+        for (let i = 0; i < 16; i++) {
+          const ang = (i / 16) * TAU + elapsed * 0.8;
+          const rr = 12 + (i % 5) * 7 + fog * 30;
+          D.disc(ctx, Math.cos(ang) * rr * 0.75, -tubeH - 30 + Math.sin(ang) * rr * 0.4,
+            3 + (i % 3), { fill: "rgba(245,248,252," + (0.12 + fog * 0.5) + ")" });
+        }
+        D.text(ctx, "白霧＝液化小液滴（不是水蒸氣）", tubeW / 2, -tubeH - 78,
+          { color: PL.col("text-dim"), size: 10, align: "center" });
+      }
+      ctx.restore();
+
+      const lampX = tubeX + 14, lampY = baseY - 16;
+      D.rect(ctx, lampX - 24, lampY - 38, 48, 38,
+        { fill: "rgba(180,80,60,0.5)", stroke: PL.theme.pale(0.3), r: 6 });
+      D.rect(ctx, lampX - 8, lampY - 50, 16, 14, { fill: "rgba(80,70,60,0.7)", r: 2 });
+      if (heat > 5 && stage < 3) {
+        D.disc(ctx, lampX, lampY - 56 - heat * 0.08, 5 + heat * 0.05,
+          { fill: "rgba(255,170,60,0.88)", glow: "#ff9a3c", glowSize: 14 + heat * 0.1 });
+        D.disc(ctx, lampX, lampY - 50 - heat * 0.04, 3.2, { fill: "rgba(255,230,120,0.95)" });
+      }
+      D.text(ctx, "酒精燈", lampX, baseY + 24, { color: PL.col("text-faint"), size: 10, align: "center" });
+      D.text(ctx, "熱機原理 · 試管噴塞", 18, 22, { color: PL.col("text-dim"), size: 12, weight: "700" });
+
+      /* 右：壓力門檻、能量鏈、階段說明 */
+      const px = W * 0.46, pw = W * 0.5;
+      D.text(ctx, "壓力進度 vs 塞子阻力", px, 34, { color: PL.col("text-dim"), size: 12, weight: "700" });
+      const barY = 48, barH = 24, barW = pw - 16;
+      D.rect(ctx, px, barY, barW, barH, { fill: PL.theme.shade(0.45), stroke: PL.theme.pale(0.22), width: 1, r: 5 });
+      D.rect(ctx, px + 1, barY + 1, Math.max(2, (barW - 2) * PL.clamp(pRatio / 1.25, 0, 1)), barH - 2,
+        { fill: stage >= 3 ? PL.col("accent-2") : PL.col("danger"), r: 4 });
+      const thrX = px + barW * (th / (th * 1.25));
+      D.line(ctx, thrX, barY - 8, thrX, barY + barH + 8, PL.col("warn"), 2.2);
+      D.text(ctx, "阻力門檻", thrX, barY + barH + 20, { color: PL.col("warn"), size: 10, align: "center" });
+
+      const chainY = 110, bw = (pw - 36) / 3, bh = 54;
+      const chainBox = (i, title, sub, color, on) => {
+        const x = px + i * (bw + 12);
+        D.rect(ctx, x, chainY, bw, bh, {
+          fill: on ? color : PL.theme.shade(0.4),
+          stroke: on ? color : PL.theme.pale(0.22), width: 1.5, r: 8
+        });
+        const ink = on ? "#141414" : PL.col("text-dim");
+        D.text(ctx, title, x + bw / 2, chainY + 20, { color: ink, size: 12, align: "center", weight: "700" });
+        D.text(ctx, sub, x + bw / 2, chainY + 40, { color: on ? "#222" : PL.col("text-faint"), size: 9.5, align: "center" });
+        if (i < 2) D.text(ctx, "→", x + bw + 6, chainY + bh / 2 + 4, { color: PL.col("text-dim"), size: 14, align: "center" });
+      };
+      chainBox(0, "化學能", "酒精燈", "#e8c39e", heat > 5 && stage <= 2);
+      chainBox(1, "內能", "管氣壓力升高", "#e57373", stage >= 1);
+      chainBox(2, "機械能", "塞子獲得動能", "#64b5f6", stage >= 3);
+
+      D.text(ctx, "108 對應", px, chainY + bh + 36, { color: PL.col("text-faint"), size: 10, weight: "700" });
+      D.text(ctx, "國中自然 · 物質與能量／能源：內能、熱傳遞與熱機簡介", px, chainY + bh + 54,
+        { color: PL.col("text-dim"), size: 10 });
+      D.text(ctx, "高中必修能量守恆（定性）→ 選修熱力學 → 本站 heat-engine 效率實驗", px, chainY + bh + 70,
+        { color: PL.col("text-dim"), size: 10 });
+
+      const noteY = chainY + bh + 92;
+      D.rect(ctx, px, noteY, pw - 16, 78, { fill: PL.theme.shade(0.25), stroke: PL.theme.pale(0.16), width: 1, r: 8 });
+      D.text(ctx, stageName(stage), px + 12, noteY + 22, { color: MC(), size: 13, weight: "700" });
+      const tip = stage <= 1 ? "熱傳遞增加內能；氣泡表示水接近沸騰、蒸氣變多。"
+        : stage === 2 ? "壓力逼近塞子阻力：塞子開始微震，即將噴出。"
+        : stage === 3 ? "氣體膨脹對塞子做功：內能 ↓、塞子機械能 ↑，管口出現白霧。"
+        : "白霧消散；演示結束——要再看請按重設，這不是連續循環熱機。";
+      D.text(ctx, tip, px + 12, noteY + 46, { color: PL.col("text-dim"), size: 10.5 });
+      D.text(ctx, "108：國中內能／熱機 → 高中熱力學銜接點", px + 12, noteY + 66,
+        { color: PL.col("text-faint"), size: 9.5 });
+
+      rStage.set(stageName(stage));
+      rU.set(U, 1);
+      rP.set((pRatio * 100).toFixed(0) + "% 門檻 " + th);
+      rWork.set(stage >= 3 ? (0.5 * corkV * corkV).toFixed(2) : "0");
+      rFog.set(fog > 0.02 ? (fog * 100).toFixed(0) + "%" : "—");
+      if (verdict && verdict.set) {
+        verdict.set(stageName(stage), stage >= 3 ? "b" : stage >= 1 ? "a" : "c");
+      }
+      if (derived && derived.set) {
+        derived.set(0, heatIn.toFixed(1));
+        derived.set(1, (PL.clamp(pRatio, 0, 1) * 100).toFixed(0));
+        derived.set(2, stage >= 3 ? U.toFixed(1) : "—");
+      }
+    }
+
+    const anim = PL.loop(dt => {
+      if (dt) {
+        elapsed += dt;
+        const heat = sHeat.get(), th = thr(), water = sWater.get();
+        if (stage <= 2 && heat > 5) {
+          // 水越多，要更多熱才能把壓力拉高
+          const gain = heat * dt * (0.55 - water * 0.006);
+          if (gain > 0) { U += gain; heatIn += gain; }
+          bubble += dt * (0.6 + heat / 80);
+        }
+        if (stage === 0 && U > th * 0.18) stage = 1;
+        if (stage === 1 && U > th * 0.72) stage = 2;
+        if (stage === 2 && U >= th) {
+          stage = 3;
+          // 一次性做功：部分內能轉成塞子機械能，其餘留在管氣／散失
+          const work = U * 0.45;
+          U -= work;
+          corkV = Math.sqrt(Math.max(0, work * 2.4));
+          fog = 1;
+        }
+        if (stage === 3) {
+          corkX += corkV * dt * 55;
+          corkV *= Math.exp(-dt * 0.35);
+          fog = Math.max(0, fog - dt * 0.35);
+          if (fog <= 0.05) stage = 4;
+        } else if (stage === 4) {
+          fog = Math.max(0, fog - dt * 0.2);
+          U = Math.max(0, U - dt * 2);
+        }
+      }
+      draw();
+    });
+
+    cv.onResize(draw); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
 })();
