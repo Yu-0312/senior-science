@@ -7,96 +7,94 @@
   /* 等加速度直線運動 */
   PL.register("uniform-accel", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
-    /* 畫布加高：上半實驗台、下半兩張圖，各約一半 */
-    const cv = PL.canvas.create(L.canvasWrap, 0.82);
+    /*
+     * 避免超模：不做「全程 0–100 m 都塞進軌道」的物理比例尺。
+     * 軌道只開局部視窗跟著車走，車用教學示意尺寸（刻意不按真實比例），
+     * 學生先看見「車在動、圖在記」，數字細節交給 x–t / v–t。
+     */
+    const cv = PL.canvas.create(L.canvasWrap, 0.78, 960);
     const TMAX = 8;
     const AP = PL.apparatus;
+    const VIEW_SPAN = 24; // 軌道視窗寬度（m）
     let t = 0, hist = [];
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const v0 = sV.get(), a = sA.get(), m = MC();
       let xs = []; for (let i = 0; i <= 40; i++) { const tt = TMAX * i / 40; xs.push(v0 * tt + 0.5 * a * tt * tt); }
-      let xmin = Math.min(0, ...xs), xmax = Math.max(0, ...xs); if (xmax - xmin < 2) xmax = xmin + 2;
+      const xmin = Math.min(0, ...xs), xmax = Math.max(0, ...xs);
+      const s = st(t);
 
-      /*
-       * 版面：上半實驗台（車要夠大才看得出「在動」）、下半 x–t / v–t。
-       * 舊版車只有 26×13 px 縮在頂端一條數線上，圖佔滿整張畫布——
-       * 學生看到的是兩張圖，不是「一輛車在跑，圖是它的紀錄」。
-       */
-      const sceneH = Math.floor(H * 0.48);
-      const graphTop = sceneH + 10;
-      const trackY = Math.floor(sceneH * 0.70);
-      const tX0 = 48, tX1 = W - 36;
-      const mapX = x => tX0 + (x - xmin) / (xmax - xmin) * (tX1 - tX0);
-      const s = st(t), cx = PL.clamp(mapX(s.x), tX0 + 8, tX1 - 8);
+      /* 上半實驗台 / 下半兩張圖 */
+      const sceneH = Math.max(200, Math.floor(H * 0.46));
+      const graphTop = sceneH + 8;
+      const trackY = Math.floor(sceneH * 0.62);
+      const tX0 = 36, tX1 = W - 28;
 
-      // 軌道檯面：看得見的實驗台，不是一條細線
+      /* 局部視窗：以目前位置為中心，避免全程比例把車壓成一點 */
+      let viewMin = s.x - VIEW_SPAN * 0.38;
+      let viewMax = s.x + VIEW_SPAN * 0.62;
+      if (viewMax - viewMin < 4) viewMax = viewMin + 4;
+      const mapX = x => tX0 + (x - viewMin) / (viewMax - viewMin) * (tX1 - tX0);
+      const cx = PL.clamp(mapX(s.x), tX0 + 60, tX1 - 60);
+
+      // 軌道
       ctx.save();
-      const tg = ctx.createLinearGradient(0, trackY, 0, trackY + 46);
-      tg.addColorStop(0, "rgba(122,112,96,0.30)");
+      const tg = ctx.createLinearGradient(0, trackY, 0, trackY + 40);
+      tg.addColorStop(0, "rgba(122,112,96,0.28)");
       tg.addColorStop(1, "rgba(60,56,50,0)");
-      ctx.fillStyle = tg; ctx.fillRect(0, trackY, W, 46);
+      ctx.fillStyle = tg; ctx.fillRect(0, trackY, W, 40);
       ctx.restore();
-      D.line(ctx, tX0 - 10, trackY, tX1 + 10, trackY, PL.theme.pale(0.35), 2.5);
-      for (let gx = Math.ceil(xmin / 5) * 5; gx <= xmax; gx += 5) {
+      D.line(ctx, tX0 - 8, trackY, tX1 + 8, trackY, PL.theme.pale(0.35), 2.5);
+      // 刻度：視窗內約每 5 m 一格（不足則 2 m）
+      const step = (viewMax - viewMin) > 30 ? 5 : (viewMax - viewMin) > 12 ? 2 : 1;
+      for (let gx = Math.ceil(viewMin / step) * step; gx <= viewMax; gx += step) {
         const px = mapX(gx);
-        D.line(ctx, px, trackY - 5, px, trackY + 6, PL.col("text-faint"), 1.2);
-        D.text(ctx, gx + "", px, trackY + 20, { color: PL.col("text-faint"), size: 10, align: "center" });
+        if (px < tX0 - 4 || px > tX1 + 4) continue;
+        D.line(ctx, px, trackY - 4, px, trackY + 6, PL.col("text-faint"), 1.1);
+        D.text(ctx, PL.fmt(gx, step < 1 ? 1 : 0), px, trackY + 20, { color: PL.col("text-faint"), size: 9.5, align: "center" });
       }
-      D.text(ctx, "位置 x (m)", tX0 - 8, trackY + 36, { color: PL.col("text-dim"), size: 11 });
-      D.text(ctx, "實驗台 · 等加速直線運動", tX0 - 8, 22, { color: PL.col("text-dim"), size: 12, weight: "700" });
+      D.text(ctx, "軌道局部視窗 · 約 " + PL.fmt(viewMax - viewMin, 0) + " m（車為示意尺寸）", tX0, 24,
+        { color: PL.col("text-dim"), size: 12, weight: "700" });
+      D.text(ctx, "x ≈ " + PL.fmt(s.x, 1) + " m", tX1, 24,
+        { color: m, size: 13, align: "right", weight: "700" });
 
-      // 大車：寬約畫布 13%，高度跟場景走（舊版 26px → 現在約 90–130px）
-      const cartW = Math.min(148, Math.max(88, W * 0.13));
-      const cartH = Math.max(30, Math.min(48, sceneH * 0.26));
-      const wheelBase = trackY;
-      if (AP && AP.cart) AP.cart(ctx, cx, wheelBase, cartW, cartH);
+      // 大車：固定佔畫布寬約 18%，不跟全程 m 數縮放
+      const cartW = Math.min(170, Math.max(110, W * 0.18));
+      const cartH = Math.max(34, Math.min(52, sceneH * 0.28));
+      if (AP && AP.cart) AP.cart(ctx, cx, trackY, cartW, cartH);
       else {
-        D.rect(ctx, cx - cartW / 2, wheelBase - cartH - 6, cartW, cartH, { fill: m, stroke: PL.theme.pale(0.4), r: 6 });
-        D.disc(ctx, cx - cartW * 0.28, wheelBase, cartH * 0.22, { fill: PL.col("text-dim") });
-        D.disc(ctx, cx + cartW * 0.28, wheelBase, cartH * 0.22, { fill: PL.col("text-dim") });
+        D.rect(ctx, cx - cartW / 2, trackY - cartH - 6, cartW, cartH,
+          { fill: m, stroke: PL.theme.pale(0.4), r: 8 });
+        D.disc(ctx, cx - cartW * 0.28, trackY, cartH * 0.22, { fill: PL.col("text-dim") });
+        D.disc(ctx, cx + cartW * 0.28, trackY, cartH * 0.22, { fill: PL.col("text-dim") });
       }
-      // 歷次位置殘影：讓「同一台車沿著 x 走」連成一條動線
-      hist.forEach((h, i) => {
-        if (i % 6 !== 0) return;
-        const hx = mapX(h[1]);
-        D.disc(ctx, hx, trackY - 4, 3, { fill: PL.theme.pale(0.18) });
-      });
 
-      // 速度／加速度箭頭：長度隨大小、方向隨符號
-      const bodyTop = wheelBase - cartH - 10;
+      const bodyTop = trackY - cartH - 8;
       if (Math.abs(s.v) > 0.15) {
-        const aLen = PL.clamp(s.v * 3.2, -70, 70);
-        D.arrow(ctx, cx, bodyTop - 22, cx + aLen, bodyTop - 22,
-          { color: PL.col("accent-2"), width: 2.4, label: "v=" + PL.fmt(s.v, 1) + " m/s", lsize: 10 });
+        const aLen = PL.clamp(s.v * 3.5, -72, 72);
+        D.arrow(ctx, cx, bodyTop - 20, cx + aLen, bodyTop - 20,
+          { color: PL.col("accent-2"), width: 2.6, label: "v " + PL.fmt(s.v, 1) + " m/s", lsize: 10 });
       }
       if (Math.abs(a) > 0.05) {
-        const aLen = PL.clamp(a * 3.2, -56, 56);
-        D.arrow(ctx, cx, bodyTop - 44, cx + aLen, bodyTop - 44,
-          { color: PL.col("warn"), width: 2, label: "a=" + PL.fmt(a, 1) + " m/s²", lsize: 10 });
+        const aLen = PL.clamp(a * 3.5, -56, 56);
+        D.arrow(ctx, cx, bodyTop - 42, cx + aLen, bodyTop - 42,
+          { color: PL.col("warn"), width: 2.2, label: "a " + PL.fmt(a, 1) + " m/s²", lsize: 10 });
       }
-      // 當前位置晶片
-      D.text(ctx, "x = " + PL.fmt(s.x, 1) + " m", cx, trackY + 36,
-        { color: m, size: 12, align: "center", weight: "700" });
 
-      // 下半：x–t 與 v–t 各半欄
-      const gH = Math.max(90, H - graphTop - 18), gap = 16, gW = (W - 44 - gap) / 2, gx1 = 30, gx2 = 30 + gW + gap;
-      const vend = v0 + a * TMAX; let vmin = Math.min(0, v0, vend), vmax = Math.max(0, v0, vend); if (vmax - vmin < 2) vmax = vmin + 2;
-      const g1 = PL.graph(cv, { x: gx1, y: graphTop, w: gW, h: gH }, { x0: 0, x1: TMAX, y0: xmin, y1: xmax });
-      g1.frame({ title: "x – t 圖", xlabel: "t (s)" }); g1.grid(4, 4);
-      /*
-       * 理論曲線用主題變數而不是寫死的白色。
-       * 舊版寫 rgba(255,255,255,0.18)，淺色主題下白線畫在近白的圖表底板上，
-       * x–t 圖看起來整張是空的——而「位置隨時間怎麼變」正是這個實驗要教的。
-       * 畫成虛線是為了和實際走過的軌跡（實線）分開：虛線是預測，實線是量到的。
-       */
-      g1.fn(tt => v0 * tt + 0.5 * a * tt * tt, { color: PL.col("text-faint"), width: 1.6, dash: [5, 4] });
+      // 下半：x–t / v–t（全程 0–TMAX，這裡才是量測紀錄）
+      const gH = Math.max(88, H - graphTop - 16), gap = 14, gW = (W - 40 - gap) / 2, gx1 = 26, gx2 = 26 + gW + gap;
+      const vend = v0 + a * TMAX; let vmin = Math.min(0, v0, vend), vmax = Math.max(0, v0, vend);
+      if (vmax - vmin < 2) vmax = vmin + 2;
+      let gy0 = Math.min(0, ...xs), gy1 = Math.max(0, ...xs); if (gy1 - gy0 < 2) gy1 = gy0 + 2;
+      const g1 = PL.graph(cv, { x: gx1, y: graphTop, w: gW, h: gH }, { x0: 0, x1: TMAX, y0: gy0, y1: gy1 });
+      g1.frame({ title: "x – t", xlabel: "t (s)" }); g1.grid(4, 3);
+      g1.fn(tt => v0 * tt + 0.5 * a * tt * tt, { color: PL.col("text-faint"), width: 1.5, dash: [5, 4] });
       if (hist.length > 1) g1.curve(hist.map(h => [h[0], h[1]]), { color: m, width: 2.4 });
       g1.dot(t, s.x, { color: m, glow: m });
       const g2 = PL.graph(cv, { x: gx2, y: graphTop, w: gW, h: gH }, { x0: 0, x1: TMAX, y0: vmin, y1: vmax });
-      g2.frame({ title: "v – t 圖（斜率=a，面積=位移）", xlabel: "t (s)" }); g2.grid(4, 4);
-      if (hist.length > 1) g2.area(hist.map(h => [h[0], h[2]]), { fill: "rgba(90,162,255,0.13)" });
-      g2.fn(tt => v0 + a * tt, { color: PL.col("accent-2"), width: 2.4 });
+      g2.frame({ title: "v – t（斜率=a）", xlabel: "t (s)" }); g2.grid(4, 3);
+      if (hist.length > 1) g2.area(hist.map(h => [h[0], h[2]]), { fill: "rgba(90,162,255,0.12)" });
+      g2.fn(tt => v0 + a * tt, { color: PL.col("accent-2"), width: 2.2 });
       g2.dot(t, s.v, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
 
       rT.set(t, 2); rX.set(s.x, 1); rV.set(s.v, 1);
