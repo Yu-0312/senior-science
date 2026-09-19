@@ -4,7 +4,7 @@
  * 之前的寫法把版本號分別寫死在 index.html 與這份清單裡，兩邊很容易對不起來；
  * 一旦不同步，預先快取的就是永遠不會被請求到的網址，等於白做一次下載。
  */
-const BUILD = "20260919-02";
+const BUILD = "20260919-03";
 const CACHE = "physics-lab-" + BUILD;
 
 const CORE = ["./", "index.html", "licensing.html", "manifest.json"];
@@ -61,8 +61,13 @@ const ICONS = ["icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png", "ic
  * 等於把剛剛靠延遲載入省下的流量又在背景花掉一次——對用行動網路的學生
  * 尤其不友善。實驗檔改由 fetch 處理器在真正被開啟時才快取；
  * 想要完整離線的使用者，可以在網站上主動按「下載全部實驗」。
+ *
+ * ICONS 也要帶版本號快取：圖示檔本身沒有 hash，
+ * 網址若永遠是 icons/icon.svg，瀏覽器與 SW 會一直端出舊的燒瓶圖。
  */
-const ASSETS = CORE.concat(VERSIONED.map(path => path + "?v=" + BUILD)).concat(ICONS);
+const ASSETS = CORE
+  .concat(VERSIONED.map(path => path + "?v=" + BUILD))
+  .concat(ICONS.map(path => path + "?v=" + BUILD));
 const EXPERIMENT_ASSETS = EXPERIMENTS.map(path => path + "?v=" + BUILD);
 
 self.addEventListener("install", e => {

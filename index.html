@@ -42,13 +42,13 @@
 
   <!-- PWA -->
   <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20260919-03" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png?v=20260919-03" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="物理實驗室" />
 
-  <link rel="stylesheet" href="css/style.css?v=20260919-02" />
+  <link rel="stylesheet" href="css/style.css?v=20260919-03" />
 
   <!-- MathJax（LaTeX 公式排版） -->
   <script>
@@ -102,10 +102,18 @@
       </button>
       <div class="brand" id="brand-home" title="回首頁">
         <div class="brand-logo" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#04121a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10 3.4V9L5.6 17.4Q5 18.8 6.5 18.8H17.5Q19 18.8 18.4 17.4L14 9V3.4"/>
-            <path d="M8.8 3.4H15.2"/>
-            <path d="M8 14H16"/>
+          <!-- 與 PWA 圖示同一套語彙：實驗桌（黑白線稿，米色底由 CSS 提供） -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2.8 10.8h18.4"/>
+            <path d="M4.4 10.8v1.6h15.2v-1.6"/>
+            <path d="M5.8 12.4V19.2"/>
+            <path d="M18.2 12.4V19.2"/>
+            <path d="M5.8 16h12.4"/>
+            <path d="M10.1 10.8V8.1L8.35 10.8"/>
+            <path d="M11.7 10.8V8.1"/>
+            <path d="M9.65 8.1h1.2"/>
+            <path d="M14.2 10.8V9.0h3.2v1.8"/>
+            <path d="M17.4 9.45h0.95"/>
           </svg>
         </div>
         <div class="brand-text">
@@ -363,25 +371,25 @@
   </section>
 
   <!-- 核心 -->
-  <script src="js/site-config.js?v=20260919-02"></script>
-  <script src="js/curriculum.js?v=20260919-02"></script>
-  <script src="js/advanced-curriculum.js?v=20260919-02"></script>
-  <script src="js/comprehensive-curriculum.js?v=20260919-02"></script>
-  <script src="js/extension-registry.js?v=20260919-02"></script>
-  <script src="js/open-curriculum.js?v=20260919-02"></script>
-  <script src="js/school-curriculum.js?v=20260919-02"></script>
-    <script src="js/sim-core.js?v=20260919-02"></script>
-  <script src="js/sim-tools.js?v=20260919-02"></script>
-  <script src="js/sim-insight.js?v=20260919-02"></script>
-  <script src="js/sim-observe.js?v=20260919-02"></script>
-  <script src="js/teaching-notes.js?v=20260919-02"></script>
-  <script src="js/sim-a11y.js?v=20260919-02"></script>
+  <script src="js/site-config.js?v=20260919-03"></script>
+  <script src="js/curriculum.js?v=20260919-03"></script>
+  <script src="js/advanced-curriculum.js?v=20260919-03"></script>
+  <script src="js/comprehensive-curriculum.js?v=20260919-03"></script>
+  <script src="js/extension-registry.js?v=20260919-03"></script>
+  <script src="js/open-curriculum.js?v=20260919-03"></script>
+  <script src="js/school-curriculum.js?v=20260919-03"></script>
+    <script src="js/sim-core.js?v=20260919-03"></script>
+  <script src="js/sim-tools.js?v=20260919-03"></script>
+  <script src="js/sim-insight.js?v=20260919-03"></script>
+  <script src="js/sim-observe.js?v=20260919-03"></script>
+  <script src="js/teaching-notes.js?v=20260919-03"></script>
+  <script src="js/sim-a11y.js?v=20260919-03"></script>
 
   <!-- 實驗程式改為延遲載入：只掛對應表，開啟實驗時才抓對應的檔案 -->
-  <script src="js/experiment-manifest.js?v=20260919-02"></script>
+  <script src="js/experiment-manifest.js?v=20260919-03"></script>
 
 
   <!-- 應用外殼 -->
-  <script src="js/app.js?v=20260919-02"></script>
+  <script src="js/app.js?v=20260919-03"></script>
 </body>
 </html>

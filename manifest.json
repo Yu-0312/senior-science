@@ -1,19 +1,19 @@
 {
   "name": "物理實驗室｜台灣中學互動物理",
   "short_name": "物理實驗室",
-  "description": "從台灣國中自然到高中 108 課綱的互動物理實驗室，200 個實驗全部附即時模擬、量測與圖表。",
+  "description": "從台灣國中自然到高中 108 課綱的互動物理實驗室，251 個實驗全部附即時模擬、量測與圖表。",
   "lang": "zh-Hant",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#080b11",
-  "theme_color": "#080b11",
+  "background_color": "#f4eee2",
+  "theme_color": "#e8dfcf",
   "categories": ["education", "science"],
   "icons": [
-    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "icons/icon.svg?v=20260919-03", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon-192.png?v=20260919-03", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png?v=20260919-03", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png?v=20260919-03", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

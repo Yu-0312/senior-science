@@ -189,7 +189,8 @@ ${gate ? '<meta name="robots" content="noindex, nofollow" />\n' : ""}<link rel="
 <meta name="theme-color" content="#0e1013" media="(prefers-color-scheme: dark)" />
 <meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
 <meta name="color-scheme" content="dark light" />
-<link rel="icon" type="image/svg+xml" href="${o.base}icons/icon.svg" />
+<link rel="icon" type="image/svg+xml" href="${o.base}icons/icon.svg?v=${o.build}" />
+<link rel="apple-touch-icon" href="${o.base}icons/icon-192.png?v=${o.build}" />
 <link rel="stylesheet" href="${o.base}css/style.css?v=${o.build}" />
 <script>
 (function () {
