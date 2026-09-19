@@ -7,44 +7,82 @@
   /* 等加速度直線運動 */
   PL.register("uniform-accel", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
-    const cv = PL.canvas.create(L.canvasWrap, 0.7);
+    /* 畫布加高：上半實驗台、下半兩張圖，各約一半 */
+    const cv = PL.canvas.create(L.canvasWrap, 0.82);
     const TMAX = 8;
+    const AP = PL.apparatus;
     let t = 0, hist = [];
-    const reset = () => { t = 0; hist = []; };
-    const sV = PL.ui.slider(L.controls, { label: "初速 v₀", min: -8, max: 20, step: 0.5, value: 6, unit: "m/s", digits: 1, onInput: reset });
-    const sA = PL.ui.slider(L.controls, { label: "加速度 a", min: -6, max: 6, step: 0.5, value: 2, unit: "m/s²", digits: 1, onInput: reset });
-    const row = PL.ui.buttonRow(L.controls);
-    /* 播放／暫停由引擎的傳輸列統一提供（還附單步與速度），實驗不再自備，避免兩個開關互相打架。 */
-    PL.ui.button(row, "重設", reset);
-    const rT = PL.ui.readout(L.readouts, { label: "時間 t", unit: "s" });
-    const rX = PL.ui.readout(L.readouts, { label: "位置 x", unit: "m" });
-    const rV = PL.ui.readout(L.readouts, { label: "速度 v", unit: "m/s" });
-
-    const st = tt => ({ x: sV.get() * tt + 0.5 * sA.get() * tt * tt, v: sV.get() + sA.get() * tt });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const v0 = sV.get(), a = sA.get(), m = MC();
       let xs = []; for (let i = 0; i <= 40; i++) { const tt = TMAX * i / 40; xs.push(v0 * tt + 0.5 * a * tt * tt); }
       let xmin = Math.min(0, ...xs), xmax = Math.max(0, ...xs); if (xmax - xmin < 2) xmax = xmin + 2;
-      const tX0 = 34, tX1 = W - 20, tY = 42;
-      const mapX = x => tX0 + (x - xmin) / (xmax - xmin) * (tX1 - tX0);
-      D.line(ctx, tX0, tY, tX1, tY, PL.col("text-faint"), 2);
-      for (let gx = Math.ceil(xmin / 5) * 5; gx <= xmax; gx += 5) { const px = mapX(gx); D.line(ctx, px, tY - 4, px, tY + 4, PL.col("text-faint"), 1); D.text(ctx, gx + "", px, tY + 16, { color: PL.col("text-faint"), size: 9, align: "center" }); }
-      // 一台小車在數線上移動（比一顆球更能連到實驗裝置）
-      const s = st(t), cx = mapX(s.x);
-      D.rect(ctx, cx - 13, tY - 13, 26, 13, { fill: m, stroke: PL.theme.pale(0.35), r: 3 });
-      D.disc(ctx, cx - 7, tY, 3.5, { fill: PL.col("text-dim"), stroke: PL.theme.pale(0.4), width: 1 });
-      D.disc(ctx, cx + 7, tY, 3.5, { fill: PL.col("text-dim"), stroke: PL.theme.pale(0.4), width: 1 });
-      // 速度箭頭：長度與符號都跟著 v 走（負速度時指向左）
-      if (Math.abs(s.v) > 0.1) {
-        const aLen = PL.clamp(s.v * 4, -46, 46);
-        D.arrow(ctx, cx, tY - 20, cx + aLen, tY - 20, { color: PL.col("accent-2"), width: 2, label: "v" });
-      }
-      D.text(ctx, "位置 (m)", tX0, tY - 26, { color: PL.col("text-dim"), size: 11 });
 
-      const gTop = 78, gH = H - gTop - 24, gap = 16, gW = (W - 44 - gap) / 2, gx1 = 30, gx2 = 30 + gW + gap;
+      /*
+       * 版面：上半實驗台（車要夠大才看得出「在動」）、下半 x–t / v–t。
+       * 舊版車只有 26×13 px 縮在頂端一條數線上，圖佔滿整張畫布——
+       * 學生看到的是兩張圖，不是「一輛車在跑，圖是它的紀錄」。
+       */
+      const sceneH = Math.floor(H * 0.48);
+      const graphTop = sceneH + 10;
+      const trackY = Math.floor(sceneH * 0.70);
+      const tX0 = 48, tX1 = W - 36;
+      const mapX = x => tX0 + (x - xmin) / (xmax - xmin) * (tX1 - tX0);
+      const s = st(t), cx = PL.clamp(mapX(s.x), tX0 + 8, tX1 - 8);
+
+      // 軌道檯面：看得見的實驗台，不是一條細線
+      ctx.save();
+      const tg = ctx.createLinearGradient(0, trackY, 0, trackY + 46);
+      tg.addColorStop(0, "rgba(122,112,96,0.30)");
+      tg.addColorStop(1, "rgba(60,56,50,0)");
+      ctx.fillStyle = tg; ctx.fillRect(0, trackY, W, 46);
+      ctx.restore();
+      D.line(ctx, tX0 - 10, trackY, tX1 + 10, trackY, PL.theme.pale(0.35), 2.5);
+      for (let gx = Math.ceil(xmin / 5) * 5; gx <= xmax; gx += 5) {
+        const px = mapX(gx);
+        D.line(ctx, px, trackY - 5, px, trackY + 6, PL.col("text-faint"), 1.2);
+        D.text(ctx, gx + "", px, trackY + 20, { color: PL.col("text-faint"), size: 10, align: "center" });
+      }
+      D.text(ctx, "位置 x (m)", tX0 - 8, trackY + 36, { color: PL.col("text-dim"), size: 11 });
+      D.text(ctx, "實驗台 · 等加速直線運動", tX0 - 8, 22, { color: PL.col("text-dim"), size: 12, weight: "700" });
+
+      // 大車：寬約畫布 13%，高度跟場景走（舊版 26px → 現在約 90–130px）
+      const cartW = Math.min(148, Math.max(88, W * 0.13));
+      const cartH = Math.max(30, Math.min(48, sceneH * 0.26));
+      const wheelBase = trackY;
+      if (AP && AP.cart) AP.cart(ctx, cx, wheelBase, cartW, cartH);
+      else {
+        D.rect(ctx, cx - cartW / 2, wheelBase - cartH - 6, cartW, cartH, { fill: m, stroke: PL.theme.pale(0.4), r: 6 });
+        D.disc(ctx, cx - cartW * 0.28, wheelBase, cartH * 0.22, { fill: PL.col("text-dim") });
+        D.disc(ctx, cx + cartW * 0.28, wheelBase, cartH * 0.22, { fill: PL.col("text-dim") });
+      }
+      // 歷次位置殘影：讓「同一台車沿著 x 走」連成一條動線
+      hist.forEach((h, i) => {
+        if (i % 6 !== 0) return;
+        const hx = mapX(h[1]);
+        D.disc(ctx, hx, trackY - 4, 3, { fill: PL.theme.pale(0.18) });
+      });
+
+      // 速度／加速度箭頭：長度隨大小、方向隨符號
+      const bodyTop = wheelBase - cartH - 10;
+      if (Math.abs(s.v) > 0.15) {
+        const aLen = PL.clamp(s.v * 3.2, -70, 70);
+        D.arrow(ctx, cx, bodyTop - 22, cx + aLen, bodyTop - 22,
+          { color: PL.col("accent-2"), width: 2.4, label: "v=" + PL.fmt(s.v, 1) + " m/s", lsize: 10 });
+      }
+      if (Math.abs(a) > 0.05) {
+        const aLen = PL.clamp(a * 3.2, -56, 56);
+        D.arrow(ctx, cx, bodyTop - 44, cx + aLen, bodyTop - 44,
+          { color: PL.col("warn"), width: 2, label: "a=" + PL.fmt(a, 1) + " m/s²", lsize: 10 });
+      }
+      // 當前位置晶片
+      D.text(ctx, "x = " + PL.fmt(s.x, 1) + " m", cx, trackY + 36,
+        { color: m, size: 12, align: "center", weight: "700" });
+
+      // 下半：x–t 與 v–t 各半欄
+      const gH = Math.max(90, H - graphTop - 18), gap = 16, gW = (W - 44 - gap) / 2, gx1 = 30, gx2 = 30 + gW + gap;
       const vend = v0 + a * TMAX; let vmin = Math.min(0, v0, vend), vmax = Math.max(0, v0, vend); if (vmax - vmin < 2) vmax = vmin + 2;
-      const g1 = PL.graph(cv, { x: gx1, y: gTop, w: gW, h: gH }, { x0: 0, x1: TMAX, y0: xmin, y1: xmax });
+      const g1 = PL.graph(cv, { x: gx1, y: graphTop, w: gW, h: gH }, { x0: 0, x1: TMAX, y0: xmin, y1: xmax });
       g1.frame({ title: "x – t 圖", xlabel: "t (s)" }); g1.grid(4, 4);
       /*
        * 理論曲線用主題變數而不是寫死的白色。
@@ -55,7 +93,7 @@
       g1.fn(tt => v0 * tt + 0.5 * a * tt * tt, { color: PL.col("text-faint"), width: 1.6, dash: [5, 4] });
       if (hist.length > 1) g1.curve(hist.map(h => [h[0], h[1]]), { color: m, width: 2.4 });
       g1.dot(t, s.x, { color: m, glow: m });
-      const g2 = PL.graph(cv, { x: gx2, y: gTop, w: gW, h: gH }, { x0: 0, x1: TMAX, y0: vmin, y1: vmax });
+      const g2 = PL.graph(cv, { x: gx2, y: graphTop, w: gW, h: gH }, { x0: 0, x1: TMAX, y0: vmin, y1: vmax });
       g2.frame({ title: "v – t 圖（斜率=a，面積=位移）", xlabel: "t (s)" }); g2.grid(4, 4);
       if (hist.length > 1) g2.area(hist.map(h => [h[0], h[2]]), { fill: "rgba(90,162,255,0.13)" });
       g2.fn(tt => v0 + a * tt, { color: PL.col("accent-2"), width: 2.4 });
@@ -63,7 +101,18 @@
 
       rT.set(t, 2); rX.set(s.x, 1); rV.set(s.v, 1);
     }
-    const anim = PL.loop(dt => { if (dt) { t += dt; if (t > TMAX) reset(); const s = st(t); hist.push([t, s.x, s.v]); } draw(); });
+    function reset() { t = 0; hist = []; draw(); }
+    const sV = PL.ui.slider(L.controls, { label: "初速 v₀", min: -8, max: 20, step: 0.5, value: 6, unit: "m/s", digits: 1, onInput: reset });
+    const sA = PL.ui.slider(L.controls, { label: "加速度 a", min: -6, max: 6, step: 0.5, value: 2, unit: "m/s²", digits: 1, onInput: reset });
+    const row = PL.ui.buttonRow(L.controls);
+    /* 播放／暫停由引擎的傳輸列統一提供（還附單步與速度），實驗不再自備，避免兩個開關互相打架。 */
+    PL.ui.button(row, "重設", reset);
+    const rT = PL.ui.readout(L.readouts, { label: "時間 t", unit: "s" });
+    const rX = PL.ui.readout(L.readouts, { label: "位置 x", unit: "m" });
+    const rV = PL.ui.readout(L.readouts, { label: "速度 v", unit: "m/s" });
+
+    const st = tt => ({ x: sV.get() * tt + 0.5 * sA.get() * tt * tt, v: sV.get() + sA.get() * tt });
+    const anim = PL.loop(dt => { if (dt) { t += dt; if (t > TMAX) { t = 0; hist = []; } const s = st(t); hist.push([t, s.x, s.v]); } draw(); });
     cv.onResize(draw); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
