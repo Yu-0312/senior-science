@@ -8,36 +8,40 @@
   PL.register("uniform-accel", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     /*
-     * 避免超模：不做「全程 0–100 m 都塞進軌道」的物理比例尺。
-     * 軌道只開局部視窗跟著車走，車用教學示意尺寸（刻意不按真實比例），
-     * 學生先看見「車在動、圖在記」，數字細節交給 x–t / v–t。
+     * 軌道背景固定不動：車從左開到右。
+     * 比例尺由本組 v₀、a 的全程軌跡決定一次，不跟著車平移／縮放。
+     * 車用教學示意尺寸（刻意不按公尺比例），才不會在長軌道上被壓成小點。
      */
     const cv = PL.canvas.create(L.canvasWrap, 0.78, 960);
     const TMAX = 8;
     const AP = PL.apparatus;
-    const VIEW_SPAN = 24; // 軌道視窗寬度（m）
     let t = 0, hist = [];
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const v0 = sV.get(), a = sA.get(), m = MC();
       let xs = []; for (let i = 0; i <= 40; i++) { const tt = TMAX * i / 40; xs.push(v0 * tt + 0.5 * a * tt * tt); }
-      const xmin = Math.min(0, ...xs), xmax = Math.max(0, ...xs);
       const s = st(t);
 
       /* 上半實驗台 / 下半兩張圖 */
       const sceneH = Math.max(200, Math.floor(H * 0.46));
       const graphTop = sceneH + 8;
       const trackY = Math.floor(sceneH * 0.62);
-      const tX0 = 36, tX1 = W - 28;
+      const tX0 = 40, tX1 = W - 32;
 
-      /* 局部視窗：以目前位置為中心，避免全程比例把車壓成一點 */
-      let viewMin = s.x - VIEW_SPAN * 0.38;
-      let viewMax = s.x + VIEW_SPAN * 0.62;
-      if (viewMax - viewMin < 4) viewMax = viewMin + 4;
+      /*
+       * 固定軌道：以整段軌跡的最小／最大位置決定比例，背景刻度不動。
+       * 車沿 x 增加方向由左往右走；視角不跟車。
+       */
+      const rawMin = Math.min(0, ...xs), rawMax = Math.max(0, ...xs);
+      const pad = Math.max(2, (rawMax - rawMin) * 0.06);
+      const viewMin = rawMin - pad, viewMax = rawMax + pad;
       const mapX = x => tX0 + (x - viewMin) / (viewMax - viewMin) * (tX1 - tX0);
-      const cx = PL.clamp(mapX(s.x), tX0 + 60, tX1 - 60);
+      // 車很大：中心夾在軌道內，讓整台車留在畫面上
+      const cartW = Math.min(168, Math.max(108, W * 0.17));
+      const half = cartW * 0.55;
+      const cx = PL.clamp(mapX(s.x), tX0 + half, tX1 - half);
 
-      // 軌道
+      // 軌道（固定）
       ctx.save();
       const tg = ctx.createLinearGradient(0, trackY, 0, trackY + 40);
       tg.addColorStop(0, "rgba(122,112,96,0.28)");
@@ -45,21 +49,23 @@
       ctx.fillStyle = tg; ctx.fillRect(0, trackY, W, 40);
       ctx.restore();
       D.line(ctx, tX0 - 8, trackY, tX1 + 8, trackY, PL.theme.pale(0.35), 2.5);
-      // 刻度：視窗內約每 5 m 一格（不足則 2 m）
-      const step = (viewMax - viewMin) > 30 ? 5 : (viewMax - viewMin) > 12 ? 2 : 1;
+      const span = viewMax - viewMin;
+      const step = span > 40 ? 10 : span > 16 ? 5 : span > 8 ? 2 : 1;
       for (let gx = Math.ceil(viewMin / step) * step; gx <= viewMax; gx += step) {
         const px = mapX(gx);
         if (px < tX0 - 4 || px > tX1 + 4) continue;
         D.line(ctx, px, trackY - 4, px, trackY + 6, PL.col("text-faint"), 1.1);
-        D.text(ctx, PL.fmt(gx, step < 1 ? 1 : 0), px, trackY + 20, { color: PL.col("text-faint"), size: 9.5, align: "center" });
+        D.text(ctx, PL.fmt(gx, step < 1 ? 1 : 0), px, trackY + 20,
+          { color: PL.col("text-faint"), size: 9.5, align: "center" });
       }
-      D.text(ctx, "軌道局部視窗 · 約 " + PL.fmt(viewMax - viewMin, 0) + " m（車為示意尺寸）", tX0, 24,
+      // 起點／終點標記：強調「左 → 右」
+      D.text(ctx, "起點", mapX(rawMin < 0 ? rawMin : 0), trackY + 34,
+        { color: PL.col("text-dim"), size: 9.5, align: "center" });
+      D.text(ctx, "車由左往右 · 軌道固定不動", tX0, 24,
         { color: PL.col("text-dim"), size: 12, weight: "700" });
-      D.text(ctx, "x ≈ " + PL.fmt(s.x, 1) + " m", tX1, 24,
+      D.text(ctx, "x = " + PL.fmt(s.x, 1) + " m", tX1, 24,
         { color: m, size: 13, align: "right", weight: "700" });
 
-      // 大車：固定佔畫布寬約 18%，不跟全程 m 數縮放
-      const cartW = Math.min(170, Math.max(110, W * 0.18));
       const cartH = Math.max(34, Math.min(52, sceneH * 0.28));
       if (AP && AP.cart) AP.cart(ctx, cx, trackY, cartW, cartH);
       else {
@@ -81,7 +87,7 @@
           { color: PL.col("warn"), width: 2.2, label: "a " + PL.fmt(a, 1) + " m/s²", lsize: 10 });
       }
 
-      // 下半：x–t / v–t（全程 0–TMAX，這裡才是量測紀錄）
+      // 下半：x–t / v–t（全程 0–TMAX）
       const gH = Math.max(88, H - graphTop - 16), gap = 14, gW = (W - 40 - gap) / 2, gx1 = 26, gx2 = 26 + gW + gap;
       const vend = v0 + a * TMAX; let vmin = Math.min(0, v0, vend), vmax = Math.max(0, v0, vend);
       if (vmax - vmin < 2) vmax = vmin + 2;
