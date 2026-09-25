@@ -1,0 +1,1095 @@
+/* 第二批課程實驗：將細分知識點做成可操作的量測台。 */
+(function () {
+  "use strict";
+  const PL = window.PhysicsLab, D = PL.draw, TAU = PL.TAU;
+  const AP = PL.apparatus;                    // 器材層（各 kind 場景共用）
+  const color = () => PL.col("m-color", "#35e0cf");
+
+  function topic(kind, a, b, output, calc) {
+    return { kind, a, b, output, calc };
+  }
+  const T = {
+    "vector-components": topic("vector", ["向量大小 A", 4, 30, 16, "N"], ["方向 θ", 0, 90, 38, "°"], "水平分量 Aₓ", (a, b) => a * Math.cos(b * Math.PI / 180)),
+    "distance-displacement": topic("motion", ["往返路程", 2, 30, 14, "m"], ["回程比例", 0, 1, 0.45, ""], "位移大小", (a, b) => Math.abs(a * (1 - 2 * b))),
+    "measurement-error": topic("measurement", ["量測次數", 3, 24, 8, "次"], ["儀器解析度", 0.1, 5, 1, "mm"], "平均不確定度", (a, b) => b / Math.sqrt(a)),
+    "force-components": topic("force", ["拉力 F", 2, 60, 28, "N"], ["拉力角 θ", 0, 90, 35, "°"], "水平分力", (a, b) => a * Math.cos(b * Math.PI / 180)),
+    "apparent-weight": topic("elevator", ["乘客質量 m", 20, 100, 60, "kg"], ["加速度 a", -8, 8, 2, "m/s²"], "體重計讀數 N", (a, b) => a * (9.8 + b)),
+    "spring-series-parallel": topic("spring", ["彈簧 k₁", 10, 80, 35, "N/m"], ["彈簧 k₂", 10, 80, 50, "N/m"], "串聯等效勁度", (a, b) => a * b / (a + b)),
+    "center-of-mass": topic("momentum", ["左側質量", 1, 10, 3, "kg"], ["右側質量", 1, 10, 7, "kg"], "質心位置", (a, b) => 10 * b / (a + b)),
+    "force-time-profile": topic("impulse", ["衝量 J", 5, 80, 30, "N·s"], ["作用時間 Δt", 0.1, 4, 1, "s"], "平均力", (a, b) => a / b),
+    "rocket-equation": topic("rocket", ["噴氣速度 vₑ", 500, 5000, 2400, "m/s"], ["質量比 m₀/m_f", 1.1, 8, 3, ""], "速度改變 Δv", (a, b) => a * Math.log(b)),
+    "work-angle": topic("work", ["外力 F", 5, 100, 48, "N"], ["夾角 θ", 0, 180, 35, "°"], "單位位移做功", (a, b) => a * Math.cos(b * Math.PI / 180)),
+    "power-lab": topic("power", ["做功 W", 100, 3000, 1200, "J"], ["完成時間 t", 1, 30, 8, "s"], "平均功率", (a, b) => a / b),
+    "friction-thermal": topic("energy", ["摩擦係數 μ", 0.05, 1, 0.32, ""], ["滑行距離 d", 1, 20, 8, "m"], "轉化熱量 Q", (a, b) => a * 9.8 * b),
+    "banked-curve": topic("orbit", ["彎道半徑 r", 20, 200, 85, "m"], ["傾角 θ", 2, 45, 18, "°"], "設計速率", (a, b) => Math.sqrt(a * 9.8 * Math.tan(b * Math.PI / 180))),
+    "satellite-energy": topic("orbit", ["軌道半徑 r", 1, 12, 4, "R⊕"], ["衛星質量 m", 100, 2000, 600, "kg"], "相對軌道速度", (a) => 7.9 / Math.sqrt(a)),
+    "escape-speed": topic("orbit", ["天體質量比", 0.1, 5, 1, "M⊕"], ["天體半徑比", 0.3, 3, 1, "R⊕"], "逃逸速度", (a, b) => 11.2 * Math.sqrt(a / b)),
+    /*
+     * 阻尼 β 的上限原本只有 1 s⁻¹，畫面固定的自然頻率 ω₀ ≈ 2.8 rad/s 根本到不了臨界值，
+     * 「比較欠阻尼、臨界阻尼與過阻尼」變成只有講義寫得出來、模擬做不出來。
+     * 上限放寬到 6 s⁻¹，β 拉過 2.8 就能親眼看到不振盪的兩種歸位方式。
+     */
+    "damped-oscillation": topic("oscillation", ["初始振幅 A₀", 1, 12, 7, "cm"], ["阻尼 β", 0.05, 6, 0.3, "s⁻¹"], "5 秒後振幅", (a, b) => a * Math.exp(-5 * b)),
+    "shm-phase": topic("oscillation", ["振幅 A", 1, 10, 6, "cm"], ["週期 T", 0.5, 6, 2, "s"], "最大速率", (a, b) => a * TAU / b),
+    /*
+     * 交換（拍）頻率原寫成 √(κ/m)/2π，那是「耦合彈簧自己的自然頻率」，不是能量
+     * 一來一回的節奏。畫面採用牆壁彈簧 k = κ 的對稱裝置，兩個正常模態為
+     * ω₁ = √(κ/m)、ω₂ = √(3κ/m)，能量完整轉移一次的頻率是模態差
+     * (ω₂ − ω₁)/2π = (√3 − 1)√(κ/m)/2π——讀數與畫面的節奏從此一致。
+     */
+    "coupled-oscillators": topic("oscillation", ["耦合勁度", 1, 30, 12, "N/m"], ["質量 m", 0.2, 5, 1, "kg"], "交換頻率", (a, b) => (Math.sqrt(3) - 1) * Math.sqrt(a / b) / TAU),
+    "hydrostatic-pressure": topic("thermal", ["深度 h", 0, 30, 12, "m"], ["液體密度 ρ", 600, 1400, 1000, "kg/m³"], "表壓", (a, b) => a * b * 9.8 / 1000),
+    "phase-change": topic("thermal", ["質量 m", 0.1, 4, 1, "kg"], ["加熱功率", 100, 2000, 800, "W"], "熔化時間", (a, b) => a * 334000 / b),
+    "heat-engine": topic("thermal", ["高溫 Tₕ", 350, 1200, 700, "K"], ["低溫 T𝚌", 200, 600, 320, "K"], "卡諾效率", (a, b) => Math.max(0, 1 - b / a) * 100),
+    "reflection-boundary": topic("wave", ["脈衝振幅", 1, 12, 7, "cm"], ["反射端", 0, 1, 0, ""], "反射相位", (a, b) => b ? 0 : 180),
+    "sound-intensity": topic("wave", ["距離 r", 1, 30, 8, "m"], ["聲源振幅", 1, 10, 5, ""], "相對聲強", (a, b) => b * b / (a * a)),
+    "air-column-resonance": topic("wave", ["空氣柱長度 L", 5, 120, 42, "cm"], ["音叉頻率 f", 100, 800, 440, "Hz"], "基頻聲速", (a, b) => 4 * a / 100 * b),
+    "critical-angle": topic("optics", ["介質折射率 n₁", 1.1, 2.4, 1.5, ""], ["入射角 θ", 0, 90, 48, "°"], "臨界角", (a) => Math.asin(1 / a) * 180 / Math.PI),
+    "refraction-slab": topic("optics", ["玻璃厚度", 1, 30, 12, "mm"], ["入射角 θ", 0, 75, 42, "°"], "側向位移", (a, b) => a * Math.sin(b * Math.PI / 180) * 0.45),
+    "optical-instruments": topic("optics", ["物鏡焦距 fₒ", 100, 1600, 800, "mm"], ["目鏡焦距 fₑ", 5, 80, 25, "mm"], "角放大率", (a, b) => a / b),
+    "kirchhoff": topic("circuit", ["電源電壓 V", 1, 24, 12, "V"], ["支路電阻 R", 1, 100, 24, "Ω"], "支路電流", (a, b) => a / b),
+    "meter-loading": topic("circuit", ["待測電阻 R", 10, 10000, 1200, "Ω"], ["電壓表內阻", 1000, 100000, 10000, "Ω"], "並聯量測誤差", (a, b) => 100 * a / (a + b)),
+    "electrostatic-shield": topic("field", ["外加場強 E", 1, 100, 45, "V/m"], ["屏蔽厚度", 1, 12, 5, "mm"], "殼內場強", () => 0),
+    "ampere-force": topic("magnetic", ["電流 I", 0.1, 10, 3, "A"], ["夾角 θ", 0, 180, 90, "°"], "相對安培力", (a, b) => a * Math.sin(b * Math.PI / 180)),
+    "motional-emf": topic("magnetic", ["導體速度 v", 0.1, 12, 4, "m/s"], ["磁場 B", 0.05, 2, 0.8, "T"], "相對感應電壓", (a, b) => a * b),
+    "coil-torque": topic("magnetic", ["線圈電流 I", 0.1, 8, 3, "A"], ["轉角 θ", 0, 180, 70, "°"], "相對力矩", (a, b) => a * Math.sin(b * Math.PI / 180)),
+    "nuclear-reaction": topic("nuclear", ["質量虧損 Δm", 0.01, 1.2, 0.18, "u"], ["反應次數", 1, 20, 4, "次"], "相對釋放能", (a, b) => a * b * 931.5),
+    "cosmological-redshift": topic("cosmos", ["退行速度", 100, 30000, 9000, "km/s"], ["本徵波長", 350, 700, 486, "nm"], "觀測波長", (a, b) => b * (1 + a / 300000)),
+    "blackbody": topic("cosmos", ["表面溫度 T", 2000, 14000, 5800, "K"], ["半徑比例", 0.2, 8, 1, "R☉"], "峰值波長", (a) => 2898000 / a)
+  };
+
+  function fillPill(ctx, x, y, label, value, w, tint) {
+    D.rect(ctx, x, y, w, 27, { fill: PL.theme.shade(0.72), stroke: tint, width: 1, r: 6 });
+    D.text(ctx, label, x + 9, y + 11, { color: PL.col("text-faint"), size: 8.5 });
+    D.text(ctx, value, x + 9, y + 22, { color: tint, size: 10.5, weight: "700" });
+  }
+
+  /*
+   * oscillation 家族的共用舞台：左牆、滑軌、彈簧掛小車，再把下半部留給
+   * x–t 波形條。原本三個實驗共用一個「方塊加正弦」的示意場景：
+   * 阻尼實驗的振幅永遠不衰減（與物理矛盾）、耦合實驗只畫一顆振子
+   * （根本沒有耦合可看）。改成每個實驗自己的精確解動畫。
+   */
+  function oscStage(cv) {
+    const { ctx, W, H } = cv;
+    const wallX = 34, cartW = 52, ay = 78, railY = ay + 30;
+    return { ctx, W, H, wallX, cartW, ay, railY };
+  }
+
+  // 牆柱、軌道、彈簧與小車；dx 是小車相對平衡位置的水平位移（px）
+  // 彈簧一端套進牆上螺栓座、另一端勾進車側眼環， cargo 讓車頂載一塊砝碼
+  function oscCart(ctx, g, eqX, dx, coils) {
+    const AP = PL.apparatus, c = color();
+    AP.steel(ctx, g.wallX - 10, g.railY, g.W - g.wallX - 26, 8, 4);
+    const post = AP.wallPost(ctx, g.wallX - 4, g.railY - 1, g.ay - 32, g.ay);
+    D.line(ctx, eqX, g.ay - 56, eqX, g.railY + 16, "rgba(120,190,255,0.5)", 1, [4, 4]);
+    D.text(ctx, "x = 0", eqX, g.ay - 62, { color: PL.theme.pale(0.75), size: 10.5, align: "center" });
+    D.spring(ctx, post.x, g.ay, eqX + dx - g.cartW / 2 - 2, g.ay, coils || 11, 11, c);
+    AP.cart(ctx, eqX + dx, g.railY, g.cartW, 36, { cargo: true });
+  }
+
+  // 振幅 ±A 與現在位置的標線；ampPx 為目前的包絡（px）
+  function oscMarks(ctx, g, eqX, ampPx, xPx) {
+    const dash = [4, 4];
+    if (ampPx > 6) {
+      D.line(ctx, eqX - ampPx, g.ay - 48, eqX - ampPx, g.railY + 8, "rgba(255,255,255,0.15)", 1, dash);
+      D.line(ctx, eqX + ampPx, g.ay - 48, eqX + ampPx, g.railY + 8, "rgba(255,255,255,0.15)", 1, dash);
+      D.text(ctx, "−A", eqX - ampPx, g.ay - 54, { color: PL.theme.pale(0.5), size: 10, align: "center" });
+      D.text(ctx, "+A", eqX + ampPx, g.ay - 54, { color: PL.theme.pale(0.5), size: 10, align: "center" });
+    }
+    const v = xPx - eqX;
+    if (Math.abs(v) > 4) {
+      const by = g.railY + 22;
+      D.line(ctx, eqX, by, xPx, by, PL.theme.pale(0.4), 1.2);
+      D.line(ctx, eqX, by - 4, eqX, by + 4, PL.theme.pale(0.4), 1.2);
+      D.line(ctx, xPx, by - 4, xPx, by + 4, PL.theme.pale(0.4), 1.2);
+    }
+  }
+
+  // 下半部的時間波形條：win 秒的滑動窗，series 是 [{pts, color, width, dash}]
+  function oscStrip(cv, yTop, win, series, title, marks) {
+    const { ctx, W, H } = cv;
+    const g = PL.graph(cv, { x: 44, y: yTop, w: W - 88, h: H - yTop - 30 }, { x0: -win, x1: 0, y0: -1.15, y1: 1.15 });
+    g.frame({ title, xlabel: marks && marks.xlabel || "" }); g.grid(4, 2);
+    (marks && marks.lines || []).forEach(l => g.vline(l.x, { color: l.color || PL.col("text-faint"), dash: [3, 4] }));
+    if (marks && marks.winLabel != null) g.label(-win + win * 0.02, 0.94, marks.winLabel, { color: PL.col("text-faint"), size: 9 });
+    series.forEach(s => { if (s.pts.length > 1) g.curve(s.pts, { color: s.color, width: s.width || 2, dash: s.dash }); });
+  }
+
+  function drawScene(cv, cfg, a, b, t, value) {
+    const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+    const c = color(), cy = H * 0.52, x0 = 54, x1 = W - 46;
+    const pulse = 0.5 + 0.5 * Math.sin(t * 3);
+    if (cfg.kind === "vector" || cfg.kind === "force") {
+      /*
+       * 向量／分力：原本三支箭頭飄在半空。改成放在實驗台上：
+       * vector = 力桌上的向量分解（刻度紙＋直角標記）；
+       * force = 繩子以 θ 角拉木塊，水平分力就是讓木塊前進的那一份。
+       */
+      const angle = b * Math.PI / 180, length = 42 + (a - cfg.a[1]) / (cfg.a[2] - cfg.a[1]) * Math.min(120, W * 0.26), ox = W * 0.43, oy = H * 0.7;
+      if (cfg.kind === "vector") {
+        D.rect(ctx, x0 - 8, oy - 132, x1 - x0 + 16, 152, { fill: PL.theme.pale(0.045), stroke: PL.col("border"), width: 1, r: 6 });
+        for (let gx = ox - 120; gx < ox + 160; gx += 30) D.line(ctx, gx, oy - 128, gx, oy + 16, "rgba(255,255,255,0.05)", 1);
+        for (let gy = oy - 120; gy < oy + 16; gy += 30) D.line(ctx, ox - 128, gy, ox + 156, gy, "rgba(255,255,255,0.05)", 1);
+      } else {
+        AP.woodBlock(ctx, ox - 60, oy + 8, 46, 30, 0);
+        D.line(ctx, ox - 34, oy - 6, ox + 10, oy - 6 - Math.sin(angle) * length * 0.55, "rgb(232,226,210)", 2);
+      }
+      D.line(ctx, x0, oy, x1, oy, "rgba(255,255,255,0.16)", 1); D.line(ctx, ox, 35, ox, H - 40, "rgba(255,255,255,0.13)", 1);
+      D.arrow(ctx, ox, oy, ox + length * Math.cos(angle), oy - length * Math.sin(angle), { color: c, width: 3, label: cfg.kind === "vector" ? "A" : "F" });
+      D.arrow(ctx, ox, oy, ox + length * Math.cos(angle), oy, { color: PL.col("accent-2"), width: 1.9, label: cfg.kind === "vector" ? "Aₓ" : "Fₓ" });
+      D.arrow(ctx, ox + length * Math.cos(angle), oy, ox + length * Math.cos(angle), oy - length * Math.sin(angle), { color: PL.col("warn"), width: 1.9, label: "Ay" });
+      ctx.save();
+      ctx.strokeStyle = PL.col("warn"); ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.arc(ox, oy, 34, -angle, 0); ctx.stroke();
+      ctx.restore();
+      D.text(ctx, PL.fmt(b, 0) + "°", ox + 42, oy - 16, { color: PL.col("warn"), size: 10 });
+      AP.valueChip(ctx, ox + length * Math.cos(angle) + 10, oy - length * Math.sin(angle) - 8, PL.fmt(value, 2), "rgba(120,190,255,0.9)");
+      fillPill(ctx, 18, 18, "向量實驗", PL.fmt(value, 2), 112, c);
+    } else if (["motion", "momentum", "impulse", "rocket", "work", "power", "energy"].includes(cfg.kind)) {
+      /* 運動家族：鋼軌＋動力小車（器材層），原本的手繪方塊＋圓點輪全面汰換 */
+      const railY = H * 0.7, pos = x0 + (0.15 + 0.7 * (0.5 + 0.5 * Math.sin(t * 1.2))) * (x1 - x0);
+      AP.steel(ctx, x0 - 8, railY, x1 - x0 + 16, 8, 4);
+      for (let m = 0; m <= 6; m++) {
+        const gx = x0 + 10 + (x1 - x0 - 20) * m / 6;
+        D.line(ctx, gx, railY + 8, gx, railY + 15, "rgba(255,255,255,0.14)", 1);
+      }
+      AP.cart(ctx, pos, railY, 54, 34);
+      if (cfg.kind === "rocket") { for (let i = 0; i < 4; i++) D.line(ctx, pos - 33 - i * 8, railY - 24, pos - 44 - i * 8, railY - 24 + Math.sin(t * 8 + i) * 5, PL.col("warn"), 2); }
+      if (cfg.kind === "energy") { D.rect(ctx, 42, 48, 20, H * 0.36, { fill: c, r: 3 }); D.rect(ctx, 70, H * 0.42, 20, H * 0.42, { fill: PL.col("accent-2"), r: 3 }); }
+      D.arrow(ctx, pos + 34, railY - 46, pos + 78, railY - 46, { color: PL.col("accent-2"), width: 2, label: "運動" });
+      fillPill(ctx, 18, 18, "即時量測", PL.fmt(value, 2), 118, c);
+    } else if (cfg.kind === "elevator") {
+      const cabinX = W * 0.38, cabinY = 48 + (0.5 + 0.5 * Math.sin(t * 1.5)) * (H * 0.33), cabinW = W * 0.25, cabinH = H * 0.3;
+      D.line(ctx, cabinX - 16, 22, cabinX - 16, H - 24, "rgba(255,255,255,0.22)", 3); D.line(ctx, cabinX + cabinW + 16, 22, cabinX + cabinW + 16, H - 24, "rgba(255,255,255,0.22)", 3);
+      D.rect(ctx, cabinX, cabinY, cabinW, cabinH, { fill: "rgba(90,162,255,0.17)", stroke: c, width: 2, r: 7 });
+      D.disc(ctx, cabinX + cabinW / 2, cabinY + cabinH * 0.58, 13, { fill: PL.col("warn") });
+      D.arrow(ctx, cabinX + cabinW / 2, cabinY + cabinH * 0.56, cabinX + cabinW / 2, cabinY + cabinH * 0.22, { color: c, width: 2, label: "N" });
+      D.arrow(ctx, cabinX + cabinW / 2, cabinY + cabinH * 0.62, cabinX + cabinW / 2, cabinY + cabinH * 0.86, { color: PL.col("danger"), width: 2, label: "mg" });
+      fillPill(ctx, W - 148, 20, "體重計", PL.fmt(value, 0) + " N", 126, c);
+    } else if (["spring", "oscillation"].includes(cfg.kind)) {
+      if (cfg.kind === "spring") {
+        // 彈簧串並聯：裝置只是示意，重點在下方關係圖；沿用單振子場景但改用器材層。
+        const g = oscStage(cv);
+        const eqX = g.W * 0.56, dx = Math.sin(t * 2.3) * (20 + a * 1.4);
+        oscCart(ctx, g, eqX, dx, 12);
+        oscMarks(ctx, g, eqX, 0, eqX + dx);
+        D.text(ctx, "k₁ 與 k₂ 的效果請對照下方關係圖", g.W / 2, 30, { color: PL.col("text-faint"), size: 10.5, align: "center" });
+        fillPill(ctx, 18, 18, "等效勁度", PL.fmt(value, 2), 118, c);
+      } else if (cfg.id === "damped-oscillation") {
+        /*
+         * 阻尼振動：畫面用固定自然頻率 ω₀，位移取真實的精確解——
+         *   欠阻尼   x = A₀e^(−βt)cos(ω′t)，ω′ = √(ω₀²−β²)
+         *   臨界阻尼 x = A₀e^(−ω₀t)(1 + ω₀t)
+         *   過阻尼   x = A₀e^(−βt)(cosh γt + (β/γ)sinh γt)，γ = √(β²−ω₀²)
+         * 每個週期自動重新釋放一次，學生不必手動重設就能反覆觀察。
+         */
+        const g = oscStage(cv);
+        const W0 = 2.8, CYCLE = 14, FADE = 0.6;
+        const s = t % CYCLE, ramp = Math.min(1, s / FADE);
+        const A0 = a, beta = b;
+        let xCm, env;
+        if (beta < W0 - 1e-6) {
+          const wd = Math.sqrt(W0 * W0 - beta * beta);
+          xCm = A0 * Math.exp(-beta * s) * Math.cos(wd * s);
+          env = A0 * Math.exp(-beta * s);
+        } else if (beta > W0 + 1e-6) {
+          const ga = Math.sqrt(beta * beta - W0 * W0);
+          xCm = A0 * Math.exp(-beta * s) * (Math.cosh(ga * s) + (beta / ga) * Math.sinh(ga * s));
+          env = Math.abs(xCm);
+        } else {
+          xCm = A0 * Math.exp(-W0 * s) * (1 + W0 * s);
+          env = Math.abs(xCm);
+        }
+        xCm *= ramp;
+        const maxHalf = (g.W - g.wallX - 90 - g.cartW) / 2;
+        const sc = maxHalf / 12;                       // A₀ 滿檔 12 cm
+        const eqX = g.wallX + 76 + g.cartW / 2 + maxHalf / 2;
+        const xPx = eqX + xCm * sc, ampPx = env * sc * ramp;
+        oscCart(ctx, g, eqX, xCm * sc, 11);
+        oscMarks(ctx, g, eqX, ampPx, xPx);
+        // 阻尼狀態直接寫在畫面上，β 拉過 ω₀ 的瞬間看得到文字與運動同時改變
+        const regime = beta < W0 - 1e-6 ? ["欠阻尼", "來回振盪，振幅指數衰減"]
+          : beta > W0 + 1e-6 ? ["過阻尼", "不振盪，但比臨界阻尼更慢歸位"]
+          : ["臨界阻尼", "不振盪，以最短時間回到平衡"];
+        D.text(ctx, "β = " + PL.fmt(beta, 2) + " s⁻¹ · " + regime[0] + "（ω₀ = 2.8 s⁻¹）", g.W - 44, 26, { color: c, size: 11, align: "right", weight: "700" });
+        D.text(ctx, regime[1], g.W - 44, 42, { color: PL.col("text-faint"), size: 10, align: "right" });
+        // 波形條：0–14 s 的掃描，橘虛線是包絡 ±A₀e^(−βt)，5 s 刻度對應左側讀數
+        const pts = [];
+        for (let u = 0; u <= s; u += CYCLE / 240) {
+          let xv;
+          if (beta < W0 - 1e-6) xv = Math.cos(Math.sqrt(W0 * W0 - beta * beta) * u);
+          else if (beta > W0 + 1e-6) { const ga = Math.sqrt(beta * beta - W0 * W0); xv = Math.cosh(ga * u) + (beta / ga) * Math.sinh(ga * u); }
+          else xv = 1 + W0 * u;
+          pts.push([u - s, A0 * Math.exp(-beta * u) * xv * ramp]);
+        }
+        const envPts = [];
+        if (beta < W0 - 1e-6) for (let u = 0; u <= s; u += CYCLE / 120) envPts.push([u - s, A0 * Math.exp(-beta * u)]);
+        const norm = p => p.map(q => [q[0], q[1] / Math.max(1e-9, A0)]);
+        oscStrip(cv, 156, CYCLE, [{ pts: norm(pts), color: c, width: 2.2 }, { pts: norm(envPts), color: PL.col("warn"), width: 1.4, dash: [5, 4] }],
+          "x – t（橘虛線 = 包絡 ±A₀e^(−βt)）", { lines: [{ x: 5 - s, color: PL.col("accent-2") }], winLabel: "釋放 →" });
+        fillPill(ctx, 18, 18, "振動讀值", PL.fmt(value, 2), 118, c);
+      } else if (cfg.id === "coupled-oscillators") {
+        /*
+         * 耦合振子：兩台小車夾三條彈簧（牆—κ—車1—κ—車2—κ—牆）。
+         * 兩個正常模態 ω₁=√(κ/m)、ω₂=√(3κ/m)，從「只拉開車1」出發：
+         *   x₁ = A cos(Δt)cos(ω̄t)、x₂ = A sin(Δt)sin(ω̄t)
+         * 能量以模態差 (ω₂−ω₁) 為節奏來回搬運——波形條裡兩條曲線此消彼長。
+         */
+        const g = oscStage(cv);
+        const kap = a, m = Math.max(1e-6, b);
+        const w1 = Math.sqrt(kap / m), w2 = Math.sqrt(3 * kap / m);
+        const wm = (w1 + w2) / 2, dm = (w2 - w1) / 2;
+        const Apx = Math.min(44, (g.W - 260) / 4);
+        const x1 = Math.cos(dm * t) * Math.cos(wm * t);
+        const x2 = Math.sin(dm * t) * Math.sin(wm * t);
+        const wallR = g.W - 30;
+        const c1eq = g.wallX + 78 + g.cartW / 2, c2eq = wallR - 78 - g.cartW / 2;
+        const c1x = c1eq + x1 * Apx, c2x = c2eq + x2 * Apx;
+        // 兩台車＋三條彈簧一次畫完（不走 oscCart，因為這裡有兩個平衡位置）
+        const AP = PL.apparatus;
+        AP.steel(ctx, g.wallX - 10, g.railY, wallR - g.wallX + 6, 8, 4);
+        const postL = AP.wallPost(ctx, g.wallX - 4, g.railY - 1, g.ay - 32, g.ay);
+        const postR = AP.wallPost(ctx, wallR + 4, g.railY - 1, g.ay - 32, g.ay);
+        D.line(ctx, c1eq, g.ay - 56, c1eq, g.railY + 16, "rgba(120,190,255,0.45)", 1, [4, 4]);
+        D.line(ctx, c2eq, g.ay - 56, c2eq, g.railY + 16, "rgba(120,190,255,0.45)", 1, [4, 4]);
+        D.spring(ctx, postL.x, g.ay, c1x - g.cartW / 2 - 2, g.ay, 8, 10, c);
+        D.spring(ctx, c1x + g.cartW / 2 + 2, g.ay, c2x - g.cartW / 2 - 2, g.ay, Math.max(9, Math.round((c2x - c1x - g.cartW) / 16)), 10, PL.col("accent-3"));
+        D.spring(ctx, c2x + g.cartW / 2 + 2, g.ay, postR.x, g.ay, 8, 10, c);
+        AP.cart(ctx, c1x, g.railY, g.cartW, 36, { cargo: true });
+        AP.cart(ctx, c2x, g.railY, g.cartW, 36, { cargo: true });
+        D.text(ctx, "振子一", c1x, g.railY + 22, { color: PL.theme.pale(0.7), size: 10, align: "center" });
+        D.text(ctx, "振子二", c2x, g.railY + 22, { color: PL.theme.pale(0.7), size: 10, align: "center" });
+        D.text(ctx, "能量沿中間彈簧來回搬運：一台變小時另一台變大", g.W / 2, 26, { color: PL.col("text-faint"), size: 10.5, align: "center" });
+        // 波形條：兩條位移曲線，互補的起伏就是「交換」；窗長至少塞得下一輪交換
+        const Tex = Math.PI / Math.max(1e-9, dm);
+        const win = Math.min(30, Math.max(Tex * 1.15, 4));
+        const pts1 = [], pts2 = [];
+        for (let u = win; u >= 0; u -= win / 240) {
+          const tt = t - u;
+          pts1.push([-u, Math.cos(dm * tt) * Math.cos(wm * tt)]);
+          pts2.push([-u, Math.sin(dm * tt) * Math.sin(wm * tt)]);
+        }
+        oscStrip(cv, 156, win, [{ pts: pts1, color: c, width: 2.1 }, { pts: pts2, color: PL.col("accent-3"), width: 2.1 }],
+          "x₁ – t（主色）與 x₂ – t（紫）：此消彼長", { winLabel: "← " + PL.fmt(win, 1) + " s" });
+        fillPill(ctx, 18, 18, "交換頻率", PL.fmt(value, 3), 118, c);
+      } else {
+        // shm-phase：單振子＋位移/速度兩條曲線，直接比出「超前 90°」
+        const g = oscStage(cv);
+        const A = a, T = Math.max(1e-6, b), w = TAU / T;
+        const xCm = A * Math.cos(w * t), vCm = -A * Math.sin(w * t);   // v÷ω，與 x 同單位
+        const maxHalf = (g.W - g.wallX - 90 - g.cartW) / 2;
+        const sc = maxHalf / 10;                                        // A 滿檔 10 cm
+        const eqX = g.wallX + 76 + g.cartW / 2 + maxHalf / 2;
+        oscCart(ctx, g, eqX, xCm * sc, 11);
+        oscMarks(ctx, g, eqX, A * sc, eqX + xCm * sc);
+        const vPx = (vCm / Math.max(1e-9, A)) * 40;
+        if (Math.abs(vPx) > 3) D.arrow(ctx, eqX + xCm * sc, g.railY + 14, eqX + xCm * sc + vPx, g.railY + 14, { color: PL.col("accent-3"), width: 2.2, label: "v÷ω", lsize: 10 });
+        D.text(ctx, "T = " + PL.fmt(T, 2) + " s · 速度超前位移 90°", g.W - 44, 26, { color: c, size: 11, align: "right", weight: "700" });
+        const xs = [], vs = [];
+        const win = Math.min(2 * T, 12);
+        for (let u = win; u >= 0; u -= win / 240) {
+          const tt = t - u;
+          xs.push([-u, Math.cos(w * tt)]);
+          vs.push([-u, -Math.sin(w * tt)]);
+        }
+        oscStrip(cv, 156, win, [{ pts: vs, color: PL.col("accent-3"), width: 1.7 }, { pts: xs, color: c, width: 2.2 }],
+          "x – t（主色）與 v÷ω – t（紫）：峰值錯開 T/4", { winLabel: "← " + PL.fmt(win, 1) + " s" });
+        fillPill(ctx, 18, 18, "最大速率", PL.fmt(value, 2), 118, c);
+      }
+    } else if (cfg.kind === "orbit") {
+      const cx = W * 0.47, cy2 = H * 0.54, r = Math.min(W, H) * (0.18 + 0.18 * (a - cfg.a[1]) / (cfg.a[2] - cfg.a[1]));
+      D.disc(ctx, cx, cy2, 20, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 18 });
+      D.ring(ctx, cx, cy2, r, "rgba(255,255,255,0.22)", 1.4);
+      const p = t * 0.9, px = cx + r * Math.cos(p), py = cy2 + r * Math.sin(p) * 0.68;
+      /*
+       * satellite-energy 的「衛星質量」原本對畫面毫無作用。
+       * 軌道速度確實與衛星質量無關——這正是要教的事——
+       * 但學生看不到任何東西改變時，只會覺得這根滑桿壞了。
+       * 改成衛星本身畫得隨質量變大，軌道半徑與速度則紋風不動，
+       * 並直接把這個結論寫在畫面上。
+       */
+      const satR = cfg.id === "satellite-energy"
+        ? 6 + 10 * (b - cfg.b[1]) / (cfg.b[2] - cfg.b[1]) : 9;
+      D.disc(ctx, px, py, satR, { fill: c, glow: c, glowSize: 10 });
+      D.arrow(ctx, px, py, px - 25 * Math.sin(p), py + 18 * Math.cos(p), { color: PL.col("accent-2"), width: 1.7, label: "v" });
+      if (cfg.id === "satellite-energy") {
+        D.text(ctx, "衛星變重了，但軌道半徑與速度完全沒變——軌道只由中心天體與半徑決定",
+          W / 2, H - 30, { color: PL.col("text-dim"), size: 10.5, align: "center" });
+      }
+      fillPill(ctx, W - 154, 20, "軌道量測", PL.fmt(value, 2), 132, c);
+    } else if (cfg.kind === "thermal") {
+      const tankX = W * 0.23, tankY = 42, tankW = W * 0.45, tankH = H * 0.56, fillY = tankY + tankH * (0.6 - 0.18 * Math.sin(t));
+      D.rect(ctx, tankX, tankY, tankW, tankH, { fill: "rgba(255,255,255,0.03)", stroke: c, width: 2, r: 7 });
+      D.rect(ctx, tankX + 2, fillY, tankW - 4, tankY + tankH - fillY - 2, { fill: "rgba(90,162,255,0.20)", r: 4 });
+      for (let i = 0; i < 18; i++) { const x = tankX + 16 + (i * 43 % (tankW - 30)); const y = fillY + 16 + ((i * 29 + t * 28) % Math.max(20, tankY + tankH - fillY - 30)); D.disc(ctx, x, y, 2.4, { fill: i % 2 ? PL.col("accent-2") : c }); }
+      D.line(ctx, tankX + tankW + 32, tankY, tankX + tankW + 32, tankY + tankH, PL.col("text-faint"), 2); D.disc(ctx, tankX + tankW + 32, fillY + 8, 7, { fill: PL.col("danger") });
+      fillPill(ctx, 18, 18, "系統讀值", PL.fmt(value, 2), 118, c);
+    } else if (cfg.kind === "wave") {
+      /*
+       * 波動三實驗原本共用一條正弦線，彼此語意完全不同：
+       *   reflection-boundary：脈衝打向牆壁（固定端反相、自由端同相）
+       *   sound-intensity：聲源發出的同心弧，強度隨距離衰減
+       *   air-column-resonance：音叉對空氣柱，駐波腹在管口、節在水面
+       * 改成各自專屬場景，器材語言與其他實驗一致。
+       */
+      if (cfg.id === "reflection-boundary") {
+        const fixed = b > 0.5;
+        const amp = 14 + (a - cfg.a[1]) / Math.max(1e-9, cfg.a[2] - cfg.a[1]) * 40;
+        const wallX = 84, ropeY = cy, segs = 90, speed = 120;
+        const phase = (t * speed) % (W * 1.6);
+        const pulseAt = u => Math.exp(-Math.pow((u - phase) / 60, 2)) * amp;
+        const refl = Math.exp(-Math.pow((2 * wallX - phase) / 60, 2)) * amp * (fixed ? -1 : 1);
+        AP.steel(ctx, wallX - 16, ropeY - 52, 14, 104, -18);
+        D.text(ctx, fixed ? "固定端（牆）" : "自由端（環）", wallX - 8, ropeY - 66, { color: PL.col("text-dim"), size: 10 });
+        ctx.save(); ctx.lineWidth = 2.6;
+        ctx.strokeStyle = c; ctx.beginPath();
+        for (let i = 0; i <= segs; i++) {
+          const x = wallX + (W - wallX - 30) * i / segs;
+          const y = ropeY - pulseAt(x) - refl;
+          i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        }
+        ctx.stroke(); ctx.restore();
+        D.line(ctx, wallX, ropeY, W - 30, ropeY, "rgba(255,255,255,0.10)", 1);
+        D.text(ctx, fixed ? "反射波反相折返（繩端不動）" : "反射波同相折返（繩端自由）",
+          W / 2 + 40, ropeY + 56, { color: c, size: 11, align: "center", weight: "700" });
+      } else if (cfg.id === "sound-intensity") {
+        const r = 30 + (a - cfg.a[1]) / Math.max(1e-9, cfg.a[2] - cfg.a[1]) * (W * 0.52 - 60);
+        const amp = 0.4 + (b - cfg.b[1]) / Math.max(1e-9, cfg.b[2] - cfg.b[1]) * 0.6;
+        const spX = 96, spY = cy;
+        D.rect(ctx, spX - 34, spY - 24, 30, 48, { fill: PL.theme.pale(0.10), stroke: PL.theme.pale(0.3), r: 4 });
+        ctx.beginPath();
+        ctx.moveTo(spX - 4, spY - 14); ctx.lineTo(spX + 10, spY - 26); ctx.lineTo(spX + 10, spY + 26); ctx.lineTo(spX - 4, spY + 14);
+        ctx.closePath(); ctx.fillStyle = c; ctx.fill();
+        for (let k = 1; k * 46 < r + 40; k++) {
+          const rr = Math.min(r + 20, k * 46);
+          ctx.strokeStyle = `rgba(120,200,255,${Math.max(0.06, amp * 0.55 - k * 0.045)})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(spX + 8, spY, rr, -1.05, 1.05); ctx.stroke();
+        }
+        D.disc(ctx, spX + 8 + r, spY, 7, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 9 });
+        D.text(ctx, "探測點 " + PL.fmt(a, 0) + " m", spX + 8 + r, spY + 24, { color: PL.col("text-dim"), size: 10, align: "center" });
+        D.text(ctx, "強度 ∝ 1/r²：距離加倍，強度剩四分之一", W / 2 + 60, H - 34, { color: PL.col("text-faint"), size: 10.5, align: "center" });
+      } else {
+        // air-column-resonance：音叉＋直立水管＋水位，駐波腹在管口
+        const L = a, f = b;
+        const tubeX = W * 0.44, tubeTop = H * 0.18, tubeBot = H * 0.72;
+        const wl = 34300 / f / 2;                       // 半波長（cm）
+        const nodeCount = Math.max(1, Math.floor(L / wl));
+        D.rect(ctx, tubeX - 22, tubeTop, 44, tubeBot - tubeTop, { fill: "rgba(190,224,240,0.14)", stroke: "rgba(206,232,244,0.7)", width: 1.6, r: 8 });
+        D.rect(ctx, tubeX - 19, tubeBot - (tubeBot - tubeTop) * 0.24, 38, (tubeBot - tubeTop) * 0.24, { fill: "rgba(90,150,200,0.4)", r: 4 });
+        D.text(ctx, "水位", tubeX + 28, tubeBot - (tubeBot - tubeTop) * 0.12, { color: PL.col("text-faint"), size: 9.5 });
+        // 駐波：管口為腹（亮）、水面為節
+        ctx.save();
+        for (let k = 0; k <= nodeCount; k++) {
+          const yy = tubeTop + (tubeBot - tubeTop) * (k / Math.max(1, nodeCount));
+          ctx.strokeStyle = k === 0 ? "rgba(255,196,110,0.9)" : "rgba(120,200,255,0.55)";
+          ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          for (let s = 0; s <= 24; s++) {
+            const yy2 = tubeTop + (yy - tubeTop) * s / 24;
+            const dx2 = Math.sin(s / 24 * Math.PI) * 13 * (k % 2 ? -1 : 1) * (0.5 + 0.5 * Math.sin(t * 6));
+            s ? ctx.lineTo(tubeX + dx2, yy2) : ctx.moveTo(tubeX + dx2, yy2);
+          }
+          ctx.stroke();
+        }
+        ctx.restore();
+        // 音叉
+        D.rect(ctx, tubeX - 7, tubeTop - 44, 14, 40, { fill: "rgb(198,164,96)", stroke: "rgba(80,56,20,0.8)", r: 3 });
+        D.text(ctx, PL.fmt(f, 0) + " Hz 音叉", tubeX + 20, tubeTop - 30, { color: PL.col("text-dim"), size: 10 });
+        D.text(ctx, "管長 " + PL.fmt(L, 0) + " cm・波長 " + PL.fmt(wl * 2, 1) + " cm", tubeX + 20, tubeTop - 14, { color: c, size: 10 });
+        D.text(ctx, nodeCount + " 個節：共振時聲音最響", W * 0.72, H - 34, { color: PL.col("text-faint"), size: 10.5, align: "center" });
+      }
+      fillPill(ctx, 18, 18, "波動讀值", PL.fmt(value, 2), 118, c);
+    } else if (cfg.kind === "optics") {
+      const sourceX = 48, lensX = W * 0.5, screenX = W - 70, lensY = cy;
+      D.rect(ctx, sourceX - 14, lensY - 22, 28, 44, { fill: PL.col("panel-3"), stroke: c, r: 4 }); D.disc(ctx, sourceX, lensY, 5, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 8 });
+      D.line(ctx, lensX, lensY - 64, lensX, lensY + 64, c, 4); D.line(ctx, screenX, lensY - 76, screenX, lensY + 76, "rgba(255,255,255,0.42)", 4);
+      if (cfg.id === "critical-angle") {
+        /*
+         * 「入射角 θ」原本對畫面完全沒有作用——三條光線永遠畫在 dy = −32/0/32。
+         * 全反射的重點就是「角度超過臨界角就折不出去」，
+         * 角度看不到的話這個實驗等於沒有內容。
+         *
+         * 改成畫一條真的以 θ 入射的光線：
+         *   θ < θc → 折射出去（用 Snell 定律算折射角）
+         *   θ ≥ θc → 折射線消失，只剩全反射線
+         */
+        const n1 = a, thetaC = Math.asin(1 / n1) * 180 / Math.PI;
+        const th = b * Math.PI / 180, bx = W * 0.5, by = lensY;
+        D.line(ctx, 40, by, W - 40, by, PL.theme.pale(0.3), 2);            // 介面
+        D.line(ctx, bx, by - 90, bx, by + 90, PL.theme.pale(0.18), 1, [5, 4]);  // 法線
+        D.text(ctx, "n₁ = " + PL.fmt(n1, 2) + "（密介質）", 46, by + 24, { color: PL.col("text-faint"), size: 10 });
+        D.text(ctx, "n₂ = 1.00（空氣）", 46, by - 14, { color: PL.col("text-faint"), size: 10 });
+        // 入射線（由下方密介質射向介面）
+        const inLen = 110;
+        D.arrow(ctx, bx - inLen * Math.sin(th), by + inLen * Math.cos(th), bx, by,
+          { color: PL.col("warn"), width: 2.2, head: 7, label: "θ = " + PL.fmt(b, 0) + "°" });
+        const sinT2 = n1 * Math.sin(th);
+        if (sinT2 <= 1) {
+          const th2 = Math.asin(sinT2);
+          D.arrow(ctx, bx, by, bx + inLen * Math.sin(th2), by - inLen * Math.cos(th2),
+            { color: c, width: 2.2, head: 7, label: "折射 " + PL.fmt(th2 * 180 / Math.PI, 0) + "°" });
+          D.text(ctx, "θ 還沒超過臨界角 " + PL.fmt(thetaC, 1) + "°，光可以折射出去",
+            W / 2, H - 26, { color: PL.col("text-dim"), size: 11, align: "center" });
+        } else {
+          D.text(ctx, "全反射", bx + 96, by - 34, { color: PL.col("danger"), size: 13, weight: "700" });
+          D.text(ctx, "θ 超過臨界角 " + PL.fmt(thetaC, 1) + "°，光完全折不出去，全部反射回密介質",
+            W / 2, H - 26, { color: PL.col("danger"), size: 11, align: "center", weight: "700" });
+        }
+        // 反射線一定存在
+        D.arrow(ctx, bx, by, bx + inLen * Math.sin(th), by + inLen * Math.cos(th),
+          { color: sinT2 > 1 ? PL.col("danger") : PL.theme.pale(0.35), width: sinT2 > 1 ? 2.4 : 1.4, head: 6 });
+      } else {
+        for (const dy of [-32, 0, 32]) { D.line(ctx, sourceX + 12, lensY + dy * 0.35, lensX, lensY + dy, PL.col("warn"), 1.8); D.line(ctx, lensX, lensY + dy, screenX, lensY - dy * 0.7, c, 1.8); }
+      }
+      fillPill(ctx, 18, 18, "光學量測", PL.fmt(value, 2), 118, c);
+    } else if (cfg.kind === "magnetic") {
+      /*
+       * 磁學三實驗（安培力／動生電動勢／通電線圈力矩）：原本是方框加同心圓環。
+       * 改成 N/S 磁極夾著導體棒（或線圈）的實物場景，×記號表達磁場，
+       * 器材語言與 rail-rods 一致。
+       */
+      const magL = W * 0.16, magR = W * 0.84, gapY = cy - 52, gapB = cy + 52;
+      const poleFace = (x2, tint, lab) => {
+        D.rect(ctx, x2 - 14, gapY - 8, 28, gapB - gapY + 16, { fill: tint, stroke: "rgba(20,26,36,0.7)", r: 5 });
+        D.text(ctx, lab, x2, cy + 5, { color: "#fff", size: 17, align: "center", weight: "700" });
+      };
+      poleFace(magL, "#c74a44", "N"); poleFace(magR, "#3f66b8", "S");
+      for (let gx = magL + 40; gx < magR - 30; gx += 44) {
+        for (let gy = gapY + 16; gy < gapB - 8; gy += 30) {
+          D.line(ctx, gx - 3.4, gy - 3.4, gx + 3.4, gy + 3.4, "rgba(201,140,255,0.4)", 1.2);
+          D.line(ctx, gx + 3.4, gy - 3.4, gx - 3.4, gy + 3.4, "rgba(201,140,255,0.4)", 1.2);
+        }
+      }
+      D.arrow(ctx, (magL + magR) / 2 - 60, gapY - 20, (magL + magR) / 2 - 60 + 46, gapY - 20, { color: "rgba(201,140,255,0.85)", width: 2, label: "B", lsize: 11 });
+      const nA = (a - cfg.a[1]) / Math.max(1e-9, cfg.a[2] - cfg.a[1]);
+      if (cfg.id === "ampere-force" || cfg.id === "motional-emf") {
+        const rodX = magL + 90 + nA * (magR - magL - 180);
+        AP.steel(ctx, magL + 30, cy + 44, magR - magL - 60, 7, 4);
+        D.rect(ctx, rodX - 5, gapY - 2, 10, gapB - gapY + 4, { fill: c, stroke: "rgba(16,22,30,0.8)", r: 4 });
+        D.disc(ctx, rodX, gapY - 2, 4.5, { fill: "rgb(198,164,96)" });
+        D.disc(ctx, rodX, gapB + 2, 4.5, { fill: "rgb(198,164,96)" });
+        if (cfg.id === "ampere-force") {
+          const th = b * Math.PI / 180;
+          const fl = Math.sin(th) * 56;
+          D.arrow(ctx, rodX, cy, rodX, cy - Math.abs(fl) - 10, { color: PL.col("danger"), width: 2.4, label: "F = BIL·sin" + PL.fmt(b, 0) + "°", lsize: 10 });
+          D.text(ctx, "電流方向 ⊙（流出紙面）", rodX + 14, cy + 18, { color: PL.col("text-faint"), size: 9.5 });
+        } else {
+          D.arrow(ctx, rodX, cy, rodX + 44, cy, { color: PL.col("accent-2"), width: 2.2, label: "v", lsize: 11 });
+          AP.valueChip(ctx, rodX + 10, gapY + 10, "ε = BLv", "rgba(126,222,190,0.9)");
+        }
+      } else {
+        const th2 = (a - cfg.a[1]) / Math.max(1e-9, cfg.a[2] - cfg.a[1]) * Math.PI;
+        const cw2 = (magR - magL) * 0.34, chh2 = (gapB - gapY) * 0.62;
+        ctx.save();
+        ctx.translate(W * 0.5, cy);
+        ctx.rotate(-th2);
+        ctx.strokeStyle = c; ctx.lineWidth = 3.4;
+        ctx.strokeRect(-cw2 / 2, -chh2 / 2, cw2, chh2);
+        ctx.restore();
+        D.text(ctx, "線圈轉角 " + PL.fmt(a, 0) + "°", W * 0.5, cy + chh2 / 2 + 22, { color: c, size: 10.5, align: "center" });
+      }
+      fillPill(ctx, W - 154, 20, "儀表讀數", PL.fmt(value, 2), 132, c);
+    } else if (cfg.kind === "circuit") {
+      /*
+       * 電路類（基爾霍夫／電表負載）：原本是一個方框加 + 號。
+       * 改成實物迴路——電池盒、閘刀開關、電阻、編織導線、圓形電表。
+       */
+      const loopY1 = cy - 66, loopY2 = cy + 66;
+      const lx = W * 0.14, rx2 = W * 0.86;
+      AP.cable(ctx, [{ x: lx, y: loopY2 }, { x: lx, y: loopY1 }, { x: rx2, y: loopY1 }, { x: rx2, y: loopY2 }, { x: lx, y: loopY2 }], "rgb(186,54,48)", 3.4, 5);
+      AP.battery(ctx, lx - 15, cy - 30, 30, 60);
+      if (cfg.id === "kirchhoff") {
+        const node = { x: rx2 - 120, y: loopY1 };
+        AP.cable(ctx, [{ x: node.x, y: loopY1 }, { x: node.x, y: cy - 20 }, { x: node.x, y: loopY2 }], "rgb(186,54,48)", 3, 4);
+        AP.symJunction(ctx, node.x, loopY1, "rgba(34,42,54,0.92)");
+        AP.symJunction(ctx, node.x, cy - 20, "rgba(34,42,54,0.92)");
+        AP.symJunction(ctx, node.x, loopY2, "rgba(34,42,54,0.92)");
+        D.arrow(ctx, node.x - 60, loopY1 + 8, node.x - 16, loopY1 + 8, { color: PL.col("accent-2"), width: 2, label: "I₁" });
+        D.arrow(ctx, node.x + 16, cy - 20, node.x + 60, cy - 20, { color: PL.col("accent-2"), width: 2, label: "I₂" });
+        D.arrow(ctx, node.x + 16, loopY2 - 8, node.x + 60, loopY2 - 8, { color: PL.col("accent-2"), width: 2, label: "I₃" });
+        D.disc(ctx, node.x, cy - 20, 6, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 8 });
+        D.text(ctx, "節點：流入 = 流出", node.x, cy + 16, { color: PL.col("text-dim"), size: 10.5, align: "center" });
+      } else {
+        const rxc = rx2 - 90;
+        AP.resistorBox(ctx, rxc, loopY1, 56, null, false);
+        D.text(ctx, "待測 R = " + PL.fmt(a, 0) + " Ω", rxc, loopY1 - 18, { color: PL.col("accent-2"), size: 10.5, align: "center" });
+        const vmx = rxc + 46, vmy = (loopY1 + cy) / 2;
+        AP.meter(ctx, vmx + 40, vmy - 10, 24, PL.clamp(value / 100, 0, 1), "V");
+        AP.cable(ctx, [{ x: rxc - 24, y: loopY1 }, { x: rxc - 24, y: vmy - 10 }, { x: vmx + 16, y: vmy - 10 }], "rgb(58,96,168)", 2.4, 3);
+        AP.cable(ctx, [{ x: rxc + 24, y: loopY1 }, { x: rxc + 24, y: vmy - 10 }, { x: vmx + 16, y: vmy - 10 }], "rgb(58,96,168)", 2.4, 3);
+        AP.valueChip(ctx, vmx - 40, vmy + 24, "伏特計內阻 " + PL.fmt(b, 0) + " kΩ", "rgba(126,222,190,0.9)");
+      }
+      AP.knifeSwitch(ctx, lx + 110, loopY2 + 2, 46, 0);
+      AP.resistorBox(ctx, rx2 - 60, loopY2, 46, null, false);
+      AP.valueChip(ctx, lx + 6, loopY1 - 34, PL.fmt(a, 1) + (cfg.id === "kirchhoff" ? " V" : " Ω"), "rgba(120,190,255,0.9)");
+      fillPill(ctx, W - 154, 20, "儀表讀數", PL.fmt(value, 2), 132, c);
+    } else if (cfg.kind === "field") {
+      const left = 70, right = W - 74, top = H * 0.3, bottom = H * 0.72;
+      D.line(ctx, left, top, right, top, c, 2.2); D.line(ctx, right, top, right, bottom, c, 2.2); D.line(ctx, right, bottom, left, bottom, c, 2.2); D.line(ctx, left, bottom, left, top, c, 2.2);
+      D.disc(ctx, left, cy, 21, { fill: "rgba(255,204,102,0.14)", stroke: PL.col("warn"), width: 2 }); D.text(ctx, "+", left, cy + 6, { color: PL.col("warn"), size: 18, align: "center", weight: "700" });
+      if (cfg.kind === "field") {
+        if (cfg.id === "electrostatic-shield") {
+          /*
+           * 「屏蔽厚度」原本對畫面沒有作用，外加場的箭頭一路穿過去，
+           * 看起來反而像是屏蔽沒有效果——和讀數說的「殼內場強 = 0」互相矛盾。
+           * 改成畫出真正有厚度的金屬殼：箭頭在殼外，殼內完全空白，
+           * 厚度隨滑桿改變，但殼內恆為零這件事不隨厚度改變。
+           */
+          const thick = 4 + (b - cfg.b[1]) / Math.max(1e-9, cfg.b[2] - cfg.b[1]) * 22;
+          const shellL = W * 0.38, shellR = W * 0.66;
+          const arrowLen = 14 + (a - cfg.a[1]) / Math.max(1e-9, cfg.a[2] - cfg.a[1]) * 26;
+          for (let y = top + 22; y < bottom; y += 22) {
+            D.arrow(ctx, left + 40, y, left + 40 + arrowLen, y, { color: PL.col("accent-2"), width: 1.4 });
+            D.arrow(ctx, shellR + thick + 10, y, shellR + thick + 10 + arrowLen, y, { color: PL.col("accent-2"), width: 1.4 });
+          }
+          D.rect(ctx, shellL, top + 10, thick, bottom - top - 20, { fill: "#8d97a6", stroke: PL.theme.pale(0.4), r: 2 });
+          D.rect(ctx, shellR, top + 10, thick, bottom - top - 20, { fill: "#8d97a6", stroke: PL.theme.pale(0.4), r: 2 });
+          D.text(ctx, "殼內 E = 0", (shellL + shellR + thick) / 2, cy + 4,
+            { color: PL.col("ok"), size: 13, align: "center", weight: "700" });
+          D.text(ctx, "厚度 " + PL.fmt(b, 1) + " mm", (shellL + shellR + thick) / 2, cy + 24,
+            { color: PL.col("text-faint"), size: 10, align: "center" });
+          D.text(ctx, "把厚度或外加場拉到最大，殼內仍然是零——這就是法拉第籠",
+            W / 2, bottom + 24, { color: PL.col("text-dim"), size: 10.5, align: "center" });
+        } else {
+          for (let y = top + 24; y < bottom; y += 25) D.arrow(ctx, left + 46, y, right - 46, y, { color: PL.col("accent-2"), width: 1 });
+        }
+      }
+      fillPill(ctx, W - 154, 20, "儀表讀數", PL.fmt(value, 2), 132, c);
+    } else if (cfg.kind === "nuclear") {
+      const sourceX = W * 0.14, targetX = W * 0.51, detectorX = W * 0.84;
+      D.rect(ctx, sourceX - 24, cy - 32, 48, 64, { fill: "rgba(255,183,77,0.12)", stroke: PL.col("warn"), width: 2, r: 5 });
+      D.text(ctx, "粒子束", sourceX, cy + 5, { color: PL.col("warn"), size: 11, align: "center", weight: "700" });
+      for (let i = 0; i < 4; i++) D.arrow(ctx, sourceX + 32, cy - 24 + i * 16, targetX - 34, cy - 12 + i * 8, { color: PL.col("accent-2"), width: 1.5 });
+      D.disc(ctx, targetX, cy, 28, { fill: "rgba(255,107,107,0.18)", stroke: PL.col("danger"), width: 2, glow: PL.col("danger"), glowSize: 9 });
+      D.text(ctx, "靶核", targetX, cy + 5, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
+      D.disc(ctx, targetX + 50, cy - 28, 8, { fill: c, glow: c, glowSize: 8 }); D.disc(ctx, targetX + 66, cy + 24, 6, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 7 });
+      D.arrow(ctx, targetX + 28, cy - 10, detectorX - 34, cy - 42, { color: c, width: 2, label: "產物" });
+      D.arrow(ctx, targetX + 28, cy + 10, detectorX - 34, cy + 42, { color: PL.col("warn"), width: 2, label: "能量" });
+      D.rect(ctx, detectorX - 34, cy - 56, 68, 112, { fill: "rgba(90,162,255,0.11)", stroke: PL.col("accent-2"), width: 2, r: 5 });
+      D.text(ctx, "偵測器", detectorX, cy - 34, { color: PL.col("accent-2"), size: 10, align: "center", weight: "700" });
+      D.text(ctx, "由質量虧損", detectorX, cy + 3, { color: PL.col("text-faint"), size: 8.5, align: "center" });
+      D.text(ctx, "轉成釋放能量", detectorX, cy + 18, { color: PL.col("text-faint"), size: 8.5, align: "center" });
+      fillPill(ctx, 18, 18, "核反應量測", PL.fmt(value, 1), 130, c);
+    } else if (cfg.kind === "cosmos") {
+      if (cfg.output === "觀測波長") {
+        const z = a / 300000, sx = 58, ex = W - 46, baseY = cy;
+        const wavelengthToX = wavelength => sx + (wavelength - 350) / 420 * (ex - sx);
+        const shift = Math.min((ex - sx) * 0.22, z * (ex - sx) * 2.8);
+        D.text(ctx, "以譜線位移讀出紅移", sx, 38, { color: PL.col("text"), size: 12, weight: "700" });
+        D.line(ctx, sx, baseY - 24, ex, baseY - 24, "rgba(210,222,240,0.56)", 7);
+        D.line(ctx, sx, baseY + 31, ex, baseY + 31, "rgba(255,107,107,0.58)", 7);
+        [410, b, 620].forEach(wavelength => { const x = wavelengthToX(wavelength); D.line(ctx, x, baseY - 35, x, baseY - 13, "#101722", 3); D.line(ctx, x + shift, baseY + 20, x + shift, baseY + 42, "#101722", 3); });
+        D.text(ctx, "實驗室參考光譜 λ₀", sx, baseY - 43, { color: PL.col("text-faint"), size: 9 });
+        D.text(ctx, "遠方星系觀測光譜 λ", sx, baseY + 56, { color: PL.col("danger"), size: 9 });
+        D.arrow(ctx, wavelengthToX(b), baseY + 77, wavelengthToX(b) + shift, baseY + 77, { color: c, width: 2, label: "Δλ" });
+        D.text(ctx, "z ≈ v/c = " + PL.fmt(z * 1000, 2) + " ×10⁻³", W * 0.68, H - 38, { color: c, size: 11, align: "center", weight: "700" });
+      } else {
+        const starX = W * 0.28, starY = cy, temperature = a, starColor = temperature < 4200 ? "#ff8a65" : temperature < 7000 ? "#ffe08a" : "#9dccff";
+        D.disc(ctx, starX, starY, 36 + b * 3, { fill: starColor, glow: starColor, glowSize: 26 });
+        D.text(ctx, "恆星表面", starX, starY + 5, { color: "#172033", size: 10, align: "center", weight: "700" });
+        const gx = W * 0.49, gy = H * 0.73, gw = W * 0.43, gh = H * 0.48;
+        const g = PL.graph(cv, { x: gx, y: gy - gh, w: gw, h: gh }, { x0: 200, x1: 1600, y0: 0, y1: 1.1 });
+        g.frame({ title: "黑體光譜（形狀示意）", xlabel: "波長 λ (nm)", ylabel: "相對強度" }); g.grid(5, 4);
+        const peak = 2898000 / temperature;
+        g.fn(lambda => Math.exp(-0.5 * ((lambda - peak) / Math.max(90, peak * 0.34)) ** 2), { color: c, width: 2.4 });
+        g.vline(peak, { color: PL.col("warn"), dash: [4, 4] }); g.label(peak, 0.94, "λmax", { color: PL.col("warn"), size: 10 });
+        D.text(ctx, "溫度越高，峰值往短波長移動", W * 0.68, H - 22, { color: PL.col("text-faint"), size: 9.5, align: "center" });
+      }
+      fillPill(ctx, 18, 18, cfg.output === "觀測波長" ? "紅移觀測" : "黑體輻射", PL.fmt(value, 1), 124, c);
+    } else {
+      const tableX = W * 0.18, tableY = H * 0.26, tableW = W * 0.64, rowH = 38;
+      D.rect(ctx, tableX, tableY, tableW, rowH * 4, { fill: "rgba(7,11,17,0.4)", stroke: "rgba(255,255,255,0.18)", r: 6 });
+      ["調整參數", "觀察量測值", "比對關係圖"].forEach((label, index) => { const y = tableY + 30 + index * rowH; D.text(ctx, String(index + 1), tableX + 20, y, { color: c, size: 12, align: "center", weight: "700" }); D.text(ctx, label, tableX + 44, y, { color: PL.col("text"), size: 11 }); if (index < 2) D.line(ctx, tableX + 12, y + 17, tableX + tableW - 12, y + 17, "rgba(255,255,255,0.1)", 1); });
+      fillPill(ctx, 18, 18, "資料量測", PL.fmt(value, 2), 118, c);
+    }
+      PL.ui.caption(cv, "互動模型：調整左側參數，讀取右側資料與曲線");
+  }
+
+  /*
+   * reflection-boundary：反射相位由「固定端／自由端」決定，與脈衝振幅無關。
+   * 原本關係圖掃振幅，畫出來是一條水平線；改掃反射端，才看得到
+   * 「固定端反相 180°、自由端同相 0°」這個本來就是重點的落差。
+   * damped-oscillation 同理：掃初始振幅只会得到直線，掃阻尼才看得到衰減曲線。
+   */
+  if (T["reflection-boundary"]) T["reflection-boundary"].sweep = "b";
+  if (T["damped-oscillation"]) T["damped-oscillation"].sweep = "b";
+
+  // 同一個 kind 由多個實驗共用，但兩根滑桿的語意各不相同。
+  // 把 id 帶進設定，讓畫面可以針對特定實驗做正確的呈現。
+  Object.keys(T).forEach(id => { T[id].id = id; });
+
+  Object.keys(T).forEach(id => {
+    PL.register(id, { build(root) {
+      const cfg = T[id], L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" }), cv = PL.canvas.create(L.canvasWrap, 0.58, 860);
+      PL.ui.section(L.controls, "實驗條件");
+      const sa = PL.ui.slider(L.controls, { label: cfg.a[0], min: cfg.a[1], max: cfg.a[2], value: cfg.a[3], step: (cfg.a[2] - cfg.a[1]) / 100, unit: cfg.a[4], digits: cfg.a[4] === "" ? 2 : 1, onInput: () => render() });
+      const sb = PL.ui.slider(L.controls, { label: cfg.b[0], min: cfg.b[1], max: cfg.b[2], value: cfg.b[3], step: (cfg.b[2] - cfg.b[1]) / 100, unit: cfg.b[4], digits: cfg.b[4] === "" ? 2 : 1, onInput: () => render() });
+      PL.ui.note(L.controls, PL.templateGuide(id, cfg));
+      const row = PL.ui.buttonRow(L.controls);
+      let anim;
+      /* 播放／暫停由引擎的傳輸列統一提供，實驗不再自備 */
+      PL.ui.button(row, "重設", () => { sa.set(cfg.a[3]); sb.set(cfg.b[3]); render(); });
+      const r = PL.ui.readout(L.readouts, { label: cfg.output });
+      const r2 = PL.ui.readout(L.readouts, { label: cfg.b[0], unit: cfg.b[4] });
+      const chart = PL.ui.chart(PL.ui.charts(root), { title: cfg.output + "關係圖", cap: "曲線以目前第二個條件為固定值；滑動任一參數可比較趨勢與當前量測點。" });
+      let time = 0;
+      function render() {
+        const a = sa.get(), b = sb.get(), result = cfg.calc(a, b);
+        drawScene(cv, cfg, a, b, time, result);
+        r.set(result, Math.abs(result) < 1 ? 3 : 2); r2.set(b, cfg.b[4] === "" ? 2 : 1);
+        chart.setCap(PL.ui.relationChart(chart, {
+          a: cfg.a, b: cfg.b, av: a, bv: b,
+          calc: cfg.calc, output: cfg.output, sweep: cfg.sweep
+        }));
+      }
+      anim = PL.loop(dt => { if (dt) time += dt; render(); });
+      cv.onResize(render); chart.onResize(render); render(); anim.start();
+      return { stop() { anim.stop(); cv.destroy(); chart.destroy(); }, rerender: render };
+    }});
+  });
+
+  /*
+   * 不確定度是抽象概念：滑桿一拉就「算出 N 筆」學生不會有量測感。
+   * 改成任務式：一按一筆，自己決定要不要再量，看平均值與離散如何收斂。
+   */
+  PL.register("measurement-error", { build(root) {
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" }), cv = PL.canvas.create(L.canvasWrap, 0.7, 900);
+    const trueLength = 100;                 // mm，模擬裡的真值（學生看不到直到揭曉）
+    let readings = [];                      // 學生實際記錄的每一筆
+    let revealed = false;
+
+    PL.ui.section(L.controls, "任務：量這支金屬棒");
+    const sResolution = PL.ui.slider(L.controls, { label: "尺的解析度 r", min: 0.1, max: 5, step: 0.1, value: 1, unit: "mm", digits: 1, onInput: () => { clearRecords(); } });
+    const sBias = PL.ui.slider(L.controls, { label: "零點偏移 b（系統誤差）", min: -2, max: 2, step: 0.1, value: 0, unit: "mm", digits: 1, onInput: () => { clearRecords(); } });
+    const sTarget = PL.ui.slider(L.controls, { label: "建議至少量幾次", min: 3, max: 20, step: 1, value: 5, unit: "次", digits: 0 });
+
+    /* 情境預設：課本會點名的量測情境——理想尺、精密尺、未校零、粗解析度 */
+    PL.ui.presets(L.controls, {
+      label: "量測情境",
+      options: [
+        { label: "理想尺 r=1mm", hint: "解析度中等、零點已校正——對照基準",
+          apply: () => { sResolution.set(1); sBias.set(0); sTarget.set(5); clearRecords(); } },
+        { label: "精密尺 r=0.1mm", hint: "解析度極細：讀值幾乎不散開，但系統誤差仍在",
+          apply: () => { sResolution.set(0.1); sBias.set(0); sTarget.set(5); clearRecords(); } },
+        { label: "未校零 +2mm", hint: "零點偏移＝系統誤差：量再多次平均值仍偏離真值",
+          apply: () => { sResolution.set(1); sBias.set(2); sTarget.set(8); clearRecords(); } },
+        { label: "粗尺 r=5mm", hint: "解析度粗：每一筆讀值都只能落在 5 mm 格點上",
+          apply: () => { sResolution.set(5); sBias.set(0); sTarget.set(8); clearRecords(); } }
+      ]
+    });
+
+    const row = PL.ui.buttonRow(L.controls);
+    const bOnce = PL.ui.button(row, "量測一次", () => measureOnce(), { primary: true });
+    const bFill = PL.ui.button(row, "一次補滿到建議次數", () => {
+      const target = Math.round(sTarget.get());
+      while (readings.length < target) measureOnce(true);
+      draw();
+    });
+    const bClear = PL.ui.button(row, "清除紀錄", () => { clearRecords(); });
+    PL.ui.note(L.controls,
+      "每按一次「量測一次」就當作你真的讀了一次尺。" +
+      "點會越堆越多，平均值會越來越穩；但零點偏移造成的整體偏移，量再多次也不會消失。");
+
+    const rCount = PL.ui.readout(L.readouts, { label: "已記錄筆數", unit: "筆" });
+    const rMean = PL.ui.readout(L.readouts, { label: "平均值 x̄", unit: "mm" });
+    const rSpread = PL.ui.readout(L.readouts, { label: "讀值離散 s", unit: "mm" });
+    const rUncertainty = PL.ui.readout(L.readouts, { label: "合成不確定度 u", unit: "mm" });
+    const rDifference = PL.ui.readout(L.readouts, { label: "平均值與真值差", unit: "mm" });
+    const rReport = PL.ui.readout(L.readouts, { label: "建議報告結果" });
+    const rTask = PL.ui.readout(L.readouts, { label: "任務進度" });
+
+    function normal() {
+      const u = Math.max(1e-8, Math.random()), v = Math.max(1e-8, Math.random());
+      return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v);
+    }
+    function stats() {
+      if (!readings.length) return { mean: NaN, spread: 0 };
+      const mean = readings.reduce((sum, value) => sum + value, 0) / readings.length;
+      const variance = readings.length > 1
+        ? readings.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (readings.length - 1)
+        : 0;
+      return { mean, spread: Math.sqrt(variance) };
+    }
+    function measureOnce(silent) {
+      const resolution = sResolution.get(), bias = sBias.get();
+      // 均勻量化到尺的刻度：讀數只能是解析度的整數倍
+      const raw = trueLength + bias + normal() * resolution * 0.72;
+      const snapped = Math.round(raw / resolution) * resolution;
+      readings.push(snapped);
+      if (!silent) draw();
+    }
+    function clearRecords() {
+      readings = [];
+      revealed = false;
+      draw();
+    }
+    function taskState() {
+      const target = Math.round(sTarget.get());
+      const n = readings.length;
+      if (n === 0) return "尚未量測：按「量測一次」開始";
+      if (n < target) return "已量 " + n + " 筆，建議至少 " + target + " 筆再報告";
+      if (Math.abs(sBias.get()) > 0.05) return "筆數足夠，但零點未校正——平均值會整體偏移";
+      return "筆數足夠：可寫成 x̄ ± u 交作業";
+    }
+
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const resolution = sResolution.get(), bias = sBias.get(), result = stats();
+      const target = Math.round(sTarget.get());
+      rCount.set(readings.length, 0);
+      rTask.set(taskState());
+
+      if (!readings.length) {
+        D.text(ctx, "同一支金屬棒：用尺讀長度", W / 2, H * 0.34, { color: PL.col("text"), size: 16, align: "center", weight: "700" });
+        D.text(ctx, "按「量測一次」——每一次都當作你真的讀了一格刻度", W / 2, H * 0.34 + 26,
+          { color: PL.col("text-faint"), size: 12, align: "center" });
+        D.text(ctx, "目前設定：解析度 " + PL.fmt(resolution, 1) + " mm · 零點偏移 " + PL.fmt(bias, 1) +
+          " mm · 建議至少 " + target + " 筆", W / 2, H * 0.34 + 48,
+          { color: PL.col("text-dim"), size: 11, align: "center" });
+        // 靜態示意：尺（刻度密疏跟解析度）與棒（位置跟零點偏移）
+        const x0 = 80, x1 = W - 80, y = H * 0.55;
+        D.rect(ctx, x0, y, x1 - x0, 36, { fill: "rgba(255,255,255,0.05)", stroke: "rgba(255,255,255,0.2)", r: 4 });
+        // 解析度越粗，刻度越疏
+        const ticks = PL.clamp(Math.round(40 * (1 / Math.max(0.1, resolution))), 8, 40);
+        for (let i = 0; i <= ticks; i++) {
+          const x = x0 + (x1 - x0) * i / ticks, major = i % 5 === 0;
+          D.line(ctx, x, y, x, y + (major ? 18 : 10), "rgba(255,255,255,0.36)", 1);
+        }
+        // 棒中心隨零點偏移左右微移（放大 8 倍才看得出來）
+        const shift = bias * 8;
+        D.rect(ctx, x0 + (x1 - x0) * 0.42 + shift, y + 6, (x1 - x0) * 0.16, 14,
+          { fill: "rgba(255,204,102,0.55)", stroke: PL.col("warn"), r: 3 });
+        D.text(ctx, "待測金屬棒", x0 + (x1 - x0) * 0.5 + shift, y + 16, { color: "#151b27", size: 9, align: "center", weight: "700" });
+        // 建議次數進度格
+        const gx = x0, gy = y + 56, cell = Math.min(22, (x1 - x0) / Math.max(8, target));
+        D.text(ctx, "建議量測進度", gx, gy - 6, { color: PL.col("text-faint"), size: 9 });
+        for (let i = 0; i < target; i++) {
+          D.rect(ctx, gx + i * (cell + 3), gy, cell, 8, { fill: PL.theme.pale(0.10), r: 2 });
+        }
+        rMean.set("—"); rSpread.set("—"); rUncertainty.set("—"); rDifference.set("—"); rReport.set("量測後出現");
+        return;
+      }
+
+      const standardError = result.spread / Math.sqrt(readings.length);
+      const instrumentUncertainty = resolution / Math.sqrt(12);
+      const uncertainty = Math.sqrt(standardError * standardError + instrumentUncertainty * instrumentUncertainty);
+      const halfRange = Math.max(4, ...readings.map(value => Math.abs(value - trueLength) + resolution * 1.5));
+      const min = trueLength - halfRange, max = trueLength + halfRange;
+      const x0 = 60, x1 = W - 42, mapX = value => x0 + (value - min) / (max - min) * (x1 - x0);
+
+      D.text(ctx, "任務：量這支金屬棒（已記錄 " + readings.length + " 筆）", x0, 25, { color: PL.col("text"), size: 12, weight: "700" });
+      D.text(ctx, revealed ? "真值 " + trueLength + " mm（僅供對照）" : "真值尚未揭曉", x1, 25, { color: PL.col("text-faint"), size: 9, align: "right" });
+
+      // 尺與棒
+      D.rect(ctx, x0, 42, x1 - x0, 34, { fill: "rgba(255,255,255,0.05)", stroke: "rgba(255,255,255,0.2)", r: 4 });
+      for (let value = Math.ceil(min); value <= Math.floor(max); value++) {
+        const x = mapX(value), major = value % 2 === 0;
+        D.line(ctx, x, 42, x, 42 + (major ? 18 : 10), "rgba(255,255,255,0.36)", 1);
+        if (major) D.text(ctx, String(value), x, 72, { color: PL.col("text-faint"), size: 8.5, align: "center" });
+      }
+      D.rect(ctx, mapX(trueLength - 1.7), 48, Math.max(10, mapX(trueLength + 1.7) - mapX(trueLength - 1.7)), 14, { fill: "rgba(255,204,102,0.55)", stroke: PL.col("warn"), r: 3 });
+      D.text(ctx, "待測金屬棒", mapX(trueLength), 58, { color: "#151b27", size: 8.5, align: "center", weight: "700" });
+
+      // 散布：每一筆是一顆綠點，按記錄順序排開
+      const scatterTop = H * 0.28, scatterBottom = H * 0.51;
+      D.rect(ctx, x0, scatterTop, x1 - x0, scatterBottom - scatterTop, { fill: "rgba(7,11,17,0.35)", stroke: "rgba(255,255,255,0.15)", r: 5 });
+      D.text(ctx, "每次讀值（你自己按出來的）", x0 + 10, scatterTop + 17, { color: PL.col("text-faint"), size: 9 });
+      if (revealed) D.line(ctx, mapX(trueLength), scatterTop + 25, mapX(trueLength), scatterBottom - 12, PL.col("warn"), 1.8, [4, 4]);
+      D.line(ctx, mapX(result.mean), scatterTop + 25, mapX(result.mean), scatterBottom - 12, PL.col("accent-2"), 2);
+      readings.forEach((value, index) => {
+        const rowIndex = index % 4, y = scatterTop + 48 + rowIndex * ((scatterBottom - scatterTop - 68) / 3);
+        D.disc(ctx, mapX(value), y, 5, { fill: color(), glow: color(), glowSize: 7 });
+        D.text(ctx, String(index + 1), mapX(value), y - 9, { color: PL.col("text-faint"), size: 8, align: "center" });
+      });
+      D.text(ctx, "平均值", mapX(result.mean), scatterTop + 19, { color: PL.col("accent-2"), size: 9, align: "center" });
+      if (revealed) D.text(ctx, "真值", mapX(trueLength), scatterBottom - 2, { color: PL.col("warn"), size: 9, align: "center" });
+
+      // 直方圖
+      const histTop = H * 0.64, histBottom = H - 42, binCount = 10, binWidth = (max - min) / binCount;
+      const bins = Array.from({ length: binCount }, () => 0);
+      readings.forEach(value => { const bin = PL.clamp(Math.floor((value - min) / binWidth), 0, binCount - 1); bins[bin] += 1; });
+      const maxBin = Math.max(1, ...bins), barWidth = (x1 - x0) / binCount;
+      D.text(ctx, "讀值分布：筆數越多，平均值越穩", x0, histTop - 14, { color: PL.col("text"), size: 11, weight: "700" });
+      D.line(ctx, x0, histBottom, x1, histBottom, "rgba(255,255,255,0.42)", 1);
+      bins.forEach((count, index) => {
+        const height = (histBottom - histTop) * count / maxBin;
+        D.rect(ctx, x0 + index * barWidth + 3, histBottom - height, Math.max(3, barWidth - 6), height, { fill: "rgba(53,224,207,0.52)", stroke: color(), r: 2 });
+      });
+      if (revealed) D.line(ctx, mapX(trueLength), histTop, mapX(trueLength), histBottom, PL.col("warn"), 1.5, [4, 4]);
+      D.line(ctx, mapX(result.mean), histTop, mapX(result.mean), histBottom, PL.col("accent-2"), 2);
+      const biasText = Math.abs(bias) < 0.05
+        ? "零點已校正：重複量測在處理隨機誤差"
+        : "零點偏移 " + PL.fmt(bias, 1) + " mm：系統誤差，量再多次也不會消失";
+      D.text(ctx, biasText, W / 2, H - 16, { color: Math.abs(bias) < 0.05 ? PL.col("text-faint") : PL.col("danger"), size: 9.5, align: "center" });
+
+      rMean.set(result.mean, 2);
+      rSpread.set(result.spread, 2);
+      rUncertainty.set(uncertainty, 2);
+      rDifference.set(result.mean - trueLength, 2);
+      rReport.set(PL.fmt(result.mean, 1) + " ± " + PL.fmt(uncertainty, 1) + " mm");
+    }
+
+    PL.ui.button(row, "揭曉真值", () => {
+      if (!readings.length) return;
+      revealed = true;
+      draw();
+    });
+
+    cv.onResize(draw); draw();
+    return { stop() { cv.destroy(); }, rerender: draw };
+  }});
+
+  /* 路程與位移要把起點、折返點和終點留在同一張圖，不能只讓物體循環移動。 */
+  PL.register("distance-displacement", { build(root) {
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" }), cv = PL.canvas.create(L.canvasWrap, 0.63, 900);
+    let progress = 1, anim;
+    PL.ui.section(L.controls, "路徑設定");
+    const sOutward = PL.ui.slider(L.controls, { label: "去程距離 L", min: 4, max: 30, step: 1, value: 14, unit: "m", digits: 0, onInput: draw });
+    const sReturn = PL.ui.slider(L.controls, { label: "回程比例 r", min: 0, max: 1, step: 0.05, value: 0.45, unit: "", digits: 2, onInput: draw });
+    const sProgress = PL.ui.slider(L.controls, { label: "觀察路徑進度", min: 0, max: 100, step: 1, value: 100, unit: "%", digits: 0, onInput: value => { progress = value / 100; draw(); } });
+    const row = PL.ui.buttonRow(L.controls);
+    const play = PL.ui.button(row, "從起點重播", () => { progress = 0; sProgress.set(0); play.textContent = "從起點重播"; anim.start(); draw(); }, { primary: true });
+    PL.ui.button(row, "回到終點判讀", () => { anim.stop(); progress = 1; sProgress.set(100); draw(); });
+    PL.ui.note(L.controls, "先從起點走到折返點，再往回走一段。路程只把走過的每一段相加；位移只比較終點與起點的位置，並保留方向。拖曳進度可在任何時刻停下判讀。");
+    const rRoute = PL.ui.readout(L.readouts, { label: "總路程 s", unit: "m" });
+    const rDisplacement = PL.ui.readout(L.readouts, { label: "終點位移 Δx", unit: "m" });
+    const rPosition = PL.ui.readout(L.readouts, { label: "目前位置 x", unit: "m" });
+    const rStage = PL.ui.readout(L.readouts, { label: "目前路段" });
+    function values() {
+      const outward = sOutward.get(), returned = outward * sReturn.get(), route = outward + returned;
+      const fractionOut = outward / route;
+      const current = progress <= fractionOut ? outward * progress / fractionOut : outward - returned * (progress - fractionOut) / (1 - fractionOut || 1);
+      const travelled = route * progress;
+      return { outward, returned, route, fractionOut, final: outward - returned, current, travelled };
+    }
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const data = values(), x0 = 72, x1 = W - 64, trackY = H * 0.57;
+      /*
+       * 原本寫成 position / data.outward，也就是把去程距離正規化成整個畫布寬度。
+       * 結果無論 L 設 4 m 還是 30 m，畫出來的路徑一模一樣長，
+       * 學生拉「去程距離」這根滑桿完全看不出差別——尺度被自己抵銷掉了。
+       *
+       * 改用固定比例尺（以滑桿上限 30 m 對應整條軌道），
+       * 短程就畫得短、長程就畫得長，L 這根滑桿才真的在說一件事。
+       */
+      const SPAN = 30;
+      const mapX = position => x0 + position / SPAN * (x1 - x0);
+      const finishX = mapX(data.final), currentX = mapX(data.current);
+      D.text(ctx, "一趟有折返的直線步行", x0, 31, { color: PL.col("text"), size: 13, weight: "700" });
+      D.text(ctx, "以起點為 x = 0，向右為正方向", x1, 31, { color: PL.col("text-faint"), size: 9.5, align: "right" });
+      D.line(ctx, x0, trackY, x1, trackY, "rgba(255,255,255,0.28)", 6);
+      for (let step = 0; step <= 10; step++) {
+        const x = x0 + step / 10 * (x1 - x0);
+        D.line(ctx, x, trackY - 10, x, trackY + 10, "rgba(255,255,255,0.2)", 1);
+        D.text(ctx, String(step * SPAN / 10), x, trackY + 24,
+          { color: PL.col("text-faint"), size: 8.5, align: "center" });
+      }
+      const turnX = mapX(data.outward);
+      D.line(ctx, x0, trackY - 78, turnX, trackY - 78, "rgba(53,224,207,0.22)", 2, [4, 4]);
+      D.arrow(ctx, x0 + 8, trackY - 78, turnX - 4, trackY - 78, { color: color(), width: 2.5, label: "去程 L = " + PL.fmt(data.outward, 1) + " m" });
+      D.line(ctx, finishX, trackY + 84, turnX, trackY + 84, "rgba(255,183,77,0.22)", 2, [4, 4]);
+      D.arrow(ctx, turnX - 4, trackY + 84, finishX + 4, trackY + 84, { color: PL.col("warn"), width: 2.5, label: "回程 rL = " + PL.fmt(data.returned, 1) + " m" });
+      [
+        [x0, "起點", "x = 0"],
+        [turnX, "折返點", "x = " + PL.fmt(data.outward, 1) + " m"],
+        [finishX, "終點", "x = " + PL.fmt(data.final, 1) + " m"]
+      ].forEach(([x, title, detail], index) => {
+        D.line(ctx, x, trackY - 22, x, trackY + 26, index === 2 ? PL.col("warn") : "rgba(255,255,255,0.54)", 2);
+        D.disc(ctx, x, trackY, index === 2 ? 7 : 5, { fill: index === 2 ? PL.col("warn") : PL.col("panel-3"), stroke: index === 2 ? PL.col("warn") : "rgba(255,255,255,0.6)", width: 1.5 });
+        D.text(ctx, title, x, trackY + 45, { color: index === 2 ? PL.col("warn") : PL.col("text"), size: 10, align: "center", weight: "700" });
+        D.text(ctx, detail, x, trackY + 60, { color: PL.col("text-faint"), size: 8.5, align: "center" });
+      });
+      D.rect(ctx, currentX - 18, trackY - 45, 36, 24, { fill: color(), stroke: "rgba(255,255,255,0.75)", width: 1.4, r: 5 });
+      D.disc(ctx, currentX - 11, trackY - 18, 4, { fill: PL.col("panel-3") }); D.disc(ctx, currentX + 11, trackY - 18, 4, { fill: PL.col("panel-3") });
+      D.arrow(ctx, currentX, trackY - 56, currentX + (progress <= data.fractionOut ? 38 : -38), trackY - 56, { color: progress <= data.fractionOut ? color() : PL.col("warn"), width: 2, label: progress <= data.fractionOut ? "向右" : "向左" });
+
+      const panelY = H * 0.79, panelW = (W - 112) / 2;
+      D.rect(ctx, 56, panelY, panelW, 62, { fill: "rgba(53,224,207,0.08)", stroke: color(), r: 6 });
+      D.text(ctx, "路程 s = 去程 + 回程", 70, panelY + 20, { color: PL.col("text-faint"), size: 9.5 });
+      D.text(ctx, PL.fmt(data.outward, 1) + " + " + PL.fmt(data.returned, 1) + " = " + PL.fmt(data.route, 1) + " m", 70, panelY + 43, { color: color(), size: 13, weight: "700" });
+      D.rect(ctx, 56 + panelW + 16, panelY, panelW, 62, { fill: "rgba(255,183,77,0.08)", stroke: PL.col("warn"), r: 6 });
+      D.text(ctx, "位移 Δx = 終點 − 起點", 70 + panelW + 16, panelY + 20, { color: PL.col("text-faint"), size: 9.5 });
+      D.text(ctx, PL.fmt(data.final, 1) + " − 0 = +" + PL.fmt(data.final, 1) + " m", 70 + panelW + 16, panelY + 43, { color: PL.col("warn"), size: 13, weight: "700" });
+      rRoute.set(data.route, 2); rDisplacement.set(data.final, 2); rPosition.set(data.current, 2); rStage.set(progress < data.fractionOut ? "去程：遠離起點" : progress < 1 ? "回程：朝起點" : "已到終點，可比較路程與位移");
+    }
+    anim = PL.loop(dt => {
+      /*
+       * 不再用 playing 旗標把迴圈擋住：傳輸列讓迴圈跑，這裡就該前進。
+       * 「播放整段路徑」的意義改成「回到起點重播」，而不是另一個開關。
+       * 走到終點就停下迴圈，避免無限重播。
+       */
+      if (!dt) { draw(); return; }
+      if (progress >= 1) { anim.stop(); play.textContent = "再播放一次"; draw(); return; }
+      progress = Math.min(1, progress + dt * 0.24); sProgress.set(progress * 100);
+      draw();
+    });
+    cv.onResize(draw); draw();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
+
+  /* =========================================================================
+     雙棒導軌：電磁剎車與動量傳遞（對應經典「雙棒導軌模型」）
+     ========================================================================= */
+  PL.register("rail-rods", { build(root) {
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
+    const cv = PL.canvas.create(L.canvasWrap, 0.62);
+    const AP = PL.apparatus;
+    const c = color();
+
+    const sB = PL.ui.slider(L.controls, { label: "磁場 B", min: 0.2, max: 2, step: 0.1, value: 0.8, unit: "T", digits: 1 });
+    const sR = PL.ui.slider(L.controls, { label: "迴路電阻 R", min: 0.5, max: 6, step: 0.5, value: 2, unit: "Ω", digits: 1 });
+    const sV0 = PL.ui.slider(L.controls, { label: "棒1初速 v₀", min: 1, max: 6, step: 0.5, value: 3, unit: "m/s", digits: 1, onInput: reset });
+    PL.ui.note(L.controls,
+      "棒1在磁場裡切割磁力線，迴路出現感應電流：快棒被安培力煞車、慢棒被推動。" +
+      "注意 v–t 圖上兩條線收斂到同一條水平線——那就是動量守恆算出的共同速度，" +
+      "少掉的動能變成了迴路的焦耳熱。改變 B 或 R，只改變「多久」收斂，不改變收斂到哪。");
+
+    const rEmf = PL.ui.readout(L.readouts, { label: "感應電動勢 ε", unit: "V" });
+    const rI = PL.ui.readout(L.readouts, { label: "感應電流 I", unit: "A" });
+    const rF = PL.ui.readout(L.readouts, { label: "安培力 F", unit: "N" });
+    const rQ = PL.ui.readout(L.readouts, { label: "已生焦耳熱", unit: "J" });
+
+    /* 物理參數：導軌間距 L=0.8 m，兩棒質量各 1 kg，導軌光滑 */
+    const Lm = 0.8, M1 = 1, M2 = 1;
+    const PX_PER_M = 110;                    // 導軌長度對應的像素比例
+    let v1 = 0, v2 = 0, x1 = 0, x2 = 0, t = 0, settled = 0, merged = false, vStar = 0, KE0 = 0;
+    let history = [];
+
+    function reset() {
+      v1 = sV0.get(); v2 = 0;
+      KE0 = 0.5 * M1 * v1 * v1;
+      vStar = M1 * v1 / (M1 + M2);
+      x1 = 1.2; x2 = 2.6; merged = false;      // 公尺
+      t = 0; settled = 0; history = [];
+    }
+    reset();
+
+    function drawScene() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const B = sB.get(), R = sR.get();
+      const emf = B * Lm * (v1 - v2), I = emf / R, F = B * Lm * I;
+      const rail1 = 78, rail2 = 234, rx0 = 56, rx1 = W - 40;
+      const mToPx = x => rx0 + x * PX_PER_M;
+
+      // 磁場：垂直紙面（×記號鋪滿導軌間）
+      ctx.save();
+      ctx.strokeStyle = "rgba(201,140,255,0.30)"; ctx.lineWidth = 1.4;
+      for (let y = rail1 + 22; y < rail2 - 6; y += 30) {
+        for (let x = rx0 + 24; x < rx1; x += 34) {
+          ctx.beginPath();
+          ctx.moveTo(x - 4, y - 4); ctx.lineTo(x + 4, y + 4);
+          ctx.moveTo(x + 4, y - 4); ctx.lineTo(x - 4, y + 4);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+      D.text(ctx, "B（垂直紙面向內）", rx1 - 8, rail1 - 12, { color: "rgba(201,140,255,0.75)", size: 10, align: "right" });
+
+      // 兩條導軌（鋼條）
+      AP.steel(ctx, rx0, rail1, rx1 - rx0, 7, 4);
+      AP.steel(ctx, rx0, rail2, rx1 - rx0, 7, 4);
+
+      // 導體棒：1 號（主色）、2 號（紫）
+      const rod = (xm, tint, lab) => {
+        const px = mToPx(xm);
+        const g = ctx.createLinearGradient(px - 5, 0, px + 5, 0);
+        g.addColorStop(0, "rgba(255,255,255,0.35)");
+        ctx.fillStyle = tint;
+        D.rect(ctx, px - 5, rail1 - 6, 10, rail2 - rail1 + 12, { fill: tint, stroke: "rgba(16,22,30,0.8)", r: 4 });
+        D.text(ctx, lab, px, rail2 + 24, { color: tint, size: 10.5, align: "center", weight: "700" });
+        // 速度箭頭
+        const vpx = (lab === "棒1" ? v1 : v2) * 16;
+        if (Math.abs(vpx) > 4) D.arrow(ctx, px, rail1 - 22, px + vpx, rail1 - 22, { color: tint, width: 2.2, label: "v", lsize: 10 });
+        return px;
+      };
+      const p1 = rod(Math.min(x1, x2 - 0.35), c, "棒1");
+      const p2 = rod(Math.max(x2, x1 + 0.35), PL.col("accent-3"), "棒2");
+      // 安培力箭頭：快棒受力與運動反向（煞車）、慢棒同向（推動）——兩棒力等大反向
+      const Fnow = sB.get() * Lm * Math.abs(sB.get() * Lm * (v1 - v2) / Math.max(0.05, sR.get()));
+      const Flen = Math.min(44, 6 + Fnow * 26);
+      if (Flen > 9) {
+        const dir1 = Math.sign(v1 - v2 || 1);
+        D.arrow(ctx, p1, rail1 - 40, p1 - dir1 * Flen, rail1 - 40, { color: PL.col("danger"), width: 2.2, label: "F₁", lsize: 10 });
+        D.arrow(ctx, p2, rail1 - 40, p2 + dir1 * Flen, rail1 - 40, { color: PL.col("danger"), width: 2.2, label: "F₂", lsize: 10 });
+      }
+
+      // 感應電流：迴路箭頭（只在有電流時出現，方向依相對速度）
+      // 棒1向右、B 向內 ⇒ 棒1 內電流往上（畫布 −y），繞外圈回到棒2 往下
+      if (Math.abs(I) > 0.02) {
+        const sgn = Math.sign(I);
+        const midX = (p1 + p2) / 2;
+        D.arrow(ctx, midX, rail1 - 8, midX + sgn * 26, rail1 - 8, { color: PL.col("warn"), width: 2 });
+        D.arrow(ctx, midX, rail2 + 10, midX - sgn * 26, rail2 + 10, { color: PL.col("warn"), width: 2 });
+        A_arrowVert(p1, rail1 + 14, sgn > 0 ? -1 : 1);
+        A_arrowVert(p2, rail1 + 14, sgn > 0 ? 1 : -1);
+      }
+      function A_arrowVert(x, y, dir) {
+        D.arrow(ctx, x, y, x, y + dir * 24, { color: PL.col("warn"), width: 2 });
+      }
+
+      // 讀值晶片
+      AP.valueChip(ctx, rx0 + 6, rail2 + 40, "I = " + PL.fmt(Math.abs(I), 2) + " A", "rgba(255,196,110,0.9)");
+      AP.valueChip(ctx, rx1 - 150, rail2 + 40, "F = " + PL.fmt(Math.abs(F), 2) + " N", "rgba(255,150,140,0.9)");
+
+      // v–t 圖：兩棒速度收斂到共同速度
+      const bx = 44, byB = 292, bw = W - 88, bh = H - byB - 26;
+      const g = PL.graph(cv, { x: bx, y: byB, w: bw, h: bh }, { x0: 0, x1: 14, y0: 0, y1: Math.max(1.2, sV0.get() * 1.15) });
+      g.frame({ title: "v – t：兩棒收斂到動量守恆的共同速度 v*", xlabel: "t (s)" }); g.grid(4, 2);
+      const win = history.filter(p => p[0] > t - 14);
+      if (win.length > 1) {
+        g.curve(win.map(p => [p[0] - (t - 14), p[1]]), { color: c, width: 2.1 });
+        g.curve(win.map(p => [p[0] - (t - 14), p[2]]), { color: PL.col("accent-3"), width: 2.1 });
+      }
+      g.hline(vStar, { color: PL.col("ok"), dash: [5, 4], width: 1.3 });
+      g.label(0.4, vStar, "v* = " + PL.fmt(vStar, 2) + " m/s（動量守恆）", { color: PL.col("ok"), size: 9.5 });
+      g.dot(Math.min(14, t), v1, { color: c, glow: c });
+
+      // 收斂提示
+      if (settled > 0) {
+        D.text(ctx, W / 2, 44, (merged ? "兩棒接觸" : "磁場完成動量傳遞") + "：以共同速度 v* = " + PL.fmt(vStar, 2) + " m/s 一起前進，電流歸零",
+          { color: PL.col("ok"), size: 11.5, align: "center", weight: "700" });
+        D.text(ctx, W / 2, 62, "少掉的動能 " + PL.fmt(KE0 - 0.5 * (M1 + M2) * vStar * vStar, 3) + " J 已變成迴路的焦耳熱",
+          { color: PL.col("text-faint"), size: 10.5, align: "center" });
+      }
+
+      rEmf.set(Math.abs(emf), 2); rI.set(Math.abs(I), 2); rF.set(Math.abs(F), 2);
+      const Q = Math.max(0, KE0 - 0.5 * M1 * v1 * v1 - 0.5 * M2 * v2 * v2);
+      rQ.set(Q, 3);
+    }
+
+    const anim = PL.loop(dt => {
+      if (dt) {
+        t += dt;
+        const B = sB.get(), R = sR.get();
+        const emf = B * Lm * (v1 - v2), I = emf / R, F = B * Lm * I;
+        // 安培力：快棒減速、慢棒加速（一對交互作用，靠磁場傳遞動量）
+        v1 -= (F / M1) * dt * Math.sign(v1 - v2 || 1);
+        v2 += (F / M2) * dt * Math.sign(v1 - v2 || 1);
+        x1 += v1 * dt; x2 += v2 * dt;
+        /*
+         * 磁場收斂需要的滑行距離（v₀·mR/B²L²）常常超過導軌長度，
+         * 棒1 會先追上棒2 —— 接觸瞬間是完全非彈性合併，動量守恆給出
+         * 與磁場收斂完全相同的 v*；之後一起等速前進、電流歸零。
+         */
+        if (x1 > x2 - 0.3) {
+          x1 = x2 - 0.3;
+          if (Math.abs(v1 - v2) > 0.02) { v1 = v2 = (M1 * v1 + M2 * v2) / (M1 + M2); merged = true; }
+        }
+        if (Math.abs(v1 - v2) < 0.02 && v1 > 0) {
+          if (settled === 0) v1 = v2 = vStar;
+          settled += dt;
+          if (settled > 3.4) reset();
+        } else settled = 0;
+        history.push([t, v1, v2]);
+        if (history.length > 1200) history.shift();
+      }
+      drawScene();
+    }, 45);
+
+    cv.onResize(drawScene); drawScene(); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: drawScene };
+  }});
+})();

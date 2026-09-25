@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>互動實驗</title>
+  <script>
+    (function () {
+      try {
+        var params = new URLSearchParams(location.search);
+        var theme = params.get("theme") || "light";
+        document.documentElement.setAttribute("data-theme", theme);
+        var m = params.get("m");
+        if (m) document.documentElement.style.setProperty("--m-color", m);
+        // Teacher / demo mode: workbench only (no brief, procedure, verdict…)
+        localStorage.setItem("pl-demo-mode", "1");
+        document.documentElement.classList.add("embed-lab");
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      background: var(--bg, #eef2f8);
+      color: var(--text, #1a1d24);
+    }
+    body { padding: 4px 4px 12px; box-sizing: border-box; }
+    #sim-root { min-height: 380px; }
+    .embed-status {
+      padding: 24px;
+      text-align: center;
+      color: var(--text-dim, #5b6575);
+      font: 700 14px/1.5 system-ui, sans-serif;
+    }
+    .embed-status.err { color: var(--danger, #c33); }
+
+    /* 只留實驗台：量測台畫布（含 x–t / v–t 圖）＋必要參數列 */
+    body.demo-mode .sim-command-bar,
+    body.demo-mode .sim-learning-brief,
+    body.demo-mode .sim-procedure,
+    body.demo-mode .sim-verdict,
+    body.demo-mode .sim-derived,
+    body.demo-mode .sim-causality,
+    body.demo-mode .sim-procedure-card,
+    body.demo-mode .sim-insight,
+    body.demo-mode .sim-insight-block,
+    body.demo-mode .sim-predict,
+    body.demo-mode .sim-challenge,
+    body.demo-mode .sim-puzzle,
+    body.demo-mode .sim-summary,
+    body.demo-mode .sim-relations,
+    body.demo-mode .sim-hint-body,
+    body.demo-mode .sim-magnifier,
+    body.demo-mode .sim-tool-bar,
+    body.demo-mode .sim-instrument-strip,
+    body.demo-mode .sim-instrument-strip + *,
+    body.demo-mode .ctrl-note,
+    body.demo-mode .sim-command-tools,
+    body.demo-mode .sim-readout-panel,
+    body.demo-mode .sim-readout-head,
+    body.demo-mode .sim-transport-hint {
+      display: none !important;
+    }
+
+    /* 與截圖一致：單一實驗台卡片 */
+    body { background: transparent; padding: 0; }
+    #sim-root, .lab-sim {
+      border: 1px solid #d7e0ea;
+      border-radius: 12px;
+      background: #fbfcfe;
+      overflow: hidden;
+    }
+    .lab-sim .sim-stage {
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .lab-sim .sim-visual-panel {
+      border: 0;
+      border-radius: 0;
+      min-width: 0;
+    }
+    .lab-sim .sim-control-deck {
+      border: 0;
+      border-top: 1px solid #e6edf5;
+      border-radius: 0;
+    }
+    .lab-sim .sim-transport {
+      border: 0;
+      border-top: 1px solid #e6edf5;
+      border-radius: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="sim-root"><div class="embed-status" id="boot-status">載入互動模擬…</div></div>
+
+  <script src="js/site-config.js"></script>
+  <script src="js/curriculum.js"></script>
+  <script src="js/advanced-curriculum.js"></script>
+  <script src="js/comprehensive-curriculum.js"></script>
+  <script src="js/extension-registry.js"></script>
+  <script src="js/open-curriculum.js"></script>
+  <script src="js/school-curriculum.js"></script>
+  <script src="js/sim-core.js"></script>
+  <script src="js/sim-tools.js"></script>
+  <script src="js/sim-insight.js"></script>
+  <script src="js/sim-observe.js"></script>
+  <script src="js/teaching-notes.js"></script>
+  <script src="js/sim-a11y.js"></script>
+  <script src="js/experiment-manifest.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      function loadScript(src) {
+        return new Promise(function (resolve, reject) {
+          var tag = document.createElement("script");
+          tag.src = src;
+          tag.async = false;
+          tag.onload = function () { resolve(src); };
+          tag.onerror = function () { reject(new Error("載入失敗：" + src)); };
+          document.head.appendChild(tag);
+        });
+      }
+
+      function fail(msg) {
+        var el = document.getElementById("boot-status");
+        if (!el) return;
+        el.className = "embed-status err";
+        el.textContent = msg;
+      }
+
+      var params = new URLSearchParams(location.search);
+      var id = params.get("id") || "";
+      var PL = window.PhysicsLab;
+      var FILES = window.PhysicsLabExperimentFiles || {};
+      var simRoot = document.getElementById("sim-root");
+
+      if (!id) { fail("缺少實驗 id"); return; }
+      if (!PL) { fail("模擬引擎未載入"); return; }
+
+      // Always run in teacher/demo mode (workbench only)
+      try {
+        document.body.classList.add("demo-mode");
+        localStorage.setItem("pl-demo-mode", "1");
+      } catch (e) {}
+
+      // Module color for canvas theming
+      try {
+        var mods = (window.PhysicsLabCurriculum && window.PhysicsLabCurriculum.modules) || [];
+        for (var i = 0; i < mods.length; i++) {
+          for (var j = 0; j < mods[i].experiments.length; j++) {
+            if (mods[i].experiments[j].id === id) {
+              if (!params.get("m")) {
+                document.documentElement.style.setProperty("--m-color", mods[i].color);
+              }
+              break;
+            }
+          }
+        }
+      } catch (e) { /* color optional */ }
+
+      var file = FILES[id];
+      Promise.resolve()
+        .then(function () {
+          if (!file) return false;
+          return loadScript("js/sim-apparatus.js")
+            .catch(function () { /* apparatus optional for some sims */ })
+            .then(function () { return loadScript("js/experiments/" + file); })
+            .then(function () { return PL.has(id); });
+        })
+        .then(function (ready) {
+          simRoot.innerHTML = "";
+          if (!ready && !PL.has(id)) {
+            fail("找不到這個實驗的模擬程式：" + id);
+            return;
+          }
+          try {
+            var api = PL.get(id).build(simRoot) || {};
+            window.__labSim = api;
+            window.parent && window.parent.postMessage({ type: "lab-ready", id: id }, "*");
+          } catch (err) {
+            console.error("模擬載入失敗：" + id, err);
+            fail("模擬載入時發生問題：" + (err && err.message ? err.message : id));
+          }
+        })
+        .catch(function (err) {
+          console.error(err);
+          fail("載入實驗程式失敗：" + id);
+        });
+    })();
+  </script>
+</body>
+</html>
