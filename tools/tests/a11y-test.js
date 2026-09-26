@@ -52,8 +52,8 @@ R.section("沒有播放鍵的實驗，操作說明要寫出怎麼開始");
 {
   const checks = [
     ["projectile", /發射/],
-    ["efield", /調整參數|滑桿|參數/],
-    ["satellite", /播放/]
+    ["coulomb", /調整參數|滑桿|參數/],
+    ["circular", /播放/]
   ];
   const bad = [];
   checks.forEach(([id, re]) => {
@@ -75,8 +75,8 @@ R.section("沒有播放鍵的實驗，操作說明要寫出怎麼開始");
 
 R.section("傳輸列按鈕要有可讀的 name");
 {
-  const root = document.createElement("div"); root.dataset = { simId: "satellite" };
-  const api = PL.get("satellite").build(root);
+  const root = document.createElement("div"); root.dataset = { simId: "circular" };
+  const api = PL.get("circular").build(root);
   const play = root.querySelector(".sim-transport-play");
   const step = root.querySelector(".sim-transport-btn");
   const reset = root.querySelector(".sim-transport-reset");

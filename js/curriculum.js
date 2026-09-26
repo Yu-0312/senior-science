@@ -32,10 +32,6 @@
           concept: "速度會隨觀察者所在參考系而不同，可用向量相加求相對速度。以過河船為例，調整船速與水流觀察合速度與漂移。",
           formula: R`\( \vec{v}_{A/B} = \vec{v}_{A} - \vec{v}_{B},\quad v = \sqrt{v_x^2 + v_y^2} \)`,
           points: ["選定參考系是描述運動的前提", "相對速度為向量差", "過河最短時間 vs 最短路徑", "常見於船渡河、飛機遇風"] },
-        { id: "vt-graph", title: "運動圖形分析", interactive: I,
-          concept: "同一段運動可用 x–t、v–t、a–t 三種圖形描述；斜率與面積把三者連結起來。拖動控制點即時比較三圖。",
-          formula: R`\( v = \dfrac{dx}{dt},\quad a = \dfrac{dv}{dt},\quad \Delta x = \int v\,dt \)`,
-          points: ["x–t 斜率為速度", "v–t 斜率為加速度", "v–t 面積為位移", "圖形是運動的語言"] },
         { id: "ticker-tape", title: "打點計時器（測速度與加速度）", interactive: I,
           concept: "打點計時器每隔固定時間在紙帶上打一點，點距越來越大代表在加速。相鄰點距除以時間得瞬時速度、點距的變化量得加速度——最經典的運動學實驗。",
           formula: R`\( \bar{v}_n = \dfrac{x_{n+1}-x_{n-1}}{2T},\quad a = \dfrac{\Delta(\Delta x)}{T^2} \)`,
@@ -180,18 +176,6 @@
           concept: "維持圓周運動所需、指向圓心的合力。以繩繫小球旋轉為例，觀察張力如何隨速率與半徑改變，並示範脫離時的切線飛出。",
           formula: R`\( F_c = \dfrac{mv^2}{r} = m\omega^2 r \)`,
           points: ["向心力指向圓心", "由張力/重力/摩擦等提供", "斷繩後沿切線飛出", "與 v² 成正比"] },
-        { id: "gravitation", title: "萬有引力定律", interactive: I,
-          concept: "任兩質點相互吸引，力與質量乘積成正比、與距離平方成反比。改變距離觀察引力的平方反比變化。",
-          formula: R`\( F = G\dfrac{m_1 m_2}{r^2},\quad g = \dfrac{GM}{R^2},\quad G = 6.67\times10^{-11} \)`,
-          points: ["平方反比定律", "解釋重力與天體運動", "距離加倍引力變 1/4", "g 隨高度減小"] },
-        { id: "orbit", title: "行星軌道與克卜勒定律", interactive: I,
-          concept: "行星在萬有引力作用下沿橢圓軌道繞恆星運行，掃過的面積速率固定。調整初速觀察圓、橢圓、拋物線軌道的轉變。",
-          formula: R`\( F = \dfrac{GMm}{r^2},\quad T^2 \propto a^3,\quad \dfrac{dA}{dt}=\text{定值} \)`,
-          points: ["軌道為橢圓恆星在焦點", "近日點速度較快（等面積律）", "週期平方與半長軸立方成正比", "向心力由萬有引力提供"] },
-        { id: "satellite", title: "人造衛星與脫離速度", interactive: I,
-          concept: "衛星以萬有引力為向心力繞行；達到脫離速度即可擺脫引力束縛。調整發射速率觀察繞行、脫離或墜落。",
-          formula: R`\( v_{\text{軌道}} = \sqrt{\dfrac{GM}{r}},\quad v_{\text{脫離}} = \sqrt{\dfrac{2GM}{R}} \)`,
-          points: ["近地軌道速率約 7.9 km/s", "脫離速率約 11.2 km/s", "同步衛星週期 24 小時", "軌道速率隨半徑減小"] },
         { id: "angular-momentum", title: "角動量守恆", interactive: I,
           concept: "無外力矩時系統角動量保持不變，解釋行星等面積律與溜冰收手加速。改變半徑觀察轉速的補償變化。",
           formula: R`\( L = mvr = I\omega = \text{定值} \)`,
@@ -218,14 +202,6 @@
           concept: "小角度擺動時單擺近似簡諧運動，週期只與擺長和重力有關，與質量、振幅無關。調整擺長觀察週期並可測 g。",
           formula: R`\( T = 2\pi\sqrt{\dfrac{L}{g}},\quad \theta = \theta_0\cos(\omega t) \)`,
           points: ["需小角度近似（< 10°）", "週期與擺錘質量無關", "擺長越長週期越長", "可用來測量 g"] },
-        { id: "shm-graph", title: "簡諧運動的位移–時間關係", interactive: I,
-          concept: "位移隨時間呈正弦變化，速度與加速度亦為正弦函數且彼此有相位差。調整振幅、週期與相位觀察三條曲線。",
-          formula: R`\( x = A\cos(\omega t + \varphi),\ v = -A\omega\sin(\omega t),\ a = -\omega^2 x \)`,
-          points: ["ω = 2π/T 為角頻率", "x–t 圖的斜率代表速度", "由圖讀出振幅與週期", "初相位決定 t = 0 的位置"] },
-        { id: "shm-phase", title: "簡諧運動的相位關係", interactive: I,
-          concept: "位移、速度、加速度同頻率但相位不同；同時觀看三條曲線與旋轉相量。",
-          formula: R`\( x=A\cos\omega t,\ v=-\omega A\sin\omega t,\ a=-\omega^2x \)`,
-          points: ["速度超前位移 90°", "加速度與位移反相", "平衡點速度最大", "端點加速度最大"] },
         { id: "shm-energy", title: "簡諧運動的能量", interactive: I,
           concept: "簡諧運動中總力學能守恆，動能與位能隨位置交替變化。觀察動能與位能沿位移的分配與總和恆定。",
           formula: R`\( E = \tfrac{1}{2}kA^2,\quad K = \tfrac{1}{2}k(A^2 - x^2) \)`,
@@ -354,14 +330,6 @@
           concept: "兩點電荷間的靜電力與電量乘積成正比、與距離平方成反比，同性相斥、異性相吸。調整電量與距離觀察靜電力。",
           formula: R`\( F = k\dfrac{q_1 q_2}{r^2},\quad k = 9\times10^{9}\ \mathrm{N\,m^2/C^2} \)`,
           points: ["同性相斥異性相吸", "平方反比定律", "與萬有引力形式相同", "距離加倍力變 1/4"] },
-        { id: "efield", title: "電場線與等勢面", interactive: I,
-          concept: "電荷在周圍空間產生電場，以電場線表示方向與強弱；與電場線垂直者為等勢面。拖動電荷觀察電場線與等勢面。",
-          formula: R`\( E = \dfrac{kQ}{r^2},\quad V = \dfrac{kQ}{r} \)`,
-          points: ["電場線由正電荷指向負電荷", "電場線密處場強大", "等勢面與電場線垂直", "沿等勢面移動不做功"] },
-        { id: "potential-e", title: "電位與電位能", interactive: I,
-          concept: "單位電荷在電場中所具有的位能為電位（純量）。在均勻電場中移動試驗電荷，觀察電位差、電場與作功的關係。",
-          formula: R`\( V = \dfrac{U}{q},\quad E = \dfrac{V}{d},\quad W = q\,\Delta V \)`,
-          points: ["電位差驅動電流", "沿電場方向電位下降", "等勢面電位相同", "單位為伏特"] },
         { id: "ohms", title: "歐姆定律與電路", interactive: I,
           concept: "導體兩端電壓與電流成正比，比值為電阻。調整電壓與電阻，觀察電流與功率如何變化。",
           formula: R`\( V = IR,\quad P = IV = I^2R = \dfrac{V^2}{R} \)`,
@@ -390,10 +358,6 @@
           concept: "帶電粒子水平射入平行板間的均勻電場，水平方向等速、鉛直方向受電力等加速，軌跡為拋物線——與拋體運動完全類比，是陰極射線管與示波器的原理。",
           formula: R`\( a = \dfrac{qE}{m},\quad y = \dfrac{qE}{2m}\left(\dfrac{L}{v}\right)^2 \)`,
           points: ["水平等速、鉛直等加速", "軌跡為拋物線（類比拋體）", "偏轉量與電場成正比、與 v² 成反比", "示波器與映像管原理"] },
-        { id: "potential-terrain", title: "電勢地形：把電位看成山丘", interactive: I,
-          concept: "電位是看不見的純量場。把兩顆可拖曳電荷的電位直接長成地形：正電荷是紅色山丘、負電荷是藍色漏斗，地形越陡處電場越強；電場線永遠垂直穿過等勢面。拖曳電荷、放置探測點，電位的空間感一眼建立。",
-          formula: R`\( V = \sum \dfrac{kq_i}{r_i},\quad E = -\dfrac{dV}{dr} \)`,
-          points: ["正電荷是山丘、負電荷是漏斗", "地形越陡＝電場越強", "沿著等高線走電位不變", "電場指向下坡方向"] },
         { id: "circuit-sandbox", title: "電路工坊：自由接線實驗室", interactive: I,
           concept: "桌上擺著電池組、閘刀開關、小燈泡、滑動變阻器與兩顆電表——點擊接線柱把它們自由接起來，電路即時求解：燈泡真的會亮、電表真的會動，把電池兩極直接接起來還會短路。切到電路圖模式，課本符號就長在器材的位置上。",
           formula: R`\( \varepsilon = I(r+R),\quad P = I^2R,\quad \text{MNA 節點電壓法即時求解} \)`,
@@ -428,10 +392,6 @@
           concept: "利用電磁感應改變交流電壓，電壓比等於匝數比；理想變壓器功率守恆。調整匝數比，觀察升壓/降壓與電流的反向變化。",
           formula: R`\( \dfrac{V_s}{V_p} = \dfrac{N_s}{N_p},\quad V_pI_p = V_sI_s \)`,
           points: ["電壓比 = 匝數比", "升壓則降流", "理想變壓器功率守恆", "高壓輸電降低損耗"] },
-        { id: "em-wave", title: "電磁波與電磁波譜", interactive: I,
-          concept: "變化的電場與磁場互相激發，形成在空間中傳播的電磁波；電場、磁場互相垂直，也垂直於前進方向。所有電磁波在真空中皆以光速前進。調整波長觀察它落在電磁波譜的哪個波段。",
-          formula: R`\( c = f\lambda = 3\times10^{8}\ \mathrm{m/s} \)`,
-          points: ["電場與磁場互相垂直", "橫波、不需介質", "真空中皆以光速前進", "波譜：無線電→微波→紅外→可見→紫外→X→γ"] },
         { id: "mass-spec", title: "質譜儀（速度選擇器）", interactive: I,
           concept: "先用互相垂直的電場與磁場組成速度選擇器，只有 v = E/B 的離子能直線通過；接著進入磁場區作圓周運動，半徑正比於質量，於是不同質量的離子分開落點，可測質量。",
           formula: R`\( v = \dfrac{E}{B},\quad r = \dfrac{mv}{qB'} \)`,
@@ -446,26 +406,10 @@
           concept: "光照射金屬時若頻率足夠高即射出電子；光以光子形式攜帶能量，證明光的粒子性。調整頻率與光強觀察光電子。",
           formula: R`\( E = hf,\quad hf = W + K_{max},\quad K_{max} = hf - W \)`,
           points: ["需超過底限頻率才有電子", "增加光強只增加電子數", "光子能量與頻率成正比", "愛因斯坦以此獲諾貝爾獎"] },
-        { id: "bohr", title: "波耳原子模型與原子光譜", interactive: I,
-          concept: "電子只能在特定能階運行，躍遷時吸收或放出特定頻率的光，形成不連續的原子光譜。切換能階觀察躍遷與譜線。",
-          formula: R`\( E_n = -\dfrac{13.6}{n^2}\ \mathrm{eV},\quad \Delta E = hf = \dfrac{1240}{\lambda[\mathrm{nm}]} \)`,
-          points: ["能階量子化", "躍遷放出特定波長的光", "萊曼系（紫外）、巴耳末系（可見）", "解釋氫原子光譜"] },
-        { id: "matter-wave", title: "物質波（德布羅意）", interactive: I,
-          concept: "運動的粒子也具有波動性，波長與動量成反比。調整粒子速度與質量，觀察物質波波長與電子繞射。",
-          formula: R`\( \lambda = \dfrac{h}{p} = \dfrac{h}{mv} \)`,
-          points: ["波粒二象性", "電子繞射實驗證實", "速度越大波長越短", "電子顯微鏡原理"] },
-        { id: "relativity", title: "狹義相對論", interactive: I,
-          concept: "接近光速時時間膨脹、長度收縮；用光鐘可看出運動時鐘走得較慢。調整速度觀察時間膨脹因子 γ 的變化。",
-          formula: R`\( \gamma = \dfrac{1}{\sqrt{1 - v^2/c^2}},\quad t = \gamma t_0,\quad E = mc^2 \)`,
-          points: ["光速為恆定上限", "時間膨脹與長度收縮", "質能等價 E = mc²", "v→c 時 γ→∞"] },
         { id: "halflife", title: "原子核與放射性半衰期", interactive: I,
           concept: "不穩定原子核放出 α、β、γ 射線而衰變，每經一個半衰期數量減半。調整半衰期，觀察衰變曲線與剩餘核數。",
           formula: R`\( N = N_0\left(\tfrac{1}{2}\right)^{t/T_{1/2}} \)`,
           points: ["三種放射線性質不同", "半衰期為統計特性", "每半衰期數量減半", "碳-14 定年法"] },
-        { id: "hubble", title: "大霹靂與哈伯定律", interactive: I,
-          concept: "從多個星系的距離與譜線紅移取得退行速度，繪成 v–d 散點圖；通過資料趨勢的最佳擬合線斜率就是哈伯常數 H₀。",
-          formula: R`\( v = H_0 d,\quad z\approx\frac{v}{c} \)`,
-          points: ["每一個散點代表一個星系的距離與退行速度", "最佳擬合線斜率就是哈伯常數 H₀", "距離較遠的星系通常有較大的紅移", "單筆資料有雜訊，需用多筆觀測看趨勢"] },
         { id: "millikan", title: "密立根油滴實驗", interactive: I,
           concept: "帶電油滴懸浮在平行板電場中，向上電力與向下重力平衡時油滴靜止。調整電壓使油滴懸浮即可求電量，且測得電量都是基本電荷 e 的整數倍——證明電荷量子化。",
           formula: R`\( qE = mg,\quad q = \dfrac{mgd}{V},\quad q = n e \)`,
@@ -481,12 +425,9 @@
   // 第二批課程地圖：把課本中常被併入章節段落的關鍵知識點拆成獨立操作實驗。
   const EXTENDED_EXPERIMENTS = {
     kinematics: [
-      { id: "vector-components", title: "位移與速度的向量分解", interactive: I, concept: "將斜向位移或速度分解為互相垂直的分量；改變大小與方向，觀察分量如何決定合向量。", formula: R`\( A_x=A\cos\theta,\quad A_y=A\sin\theta \)`, points: ["向量有大小與方向", "正交分量可獨立處理", "合量由畢氏定理求得", "拋體運動可分方向分析"] },
-      { id: "distance-displacement", title: "路程、位移與平均速度", interactive: I, concept: "沿直線先走到折返點再往回走；路程把去程與回程的長度相加，位移只比較終點相對起點的位置與方向。", formula: R`\( s=L+rL,\quad \Delta x=x_{\text{終}}-x_{\text{起}} \)`, points: ["路程為實際走過的總長，永遠不為負", "位移是起點指向終點的有向量", "回到原點時位移為零，但路程不為零", "平均速度與平均速率分別使用位移與路程"] },
       { id: "measurement-error", title: "量測、不確定度與有效數字", interactive: I, concept: "用同一把尺反覆量測固定長度；每筆讀值會因讀取雜訊、儀器解析度與零點偏移略有不同，從讀值分布建立平均值與不確定度。", formula: R`\( \bar x=\frac{1}{n}\sum x_i,\quad u(\bar x)\sim\frac{s}{\sqrt n} \)`, points: ["每一個點是一筆獨立讀值，散開不等於做錯", "解析度決定讀值可分辨到多細", "重複量測讓平均值更穩定，但不會消除系統誤差", "結果可寫成平均值 ± 不確定度，並附單位"] }
     ],
     newton: [
-      { id: "force-components", title: "力的分解與正交合成", interactive: I, concept: "把一個斜向拉力分解為水平與鉛直分量，觀察角度改變如何影響物體的受力平衡。", formula: R`\( F_x=F\cos\theta,\quad F_y=F\sin\theta \)`, points: ["先選座標軸", "分量可分別列方程", "合力由分量相加", "常用於斜面與拉繩題"] },
       { id: "apparent-weight", title: "超重與失重（電梯）", interactive: I, concept: "電梯加速時體重計讀數為支持力 N=m(g+a)，不是固定的 mg。", formula: R`\( N=m(g+a) \)`, points: ["向上加速會超重", "向下加速會失重", "自由落體時 N=0", "重量 mg 不隨運動改變"] },
       { id: "spring-series-parallel", title: "彈簧串聯與並聯", interactive: I, concept: "兩彈簧串聯會變軟、並聯會變硬；以等效勁度比較相同外力下的伸長。", formula: R`\( \frac{1}{k_s}=\frac{1}{k_1}+\frac{1}{k_2},\quad k_p=k_1+k_2 \)`, points: ["串聯伸長量相加", "並聯受力分攤", "等效勁度決定變形", "符合虎克定律"] }
     ],
@@ -501,9 +442,7 @@
       { id: "friction-thermal", title: "摩擦耗散與熱能", interactive: I, concept: "滑塊受摩擦後，機械能減少並轉為內能；調整摩擦係數比較停止距離與熱量。", formula: R`\( W_f=-f_kd,\quad Q=f_kd \)`, points: ["非保守力改變機械能", "摩擦做負功", "損失的機械能轉為內能", "能量仍守恆"] }
     ],
     gravity: [
-      { id: "banked-curve", title: "傾斜彎道與向心力", interactive: I, concept: "車在傾斜彎道上可由正向力的水平分量提供向心力；改變速度與傾角判讀是否打滑。", formula: R`\( \tan\theta=\frac{v^2}{rg} \)`, points: ["正向力的水平分量提供向心力", "傾角決定設計速度", "過快或過慢需摩擦補償", "道路與賽車彎道應用"] },
-      { id: "satellite-energy", title: "衛星軌道能量", interactive: I, concept: "衛星的重力位能與動能隨半徑改變；圓軌道的總機械能為負值。", formula: R`\( v=\sqrt{GM/r},\quad E=-\frac{GMm}{2r} \)`, points: ["重力提供向心力", "軌道半徑越大速度越小", "束縛系統總能量為負", "地球同步衛星有特定半徑"] },
-      { id: "escape-speed", title: "逃逸速度", interactive: I, concept: "從天體表面出發的物體若總能量不小於零，就能脫離重力束縛。", formula: R`\( v_e=\sqrt{\frac{2GM}{R}} \)`, points: ["忽略空氣阻力", "與發射物質量無關", "地表約 11.2 km/s", "並非離開大氣層的速度"] }
+      { id: "banked-curve", title: "傾斜彎道與向心力", interactive: I, concept: "車在傾斜彎道上可由正向力的水平分量提供向心力；改變速度與傾角判讀是否打滑。", formula: R`\( \tan\theta=\frac{v^2}{rg} \)`, points: ["正向力的水平分量提供向心力", "傾角決定設計速度", "過快或過慢需摩擦補償", "道路與賽車彎道應用"] }
     ],
     shm: [
       /* 阻尼振動與相位關係已併入主模組，讓「阻尼」在「共振」之前登場（跳階修正）。 */
@@ -511,8 +450,7 @@
     ],
     thermal: [
       { id: "hydrostatic-pressure", title: "液體壓力與深度", interactive: I, concept: "靜止液體內壓力隨深度線性增加，與容器形狀無關。", formula: R`\( P=P_0+\rho gh \)`, points: ["深度越大壓力越大", "同深度壓力相同", "與容器形狀無關", "水壩底部更厚"] },
-      { id: "phase-change", title: "相變與加熱曲線", interactive: I, concept: "物質在熔化、沸騰時吸收熱量但溫度保持不變；切換加熱功率觀察平台。", formula: R`\( Q=mc\Delta T,\quad Q=mL \)`, points: ["相變時溫度不變", "潛熱用來改變狀態", "斜段由比熱決定", "平台長度與質量成正比"] },
-      { id: "heat-engine", title: "熱機、效率與熵方向", interactive: I, concept: "熱機從高溫熱源吸熱，部分轉為功，其餘排向低溫熱源；效率受溫度限制。", formula: R`\( \eta=\frac{W}{Q_H}\le1-\frac{T_C}{T_H} \)`, points: ["不可能把熱全轉為功", "需高溫與低溫熱源", "卡諾效率是上限", "熱自發由高溫流向低溫"] }
+      { id: "phase-change", title: "相變與加熱曲線", interactive: I, concept: "物質在熔化、沸騰時吸收熱量但溫度保持不變；切換加熱功率觀察平台。", formula: R`\( Q=mc\Delta T,\quad Q=mL \)`, points: ["相變時溫度不變", "潛熱用來改變狀態", "斜段由比熱決定", "平台長度與質量成正比"] }
     ],
     waves: [
       { id: "reflection-boundary", title: "波的反射與邊界", interactive: I, concept: "波遇固定端反射會反相，遇自由端反射不反相；切換邊界條件觀察脈衝回傳。", formula: R`\( y_{\text{反}}=\pm y_{\text{入}} \)`, points: ["固定端反相", "自由端同相", "反射波速不變", "疊加可形成駐波"] },
@@ -536,8 +474,6 @@
       { id: "coil-torque", title: "通電線圈的力矩", interactive: I, concept: "線圈在磁場中兩側受安培力形成力偶，驅動轉子旋轉；改變角度觀察力矩。", formula: R`\( \tau=NIAB\sin\theta \)`, points: ["平面平行磁場時力矩最大", "法線平行磁場時力矩為零", "直流馬達需要換向", "線圈匝數增加力矩增大"] }
     ],
     modern: [
-      { id: "nuclear-reaction", title: "核反應與質能轉換", interactive: I, concept: "核融合與核分裂前後的質量差會轉為巨大能量；比較不同反應的束縛能與能量釋放。", formula: R`\( E=\Delta mc^2 \)`, points: ["質量虧損轉為能量", "融合驅動恆星", "分裂可形成鏈式反應", "核能密度遠高於化學能"] },
-      { id: "cosmological-redshift", title: "宇宙紅移與光譜", interactive: I, concept: "遙遠星系遠離時，光波長被宇宙膨脹拉長，譜線向紅端位移。", formula: R`\( z=\frac{\Delta\lambda}{\lambda_0}\approx\frac{v}{c} \)`, points: ["紅移表示遠離", "譜線提供速度資訊", "小紅移可近似都卜勒效應", "支持宇宙膨脹"] },
       { id: "blackbody", title: "黑體輻射與恆星顏色", interactive: I, concept: "黑體光譜峰值隨溫度升高而向短波移動；恆星顏色可反映表面溫度。", formula: R`\( \lambda_{max}T=b \)`, points: ["溫度越高峰值越偏藍", "總輻射功率隨 T^4 增加", "黑體是理想吸收體", "可估計恆星溫度"] }
     ]
   };

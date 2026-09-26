@@ -544,45 +544,6 @@
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
 
-  /* 運動圖形分析 x-t / v-t / a-t */
-  PL.register("vt-graph", { build(root) {
-    const L = PL.ui.layout(root, { chrome: "quiet" });
-    const cv = PL.canvas.create(L.canvasWrap, 0.78);
-    const TMAX = 6;
-    const sV = PL.ui.slider(L.controls, { label: "初速 v₀", min: -6, max: 12, step: 0.5, value: 3, unit: "m/s", digits: 1, onInput: draw });
-    const sA = PL.ui.slider(L.controls, { label: "加速度 a", min: -4, max: 4, step: 0.5, value: 1.5, unit: "m/s²", digits: 1, onInput: draw });
-    const sT = PL.ui.slider(L.controls, { label: "時間游標 t", min: 0, max: TMAX, step: 0.1, value: 3, unit: "s", digits: 1, onInput: draw });
-    PL.ui.note(L.controls, "x–t 的斜率即 v–t 的值；v–t 的斜率即 a；v–t 曲線下的面積即位移。");
-    const rX = PL.ui.readout(L.readouts, { label: "x(t)", unit: "m" });
-    const rV = PL.ui.readout(L.readouts, { label: "v(t)", unit: "m/s" });
-    const rA = PL.ui.readout(L.readouts, { label: "a(t)", unit: "m/s²" });
-
-    function draw() {
-      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const v0 = sV.get(), a = sA.get(), tc = sT.get(), m = MC();
-      const fx = tt => v0 * tt + 0.5 * a * tt * tt, fv = tt => v0 + a * tt;
-      let xs = []; for (let i = 0; i <= 30; i++) xs.push(fx(TMAX * i / 30));
-      let xmin = Math.min(0, ...xs), xmax = Math.max(0, ...xs); if (xmax - xmin < 2) xmax = xmin + 2;
-      const vend = fv(TMAX); let vmin = Math.min(0, v0, vend), vmax = Math.max(0, v0, vend); if (vmax - vmin < 2) vmax = vmin + 2;
-      const amin = Math.min(0, a) - 1, amax = Math.max(0, a) + 1;
-      const pad = 30, gW = W - pad - 16, gH = (H - 40) / 3 - 12;
-      const mk = (i, dom, title, fn, col2) => {
-        const g = PL.graph(cv, { x: pad, y: 16 + i * (gH + 14), w: gW, h: gH }, dom);
-        g.frame({ title, xlabel: "t (s)" }); g.grid(6, 3);
-        if (i === 1) g.area([[0, 0]].concat(Array.from({ length: 31 }, (_, k) => { const tt = tc * k / 30; return [tt, fn(tt)]; })), { fill: "rgba(90,162,255,0.14)" });
-        g.fn(fn, { color: col2, width: 2.4 });
-        g.vline(tc, { color: m, dash: [4, 3], width: 1.5 });
-        g.dot(tc, fn(tc), { color: m, glow: m });
-        return g;
-      };
-      mk(0, { x0: 0, x1: TMAX, y0: xmin, y1: xmax }, "x – t 位置", fx, MC());
-      mk(1, { x0: 0, x1: TMAX, y0: vmin, y1: vmax }, "v – t 速度（面積=位移）", fv, PL.col("accent-2"));
-      mk(2, { x0: 0, x1: TMAX, y0: amin, y1: amax }, "a – t 加速度", () => a, PL.col("accent-3"));
-      rX.set(fx(tc), 2); rV.set(fv(tc), 2); rA.set(a, 2);
-    }
-    cv.onResize(draw); draw();
-    return { stop() { cv.destroy(); }, rerender: draw };
-  }});
 
   /* 打點計時器（測速度與加速度） */
   /* 打點計時器 —— 重物拉著小車加速，計時器一點一點把過程打在紙帶上

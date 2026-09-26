@@ -151,19 +151,19 @@ R.section("靜態實驗：沒有播放／單步／速度，提示改成調整參
 {
   // 連續繞行的對照
   const satRoot = document.createElement("div");
-  satRoot.dataset = { simId: "satellite" };
-  const satApi = PL.get("satellite").build(satRoot);
+  satRoot.dataset = { simId: "circular" };
+  const satApi = PL.get("circular").build(satRoot);
   const satTrans = satRoot._labTransport;
   R.ok(!!satTrans && satTrans.playBtn.hidden !== true,
-    "satellite 保留播放/暫停（持續繞行要能暫停讀值）");
+    "circular 保留播放/暫停（持續繞行要能暫停讀值）");
   R.ok(!!satTrans && (!satTrans.playHint || satTrans.playHint.hidden === true),
     "有播放鍵時不顯示提示");
   if (satApi && satApi.stop) satApi.stop();
 
   // 靜態場景：拉滑桿就重畫，沒有動畫迴圈
   const root = document.createElement("div");
-  root.dataset = { simId: "efield" };
-  const api = PL.get("efield").build(root);
+  root.dataset = { simId: "coulomb" };
+  const api = PL.get("coulomb").build(root);
   const trans = root._labTransport;
   const ctx = null;
   R.ok(!!trans && trans.playBtn.hidden === true, "靜態實驗隱藏播放鍵");

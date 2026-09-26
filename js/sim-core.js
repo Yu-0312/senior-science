@@ -375,8 +375,7 @@
    */
   const METHODS_PROFILE = { family: "methods", stage: "實驗方法台", code: "LAB" };
   const METHOD_IDS = new Set([
-    "measurement-error", "regression-lab", "error-propagation",
-    "dimensional-analysis", "experimental-design", "geiger-statistics"
+    "measurement-error", "geiger-statistics"
   ]);
 
   /*

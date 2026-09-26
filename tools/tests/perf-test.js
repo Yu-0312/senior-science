@@ -62,7 +62,7 @@ R.section("實驗清單由沙箱執行產生（不是用正則猜）");
 {
   const man = fs.readFileSync("js/experiment-manifest.js", "utf8");
   const n = (man.match(/"[a-z0-9-]+":\s*"/g) || []).length;
-  R.ok(n >= 240, "清單涵蓋 " + n + " 個實驗");
+  R.ok(n >= 200, "清單涵蓋 " + n + " 個實驗");
 }
 
 /*

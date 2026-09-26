@@ -797,42 +797,6 @@
     return { stop() { anim.stop(); cv.destroy(); }, rerender: update };
   }});
 
-  /* 電磁波與電磁波譜 */
-  PL.register("em-wave", { build(root) {
-    const L = PL.ui.layout(root, { chrome: "quiet" });
-    const cv = PL.canvas.create(L.canvasWrap, 0.62);
-    let t = 0; const c = 3e8;
-    const sP = PL.ui.slider(L.controls, { label: "波長 λ（10ˣ 公尺）", min: -13, max: 3, step: 0.1, value: -6.3, unit: "", digits: 1 });
-    PL.ui.note(L.controls, "電場 E 與磁場 B 互相垂直、也垂直於前進方向；真空中都以光速前進。");
-    const rLam = PL.ui.readout(L.readouts, { label: "波長 λ", unit: "m" });
-    const rF = PL.ui.readout(L.readouts, { label: "頻率 f", unit: "Hz" });
-    const rBand = PL.ui.readout(L.readouts, { label: "波段" });
-    const band = lam => lam > 0.1 ? "無線電波" : lam > 1e-3 ? "微波" : lam > 7e-7 ? "紅外線" : lam > 4e-7 ? "可見光" : lam > 1e-8 ? "紫外線" : lam > 1e-11 ? "X 射線" : "γ 射線";
-    function draw() {
-      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const p = sP.get(), lam = Math.pow(10, p), f = c / lam;
-      const swl = 18 + (p + 13) / 16 * 150, x0 = 30, x1 = W - 30, A = 30;
-      const eY = H * 0.3, bY = H * 0.56;
-      D.line(ctx, x0, eY, x1, eY, "rgba(255,255,255,0.14)", 1);
-      ctx.save(); ctx.strokeStyle = "#ff6b6b"; ctx.lineWidth = 2.2; ctx.beginPath();
-      for (let x = x0; x <= x1; x += 2) { const y = eY - A * Math.sin(PL.TAU * (x - x0) / swl - t * 4); x === x0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
-      D.text(ctx, "E 電場", x0, eY - A - 6, { color: "#ff6b6b", size: 11 });
-      D.line(ctx, x0, bY, x1, bY, "rgba(255,255,255,0.14)", 1);
-      ctx.save(); ctx.strokeStyle = "#5aa2ff"; ctx.lineWidth = 2.2; ctx.beginPath();
-      for (let x = x0; x <= x1; x += 2) { const y = bY - A * Math.sin(PL.TAU * (x - x0) / swl - t * 4); x === x0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
-      D.text(ctx, "B 磁場（⊥ E）", x0, bY - A - 6, { color: "#5aa2ff", size: 11 });
-      D.arrow(ctx, x1 - 44, (eY + bY) / 2, x1 - 8, (eY + bY) / 2, { color: "#fff", width: 2, label: "c" });
-      const bands = [["無線電", "#6b7cff"], ["微波", "#4db6ac"], ["紅外", "#ff8a65"], ["可見", "#7bd47b"], ["紫外", "#b98bff"], ["X", "#5aa2ff"], ["γ", "#ff6b6b"]];
-      const by = H - 28, bw = (W - 60) / bands.length;
-      bands.forEach((b, i) => { D.rect(ctx, 30 + i * bw, by, bw - 2, 14, { fill: b[1] }); D.text(ctx, b[0], 30 + i * bw + bw / 2, by + 26, { color: PL.col("text-faint"), size: 9, align: "center" }); });
-      const mx = 30 + PL.clamp((3 - p) / 16, 0, 1) * (W - 62);
-      D.line(ctx, mx, by - 6, mx, by + 16, "#fff", 2);
-      rLam.set(lam, 2); rF.set(f, 2); rBand.set(band(lam));
-    }
-    const anim = PL.loop(dt => { if (dt) t += dt; draw(); });
-    cv.onResize(draw); anim.start();
-    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
-  }});
 
   /* 質譜儀（速度選擇器） */
   PL.register("mass-spec", { build(root) {
