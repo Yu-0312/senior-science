@@ -210,33 +210,7 @@
       }
       return ["有光電子逸出：最大動能 " + PL.fmt(k, 2) + " eV。增加光強只會增加電子數，不會增加動能", "ok"];
     },
-    "cosmic-distance-ladder": r => {
-      const d = r("距離 d").n;
-      if (d == null) return null;
-      if (d < 0.05) return ["自我檢核：這個距離適合用視差法。造父變星與 Ia 超新星是給更遠天體用的", "info"];
-      if (d < 20) return ["自我檢核：這個距離要靠造父變星這類標準燭光，視差已經量不到了", "info"];
-      return ["自我檢核：這麼遠只剩 Ia 超新星與哈伯定律可用——每一階都建立在前一階的校準上", "info"];
-    },
     /* --- 方法類：不判對錯，提示該檢查什麼 --- */
-    "unit-conversion": r => {
-      const k = r("換算倍率").n;
-      if (k == null) return null;
-      const mag = Math.round(Math.log10(Math.abs(k) || 1));
-      return ["自我檢核：換算倍率是 10^" + mag + "。單位變小則數字變大——" +
-        "算完先看數量級對不對，再看有效數字有沒有跟著改變", "info"];
-    },
-    "experimental-design": r => {
-      const c = r("控制變因 c").n;
-      return ["自我檢核：現在只改變了自變因，控制變因固定在 " +
-        (c == null ? "設定值" : PL.fmt(c, 2)) +
-        "。若同時改兩個變因，得到的差異就無法歸因給任何一個", "info"];
-    },
-    "error-propagation": r => {
-      const a = r("面積相對不確定度").n, l = r("邊長相對不確定度").n;
-      if (a == null || l == null) return null;
-      return ["自我檢核：面積的相對不確定度是邊長的 " + PL.fmt(a / Math.max(1e-9, l), 1) +
-        " 倍。平方關係會放大不確定度——結果要同時寫出數值與範圍", "info"];
-    },
     "energy-forms": r => {
       const eff = r("轉換效率").n;
       if (eff == null) return null;
@@ -339,18 +313,6 @@
       ],
       rule: "電表接法要看待測電阻大小：<strong>大電阻用安培計內接</strong>（電流表誤差相對小）、" +
         "<strong>小電阻用安培計外接</strong>。接反了會產生系統誤差，而且圖形照樣是漂亮的直線，看不出來。"
-    },
-    "potential-terrain": {
-      title: "操作檢核：讀懂這座地形",
-      steps: [
-        "先把兩顆電荷拖成<strong>一正一負</strong>：紅色山丘與藍色漏斗之間的「鞍部」就是電偶極場的特色。",
-        "把探測點放在<strong>山丘頂</strong>：電位最大，但探測點若是電荷所在處本身就沒有意義——地形是「其他電荷」在該處造成的（本實驗以合成場呈現）。",
-        "把探測點沿著<strong>同一條等高線</strong>移動：電位讀值不變——這就是等勢面的定義。",
-        "把探測點從山丘往谷底移：電位下降，電場箭頭永遠指向<strong>下坡方向</strong>（E = −dV/dr）。",
-        "把 q₁、q₂ 都調成同號再看一次：兩座山之間出現谷底，電場在谷底歸零——這是電場為零的平衡點。"
-      ],
-      rule: "電場與電位的關係是這座地形的核心：<strong>電場指向電位下降最陡的方向</strong>，" +
-        "等勢面（等高線）越密的地方電場越強。沿等勢面移動電荷不做功——這是電位能觀念的幾何版。"
     },
     "heat-engine-principle": {
       title: "操作檢核與台灣 108 對應",
@@ -465,30 +427,7 @@
       ],
       rule: "超音波測的是<strong>回波往返時間</strong>，再乘聲速的一半。" +
         "所以聲速會隨溫度改變這件事直接影響結果——不同室溫下要重新校正。"
-    },
-    "distance-displacement": {
-      title: "實驗流程：用打點計時器區分路程與位移",
-      steps: [
-        "紙帶穿過打點計時器接在滑車上，先<strong>啟動計時器再放開滑車</strong>。",
-        "取一段點距<strong>清晰均勻</strong>的紙帶，捨棄開頭幾個擠在一起的點。",
-        "選定<strong>每 5 個間隔</strong>為一個計時單位（50 Hz 下即 0.1 s），依序編號。",
-        "分別量出<strong>每一段的長度</strong>（相加得路程）與<strong>起點到終點的直線距離</strong>（即位移）。",
-        "讓滑車折返再做一次，比較兩者的差異。"
-      ],
-      rule: "路程是把每一段<strong>都加起來</strong>，位移只看<strong>終點減起點</strong>且<strong>帶方向</strong>。" +
-        "折返之後兩者必定不同——這正是這個實驗要學生親手量出來的事。"
-    },
-    "unit-conversion": {
-      title: "換算三步",
-      steps: [
-        "先寫出<strong>單位的定義關係</strong>（例如 1 km = 10³ m），不要憑印象記倍率。",
-        "把原數乘上<strong>等於 1 的換算因子</strong>，讓不要的單位上下相消。",
-        "檢查<strong>數量級</strong>：單位變小則數字變大，反之亦然。"
-      ],
-      rule: "換算<strong>不會改變有效數字的位數</strong>。1.5 km 換成 1500 m 時，" +
-        "有效數字仍然是兩位，要寫成 1.5 × 10³ m 才不會被誤讀成四位。"
-    }
-  };
+    }};
 
   /* =====================================================================
      因果面板（自動探測看不出來的那些）
@@ -503,11 +442,6 @@
       { name: "量測次數", tone: "a", note: "只壓低<strong>隨機誤差</strong>：平均值的標準誤約為 s/√N，量越多越穩。" },
       { name: "零點偏移", tone: "b", note: "<strong>系統誤差</strong>：平均值整體偏移，重複量測無法消除，必須校正儀器。" },
       { name: "解析度", tone: "c", note: "讀數只能落在刻度上，貢獻約 r/√12 的儀器不確定度。" }
-    ]},
-    "regression-lab": { title: "最小平方法在估什麼", rows: [
-      { name: "資料點數", tone: "a", note: "點少時斜率亂跳；點多了 k̂ 會在真值附近收斂——精確度來自樣本數。" },
-      { name: "雜訊 σ", tone: "b", note: "隨機雜訊讓估計<strong>不精確</strong>，但不會系統性偏高偏低（不失準）。" },
-      { name: "彎曲 c", tone: "c", note: "殘差若出現 U 形，是<strong>模型選錯</strong>，不是再擬合一次就能解決。" }
     ]},
     "geiger-statistics": { title: "放射性計數為何每次都不一樣", rows: [
       { name: "平均計數率", tone: "a", note: "決定平均 N；時間窗越長，N 越大。" },
@@ -549,11 +483,6 @@
       { name: "第二片", tone: "a", note: "遵守馬呂士定律 I = I₀cos²θ，θ 是兩片<strong>透振方向的夾角</strong>，不是與入射光的夾角。" },
       { name: "夾在中間的第三片", tone: "b", note: "兩片正交時完全消光，但中間<strong>插入</strong>一片 45° 反而又有光透出——這不是矛盾，因為每一片都會改變光的偏振方向。" }
     ]},
-    "efield": { title: "電場、電位、電力線", rows: [
-      { name: "電場方向", tone: "a", note: "由<strong>正電荷受力方向</strong>定義。電力線從正電荷出發、終止於負電荷，永遠不相交。" },
-      { name: "等勢面", tone: "b", note: "永遠與電力線<strong>垂直</strong>。沿等勢面移動電荷不做功——這是判斷等勢面畫得對不對的方法。" },
-      { name: "電場強弱", tone: "c", note: "看電力線的<strong>疏密</strong>，不是看長短。線越密的地方場越強。" }
-    ]},
     "diode-rectifier": { title: "整流電路裡誰決定誰", rows: [
       { name: "二極體", tone: "a", note: "決定電流<strong>方向</strong>：只讓一個方向通過，因此把交流變成脈動直流。" },
       { name: "濾波電容", tone: "b", note: "決定<strong>漣波大小</strong>：電容越大，電壓下降得越慢，輸出越平穩。它不改變平均值的方向。" },
@@ -568,11 +497,6 @@
       { name: "感應電流方向", tone: "a", note: "永遠<strong>反抗磁通量的改變</strong>：磁鐵靠近就排斥它、遠離就吸引它。" },
       { name: "不是反抗磁場", tone: "b", note: "反抗的是<strong>變化</strong>不是磁場本身。磁鐵停著不動時磁通量再大，也沒有感應電流。" },
       { name: "為什麼一定是反抗", tone: "c", note: "若感應電流反而助長變化，磁鐵會自己越跑越快——能量憑空增加，違反能量守恆。楞次定律其實是能量守恆的結果。" }
-    ]},
-    "em-wave": { title: "電磁波的三個垂直", rows: [
-      { name: "E 與 B", tone: "a", note: "互相<strong>垂直</strong>，而且同相位——同時到最大、同時為零。不是一個大時另一個小。" },
-      { name: "傳播方向", tone: "a", note: "同時垂直於 E 與 B，由 E × B 的方向決定。三者構成右手系。" },
-      { name: "速率", tone: "b", note: "真空中一律是 c，<strong>與頻率、波長、強度都無關</strong>。改變頻率只會改變波長（c = fλ）。" }
     ]},
     "ampere-force": { title: "安培力的大小與方向", rows: [
       { name: "電流與磁場的夾角", tone: "a", note: "F = BIL·sinθ。<strong>平行時力為零</strong>、垂直時最大——這是最常被忽略的一項。" },
@@ -595,11 +519,6 @@
       { name: "推論的關鍵", tone: "b", note: "重點不是「大部分粒子直線通過」，而是<strong>極少數被反彈回來</strong>——" +
         "這在均勻分布的模型下機率幾乎為零，因此正電荷必定<strong>集中在極小的核</strong>裡。" }
     ]},
-    "satellite": { title: "發射速率決定軌道形狀", rows: [
-      { name: "小於圓速", tone: "a", note: "軌道是橢圓，而且<strong>發射點是遠地點</strong>——物體會往地球掉，速率太小就直接落回地面。" },
-      { name: "等於圓速", tone: "a", note: "剛好維持圓形軌道（第一宇宙速度，約 7.9 km/s）。這是圓與橢圓的分界。" },
-      { name: "超過脫離速度", tone: "b", note: "達到 √2 倍圓速（約 11.2 km/s）後軌道變成拋物線，再快就是雙曲線——<strong>一去不回</strong>。" }
-    ]},
     "incline-friction-coefficient": { title: "臨界角測 μs 的因果", rows: [
       { name: "傾角", tone: "a", note: "決定重力沿斜面的分量。角度越大，下滑的趨勢越強。" },
       { name: "臨界角", tone: "b", note: "由<strong>接觸面的材質</strong>決定，tan θc = μs。這是這個實驗要測的量。" },
@@ -611,42 +530,16 @@
      衍生量卡：把中間量攤開
      ===================================================================== */
   const DERIVED = {
-    "distance-displacement": [
-      { label: "去程走的距離", unit: "m", hint: "第一段，全部算進路程" },
-      { label: "回程走的距離", unit: "m", hint: "第二段，同樣算進路程" },
-      { label: "路程 − |位移|", unit: "m", hint: "折返造成的差額，不折返時為 0" }
-    ],
-    "unit-conversion": [
-      { label: "原數的數量級", hint: "10 的幾次方" },
-      { label: "換算倍率", hint: "乘上這個因子" },
-      { label: "結果的數量級", hint: "檢查它是否合理" }
-    ],
     "wheatstone": [
       { label: "左臂長度比 L₁/L₂", hint: "滑線分成的兩段" },
       { label: "標準電阻 Rs", unit: "Ω", hint: "已知的比較基準" },
       { label: "Rx = Rs × L₁/L₂", unit: "Ω", hint: "平衡時才成立" }
     ],
-    "dimensional-analysis": [
-      { label: "長度的次方 L", hint: "等號兩邊要一致" },
-      { label: "時間的次方 T", hint: "等號兩邊要一致" },
-      { label: "量綱是否相符", hint: "不符就一定寫錯了" }
-    ],
-    "force-components": [
-      { label: "水平分量 F cosθ", unit: "N", hint: "沿位移方向，會做功" },
-      { label: "鉛直分量 F sinθ", unit: "N", hint: "垂直位移，不做功" },
-      { label: "兩分量平方和開根號", unit: "N", hint: "應等於原力大小" }
-    ],
     "truss-bridge": [
       { label: "支點反力", unit: "N", hint: "先由整體平衡求出" },
       { label: "節點受力數", hint: "每個節點列兩條方程" },
       { label: "最大桿件內力", unit: "N", hint: "決定要用多粗的桿" }
-    ],
-    "hohmann-transfer": [
-      { label: "第一次點火 Δv₁", unit: "", hint: "從圓軌道進入橢圓" },
-      { label: "第二次點火 Δv₂", unit: "", hint: "從橢圓進入目標圓軌道" },
-      { label: "總 Δv", unit: "", hint: "兩次相加，決定燃料需求" }
-    ]
-  };
+    ]};
 
   /* 情境預設：這兩個實驗的關鍵操作點需要特別指出 */
   const PRESETS = {

@@ -140,62 +140,6 @@
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
 
-  /* 簡諧運動的位移–時間關係 */
-  PL.register("shm-graph", { build(root) {
-    const L = PL.ui.layout(root, { chrome: "quiet" });
-    const cv = PL.canvas.create(L.canvasWrap, 0.66);
-    let t = 0;
-    const sA = PL.ui.slider(L.controls, { label: "振幅 A", min: 0.5, max: 2, step: 0.1, value: 1.5, unit: "m", digits: 1 });
-    const sT = PL.ui.slider(L.controls, { label: "週期 T", min: 1, max: 5, step: 0.2, value: 3, unit: "s", digits: 1 });
-    const sPh = PL.ui.slider(L.controls, { label: "相位 φ", min: 0, max: 360, step: 5, value: 0, unit: "°", digits: 0 });
-    PL.ui.note(L.controls, "速度超前位移 90°，加速度與位移反相（相差 180°）。");
-    const rX = PL.ui.readout(L.readouts, { label: "x", unit: "m" });
-    const rV = PL.ui.readout(L.readouts, { label: "v", unit: "m/s" });
-    const rAcc = PL.ui.readout(L.readouts, { label: "a", unit: "m/s²" });
-    function draw() {
-      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const A = sA.get(), T = sT.get(), w = TAU / T, ph = sPh.get() * Math.PI / 180;
-      /*
-       * 原本的座標軸是 x1 = 2T、y = ±A·ω²·1.1，兩軸都跟著參數自動縮放。
-       * 後果是拉「振幅」與「週期」時畫面**完全沒有變化**：
-       * 波形永遠佔滿整個框、永遠顯示剛好兩個週期。三根滑桿有兩根等於白放。
-       *
-       * 這是很容易犯的錯：把座標軸縮放成剛好貼合資料，
-       * 等於親手把滑桿想示範的效果 normalize 掉。
-       *
-       * 改成固定座標軸：
-       *   x 軸固定 0～10 s  → 週期變長，波就變疏，看得見
-       *   y 軸固定 ±2.3 m   → 振幅變大，波就變高，看得見
-       * 三條曲線改成除以各自的 ω 次方（v÷ω、a÷ω²），
-       * 這樣三者同單位、同大小，可以直接比較相位差，
-       * 而振幅仍然真實地反映在高度上。
-       */
-      const A_MAX = 2.3, T_SPAN = 10;
-      const bx = 40, by = 24, bw = W - 80, bh = H - 48;
-      const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: T_SPAN, y0: -A_MAX, y1: A_MAX });
-      g.frame({ title: "位移 x、速度 v÷ω、加速度 a÷ω²（三者同單位，便於比較相位）", xlabel: "t (s)" });
-      g.grid(5, 4);
-      const fx = tt => A * Math.cos(w * tt + ph), fv = tt => -A * w * Math.sin(w * tt + ph), fa = tt => -A * w * w * Math.cos(w * tt + ph);
-      g.fn(fx, { color: MC(), width: 2.2 });
-      g.fn(tt => fv(tt) / w, { color: PL.col("accent-2"), width: 2.2 });
-      g.fn(tt => fa(tt) / (w * w), { color: PL.col("accent-3"), width: 2.2 });
-      // 振幅包絡線：讓「振幅」這根滑桿的作用一眼可辨
-      g.hline(A, { color: PL.theme.pale(0.28), dash: [5, 4], width: 1 });
-      g.hline(-A, { color: PL.theme.pale(0.28), dash: [5, 4], width: 1 });
-      g.label(0.15, A + 0.12, "A = " + PL.fmt(A, 1) + " m", { color: PL.col("text-faint"), size: 9.5 });
-      g.vline(t % T_SPAN, { color: "#fff", dash: [4, 3], width: 1 });
-      D.text(ctx, "x", bx + bw - 30, by + 14, { color: MC(), size: 11 });
-      D.text(ctx, "v÷ω", bx + bw - 30, by + 28, { color: PL.col("accent-2"), size: 11 });
-      D.text(ctx, "a÷ω²", bx + bw - 30, by + 42, { color: PL.col("accent-3"), size: 11 });
-      PL.ui.caption(cv, "週期 T = " + PL.fmt(T, 1) + " s，這個畫面（10 秒）裝得下 " +
-        PL.fmt(T_SPAN / T, 1) + " 個完整週期。" +
-        "速度比位移超前 90°（位移過零時速度最大），加速度與位移永遠反相。");
-      rX.set(fx(t), 2); rV.set(fv(t), 2); rAcc.set(fa(t), 2);
-    }
-    const anim = PL.loop(dt => { if (dt) t += dt; draw(); });
-    cv.onResize(draw); anim.start();
-    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
-  }});
 
   /* 簡諧運動的能量 */
   PL.register("shm-energy", { build(root) {

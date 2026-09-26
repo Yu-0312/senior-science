@@ -9,10 +9,7 @@
     return { kind, a, b, output, calc };
   }
   const T = {
-    "vector-components": topic("vector", ["向量大小 A", 4, 30, 16, "N"], ["方向 θ", 0, 90, 38, "°"], "水平分量 Aₓ", (a, b) => a * Math.cos(b * Math.PI / 180)),
-    "distance-displacement": topic("motion", ["往返路程", 2, 30, 14, "m"], ["回程比例", 0, 1, 0.45, ""], "位移大小", (a, b) => Math.abs(a * (1 - 2 * b))),
     "measurement-error": topic("measurement", ["量測次數", 3, 24, 8, "次"], ["儀器解析度", 0.1, 5, 1, "mm"], "平均不確定度", (a, b) => b / Math.sqrt(a)),
-    "force-components": topic("force", ["拉力 F", 2, 60, 28, "N"], ["拉力角 θ", 0, 90, 35, "°"], "水平分力", (a, b) => a * Math.cos(b * Math.PI / 180)),
     "apparent-weight": topic("elevator", ["乘客質量 m", 20, 100, 60, "kg"], ["加速度 a", -8, 8, 2, "m/s²"], "體重計讀數 N", (a, b) => a * (9.8 + b)),
     "spring-series-parallel": topic("spring", ["彈簧 k₁", 10, 80, 35, "N/m"], ["彈簧 k₂", 10, 80, 50, "N/m"], "串聯等效勁度", (a, b) => a * b / (a + b)),
     "center-of-mass": topic("momentum", ["左側質量", 1, 10, 3, "kg"], ["右側質量", 1, 10, 7, "kg"], "質心位置", (a, b) => 10 * b / (a + b)),
@@ -22,15 +19,12 @@
     "power-lab": topic("power", ["做功 W", 100, 3000, 1200, "J"], ["完成時間 t", 1, 30, 8, "s"], "平均功率", (a, b) => a / b),
     "friction-thermal": topic("energy", ["摩擦係數 μ", 0.05, 1, 0.32, ""], ["滑行距離 d", 1, 20, 8, "m"], "轉化熱量 Q", (a, b) => a * 9.8 * b),
     "banked-curve": topic("orbit", ["彎道半徑 r", 20, 200, 85, "m"], ["傾角 θ", 2, 45, 18, "°"], "設計速率", (a, b) => Math.sqrt(a * 9.8 * Math.tan(b * Math.PI / 180))),
-    "satellite-energy": topic("orbit", ["軌道半徑 r", 1, 12, 4, "R⊕"], ["衛星質量 m", 100, 2000, 600, "kg"], "相對軌道速度", (a) => 7.9 / Math.sqrt(a)),
-    "escape-speed": topic("orbit", ["天體質量比", 0.1, 5, 1, "M⊕"], ["天體半徑比", 0.3, 3, 1, "R⊕"], "逃逸速度", (a, b) => 11.2 * Math.sqrt(a / b)),
     /*
      * 阻尼 β 的上限原本只有 1 s⁻¹，畫面固定的自然頻率 ω₀ ≈ 2.8 rad/s 根本到不了臨界值，
      * 「比較欠阻尼、臨界阻尼與過阻尼」變成只有講義寫得出來、模擬做不出來。
      * 上限放寬到 6 s⁻¹，β 拉過 2.8 就能親眼看到不振盪的兩種歸位方式。
      */
     "damped-oscillation": topic("oscillation", ["初始振幅 A₀", 1, 12, 7, "cm"], ["阻尼 β", 0.05, 6, 0.3, "s⁻¹"], "5 秒後振幅", (a, b) => a * Math.exp(-5 * b)),
-    "shm-phase": topic("oscillation", ["振幅 A", 1, 10, 6, "cm"], ["週期 T", 0.5, 6, 2, "s"], "最大速率", (a, b) => a * TAU / b),
     /*
      * 交換（拍）頻率原寫成 √(κ/m)/2π，那是「耦合彈簧自己的自然頻率」，不是能量
      * 一來一回的節奏。畫面採用牆壁彈簧 k = κ 的對稱裝置，兩個正常模態為
@@ -40,7 +34,6 @@
     "coupled-oscillators": topic("oscillation", ["耦合勁度", 1, 30, 12, "N/m"], ["質量 m", 0.2, 5, 1, "kg"], "交換頻率", (a, b) => (Math.sqrt(3) - 1) * Math.sqrt(a / b) / TAU),
     "hydrostatic-pressure": topic("thermal", ["深度 h", 0, 30, 12, "m"], ["液體密度 ρ", 600, 1400, 1000, "kg/m³"], "表壓", (a, b) => a * b * 9.8 / 1000),
     "phase-change": topic("thermal", ["質量 m", 0.1, 4, 1, "kg"], ["加熱功率", 100, 2000, 800, "W"], "熔化時間", (a, b) => a * 334000 / b),
-    "heat-engine": topic("thermal", ["高溫 Tₕ", 350, 1200, 700, "K"], ["低溫 T𝚌", 200, 600, 320, "K"], "卡諾效率", (a, b) => Math.max(0, 1 - b / a) * 100),
     "reflection-boundary": topic("wave", ["脈衝振幅", 1, 12, 7, "cm"], ["反射端", 0, 1, 0, ""], "反射相位", (a, b) => b ? 0 : 180),
     "sound-intensity": topic("wave", ["距離 r", 1, 30, 8, "m"], ["聲源振幅", 1, 10, 5, ""], "相對聲強", (a, b) => b * b / (a * a)),
     "air-column-resonance": topic("wave", ["空氣柱長度 L", 5, 120, 42, "cm"], ["音叉頻率 f", 100, 800, 440, "Hz"], "基頻聲速", (a, b) => 4 * a / 100 * b),
@@ -53,8 +46,6 @@
     "ampere-force": topic("magnetic", ["電流 I", 0.1, 10, 3, "A"], ["夾角 θ", 0, 180, 90, "°"], "相對安培力", (a, b) => a * Math.sin(b * Math.PI / 180)),
     "motional-emf": topic("magnetic", ["導體速度 v", 0.1, 12, 4, "m/s"], ["磁場 B", 0.05, 2, 0.8, "T"], "相對感應電壓", (a, b) => a * b),
     "coil-torque": topic("magnetic", ["線圈電流 I", 0.1, 8, 3, "A"], ["轉角 θ", 0, 180, 70, "°"], "相對力矩", (a, b) => a * Math.sin(b * Math.PI / 180)),
-    "nuclear-reaction": topic("nuclear", ["質量虧損 Δm", 0.01, 1.2, 0.18, "u"], ["反應次數", 1, 20, 4, "次"], "相對釋放能", (a, b) => a * b * 931.5),
-    "cosmological-redshift": topic("cosmos", ["退行速度", 100, 30000, 9000, "km/s"], ["本徵波長", 350, 700, 486, "nm"], "觀測波長", (a, b) => b * (1 + a / 300000)),
     "blackbody": topic("cosmos", ["表面溫度 T", 2000, 14000, 5800, "K"], ["半徑比例", 0.2, 8, 1, "R☉"], "峰值波長", (a) => 2898000 / a)
   };
 
@@ -841,94 +832,6 @@
     return { stop() { cv.destroy(); }, rerender: draw };
   }});
 
-  /* 路程與位移要把起點、折返點和終點留在同一張圖，不能只讓物體循環移動。 */
-  PL.register("distance-displacement", { build(root) {
-    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" }), cv = PL.canvas.create(L.canvasWrap, 0.63, 900);
-    let progress = 1, anim;
-    PL.ui.section(L.controls, "路徑設定");
-    const sOutward = PL.ui.slider(L.controls, { label: "去程距離 L", min: 4, max: 30, step: 1, value: 14, unit: "m", digits: 0, onInput: draw });
-    const sReturn = PL.ui.slider(L.controls, { label: "回程比例 r", min: 0, max: 1, step: 0.05, value: 0.45, unit: "", digits: 2, onInput: draw });
-    const sProgress = PL.ui.slider(L.controls, { label: "觀察路徑進度", min: 0, max: 100, step: 1, value: 100, unit: "%", digits: 0, onInput: value => { progress = value / 100; draw(); } });
-    const row = PL.ui.buttonRow(L.controls);
-    const play = PL.ui.button(row, "從起點重播", () => { progress = 0; sProgress.set(0); play.textContent = "從起點重播"; anim.start(); draw(); }, { primary: true });
-    PL.ui.button(row, "回到終點判讀", () => { anim.stop(); progress = 1; sProgress.set(100); draw(); });
-    PL.ui.note(L.controls, "先從起點走到折返點，再往回走一段。路程只把走過的每一段相加；位移只比較終點與起點的位置，並保留方向。拖曳進度可在任何時刻停下判讀。");
-    const rRoute = PL.ui.readout(L.readouts, { label: "總路程 s", unit: "m" });
-    const rDisplacement = PL.ui.readout(L.readouts, { label: "終點位移 Δx", unit: "m" });
-    const rPosition = PL.ui.readout(L.readouts, { label: "目前位置 x", unit: "m" });
-    const rStage = PL.ui.readout(L.readouts, { label: "目前路段" });
-    function values() {
-      const outward = sOutward.get(), returned = outward * sReturn.get(), route = outward + returned;
-      const fractionOut = outward / route;
-      const current = progress <= fractionOut ? outward * progress / fractionOut : outward - returned * (progress - fractionOut) / (1 - fractionOut || 1);
-      const travelled = route * progress;
-      return { outward, returned, route, fractionOut, final: outward - returned, current, travelled };
-    }
-    function draw() {
-      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const data = values(), x0 = 72, x1 = W - 64, trackY = H * 0.57;
-      /*
-       * 原本寫成 position / data.outward，也就是把去程距離正規化成整個畫布寬度。
-       * 結果無論 L 設 4 m 還是 30 m，畫出來的路徑一模一樣長，
-       * 學生拉「去程距離」這根滑桿完全看不出差別——尺度被自己抵銷掉了。
-       *
-       * 改用固定比例尺（以滑桿上限 30 m 對應整條軌道），
-       * 短程就畫得短、長程就畫得長，L 這根滑桿才真的在說一件事。
-       */
-      const SPAN = 30;
-      const mapX = position => x0 + position / SPAN * (x1 - x0);
-      const finishX = mapX(data.final), currentX = mapX(data.current);
-      D.text(ctx, "一趟有折返的直線步行", x0, 31, { color: PL.col("text"), size: 13, weight: "700" });
-      D.text(ctx, "以起點為 x = 0，向右為正方向", x1, 31, { color: PL.col("text-faint"), size: 9.5, align: "right" });
-      D.line(ctx, x0, trackY, x1, trackY, "rgba(255,255,255,0.28)", 6);
-      for (let step = 0; step <= 10; step++) {
-        const x = x0 + step / 10 * (x1 - x0);
-        D.line(ctx, x, trackY - 10, x, trackY + 10, "rgba(255,255,255,0.2)", 1);
-        D.text(ctx, String(step * SPAN / 10), x, trackY + 24,
-          { color: PL.col("text-faint"), size: 8.5, align: "center" });
-      }
-      const turnX = mapX(data.outward);
-      D.line(ctx, x0, trackY - 78, turnX, trackY - 78, "rgba(53,224,207,0.22)", 2, [4, 4]);
-      D.arrow(ctx, x0 + 8, trackY - 78, turnX - 4, trackY - 78, { color: color(), width: 2.5, label: "去程 L = " + PL.fmt(data.outward, 1) + " m" });
-      D.line(ctx, finishX, trackY + 84, turnX, trackY + 84, "rgba(255,183,77,0.22)", 2, [4, 4]);
-      D.arrow(ctx, turnX - 4, trackY + 84, finishX + 4, trackY + 84, { color: PL.col("warn"), width: 2.5, label: "回程 rL = " + PL.fmt(data.returned, 1) + " m" });
-      [
-        [x0, "起點", "x = 0"],
-        [turnX, "折返點", "x = " + PL.fmt(data.outward, 1) + " m"],
-        [finishX, "終點", "x = " + PL.fmt(data.final, 1) + " m"]
-      ].forEach(([x, title, detail], index) => {
-        D.line(ctx, x, trackY - 22, x, trackY + 26, index === 2 ? PL.col("warn") : "rgba(255,255,255,0.54)", 2);
-        D.disc(ctx, x, trackY, index === 2 ? 7 : 5, { fill: index === 2 ? PL.col("warn") : PL.col("panel-3"), stroke: index === 2 ? PL.col("warn") : "rgba(255,255,255,0.6)", width: 1.5 });
-        D.text(ctx, title, x, trackY + 45, { color: index === 2 ? PL.col("warn") : PL.col("text"), size: 10, align: "center", weight: "700" });
-        D.text(ctx, detail, x, trackY + 60, { color: PL.col("text-faint"), size: 8.5, align: "center" });
-      });
-      D.rect(ctx, currentX - 18, trackY - 45, 36, 24, { fill: color(), stroke: "rgba(255,255,255,0.75)", width: 1.4, r: 5 });
-      D.disc(ctx, currentX - 11, trackY - 18, 4, { fill: PL.col("panel-3") }); D.disc(ctx, currentX + 11, trackY - 18, 4, { fill: PL.col("panel-3") });
-      D.arrow(ctx, currentX, trackY - 56, currentX + (progress <= data.fractionOut ? 38 : -38), trackY - 56, { color: progress <= data.fractionOut ? color() : PL.col("warn"), width: 2, label: progress <= data.fractionOut ? "向右" : "向左" });
-
-      const panelY = H * 0.79, panelW = (W - 112) / 2;
-      D.rect(ctx, 56, panelY, panelW, 62, { fill: "rgba(53,224,207,0.08)", stroke: color(), r: 6 });
-      D.text(ctx, "路程 s = 去程 + 回程", 70, panelY + 20, { color: PL.col("text-faint"), size: 9.5 });
-      D.text(ctx, PL.fmt(data.outward, 1) + " + " + PL.fmt(data.returned, 1) + " = " + PL.fmt(data.route, 1) + " m", 70, panelY + 43, { color: color(), size: 13, weight: "700" });
-      D.rect(ctx, 56 + panelW + 16, panelY, panelW, 62, { fill: "rgba(255,183,77,0.08)", stroke: PL.col("warn"), r: 6 });
-      D.text(ctx, "位移 Δx = 終點 − 起點", 70 + panelW + 16, panelY + 20, { color: PL.col("text-faint"), size: 9.5 });
-      D.text(ctx, PL.fmt(data.final, 1) + " − 0 = +" + PL.fmt(data.final, 1) + " m", 70 + panelW + 16, panelY + 43, { color: PL.col("warn"), size: 13, weight: "700" });
-      rRoute.set(data.route, 2); rDisplacement.set(data.final, 2); rPosition.set(data.current, 2); rStage.set(progress < data.fractionOut ? "去程：遠離起點" : progress < 1 ? "回程：朝起點" : "已到終點，可比較路程與位移");
-    }
-    anim = PL.loop(dt => {
-      /*
-       * 不再用 playing 旗標把迴圈擋住：傳輸列讓迴圈跑，這裡就該前進。
-       * 「播放整段路徑」的意義改成「回到起點重播」，而不是另一個開關。
-       * 走到終點就停下迴圈，避免無限重播。
-       */
-      if (!dt) { draw(); return; }
-      if (progress >= 1) { anim.stop(); play.textContent = "再播放一次"; draw(); return; }
-      progress = Math.min(1, progress + dt * 0.24); sProgress.set(progress * 100);
-      draw();
-    });
-    cv.onResize(draw); draw();
-    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
-  }});
 
   /* =========================================================================
      雙棒導軌：電磁剎車與動量傳遞（對應經典「雙棒導軌模型」）

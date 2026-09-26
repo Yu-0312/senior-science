@@ -43,7 +43,7 @@ R.section("判定徽章：內容要指向這個實驗自己的物理");
 });
 
 R.section("方法類實驗：改成自我檢核，不假裝有標準答案");
-["unit-conversion", "experimental-design", "error-propagation", "energy-forms", "cosmic-distance-ladder"]
+["energy-forms"]
   .forEach(id => {
     if (!PL.has(id)) return;
     const s = open(id);
@@ -66,10 +66,8 @@ R.section("學生必做實驗：步驟寫的是實體實驗室，而且附誤差
   ["current-balance", /歸零|有效長度/],
   ["cathode-ray-em", /垂直|速度選擇/],
   ["motion-sensor", /回波|聲速/],
-  ["distance-displacement", /打點|折返/],
   ["lens", /虛像/],
-  ["mirror", /凸面鏡|虛像/],
-  ["unit-conversion", /有效數字/]
+  ["mirror", /凸面鏡|虛像/]
 ].forEach(([id, re]) => {
   if (!PL.has(id)) return;
   const s = open(id);
