@@ -41,41 +41,37 @@
       const half = cartW * 0.55;
       const cx = PL.clamp(mapX(s.x), tX0 + half, tX1 - half);
 
-      // 軌道（固定）
+      /* 場景：一條筆直的道路。路面固定不動，車由左往右開 */
+      const AP2 = PL.apparatus;
       ctx.save();
-      const tg = ctx.createLinearGradient(0, trackY, 0, trackY + 40);
-      tg.addColorStop(0, "rgba(122,112,96,0.28)");
-      tg.addColorStop(1, "rgba(60,56,50,0)");
-      ctx.fillStyle = tg; ctx.fillRect(0, trackY, W, 40);
+      ctx.beginPath(); ctx.rect(0, 0, W, sceneH); ctx.clip();
+      AP2.outdoor(ctx, W, sceneH, trackY - 16, { ground: "grass", city: true, sunX: W * 0.9, sunY: 30, t: t });
+      AP2.road(ctx, 0, W, trackY - 12, 22, { laneAt: 0.42 });
       ctx.restore();
-      D.line(ctx, tX0 - 8, trackY, tX1 + 8, trackY, PL.theme.pale(0.35), 2.5);
+      D.line(ctx, 0, sceneH, W, sceneH, PL.col("border"), 1);
       const span = viewMax - viewMin;
       const step = span > 40 ? 10 : span > 16 ? 5 : span > 8 ? 2 : 1;
       for (let gx = Math.ceil(viewMin / step) * step; gx <= viewMax; gx += step) {
         const px = mapX(gx);
         if (px < tX0 - 4 || px > tX1 + 4) continue;
-        D.line(ctx, px, trackY - 4, px, trackY + 6, PL.col("text-faint"), 1.1);
-        D.text(ctx, PL.fmt(gx, step < 1 ? 1 : 0), px, trackY + 20,
-          { color: PL.col("text-faint"), size: 9.5, align: "center" });
+        // 路邊的里程樁
+        ctx.fillStyle = "rgba(245,245,240,0.95)"; ctx.fillRect(px - 2, trackY + 10, 4, 9);
+        ctx.fillStyle = "rgba(220,60,50,0.9)"; ctx.fillRect(px - 2, trackY + 10, 4, 2.5);
+        D.text(ctx, PL.fmt(gx, step < 1 ? 1 : 0), px, trackY + 31,
+          { color: PL.col("text"), size: 9.5, align: "center", weight: "700" });
       }
-      // 起點／終點標記：強調「左 → 右」
-      D.text(ctx, "起點", mapX(rawMin < 0 ? rawMin : 0), trackY + 34,
+      D.text(ctx, "起點", mapX(rawMin < 0 ? rawMin : 0), trackY + 44,
         { color: PL.col("text-dim"), size: 9.5, align: "center" });
-      D.text(ctx, "車由左往右 · 軌道固定不動", tX0, 24,
-        { color: PL.col("text-dim"), size: 12, weight: "700" });
+      D.text(ctx, "車由左往右 · 路面固定不動", tX0, 24,
+        { color: PL.col("text"), size: 12, weight: "700" });
       D.text(ctx, "x = " + PL.fmt(s.x, 1) + " m", tX1, 24,
         { color: m, size: 13, align: "right", weight: "700" });
 
-      const cartH = Math.max(34, Math.min(52, sceneH * 0.28));
-      if (AP && AP.cart) AP.cart(ctx, cx, trackY, cartW, cartH);
-      else {
-        D.rect(ctx, cx - cartW / 2, trackY - cartH - 6, cartW, cartH,
-          { fill: m, stroke: PL.theme.pale(0.4), r: 8 });
-        D.disc(ctx, cx - cartW * 0.28, trackY, cartH * 0.22, { fill: PL.col("text-dim") });
-        D.disc(ctx, cx + cartW * 0.28, trackY, cartH * 0.22, { fill: PL.col("text-dim") });
-      }
+      // 減速中（a 與 v 反向）亮煞車燈：加速度的方向看得見
+      const braking = a * s.v < -0.01;
+      AP2.car(ctx, cx, trackY + 2, cartW * 0.92, { color: "#d9463b", roll: (cx - tX0) / (cartW * 0.09), brake: braking });
 
-      const bodyTop = trackY - cartH - 8;
+      const bodyTop = trackY - cartW * 0.92 * 0.3 - 6;
       if (Math.abs(s.v) > 0.15) {
         const aLen = PL.clamp(s.v * 3.5, -72, 72);
         D.arrow(ctx, cx, bodyTop - 20, cx + aLen, bodyTop - 20,
@@ -125,8 +121,8 @@
   PL.register("freefall", { build(root) {
     const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
-    let t = 0, landed = false, strobe = [];
-    const reset = () => { t = 0; landed = false; strobe = []; };
+    let t = 0, landed = false, strobe = [], landAge = 0;
+    const reset = () => { t = 0; landed = false; strobe = []; landAge = 0; };
     const sH = PL.ui.slider(L.controls, { label: "初始高度 h", min: 5, max: 80, step: 1, value: 45, unit: "m", digits: 0, onInput: reset });
     const sG = PL.ui.slider(L.controls, { label: "重力加速度 g", min: 1.6, max: 20, step: 0.1, value: 9.8, unit: "m/s²", digits: 1, onInput: reset });
     const row = PL.ui.buttonRow(L.controls);
@@ -140,34 +136,46 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const h = sH.get(), g = sG.get(), m = MC();
       const tFall = Math.sqrt(2 * h / g);
-      const groundY = H - 34, topY = 30, scale = (groundY - topY) / h;
+      const groundY = H - 34, topY = 30;
+      // 球心從 y0（吸在電磁鐵下）落到 y1（碰到沙坑），這段就是 h
+      const y0 = topY + 13, y1 = groundY - 12, scale = (y1 - y0) / h;
       const px0 = 130;
       const AP = PL.apparatus;
       cv.calibrate(scale, "m");   // 讓可拖曳的尺能直接量落下高度
-      // 地面：淡色地坪＋建築輪廓（釋放樓層意象）
-      AP && AP.benchTop && AP.benchTop(ctx, W, H, groundY + 2);
-      D.line(ctx, 40, groundY, W - 130, groundY, "rgba(150,140,120,0.6)", 2);
-      // 釋放平台（頂部橫桿＋支架）
-      ctx.save();
-      ctx.strokeStyle = "rgba(150,160,180,0.7)"; ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.moveTo(px0 - 34, topY - 6); ctx.lineTo(px0 + 34, topY - 6); ctx.stroke();
-      ctx.lineWidth = 2.4;
-      ctx.beginPath(); ctx.moveTo(px0 - 26, topY - 4); ctx.lineTo(px0 - 26, topY + 6); ctx.stroke();
-      ctx.restore();
+      /* 場景：戶外落體塔。球掛在塔頂伸出的電磁鐵下，斷電釋放，落進沙坑 */
+      AP.outdoor(ctx, W, H, groundY, { ground: "grass", t: t, sunX: W * 0.62 });
+      AP.building(ctx, 8, groundY, px0 - 44, groundY - topY + 4, {});
+      // 塔頂伸出的懸臂與電磁鐵
+      AP.steel(ctx, px0 - 40, topY - 12, 52, 7, 10);
+      AP.steel(ctx, px0 - 11, topY - 7, 22, 12, -6);
+      ctx.fillStyle = "rgb(184,110,52)"; ctx.fillRect(px0 - 9, topY - 5, 18, 7);
+      D.text(ctx, landed || t > 0 ? "電磁鐵斷電" : "電磁鐵吸住", px0 + 16, topY - 10, { color: PL.col("text-dim"), size: 9.5 });
+      // 沙坑
+      ctx.fillStyle = PL.theme.isLight() ? "#e6cf9c" : "#4d4230";
+      ctx.beginPath(); ctx.ellipse(px0, groundY + 6, 34, 7, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(120,90,50,0.5)"; ctx.lineWidth = 1; ctx.stroke();
       const fallen = 0.5 * g * t * t; const y = Math.min(h, fallen);
-      const py = topY + y * scale;
-      // 頻閃殘影（等時間間隔）
-      strobe.forEach(sy => D.disc(ctx, px0, topY + sy * scale, 7, { fill: "rgba(150,160,185,0.16)" }));
+      const py = y0 + y * scale;
+      // 頻閃殘影（等時間間隔）：間距越拉越大
+      ctx.save(); ctx.globalAlpha = 0.3;
+      strobe.forEach(sy => AP.sportBall(ctx, px0, y0 + Math.min(h, sy) * scale, 11, "steel"));
+      ctx.restore();
       // 落地陰影
       const shA = Math.max(0.06, 0.3 - (h - y) / h * 0.26);
-      ctx.fillStyle = `rgba(60,60,60,${shA})`;
-      ctx.beginPath(); ctx.ellipse(px0, groundY + 3, 14 + (h - y) / h * 4, 3.4, 0, 0, Math.PI * 2); ctx.fill();
-      // 金屬球（擬真）
-      if (AP && AP.moonBall) AP.moonBall(ctx, px0, py, 13, [186, 190, 200]);
-      else D.disc(ctx, px0, py, 12, { fill: m, glow: m, glowSize: 16 });
-      D.arrow(ctx, px0, py + 18, px0, py + 18 + Math.min(46, g * t * 2.4), { color: PL.col("accent-2"), width: 2, label: "v" });
-      // 高度刻度
-      for (let hh = 0; hh <= h; hh += Math.max(5, Math.round(h / 8 / 5) * 5)) { const yy = topY + (h - hh) * scale; D.line(ctx, 44, yy, 52, yy, PL.col("text-faint"), 1); D.text(ctx, hh + "", 40, yy + 3, { color: PL.col("text-faint"), size: 9, align: "right" }); }
+      ctx.fillStyle = `rgba(40,30,20,${shA})`;
+      ctx.beginPath(); ctx.ellipse(px0, groundY + 5, 14 + (h - y) / h * 4, 3.4, 0, 0, Math.PI * 2); ctx.fill();
+      AP.sportBall(ctx, px0, py, 12, "steel");
+      if (landed) AP.dustKick(ctx, px0, groundY + 4, landAge, 1);
+      if (t > 0 && !landed) D.arrow(ctx, px0, py + 18, px0, py + 18 + Math.min(46, g * t * 2.4), { color: PL.col("accent-2"), width: 2, label: "v" });
+      // 高度標尺：立在落點旁的測高桿
+      const rx = px0 + 40;
+      ctx.fillStyle = PL.theme.isLight() ? "rgba(255,250,235,0.9)" : "rgba(40,44,52,0.9)";
+      ctx.fillRect(rx - 3, y0 - 4, 6, y1 - y0 + 8);
+      for (let hh = 0; hh <= h; hh += Math.max(5, Math.round(h / 8 / 5) * 5)) {
+        const yy = y1 - hh * scale;
+        D.line(ctx, rx - 3, yy, rx + 5, yy, PL.col("text"), 1.2);
+        D.text(ctx, hh + " m", rx + 8, yy + 3, { color: PL.col("text"), size: 9, weight: "700" });
+      }
 
       // v–t 迷你圖
       const bx = W - 118, by = 40, bw = 96, bh = 150;
@@ -177,11 +185,12 @@
       gg.dot(Math.min(t, tFall), Math.min(g * t, g * tFall), { color: m, glow: m });
 
       rT.set(Math.min(t, tFall), 2); rV.set(Math.min(g * t, g * tFall), 1); rY.set(Math.max(0, h - fallen), 1);
-      if (fallen >= h && !landed) { landed = true; anim.stop(); }
+      if (fallen >= h && !landed) { landed = true; landAge = 0; }
     }
     let acc = 0;
     const anim = PL.loop(dt => {
       if (dt && !landed) { t += dt; acc += dt; if (acc > 0.18) { acc = 0; strobe.push(0.5 * sG.get() * t * t); } }
+      else if (dt && landed) { landAge += dt; if (landAge > 1) anim.stop(); }
       draw();
     });
     cv.onResize(draw); draw();
@@ -226,7 +235,7 @@
      * （兩個開關）；而且傳輸列的「單步」推進的是迴圈、不是 flying，所以逐格看根本沒反應。
      * 改成 landed 之後，發射＝t 歸零並開跑、落地＝停住，單步也能一格一格把球往前推。
      */
-    let t = 0, landed = false, shots = [], flash = 0;
+    let t = 0, landed = false, shots = [], landAge = 0, clock = 0;
 
     PL.ui.section(L.controls, "發射參數");
     const sV = PL.ui.stepper(L.controls, { label: "初速 v₀ (m/s)", value: 24, min: 5, max: 45, step: 1, onInput: onParam });
@@ -255,8 +264,8 @@
 
     const row = PL.ui.buttonRow(L.controls);
     /* trigger: true → 這顆就是唯一的「開始」，按下時引擎會順便啟動迴圈並藏掉傳輸列的播放。 */
-    PL.ui.button(row, "發射", () => { t = 0; flash = 0; landed = false; }, { primary: true, trigger: true });
-    PL.ui.button(row, "清除落點", () => { shots = []; t = 0; landed = false; flash = 0; anim.stop(); drawAll(); });
+    PL.ui.button(row, "發射", () => { t = 0; landAge = 0; landed = false; }, { primary: true, trigger: true });
+    PL.ui.button(row, "清除落點", () => { shots = []; t = 0; landed = false; landAge = 0; anim.stop(); drawAll(); });
 
     PL.ui.note(L.controls,
       "先在真空下找出射程最遠的角度，再打開空氣阻力重找一次——最佳角度會往下移。" +
@@ -316,7 +325,7 @@
 
     let model = simulate();
 
-    function onParam() { t = 0; landed = false; flash = 0; model = simulate(); }
+    function onParam() { t = 0; landed = false; landAge = 0; model = simulate(); }
 
     /* 射程對角度：有阻力時要逐點積分，才看得到最佳角度的移動 */
     function rangeAt(angleDeg) {
@@ -339,12 +348,12 @@
     function scene() {
       const { ctx, W, H } = cv;
       cv.clear(); D.bg(cv);
-      const m = MC();
+      const m = MC(), AP = PL.apparatus;
       const path = model.path, range = model.range, peak = model.peak, time = model.time;
-      const ammo = model.ammo, th = model.th, h0 = model.h0;
+      const th = model.th, h0 = model.h0;
       const target = sTarget.get();
 
-      const ox = 62, oy = H - 46;
+      const ox = 76, oy = H - 44;
       const spanX = Math.max(range, target) * 1.18 + 6;
       const spanY = Math.max(peak, h0) * 1.35 + 4;
       const sc = Math.min((W - ox - 40) / spanX, (oy - 26) / spanY);
@@ -352,54 +361,44 @@
       const py = ym => oy - ym * sc;
       cv.calibrate(sc, "m");
 
-      // 地面與距離刻度
-      D.rect(ctx, 20, oy, W - 40, 5, { fill: PL.theme.pale(0.16), r: 2 });
-      D.line(ctx, 20, oy, W - 20, oy, PL.col("text-faint"), 1.5);
+      /* 場景：戶外靶場。地面線就是 y = 0（落地的高度），距離刻度釘在上面。 */
+      AP.outdoor(ctx, W, H, oy, { t: clock * 0.4, ground: "grass" });
       const gridStep = spanX > 90 ? 20 : 10;
       for (let d = gridStep; d < spanX; d += gridStep) {
         if (px(d) > W - 24) break;
-        D.line(ctx, px(d), oy, px(d), oy + 5, PL.theme.pale(0.22), 1);
-        D.text(ctx, String(d), px(d), oy + 17, { color: PL.col("text-faint"), size: 9, align: "center" });
+        D.line(ctx, px(d), oy, px(d), oy + 6, PL.theme.pale(0.4), 1.2);
+        D.text(ctx, String(d), px(d), oy + 18, { color: PL.col("text-dim"), size: 9.5, align: "center" });
       }
+      D.text(ctx, "m", Math.min(W - 18, px(gridStep) - 14), oy + 18, { color: PL.col("text-faint"), size: 9, align: "right" });
 
-      // 砲台與砲管：角度看得見，就不用一直回頭確認滑桿
-      const baseY = py(h0);
-      if (h0 > 0.05) {
-        D.rect(ctx, ox - 18, baseY, 32, oy - baseY, { fill: PL.theme.pale(0.14), stroke: PL.theme.pale(0.28), r: 2 });
-      }
-      ctx.save();
-      ctx.translate(ox, baseY);
-      ctx.rotate(-th);
-      D.rect(ctx, -6, -9, 46, 18, { fill: m, stroke: PL.theme.pale(0.35), width: 1.5, r: 4 });
-      ctx.restore();
-      D.disc(ctx, ox, baseY, 13, { fill: PL.theme.pale(0.22), stroke: PL.theme.pale(0.4) });
-      D.text(ctx, sA.get() + "°", ox - 24, baseY - 16, { color: PL.col("accent-2"), size: 12, weight: "700", align: "right" });
-
-      // 靶：打中與否要一眼看得出來
+      /* 靶：畫在草地上的同心圓靶 + 距離旗 */
       const tx = px(target);
       const hitDistance = Math.abs(range - target);
       const isHit = hitDistance <= 1.5;
       if (tx < W - 16) {
-        const tc = isHit ? PL.col("ok") : PL.col("danger");
-        D.rect(ctx, tx - 2, oy - 16, 4, 16, { fill: PL.theme.pale(0.3) });
-        [13, 8, 4].forEach((r, i) => {
-          D.disc(ctx, tx, oy - 22, r, { fill: i === 1 ? "#f2f4f7" : tc });
+        const rx = Math.max(10, 1.5 * sc);
+        ["#f4f1ea", "#e0473c", "#f4f1ea", "#e0473c"].forEach((c, i) => {
+          ctx.fillStyle = c;
+          ctx.beginPath(); ctx.ellipse(tx, oy + 4, rx * (1 - i * 0.24), 3.6 * (1 - i * 0.2), 0, 0, Math.PI * 2); ctx.fill();
         });
-        D.text(ctx, target + " m", tx, oy + 30, { color: tc, size: 10, align: "center", weight: "700" });
+        AP.flag(ctx, tx + rx + 6, oy + 4, 40, isHit && landed ? "#2fae62" : "#e0473c", clock);
+        D.text(ctx, target + " m", tx, oy + 32, { color: isHit ? PL.col("ok") : PL.col("danger"), size: 10, align: "center", weight: "700" });
       }
 
       // 歷次落點：換條件重射時，差異會自己浮現
       if (layers.has("shots")) {
         shots.forEach(s => {
-          D.disc(ctx, px(s.x), oy - 3, 3, { fill: PL.theme.pale(0.34) });
-          D.text(ctx, s.label, px(s.x), oy - 11, { color: PL.col("text-faint"), size: 8.5, align: "center" });
+          ctx.fillStyle = "rgba(90,70,50,0.45)";
+          ctx.beginPath(); ctx.ellipse(px(s.x), oy + 2, 5, 2, 0, 0, Math.PI * 2); ctx.fill();
+          D.text(ctx, s.label, px(s.x), oy - 7, { color: PL.col("text-dim"), size: 8.5, align: "center" });
         });
       }
 
       // 預測軌跡
       if (layers.has("traj") && path.length > 1) {
         ctx.save();
-        ctx.strokeStyle = "rgba(120,190,220,0.42)"; ctx.lineWidth = 1.6; ctx.setLineDash([5, 4]);
+        ctx.strokeStyle = PL.theme.isLight() ? "rgba(30,90,140,0.45)" : "rgba(150,210,240,0.45)";
+        ctx.lineWidth = 1.6; ctx.setLineDash([5, 4]);
         ctx.beginPath();
         path.forEach((p, i) => (i ? ctx.lineTo(px(p[0]), py(p[1])) : ctx.moveTo(px(p[0]), py(p[1]))));
         ctx.stroke(); ctx.restore();
@@ -407,28 +406,38 @@
 
       if (layers.has("marks")) {
         D.line(ctx, px(range), oy - 7, px(range), oy + 7, m, 2);
-        D.text(ctx, "R=" + PL.fmt(range, 1) + "m", px(range), oy - 13, { color: m, size: 10, align: "center" });
+        D.text(ctx, "R=" + PL.fmt(range, 1) + "m", px(range), oy - 13, { color: m, size: 10, align: "center", weight: "700" });
         const apex = path.reduce((best, p) => (p[1] > best[1] ? p : best), path[0]);
-        D.line(ctx, px(apex[0]), py(apex[1]), px(apex[0]), oy, PL.theme.pale(0.16), 1, [3, 3]);
-        D.text(ctx, "H=" + PL.fmt(peak, 1) + "m", px(apex[0]) + 5, py(apex[1]) - 5, { color: PL.col("text-dim"), size: 10 });
+        D.line(ctx, px(apex[0]), py(apex[1]), px(apex[0]), oy, PL.theme.pale(0.3), 1, [3, 3]);
+        D.text(ctx, "H=" + PL.fmt(peak, 1) + "m", px(apex[0]) + 5, py(apex[1]) - 8, { color: PL.col("text-dim"), size: 10, weight: "700" });
       }
 
-      // 飛行中的發射物
+      // 飛行中的發射物與頻閃殘影（每 0.2 s 一顆：水平間距相等、鉛直間距越來越大）
       const frac = time > 0 ? Math.min(1, t / time) : 0;
       const idx = Math.min(path.length - 1, Math.max(0, Math.floor(frac * (path.length - 1))));
       const now = path[idx];
       const bx = px(now[0]), by = py(now[1]);
-      const rpx = Math.max(5, ammo.radius * sc * 2.2);
-      D.disc(ctx, bx, by, rpx, { fill: ammo.color, stroke: ammo.accent, width: 2 });
-      if (ammoKey === "basket") {
-        D.line(ctx, bx - rpx, by, bx + rpx, by, ammo.accent, 1.2);
-        D.ring(ctx, bx, by, rpx * 0.6, ammo.accent, 1.2);
-      }
-      if (ammoKey === "balloon") {
-        D.line(ctx, bx, by + rpx, bx, by + rpx + 7, ammo.accent, 1.2);
+      const rpx = PL.clamp(model.ammo.radius * sc * 2.6, 8, 12);
+      const kind = { bowling: "bowling", basket: "basketball", melon: "watermelon", balloon: "balloon" }[ammoKey];
+      const flying = t > 0;
+      if (flying && time > 0) {
+        ctx.save(); ctx.globalAlpha = 0.28;
+        for (let tt = 0.2; tt < Math.min(t, time) - 0.05; tt += 0.2) {
+          const k = Math.min(path.length - 1, Math.floor(tt / time * (path.length - 1)));
+          AP.sportBall(ctx, px(path[k][0]), py(path[k][1]), rpx * 0.9, kind, tt * 6);
+        }
+        ctx.restore();
       }
 
-      if (layers.has("vcomp") && path.length > 1) {
+      // 高台：砲輪要踩在台面上
+      const pivotY = py(h0), CS = 1.15, drop = AP.cannonWheelDrop(CS);
+      if (pivotY + drop < oy - 3) AP.cliff(ctx, 0, ox + 30, pivotY + drop, oy + 2);
+      // 球先畫、大砲後畫：球是從砲口「出來」的
+      if (flying || !landed) AP.sportBall(ctx, bx, by, rpx, kind, t * 6);
+      AP.cannon(ctx, ox, pivotY, th, { s: CS, fired: flying ? t : null });
+      D.text(ctx, sA.get() + "°", ox - 8, pivotY - 30, { color: PL.col("accent-2"), size: 12, weight: "700" });
+
+      if (layers.has("vcomp") && path.length > 1 && flying) {
         const nxt = path[Math.min(path.length - 1, idx + 1)];
         const dx = nxt[0] - now[0], dy = nxt[1] - now[1];
         const norm = Math.hypot(dx, dy) || 1;
@@ -438,18 +447,16 @@
       }
 
       // 落地瞬間給明確回饋——學生要知道自己有沒有打中
-      if (flash > 0) {
-        const ring = (1 - flash) * 40 + 8;
-        ctx.save(); ctx.globalAlpha = flash;
-        D.ring(ctx, px(range), oy - 12, ring, isHit ? PL.col("ok") : PL.col("danger"), 3);
-        ctx.restore();
+      if (landed) {
+        AP.dustKick(ctx, px(range), oy + 2, landAge, 1.1);
+        if (isHit) AP.confetti(ctx, px(range), oy - 10, landAge, { seed: Math.round(range * 10) });
         D.text(ctx, isHit ? "命中！" : (range > target ? "太遠了" : "距離不夠"),
-          px(range), oy - 46, { color: isHit ? PL.col("ok") : PL.col("danger"), size: 15, align: "center", weight: "700" });
+          px(range), oy - 40, { color: isHit ? PL.col("ok") : PL.col("danger"), size: 15, align: "center", weight: "700" });
       }
 
       PL.ui.caption(cv, cDrag.get()
         ? "空氣阻力已開啟：軌跡上升與下降不再對稱，質量越小受影響越大。"
-        : "目前為真空狀態：軌跡完全對稱，換任何發射物結果都一樣。");
+        : "目前為真空狀態：軌跡完全對稱，換任何發射物結果都一樣。淡色殘影每隔 0.2 秒一顆。");
 
       rR.set(range, 1); rHm.set(peak, 1); rTf.set(time, 2);
       rS.set(now[2], 1); rHit.set(hitDistance, 1);
@@ -475,17 +482,20 @@
 
     const anim = PL.loop(dt => {
       if (dt) {
+        clock += dt;
         // 只要還沒落地就推進 t——不論是傳輸列的單步，還是發射後的連續播放，走的都是這條路。
         if (!landed) {
           t += dt;
           if (t >= model.time) {
-            t = model.time; landed = true; flash = 1;
-            anim.stop();                     // 一次性運動，落地即停，不空轉
+            t = model.time; landed = true; landAge = 0;
             shots.push({ x: model.range, label: AMMO[ammoKey].label + (cDrag.get() ? "·阻力" : "") });
             if (shots.length > 6) shots.shift();
           }
+        } else {
+          // 落地後再跑一下，讓揚塵與彩帶播完，然後停住不空轉
+          landAge += dt;
+          if (landAge > 1.5) anim.stop();
         }
-        if (flash > 0) flash = Math.max(0, flash - dt * 1.2);
       }
       scene();
     }, 50);
@@ -520,23 +530,37 @@
       const vx = c + b * Math.sin(th), vy = b * Math.cos(th); // x下游, y對岸
       const cross = vy > 0 ? RW / vy : Infinity, drift = vy > 0 ? vx * cross : 0;
       const bankTop = 40, bankBot = H - 40, riverH = bankBot - bankTop;
-      D.rect(ctx, 0, bankTop, W, riverH, { fill: "rgba(90,162,255,0.08)" });
-      D.line(ctx, 0, bankTop, W, bankTop, PL.col("accent-2"), 2);
-      D.line(ctx, 0, bankBot, W, bankBot, PL.col("text-faint"), 2);
-      D.text(ctx, "對岸", 8, bankTop - 8, { color: PL.col("accent-2"), size: 11 });
-      D.text(ctx, "起點岸", 8, bankBot + 18, { color: PL.col("text-dim"), size: 11 });
-      // 水流箭頭
-      for (let i = 0; i < 5; i++) { const yy = bankBot - riverH * (i + 0.5) / 5; D.arrow(ctx, 30, yy, 30 + c * 8, yy, { color: "rgba(90,162,255,0.4)", width: 1.5 }); }
+      const AP = PL.apparatus, light = PL.theme.isLight();
       const sc = riverH / RW, ox = 90, oy = bankBot;
+      /* 俯視的河：兩岸草地、沙質河岸，水面波紋以水流速度往下游漂 */
+      AP.ground(ctx, 0, W, 0, bankTop, "grass");
+      AP.ground(ctx, 0, W, bankBot, H - bankBot, "grass");
+      AP.water(ctx, 0, bankTop, W, riverH, t, { flow: c * sc });
+      ctx.fillStyle = light ? "#e3cf9f" : "#4a3f2c";
+      ctx.fillRect(0, bankTop - 5, W, 6); ctx.fillRect(0, bankBot - 1, W, 6);
+      for (let i = 0; i < 6; i++) AP.tree(ctx, 40 + i * (W - 60) / 5, bankTop - 6, 30, 3 + i);
+      // 起點碼頭
+      ctx.fillStyle = light ? "#a8794a" : "#5a4028";
+      ctx.fillRect(ox - 16, oy - 6, 32, 30);
+      ctx.strokeStyle = "rgba(60,36,14,0.55)"; ctx.lineWidth = 1;
+      for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.moveTo(ox - 16, oy - 6 + k * 6); ctx.lineTo(ox + 16, oy - 6 + k * 6); ctx.stroke(); }
+      D.text(ctx, "對岸", 8, bankTop - 10, { color: PL.col("text"), size: 11, weight: "700" });
+      D.text(ctx, "起點岸（碼頭）", ox + 22, bankBot + 20, { color: PL.col("text"), size: 11, weight: "700" });
+      // 水流方向
+      for (let i = 0; i < 4; i++) {
+        const yy = bankBot - riverH * (i + 0.5) / 4;
+        D.arrow(ctx, W - 96, yy, W - 96 + Math.max(6, c * 9), yy, { color: light ? "rgba(255,255,255,0.9)" : "rgba(190,225,250,0.75)", width: 2 });
+      }
+      D.text(ctx, "水流 " + PL.fmt(c, 1) + " m/s", W - 96, bankTop + 16, { color: light ? "#ffffff" : "#d6ecff", size: 10.5, weight: "700" });
       const prog = Math.min(t, isFinite(cross) ? cross : 6);
       const bx = ox + vx * prog * sc, by = oy - vy * prog * sc;
       // 實際路徑
-      D.line(ctx, ox, oy, bx, by, "rgba(255,255,255,0.25)", 1.5, [4, 4]);
-      D.disc(ctx, bx, by, 9, { fill: m, glow: m, glowSize: 12 });
+      D.line(ctx, ox, oy, bx, by, light ? "rgba(255,255,255,0.85)" : "rgba(220,235,255,0.6)", 1.6, [5, 4]);
+      AP.boatTop(ctx, bx, by, 46, -Math.PI / 2 + th, { color: "#e2574c" });
       // 速度向量
-      D.arrow(ctx, bx, by, bx + b * Math.sin(th) * 6, by - b * Math.cos(th) * 6, { color: MC(), width: 2, label: "船" });
-      D.arrow(ctx, bx, by, bx + c * 6, by, { color: PL.col("accent-2"), width: 2, label: "水流" });
-      D.arrow(ctx, bx, by, bx + vx * 6, by - vy * 6, { color: PL.col("warn"), width: 2.4, label: "合" });
+      D.arrow(ctx, bx, by, bx + b * Math.sin(th) * 12, by - b * Math.cos(th) * 12, { color: light ? "#4c1d95" : "#ffe08a", width: 2.4, label: "船" });
+      D.arrow(ctx, bx, by, bx + c * 12, by, { color: light ? "#ffffff" : "#cfe8ff", width: 2.2, label: "水流" });
+      D.arrow(ctx, bx, by, bx + vx * 12, by - vy * 12, { color: light ? "#9f1239" : "#ff8a6a", width: 2.8, label: "合" });
       rSpd.set(Math.hypot(vx, vy), 2); rT.set(cross, 2); rD.set(drift, 1);
     }
     const anim = PL.loop(dt => { if (dt) { const b = sB.get(), th = sH.get() * Math.PI / 180, vy = b * Math.cos(th); const cross = vy > 0 ? RW / vy : 6; t += dt; if (t > cross) t = 0; } draw(); });
@@ -544,45 +568,6 @@
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
 
-  /* 運動圖形分析 x-t / v-t / a-t */
-  PL.register("vt-graph", { build(root) {
-    const L = PL.ui.layout(root, { chrome: "quiet" });
-    const cv = PL.canvas.create(L.canvasWrap, 0.78);
-    const TMAX = 6;
-    const sV = PL.ui.slider(L.controls, { label: "初速 v₀", min: -6, max: 12, step: 0.5, value: 3, unit: "m/s", digits: 1, onInput: draw });
-    const sA = PL.ui.slider(L.controls, { label: "加速度 a", min: -4, max: 4, step: 0.5, value: 1.5, unit: "m/s²", digits: 1, onInput: draw });
-    const sT = PL.ui.slider(L.controls, { label: "時間游標 t", min: 0, max: TMAX, step: 0.1, value: 3, unit: "s", digits: 1, onInput: draw });
-    PL.ui.note(L.controls, "x–t 的斜率即 v–t 的值；v–t 的斜率即 a；v–t 曲線下的面積即位移。");
-    const rX = PL.ui.readout(L.readouts, { label: "x(t)", unit: "m" });
-    const rV = PL.ui.readout(L.readouts, { label: "v(t)", unit: "m/s" });
-    const rA = PL.ui.readout(L.readouts, { label: "a(t)", unit: "m/s²" });
-
-    function draw() {
-      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const v0 = sV.get(), a = sA.get(), tc = sT.get(), m = MC();
-      const fx = tt => v0 * tt + 0.5 * a * tt * tt, fv = tt => v0 + a * tt;
-      let xs = []; for (let i = 0; i <= 30; i++) xs.push(fx(TMAX * i / 30));
-      let xmin = Math.min(0, ...xs), xmax = Math.max(0, ...xs); if (xmax - xmin < 2) xmax = xmin + 2;
-      const vend = fv(TMAX); let vmin = Math.min(0, v0, vend), vmax = Math.max(0, v0, vend); if (vmax - vmin < 2) vmax = vmin + 2;
-      const amin = Math.min(0, a) - 1, amax = Math.max(0, a) + 1;
-      const pad = 30, gW = W - pad - 16, gH = (H - 40) / 3 - 12;
-      const mk = (i, dom, title, fn, col2) => {
-        const g = PL.graph(cv, { x: pad, y: 16 + i * (gH + 14), w: gW, h: gH }, dom);
-        g.frame({ title, xlabel: "t (s)" }); g.grid(6, 3);
-        if (i === 1) g.area([[0, 0]].concat(Array.from({ length: 31 }, (_, k) => { const tt = tc * k / 30; return [tt, fn(tt)]; })), { fill: "rgba(90,162,255,0.14)" });
-        g.fn(fn, { color: col2, width: 2.4 });
-        g.vline(tc, { color: m, dash: [4, 3], width: 1.5 });
-        g.dot(tc, fn(tc), { color: m, glow: m });
-        return g;
-      };
-      mk(0, { x0: 0, x1: TMAX, y0: xmin, y1: xmax }, "x – t 位置", fx, MC());
-      mk(1, { x0: 0, x1: TMAX, y0: vmin, y1: vmax }, "v – t 速度（面積=位移）", fv, PL.col("accent-2"));
-      mk(2, { x0: 0, x1: TMAX, y0: amin, y1: amax }, "a – t 加速度", () => a, PL.col("accent-3"));
-      rX.set(fx(tc), 2); rV.set(fv(tc), 2); rA.set(a, 2);
-    }
-    cv.onResize(draw); draw();
-    return { stop() { cv.destroy(); }, rerender: draw };
-  }});
 
   /* 打點計時器（測速度與加速度） */
   /* 打點計時器 —— 重物拉著小車加速，計時器一點一點把過程打在紙帶上
@@ -696,7 +681,7 @@
 
       /* ---------- 上半：實驗台（照真實裝置：計時器→紙帶→小車→繩→滑輪→重物） ---------- */
       const trackY = H * 0.40;
-      const pulleyX = W - 40, pulleyY = trackY - 6, pulleyR = 12;
+      const pulleyX = W - 44, pulleyY = trackY + 8, pulleyR = 12;
       const x0 = 132, x1 = pulleyX - 44;            // 軌道右端留給滑輪
       const sc = (x1 - x0) / total;                 // 每公尺對應的像素
       cv.calibrate(sc, "m");
@@ -713,13 +698,13 @@
        * 要被看見的東西一律用 theme.pale()，它會隨主題翻面。
        */
       const AP = PL.apparatus;
-      /* 檯面只鋪窄窄一條：下半部還要放「取下後攤平的紙帶」，鋪到底會把它壓成灰的 */
-      ctx.save();
-      const tg = ctx.createLinearGradient(0, trackY + 20, 0, trackY + 44);
-      tg.addColorStop(0, "rgba(122,112,96,0.34)");
-      tg.addColorStop(1, "rgba(60,56,50,0)");
-      ctx.fillStyle = tg; ctx.fillRect(0, trackY + 20, W, 24);
+      /* 場景：實驗室的長桌。上半是桌上的裝置，下半留給「取下後攤平的紙帶」 */
+      const benchY = trackY + 20, benchEnd = pulleyX - pulleyR - 4, sceneBot = H * 0.78 - 46;
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, sceneBot); ctx.clip();
+      AP.labRoom(ctx, W, sceneBot, sceneBot, { bench: "none" });
+      AP.table(ctx, -12, benchEnd, benchY, sceneBot + 4, { thick: 16 });
       ctx.restore();
+      D.line(ctx, 0, sceneBot, W, sceneBot, PL.col("border"), 1);
       AP.steel(ctx, x0 - 10, trackY + 12, x1 - x0 + 20, 8, -6);
       for (let m = 0; m <= total; m += Math.max(0.1, Math.round(total / 8 * 10) / 10)) {
         const px = x0 + m * sc;
@@ -730,8 +715,10 @@
       D.text(ctx, "位置 (m)", x0, trackY + 52, { color: PL.col("text-faint"), size: 10 });
 
       // 紙帶：從小車後方拉回來，穿過計時器再露出一小截
-      const tapeY = trackY - 26;
-      D.rect(ctx, 26, tapeY - 7, carX - 26, 14, { fill: PL.theme.pale(0.10), stroke: PL.theme.pale(0.26), width: 1 });
+      // 紙帶的高度對齊小車車身中段；計時器墊在木塊上，讓振針正好落在紙帶上
+      const tapeY = trackY - 4;
+      AP.woodBlock(ctx, 92, benchY, 70, benchY - (tapeY + 8), 0);
+      AP.paperTape(ctx, 26, carX - cw / 2 + 2, tapeY, 12);
       // 紙帶上已經打好的點（跟著紙帶一起往右移動）
       for (let k = 0; k < dots; k++) {
         const px = carX - (xAt(t) - xn(k)) * sc;
@@ -752,31 +739,34 @@
       /* 繩子：從小車前緣水平拉到滑輪，再垂下去接重物。滑輪把「水平的拉」轉成「垂直的落」。
          重物隨小車前進而下落——物理上兩者位移相等，但畫面上垂直空間有限，
          所以這裡按「小車跑完全程的比例」在可用高度內下落，示意「重物掉、小車加速」。 */
-      const ropeY = trackY - 2;
+      const ropeY = trackY - 4;                       // 小車掛鉤的高度＝滑輪頂緣
       const weightTop = pulleyY + pulleyR + 14;
-      const weightY = weightTop + (H * 0.20) * frac;
-      AP.cord(ctx, carX + cw / 2, ropeY, pulleyX, pulleyY);
-      AP.cord(ctx, pulleyX, pulleyY, pulleyX, weightY);
+      const weightY = weightTop + (H * 0.18) * frac;
+      const hangX = pulleyX + pulleyR;                 // 繩子從滑輪外緣垂下
+      AP.cord(ctx, carX + cw / 2 + 2, ropeY, pulleyX, pulleyY - pulleyR);
+      AP.cord(ctx, hangX, pulleyY, hangX, weightY - 5);
 
-      // 滑輪
+      // 滑輪：用 C 形夾固定在桌緣，輪子伸出桌外，重物才掛得下去
+      AP.steel(ctx, benchEnd - 14, pulleyY - 3, pulleyX - benchEnd + 14, 6, 6);
+      AP.steel(ctx, benchEnd - 14, benchY + 16, 18, 6, -4);
+      AP.steel(ctx, benchEnd + 1, pulleyY - 3, 5, benchY + 22 - pulleyY + 3, -2);
+      AP.brassDisc(ctx, benchEnd - 6, benchY + 26, 3.5);
       AP.pulley(ctx, pulleyX, pulleyY, pulleyR);
       D.text(ctx, "滑輪", pulleyX, pulleyY - pulleyR - 8, { color: PL.col("text-faint"), size: 10, align: "center" });
 
       // 重物
       const ww = 22, wh = 26;
-      AP.weight(ctx, pulleyX, weightY, ww, wh, null);
-      D.text(ctx, PL.fmt(sMw.get(), 2) + " kg", pulleyX, weightY + wh + 12, { color: PL.col("text-faint"), size: 9, align: "center" });
+      AP.weight(ctx, hangX, weightY, ww, wh, null);
+      D.text(ctx, PL.fmt(sMw.get(), 2) + " kg", hangX - ww / 2 - 4, weightY + wh / 2 + 3, { color: PL.col("text-dim"), size: 9, align: "right", weight: "700" });
       // 重物受力箭頭：往下的重力，長度正比於 mg
       if (t === 0) {
-        D.arrow(ctx, pulleyX + ww / 2 + 4, weightY + wh / 2, pulleyX + ww / 2 + 4, weightY + wh / 2 + 16 + sMw.get() * 18,
+        D.arrow(ctx, hangX, weightY + wh + 2, hangX, weightY + wh + 18 + sMw.get() * 18,
           { color: PL.col("accent-2"), width: 1.6, label: "mg" });
       }
 
       // 小車（有車廂與兩個輪子）
       AP.cart(ctx, carX, trackY + 12, cw, ch);
-      D.text(ctx, "小車", carX, trackY - ch / 2 + 13, { color: "#04121a", size: 10, align: "center", weight: "700" });
-      D.disc(ctx, carX - 11, trackY + 12, 4.5, { fill: PL.col("text-dim"), stroke: PL.theme.pale(0.4), width: 1 });
-      D.disc(ctx, carX + 11, trackY + 12, 4.5, { fill: PL.col("text-dim"), stroke: PL.theme.pale(0.4), width: 1 });
+      D.text(ctx, "小車", carX, trackY - ch - 10, { color: PL.col("text-dim"), size: 10, align: "center", weight: "700" });
       // 速度箭頭：長度正比於當前速率，停著時不畫
       const vNow = a * t;
       if (t > 0 && vNow > 0) {
@@ -788,8 +778,7 @@
       const ty = H * 0.78, tapeX0 = 30, tapeX1 = W - 24;
       const tsc = (tapeX1 - tapeX0) / total;
       D.text(ctx, "取下後攤平的紙帶", tapeX0, ty - 34, { color: PL.col("text-dim"), size: 11 });
-      D.rect(ctx, tapeX0 - 6, ty - 22, tapeX1 - tapeX0 + 12, 44,
-        { fill: PL.theme.pale(0.07), stroke: PL.col("border"), width: 1, r: 6 });
+      AP.paperTape(ctx, tapeX0 - 10, tapeX1 + 10, ty, 24);
 
       // 預測點：還沒打到的位置先用淡點標出來，讓「預期」與「實測」可以對照
       for (let k = 0; k <= N; k++) {

@@ -3,7 +3,10 @@
   "use strict";
   const PL = window.PhysicsLab, D = PL.draw;
   const MC = () => PL.col("m-color", "#ff8a65");
-  const block = (ctx, x, y, w, h, m, label) => {
+  /* 質量塊：烤漆金屬塊（保留用顏色區分兩個物體的教學約定） */
+  const block = (ctx, x, y, w, h, m, label, ang) => {
+    const AP = PL.apparatus;
+    if (AP && AP.massBlock) { AP.massBlock(ctx, x, y, w, h, { color: m, label, ang }); return; }
     D.rect(ctx, x - w / 2, y - h, w, h, { fill: m, stroke: "rgba(255,255,255,0.35)", width: 1.5, r: 5 });
     if (label) D.text(ctx, label, x, y - h / 2 + 4, { color: "#04121a", size: 12, align: "center", weight: "700" });
   };
@@ -24,10 +27,17 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const gy = H - 40, sc = (W - 120) / 30;
-      D.line(ctx, 20, gy, W - 20, gy, PL.col("text-faint"), 2);
-      for (let gx = 0; gx <= 30; gx += 5) { const px = 60 + gx * sc; if (px < W - 20) { D.line(ctx, px, gy, px, gy + 5, PL.col("text-faint"), 1); D.text(ctx, gx + "", px, gy + 17, { color: PL.col("text-faint"), size: 9, align: "center" }); } }
+      const AP = PL.apparatus, mu0 = sMu.get();
+      /* 場景：室內長走道。μ 越小地面越像冰面——μ = 0 時就是一片光滑的冰 */
+      AP.labRoom(ctx, W, H, gy, { bench: mu0 < 0.02 ? "steel" : "wood", window: { x: W * 0.62, w: Math.min(170, W * 0.2), h: (gy) * 0.42 } });
+      if (mu0 < 0.05) {
+        ctx.fillStyle = "rgba(200,235,255," + (0.55 - mu0 * 8) + ")"; ctx.fillRect(0, gy, W, H - gy);
+        D.text(ctx, "冰面", W - 60, gy + 30, { color: PL.col("text-dim"), size: 10, weight: "700" });
+      }
+      for (let gx = 0; gx <= 30; gx += 5) { const px = 60 + gx * sc; if (px < W - 20) { D.line(ctx, px, gy, px, gy + 6, PL.col("text"), 1.2); D.text(ctx, gx + " m", px, gy + 19, { color: PL.col("text"), size: 9, align: "center" }); } }
       const px = 60 + (x % 30) * sc;
-      block(ctx, px, gy, 40, 28, MC());
+      AP.crate(ctx, px, gy, 62, 50, {});
+      if (v < 0.01 && x === 0) AP.hand(ctx, px - 32, gy - 25, 1, 1.15);
 
       /*
        * 原本速度與摩擦力箭頭都只在 v > 0.01（也就是按下「推一下」之後）才畫，
@@ -41,10 +51,10 @@
       const v0 = sV.get(), mu = sMu.get();
       const moving = v > 0.01;
       const showV = moving ? v : v0;
-      D.arrow(ctx, px + 22, gy - 14, px + 22 + showV * 4, gy - 14,
+      D.arrow(ctx, px + 32, gy - 60, px + 32 + showV * 4, gy - 60,
         { color: PL.col("accent-2"), width: 2, label: "v = " + PL.fmt(showV, 1) });
       if (mu > 0) {
-        D.arrow(ctx, px - 22, gy - 14, px - 22 - mu * 160, gy - 14,
+        D.arrow(ctx, px - 32, gy - 6, px - 32 - mu * 160, gy - 6,
           { color: PL.col("danger"), width: 2, label: "f（μ=" + PL.fmt(mu, 2) + "）" });
       }
       if (!moving) {
@@ -95,10 +105,17 @@
       AP.benchTop(ctx, W, H, gy + 6);
       AP.steel(ctx, 18, gy, W - 36, 7, -6);
       const sc = (W - 140) / 24, px = 70 + (x % 24) * sc;
-      const w = 30 + sM.get() * 4;
-      AP.cart(ctx, px, gy, w, 22 + sM.get() * 2);
-      D.text(ctx, sM.get() + " kg", px, gy - 26, { color: "#2b1f10", size: 11, align: "center", weight: "700" });
-      if (sF.get() > 0) D.arrow(ctx, px + w / 2, gy - 16, px + w / 2 + sF.get() * 5, gy - 16, { color: PL.col("accent-2"), width: 2.5, label: "F = " + sF.get() + " N" });
+      const w = 56 + sM.get() * 6, ch = 30 + sM.get() * 1.5;
+      AP.cart(ctx, px, gy, w, ch, {});
+      // 車上疊的砝碼越多，車越重：質量是看得見的
+      const nW = Math.max(1, Math.min(8, Math.round(sM.get())));
+      const bodyTop = gy - Math.max(4, Math.min(9, ch * 0.26)) * 1.1 - ch;
+      for (let i = 0; i < nW; i++) {
+        const col = i % 4, rowI = Math.floor(i / 4);
+        AP.weight(ctx, px - 21 + col * 14, bodyTop - 16 - rowI * 17, 12, 16, null);
+      }
+      D.text(ctx, sM.get() + " kg", px, bodyTop - 20 - Math.ceil(nW / 4) * 17, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
+      if (sF.get() > 0) D.arrow(ctx, px + w / 2 + 4, gy - ch / 2 - 6, px + w / 2 + 4 + sF.get() * 5, gy - ch / 2 - 6, { color: PL.col("accent-2"), width: 2.5, label: "F = " + sF.get() + " N" });
       // a 長條
       D.text(ctx, "a = F / m = " + PL.fmt(a, 2) + " m/s²", 24, 28, { color: MC(), size: 13 });
       rA.set(a, 2); rV.set(v, 2); rX.set(x, 1);
@@ -185,17 +202,15 @@
       const gy = 124;
       /* 桌面：摩擦力發生在木塊與桌面之間，那個接觸面要看得見。
          只鋪一條窄帶，不能鋪到畫布底部——下面還有 f–F 圖。 */
-      ctx.save();
-      const tg = ctx.createLinearGradient(0, gy, 0, gy + 16);
-      tg.addColorStop(0, "rgba(122,112,96,0.42)");
-      tg.addColorStop(1, "rgba(60,56,50,0)");
-      ctx.fillStyle = tg; ctx.fillRect(0, gy, W, 16);
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, gy + 20); ctx.clip();
+      AP.labRoom(ctx, W, gy + 20, gy, { bench: "wood" });
       ctx.restore();
-      D.line(ctx, 16, gy, W - 16, gy, PL.theme.pale(0.5), 2);
+      D.line(ctx, 0, gy + 20, W, gy + 20, PL.col("border"), 1);
 
       const px = 120 + (moving ? (x % 20) * 6 : 0);
       AP.woodBlock(ctx, px, gy, 52, 32, 0);
       D.text(ctx, mass + " kg", px, gy - 12, { color: "#2b1f10", size: 11, align: "center", weight: "700" });
+      AP.hand(ctx, px + 28 + 62 + 16, gy - 16, -1, 0.85, { pull: true });
       // 拉力用彈簧秤施加，指針位置就是施力大小
       AP.springScale(ctx, px + 28, gy - 16, 62, F / 30);
       // 力向量畫在木塊上方，避開彈簧秤
@@ -274,7 +289,9 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const gy = H - 46, cx = W / 2, F = sF.get();
-      D.line(ctx, 20, gy, W - 20, gy, PL.col("text-faint"), 2);
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, gy);
+      AP.steel(ctx, 18, gy - 6, W - 36, 6, -6);
       /*
        * 原本車子固定 44×30、力箭頭只在「互推中」才畫，
        * 於是三根滑桿在按下互推之前完全不影響畫面——學生拉半天像在看靜態插圖。
@@ -284,23 +301,29 @@
        * 在按下按鈕之前就已經看得出來了。
        */
       const m1 = sm1.get(), m2 = sm2.get();
-      const w1 = 30 + m1 * 5, w2 = 30 + m2 * 5;     // 1kg→35px，8kg→70px
+      const w1 = 48 + m1 * 7, w2 = 48 + m2 * 7;     // 1kg→55px，8kg→104px
       const bx1 = cx - 12 - w1 / 2 - x1 * 30, bx2 = cx + 12 + w2 / 2 + x2 * 30;
-      block(ctx, bx1, gy, w1, 30, MC(), PL.fmt(m1, 1) + "kg");
-      block(ctx, bx2, gy, w2, 30, "#ffab80", PL.fmt(m2, 1) + "kg");
+      // 兩台力學車：中間的彈簧撞針就是「互推」的來源
+      AP.cart(ctx, bx1, gy - 6, w1, 30, {});
+      AP.cart(ctx, bx2, gy - 6, w2, 30, {});
+      if (phase !== "glide" && x1 + x2 < 0.05) {
+        D.spring(ctx, bx1 + w1 / 2 + 2, gy - 30, bx2 - w2 / 2 - 2, gy - 30, 5, 6, "#9aa8b8");
+      }
+      D.text(ctx, PL.fmt(m1, 1) + " kg", bx1, gy - 40, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
+      D.text(ctx, PL.fmt(m2, 1) + " kg", bx2, gy - 40, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
 
       // 互推的一對力：大小永遠相等、方向相反，這是第三定律的重點
       const fLen = F * 4;
-      D.arrow(ctx, bx1 + w1 / 2, gy - 16, bx1 + w1 / 2 - fLen, gy - 16,
+      D.arrow(ctx, bx1 + w1 / 2, gy - 58, bx1 + w1 / 2 - fLen, gy - 58,
         { color: PL.col("danger"), width: 2.4, label: "F = " + F + " N" });
-      D.arrow(ctx, bx2 - w2 / 2, gy - 16, bx2 - w2 / 2 + fLen, gy - 16,
+      D.arrow(ctx, bx2 - w2 / 2, gy - 58, bx2 - w2 / 2 + fLen, gy - 58,
         { color: PL.col("accent-2"), width: 2.4, label: "F = " + F + " N" });
 
       // 加速度箭頭：同樣的力，質量小的箭頭明顯比較長
       const a1 = F / m1, a2 = F / m2, aScale = 90 / Math.max(a1, a2);
-      D.arrow(ctx, bx1, gy - 46, bx1 - a1 * aScale, gy - 46,
+      D.arrow(ctx, bx1, gy - 84, bx1 - a1 * aScale, gy - 84,
         { color: PL.col("warn"), width: 2, head: 7, label: "a₁=" + PL.fmt(a1, 1) });
-      D.arrow(ctx, bx2, gy - 46, bx2 + a2 * aScale, gy - 46,
+      D.arrow(ctx, bx2, gy - 84, bx2 + a2 * aScale, gy - 84,
         { color: PL.col("warn"), width: 2, head: 7, label: "a₂=" + PL.fmt(a2, 1) });
 
       PL.ui.caption(cv, Math.abs(m1 - m2) < 0.05
@@ -417,20 +440,12 @@
 
       // 支架與支點：三角刀口座立在檯面上
       const AP = PL.apparatus;
-      AP.benchTop(ctx, W, H, cy + 46);
-      AP.contactShadow(ctx, cx, cy + 50, 46);
-      ctx.save();
-      const kg = ctx.createLinearGradient(0, cy, 0, cy + 48);
-      kg.addColorStop(0, "rgb(160,170,186)");
-      kg.addColorStop(0.5, "rgb(104,113,128)");
-      kg.addColorStop(1, "rgb(58,64,76)");
-      ctx.fillStyle = kg;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy + 2); ctx.lineTo(cx + 26, cy + 48); ctx.lineTo(cx - 26, cy + 48);
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = "rgba(30,38,50,0.6)"; ctx.lineWidth = 1; ctx.stroke();
-      ctx.restore();
-      AP.steel(ctx, cx - 38, cy + 46, 76, 7, 6);
+      // 桌面放低，槓桿架在一根立柱上：砝碼才有空間往下掛
+      const benchY = H - 88;
+      AP.benchTop(ctx, W, H, benchY);
+      AP.steel(ctx, cx - 5, cy + 48, 10, benchY - cy - 48, 8);
+      AP.steel(ctx, cx - 40, benchY - 7, 80, 8, -6);
+      AP.knifeEdge(ctx, cx, cy + 2, 44, 50);
       // 水平參考線：桿子傾斜時才看得出來偏了多少
       D.line(ctx, cx - half, cy, cx + half, cy, PL.col("text-faint"), 1, [4, 5]);
       ctx.save();
@@ -448,10 +463,8 @@
       function side(dist, m, weight, sign, name, tone) {
         const ax = cx + sign * dist * sc * c, ay = cy + sign * dist * sc * s;
         const bw = 20 + m * 4, bh = 16 + m * 2;
-        D.line(ctx, ax, ay, ax, ay + 22, PL.col("text-dim"), 1.5);
-        D.rect(ctx, ax - bw / 2, ay + 22, bw, bh, { fill: tone, stroke: PL.theme.pale(0.4), r: 4 });
-        D.text(ctx, PL.fmt(m, 1) + " kg", ax, ay + 22 + bh / 2 + 4,
-          { color: "#04121a", size: 10, align: "center", weight: "700" });
+        AP.cord(ctx, ax, ay, ax, ay + 18);
+        AP.massBlock(ctx, ax, ay + 22 + bh, bw, bh, { color: tone, label: PL.fmt(m, 1) + " kg", hook: true, noShadow: true });
         // 重量箭頭：長度正比於 W，讓「力」有大小可看
         const aLen = 16 + weight / 78 * 34;
         D.arrow(ctx, ax, ay + 24 + bh, ax, ay + 24 + bh + aLen,
@@ -468,7 +481,8 @@
       side(d2, m2, W2, 1, "W₂", "#ffab80");
 
       /* 力矩長條比較：把「誰比較大」變成長度而不是兩個數字 */
-      const barY = H - 46, barX = 56, barW = W - 112, tMax = Math.max(t1, t2, 1);
+      const barY = H - 46, barX = 56, barW = W - 112 - 110, tMax = Math.max(t1, t2, 1);
+      AP.infoCard(ctx, barX - 14, barY - 30, W - 84, 64);
       D.text(ctx, "力矩比較 τ = W × d", barX, barY - 12, { color: PL.col("text-dim"), size: 11 });
       [[t1, MC(), "τ₁"], [t2, "#ffab80", "τ₂"]].forEach((b, i) => {
         const y = barY + i * 15;
@@ -517,16 +531,29 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const cx = W / 2, cy = H / 2, S = 15;
-      D.ring(ctx, cx, cy, Math.min(W, H) * 0.4, "rgba(255,255,255,0.12)", 1.5);
-      D.disc(ctx, cx, cy, 5, { fill: "#fff" });
+      const AP = PL.apparatus;
+      /* 真實的力桌（俯視）：盤緣夾滑輪，繩子吊砝碼。砝碼的重量就是那一條繩的拉力 */
+      const deskG = ctx.createLinearGradient(0, 0, 0, H);
+      deskG.addColorStop(0, PL.theme.isLight() ? "#d9b88a" : "#4f3a26"); deskG.addColorStop(1, PL.theme.isLight() ? "#c9a26d" : "#3f2e1e");
+      ctx.fillStyle = deskG; ctx.fillRect(0, 0, W, H);
+      PL.theme.note(ctx, PL.theme.isLight() ? "#d2ae7c" : "#473422", 0, 0, W, H);
       const f1 = sF1.get(), a1 = sA1.get() * Math.PI / 180, f2 = sF2.get(), a2 = sA2.get() * Math.PI / 180;
+      const R = Math.min(W, H) * 0.36;
+      const pulleyAt = AP.forceTableTop(ctx, cx, cy, R);
+      const resAng0 = (Math.atan2(f1 * Math.sin(a1) + f2 * Math.sin(a2), f1 * Math.cos(a1) + f2 * Math.cos(a2)) * 180 / Math.PI + 540) % 360;
+      pulleyAt(sA1.get(), PL.fmt(f1 / 9.8 * 1000, 0) + "g", "#2f6fd0");
+      pulleyAt(sA2.get(), PL.fmt(f2 / 9.8 * 1000, 0) + "g", "#7a4fd0");
+      pulleyAt(resAng0, "?", "#b0801e");
+      // 中心環
+      ctx.strokeStyle = "rgb(150,160,176)"; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2); ctx.stroke();
       const v1 = { x: f1 * Math.cos(a1), y: -f1 * Math.sin(a1) }, v2 = { x: f2 * Math.cos(a2), y: -f2 * Math.sin(a2) }, rs = { x: v1.x + v2.x, y: v1.y + v2.y };
       D.line(ctx, cx + v1.x * S, cy + v1.y * S, cx + rs.x * S, cy + rs.y * S, "rgba(255,255,255,0.2)", 1, [4, 4]);
       D.line(ctx, cx + v2.x * S, cy + v2.y * S, cx + rs.x * S, cy + rs.y * S, "rgba(255,255,255,0.2)", 1, [4, 4]);
       D.arrow(ctx, cx, cy, cx + v1.x * S, cy + v1.y * S, { color: PL.col("accent-2"), width: 2.4, label: "F₁" });
       D.arrow(ctx, cx, cy, cx + v2.x * S, cy + v2.y * S, { color: PL.col("accent-3"), width: 2.4, label: "F₂" });
       D.arrow(ctx, cx, cy, cx + rs.x * S, cy + rs.y * S, { color: MC(), width: 3, label: "合力" });
-      D.arrow(ctx, cx, cy, cx - rs.x * S, cy - rs.y * S, { color: PL.col("warn"), width: 2, label: "平衡力", dash: [5, 4] });
+      D.arrow(ctx, cx, cy, cx - rs.x * S, cy - rs.y * S, { color: PL.col("warn"), width: 2, label: "平衡力（第三個砝碼）", dash: [5, 4] });
       const mag = Math.hypot(rs.x, rs.y), ang = (Math.atan2(-rs.y, rs.x) * 180 / Math.PI + 360) % 360;
       rMag.set(mag, 2); rAng.set(ang, 0); rEq.set((ang + 180) % 360, 0);
     }
@@ -617,12 +644,14 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const q = model(), wallX = W * 0.72, bw = Math.min(68, 42 + q.m * 7), bh = 38 + q.m * 4;
       const minY = 46, maxY = H - bh - 30, by = PL.clamp(H * 0.40 + y, minY, maxY), bx = wallX - bw - 12;
-      D.rect(ctx, wallX, 24, 26, H - 48, { fill: "rgba(135,157,180,0.20)", stroke: PL.col("text-faint"), width: 1.5, r: 4 });
-      for (let gy = 36; gy < H - 30; gy += 16) D.line(ctx, wallX + 2, gy, wallX + 24, gy - 12, "rgba(255,255,255,0.10)", 1);
-      D.rect(ctx, bx, by, bw, bh, { fill: MC(), stroke: "rgba(255,255,255,0.48)", width: 1.5, r: 5 });
-      D.text(ctx, q.m + " kg", bx + bw / 2, by + bh / 2 + 4, { color: "#04121a", size: 12, align: "center", weight: "700" });
+      const AP = PL.apparatus;
+      AP.labRoom(ctx, W, H, H - 22, { bench: "wood" });
+      AP.wallBlock(ctx, wallX, 0, H - 22, W - wallX, { dir: 1 });
+      AP.massBlock(ctx, bx + bw / 2, by + bh, bw, bh, { color: MC(), label: q.m + " kg", noShadow: true });
+      // 手把物體壓在牆上：推力的來源
+      AP.hand(ctx, bx - 2, by + bh / 2, 1, 1.05);
       const cy = by + bh / 2, forceScale = 0.55;
-      D.arrow(ctx, bx - Math.min(94, q.F * forceScale), cy, bx - 8, cy, { color: PL.col("accent-2"), width: 2.6, label: "推力 F" });
+      D.arrow(ctx, bx - 70 - Math.min(94, q.F * forceScale), cy - 26, bx - 70, cy - 26, { color: PL.col("accent-2"), width: 2.6, label: "推力 F" });
       D.arrow(ctx, bx + bw - 4, cy - 17, bx + bw - 4 - Math.min(84, q.F * forceScale), cy - 17, { color: "#8db7ff", width: 2.3, label: "N" });
       D.arrow(ctx, bx + bw / 2, by + bh / 2, bx + bw / 2, by + bh / 2 + 48, { color: PL.col("warn"), width: 2.3, label: "mg" });
       const fLen = Math.min(60, q.f * 2.1);
@@ -637,7 +666,8 @@
        * 再畫一條重力的參考線。μₖ 的棒子隨滑桿即時變化，
        * 而「動摩擦棒比靜摩擦棒短」這件事一眼就看得到。
        */
-      const sx = 28, sy = H - 66, sw = Math.min(200, W * 0.42);
+      const sx = 28, sy = H - 76, sw = Math.min(200, W * 0.42);
+      AP.infoCard(ctx, sx - 12, sy - 26, sw + 170, 66);
       const ratioS = Math.min(1, q.fsMax / q.mg);
       // 靠牆的情形，正向力就是水平推力本身（模型裡叫 q.F，不是 q.N）。
       // 第一版誤用 q.N，算出 NaN，長條完全沒畫出來——量化稽核抓到了這個錯。
@@ -705,14 +735,13 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const q = model(), gy = H * 0.72, cx = W * 0.28, shiftTop = xTop * 8, shiftBottom = xBottom * 8;
-      D.line(ctx, 22, gy, W - 22, gy, PL.col("text-faint"), 2);
-      for (let gx = 38; gx < W - 18; gx += 22) D.line(ctx, gx, gy, gx + 8, gy + 7, "rgba(255,255,255,0.10)", 1);
-      const lowerW = Math.min(115, 66 + q.m2 * 8), lowerH = 35, upperW = Math.min(78, 42 + q.m1 * 9), upperH = 30;
+      const AP = PL.apparatus;
+      AP.labRoom(ctx, W, H, gy, { bench: "wood" });
+      const lowerW = Math.min(160, 92 + q.m2 * 11), lowerH = 48, upperW = Math.min(112, 60 + q.m1 * 12), upperH = 40;
       const lowerX = cx + shiftBottom, upperX = cx + shiftTop;
-      D.rect(ctx, lowerX - lowerW / 2, gy - lowerH, lowerW, lowerH, { fill: "#ffab80", stroke: "rgba(255,255,255,0.45)", width: 1.5, r: 5 });
-      D.rect(ctx, upperX - upperW / 2, gy - lowerH - upperH, upperW, upperH, { fill: MC(), stroke: "rgba(255,255,255,0.45)", width: 1.5, r: 5 });
-      D.text(ctx, "m₂", lowerX, gy - 13, { color: "#24110a", size: 12, align: "center", weight: "700" });
-      D.text(ctx, "m₁", upperX, gy - lowerH - 10, { color: "#04121a", size: 12, align: "center", weight: "700" });
+      AP.massBlock(ctx, lowerX, gy, lowerW, lowerH, { color: "#ffab80", label: "m₂" });
+      AP.massBlock(ctx, upperX, gy - lowerH, upperW, upperH, { color: MC(), label: "m₁", noShadow: true });
+      if (!released || xBottom < 0.3) AP.hand(ctx, lowerX - lowerW / 2 - 1, gy - lowerH / 2, 1, 1.15);
       D.arrow(ctx, lowerX + lowerW / 2, gy - 18, lowerX + lowerW / 2 + Math.min(86, q.F * 1.1), gy - 18, { color: PL.col("accent-2"), width: 2.6, label: "F" });
       const upperY = gy - lowerH - upperH / 2;
       D.arrow(ctx, upperX, upperY, upperX + Math.min(60, q.f * 3), upperY, { color: "#7ee0c0", width: 2.2, label: "上方受 f" });
@@ -770,12 +799,19 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const q = model(), cx = W * 0.5, cy = H * 0.48, len = Math.min(W * 0.27, H * 0.55);
       const lx = cx - len * Math.cos(q.l), ly = cy - len * Math.sin(q.l), rx = cx + len * Math.cos(q.r), ry = cy - len * Math.sin(q.r);
-      D.line(ctx, lx, ly, cx, cy, "rgba(255,255,255,0.62)", 3); D.line(ctx, rx, ry, cx, cy, "rgba(255,255,255,0.62)", 3);
-      D.rect(ctx, lx - 15, ly - 8, 30, 9, { fill: PL.col("text-faint"), r: 3 }); D.rect(ctx, rx - 15, ry - 8, 30, 9, { fill: PL.col("text-faint"), r: 3 });
-      D.disc(ctx, cx, cy, 7, { fill: "#e7edf5", stroke: MC(), width: 2, glow: MC() });
-      D.line(ctx, cx, cy, cx, cy + 42, "#c9d3e0", 2);
-      D.rect(ctx, cx - 28, cy + 42, 56, 34, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 5 });
-      D.text(ctx, q.m + " kg", cx, cy + 64, { color: "#04121a", size: 12, align: "center", weight: "700" });
+      const AP = PL.apparatus;
+      AP.labRoom(ctx, W, H, H - 20, { bench: "wood" });
+      // 兩條繩各綁在一根立柱頂的吊環上
+      [[lx, ly], [rx, ry]].forEach(p => {
+        AP.steel(ctx, p[0] - 4, p[1], 8, H - 20 - p[1], 8);
+        AP.steel(ctx, p[0] - 16, H - 26, 32, 7, -6);
+        AP.brassDisc(ctx, p[0], p[1], 5);
+      });
+      AP.rope(ctx, lx, ly, cx, cy, 3, "#c8a46a"); AP.rope(ctx, rx, ry, cx, cy, 3, "#c8a46a");
+      ctx.strokeStyle = "rgb(150,160,176)"; ctx.lineWidth = 2.6;
+      ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.stroke();
+      AP.rope(ctx, cx, cy + 6, cx, cy + 40, 2.4, "#c8a46a");
+      AP.massBlock(ctx, cx, cy + 78, 56, 34, { color: MC(), label: q.m + " kg", hook: true, noShadow: true });
       D.arrow(ctx, cx, cy, cx - Math.cos(q.l) * Math.min(72, q.tl * 1.2), cy - Math.sin(q.l) * Math.min(72, q.tl * 1.2), { color: "#8db7ff", width: 2.4, label: "Tₗ" });
       D.arrow(ctx, cx, cy, cx + Math.cos(q.r) * Math.min(72, q.tr * 1.2), cy - Math.sin(q.r) * Math.min(72, q.tr * 1.2), { color: "#7ee0c0", width: 2.4, label: "Tᵣ" });
       D.arrow(ctx, cx, cy, cx, cy + 58, { color: PL.col("warn"), width: 2.4, label: "mg" });
@@ -832,12 +868,13 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const q = model(), beltY = H * 0.64, beltX = 32, beltW = W - 64, beltH = 38;
-      D.rect(ctx, beltX, beltY, beltW, beltH, { fill: "rgba(95,138,176,0.25)", stroke: PL.col("text-faint"), width: 2, r: 18 });
-      const step = 28, offset = ((t * q.u * 28) % step + step) % step;
-      for (let px = beltX + 16 - offset; px < beltX + beltW - 10; px += step) D.arrow(ctx, px, beltY + beltH / 2, px + 12 * Math.sign(q.u || 1), beltY + beltH / 2, { color: "rgba(180,211,239,0.70)", width: 1.5, head: 5 });
-      const bx = W * 0.5 + PL.clamp(x * 22, -W * 0.24, W * 0.24), bw = 64, bh = 35, by = beltY - bh + 3;
-      D.rect(ctx, bx - bw / 2, by, bw, bh, { fill: MC(), stroke: "rgba(255,255,255,0.48)", width: 1.5, r: 5 });
-      D.text(ctx, sM.get() + " kg", bx, by + 22, { color: "#04121a", size: 12, align: "center", weight: "700" });
+      const AP = PL.apparatus;
+      AP.labRoom(ctx, W, H, beltY + beltH + 46, { bench: "wood" });
+      AP.conveyor(ctx, beltX, beltX + beltW, beltY, beltH, t * q.u * 28);
+      // 帶面運動方向
+      for (let px = beltX + 40; px < beltX + beltW - 30; px += 90) D.arrow(ctx, px, beltY + beltH / 2, px + 18 * Math.sign(q.u || 1), beltY + beltH / 2, { color: "#e8eef5", width: 1.6, head: 5 });
+      const bx = W * 0.5 + PL.clamp(x * 22, -W * 0.24, W * 0.24), bw = 80, bh = 54, by = beltY - bh;
+      AP.crate(ctx, bx, beltY, bw, bh, { label: sM.get() + " kg" });
       if (q.direction) D.arrow(ctx, bx, by - 14, bx + q.direction * Math.min(72, Math.abs(q.f) * 7), by - 14, { color: q.direction > 0 ? "#7ee0c0" : PL.col("danger"), width: 2.5, label: "fₖ" });
       D.text(ctx, "輸送帶 u = " + PL.fmt(q.u, 1) + " m/s", beltX, beltY - 12, { color: PL.col("text-dim"), size: 12 });
       const state = q.direction === 0 ? "已同速：無相對滑動" : q.direction > 0 ? "物體比帶慢，摩擦力向右" : "物體比帶快，摩擦力向左";
@@ -892,10 +929,12 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const q = model(), floorY = H - 42, baseX = 42, slopeLength = Math.min(W * 0.63, H * 1.05 / Math.sin(q.th));
       const top = { x: baseX + slopeLength * Math.cos(q.th), y: floorY - slopeLength * Math.sin(q.th) };
-      ctx.save(); ctx.beginPath(); ctx.moveTo(baseX, floorY); ctx.lineTo(top.x, top.y); ctx.lineTo(top.x, floorY); ctx.closePath(); ctx.fillStyle = "rgba(90,162,255,0.08)"; ctx.fill(); ctx.strokeStyle = PL.col("text-faint"); ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, floorY);
+      AP.ramp(ctx, baseX, floorY, slopeLength, q.th);
       const down = { x: -Math.cos(q.th), y: Math.sin(q.th) }, normal = { x: -Math.sin(q.th), y: -Math.cos(q.th) };
       const point = { x: top.x + down.x * slopeLength * 0.48, y: top.y + down.y * slopeLength * 0.48 };
-      ctx.save(); ctx.translate(point.x, point.y); ctx.rotate(-q.th); D.rect(ctx, -25, -32, 50, 28, { fill: MC(), stroke: "rgba(255,255,255,0.46)", width: 1.5, r: 5 }); ctx.restore();
+      AP.massBlock(ctx, point.x + normal.x * 1, point.y + normal.y * 1, 50, 28, { color: MC(), label: q.m + " kg", ang: -q.th, noShadow: true });
       const c = { x: point.x + normal.x * 13, y: point.y + normal.y * 13 }, scale = 3.1;
       D.arrow(ctx, c.x, c.y, c.x, c.y + 50, { color: PL.col("warn"), width: 2.2, label: "mg" });
       D.arrow(ctx, c.x, c.y, c.x + normal.x * 42, c.y + normal.y * 42, { color: "#8db7ff", width: 2.2, label: "N" });
@@ -910,6 +949,7 @@
        * 這是斜面題最常考、也最常被搞混的一步。
        */
       const gx = W - 186, gy2 = 34, gw = 150;
+      AP.infoCard(ctx, gx - 12, gy2 - 24, gw + 26, 88);
       const gMax = Math.max(q.fsMax, sMk.get() * q.N, Math.abs(q.drive), 1) * 1.15;
       D.text(ctx, "沿斜面方向的力比較（N）", gx, gy2 - 8, { color: PL.col("text-dim"), size: 10 });
       [["最大靜摩擦 μₛN", q.fsMax, "#7ee0c0"],
@@ -962,13 +1002,20 @@
     }
     function reset() { y = 0; v = 0; released = false; draw(); }
     function draw() {
-      const { ctx, W, H } = cv; cv.clear(); D.bg(cv); const q = model(), tableY = H * 0.43, edge = W * 0.70, blockX = edge - 105 + y * 12, ropeY = tableY - 26;
-      D.rect(ctx, 30, tableY, edge - 30, 16, { fill: "rgba(150,174,201,0.24)", stroke: PL.col("text-faint"), width: 1.5, r: 4 }); D.line(ctx, edge, tableY, edge, H - 32, PL.col("text-faint"), 4);
-      D.ring(ctx, edge, ropeY, 18, "rgba(255,255,255,0.58)", 3); D.line(ctx, blockX + 26, ropeY, edge, ropeY, "#c9d3e0", 2); D.line(ctx, edge + 18, ropeY, edge + 18, ropeY + 64 + y * 18, "#c9d3e0", 2);
-      D.rect(ctx, blockX - 30, tableY - 34, 60, 30, { fill: MC(), stroke: "rgba(255,255,255,0.45)", width: 1.5, r: 5 }); D.text(ctx, "mₜ", blockX, tableY - 14, { color: "#04121a", size: 12, align: "center", weight: "700" });
-      const hy = ropeY + 64 + y * 18; D.rect(ctx, edge - 8, hy, 52, 31, { fill: "#ffab80", stroke: "rgba(255,255,255,0.45)", width: 1.5, r: 5 }); D.text(ctx, "mₕ", edge + 18, hy + 20, { color: "#24110a", size: 12, align: "center", weight: "700" });
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv); const q = model(), tableY = H * 0.43, edge = W * 0.70, blockX = edge - 105 + y * 12, ropeY = tableY - 15;
+      const AP = PL.apparatus;
+      AP.labRoom(ctx, W, H, H - 18, { bench: "none" });
+      AP.table(ctx, 20, edge, tableY, H - 18, { thick: 16 });
+      AP.ground(ctx, 0, W, H - 18, 18, "field");
+      // 桌緣滑輪（夾具固定），繩子從輪頂水平拉向物體、從輪外緣垂下
+      AP.steel(ctx, edge - 16, ropeY - 3, 22, 6, 6);
+      AP.pulley(ctx, edge + 2, ropeY + 18, 18);
+      AP.cord(ctx, blockX + 30, ropeY, edge + 2, ropeY); AP.cord(ctx, edge + 20, ropeY + 18, edge + 20, ropeY + 64 + y * 18);
+      AP.massBlock(ctx, blockX, tableY, 64, 30, { color: MC(), label: "mₜ" });
+      const hy = ropeY + 64 + y * 18;
+      AP.massBlock(ctx, edge + 20, hy + 40, 58, 40, { color: "#ffab80", label: "mₕ", hook: true, noShadow: true });
       D.arrow(ctx, blockX, tableY - 45, blockX + Math.min(60, q.T * 2.2), tableY - 45, { color: PL.col("accent-2"), width: 2.4, label: "T" }); if (q.f) D.arrow(ctx, blockX, tableY - 56, blockX - Math.min(58, q.f * 1.3), tableY - 56, { color: q.staticHold ? "#7ee0c0" : PL.col("danger"), width: 2.2, label: "f" });
-      D.arrow(ctx, edge + 43, hy + 14, edge + 43, hy + 58, { color: PL.col("warn"), width: 2.3, label: "mₕg" }); D.text(ctx, q.staticHold ? "最大靜摩擦足夠：系統靜止" : "懸掛物下降，兩物體共同加速", 24, 30, { color: q.staticHold ? "#7ee0c0" : PL.col("danger"), size: 12 });
+      D.arrow(ctx, edge + 52, hy + 14, edge + 52, hy + 58, { color: PL.col("warn"), width: 2.3, label: "mₕg" }); D.text(ctx, q.staticHold ? "最大靜摩擦足夠：系統靜止" : "懸掛物下降，兩物體共同加速", 24, 30, { color: q.staticHold ? "#7ee0c0" : PL.col("danger"), size: 12 });
       rA.set(q.a, 2); rT.set(q.T, 2); rF.set(q.f, 2); rState.set(q.staticHold ? "保持靜止" : "mₕ 向下運動");
       cc.clear(); const g = PL.graph(cc, { x: 42, y: 16, w: cc.W - 56, h: cc.H - 40 }, { x0: 0.5, x1: 5, y0: 0, y1: 9 }); g.frame({ xlabel: "懸掛質量 mₕ (kg)", ylabel: "a (m/s²)" }); g.grid(5, 4); g.fn(mh => model(mh).a, { color: MC(), width: 2.3 }); g.dot(q.mh, q.a, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
     }
@@ -1000,8 +1047,15 @@
       const L_MAX = 10, ropePx = (edge - ropeTopStart) * (0.25 + 0.75 * length / L_MAX);
       const topLength = Math.max(24, ropePx * (1 - portion));
       const hangLength = Math.max(20, Math.min(H - tableY - 54, ropePx * portion));
-      D.rect(ctx, 30, tableY, edge - 30, 16, { fill: "rgba(150,174,201,0.24)", stroke: PL.col("text-faint"), width: 1.5, r: 4 }); D.line(ctx, edge, tableY, edge, H - 30, PL.col("text-faint"), 4);
-      D.line(ctx, edge - topLength, tableY - 10, edge, tableY - 10, PL.col("warn"), 7); D.ring(ctx, edge, tableY - 2, 12, PL.col("warn"), 5); D.line(ctx, edge + 11, tableY - 2, edge + 11, tableY + hangLength, PL.col("warn"), 7);
+      const AP = PL.apparatus;
+      AP.labRoom(ctx, W, H, H - 16, { bench: "none" });
+      AP.table(ctx, 20, edge, tableY, H - 16, { thick: 16 });
+      AP.ground(ctx, 0, W, H - 16, 16, "field");
+      // 光滑桌邊（圓角）＋一條均勻的粗繩
+      ctx.fillStyle = "rgb(190,198,210)"; ctx.beginPath(); ctx.arc(edge, tableY + 8, 8, -Math.PI / 2, Math.PI / 2); ctx.fill();
+      AP.rope(ctx, edge - topLength, tableY - 3.5, edge, tableY - 3.5, 7, "#d09a4a");
+      ctx.strokeStyle = "#d09a4a"; ctx.lineWidth = 7; ctx.beginPath(); ctx.arc(edge, tableY + 8, 11.5, -Math.PI / 2, 0); ctx.stroke();
+      AP.rope(ctx, edge + 11.5, tableY + 8, edge + 11.5, tableY + hangLength, 7, "#d09a4a");
       D.arrow(ctx, edge + 32, tableY + hangLength * 0.48, edge + 32, tableY + hangLength * 0.48 + Math.min(50, portion * 70), { color: PL.col("danger"), width: 2.3, label: "垂落部分重力" }); D.arrow(ctx, edge - topLength * 0.52, tableY - 32, edge - topLength * 0.52 + Math.min(50, v * 6), tableY - 32, { color: PL.col("accent-2"), width: 2.2, label: "v" });
       D.text(ctx, "垂落比例 x/L = " + PL.fmt(portion, 2), 24, 30, { color: PL.col("text-dim"), size: 12 }); D.text(ctx, released ? "垂落越多，拉力與加速度越大" : "設定初始垂落比例後釋放繩子", 24, 50, { color: PL.col("text-faint"), size: 11 });
       rA.set(a, 2); rX.set(portion * length, 2); rV.set(v, 2); rState.set("整條繩共同加速");
