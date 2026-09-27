@@ -219,6 +219,13 @@
   const inkMemo = { key: "", map: new Map() };
 
   function ink(ctx, color, x, y, kind) {
+    /*
+     * 漸層／圖樣物件直接放行。
+     * 下面的快取鍵是 color + "|" …，物件轉字串一律是 "[object CanvasGradient]"，
+     * 所有漸層會共用同一格快取——第一個被畫的漸層會被後面每一個漸層拿去用
+     * （木塊的木紋漸層跑到小車車身上）。器材本來就是固定色，不需要墨色調整。
+     */
+    if (typeof color !== "string") return color;
     const bg = backdropLum(ctx, x, y);
     const key = cacheKey();
     if (inkMemo.key !== key) { inkMemo.key = key; inkMemo.map.clear(); }
@@ -375,8 +382,7 @@
    */
   const METHODS_PROFILE = { family: "methods", stage: "實驗方法台", code: "LAB" };
   const METHOD_IDS = new Set([
-    "measurement-error", "regression-lab", "error-propagation",
-    "dimensional-analysis", "experimental-design", "geiger-statistics"
+    "measurement-error", "geiger-statistics"
   ]);
 
   /*
@@ -2071,6 +2077,12 @@
       name: themeName,
       isLight: () => themeName() === "light",
       ink, luminance, parseColor,
+      /*
+       * 場景層（天空、牆面、桌面、草地）是用 ctx 漸層直接畫的，墨色層看不到。
+       * 畫完之後用這個把「這一塊大致是什麼亮度」登記進去，
+       * 之後疊在上面的標註文字才會選對墨色。
+       */
+      note(ctx, color, x, y, w, h) { noteFill(ctx, color, x, y, w, h); },
       /* 供稽核工具判斷某個顏色是否為主題衍生（已隨主題調整、不該再被墨色層改動） */
       isThemeSurface,
       /* 畫在實驗台背景上的中性裝飾線／面。深色主題是半透明白，淺色主題自動換成半透明深墨。 */

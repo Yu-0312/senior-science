@@ -11,7 +11,6 @@
 
   const ADDITIONS = {
     kinematics: [
-      { id: "unit-conversion", title: "單位換算與尺度估計", interactive: I, concept: "同一物理量可用不同單位表示；先選擇合適尺度，再用倍率正確換算，才能判讀量測結果。", formula: R`\( 1\ \mathrm{m}=10^3\ \mathrm{mm},\quad 1\ \mathrm{km}=10^3\ \mathrm{m} \)`, points: ["單位是量測值的一部分", "公制單位以十進位換算", "先估量級可發現錯誤", "面積與體積的換算要平方或立方"] },
       { id: "motion-sensor", title: "超音波測距與位置—時間圖", interactive: I, concept: "測距感測器定時記錄人或車的位置，可直接得到位置—時間圖並由斜率判讀速度。", formula: R`\( v=\frac{\Delta x}{\Delta t} \)`, points: ["水平圖線代表靜止", "斜率越大速度越快", "斜率正負代表運動方向", "感測器可取代手動計時"] },
       { id: "reaction-time", title: "反應時間與平均速率", interactive: I, concept: "駕駛或接尺時，反應時間內物體仍會前進；把速率乘上反應時間可估算反應距離。", formula: R`\( d=vt,\quad \bar v=\frac{\text{路程}}{\text{時間}} \)`, points: ["反應距離與速率成正比", "疲勞會增加反應時間", "煞車距離另受摩擦影響", "平均速率以總路程除總時間"] }
     ],
@@ -33,9 +32,7 @@
       { id: "wind-turbine", title: "風力發電與葉片掃掠面積", interactive: I, concept: "風機擷取流過葉片掃掠面積的動能；風速對功率的影響接近三次方。", formula: R`\( P\approx\tfrac12\rho Av^3\eta \)`, points: ["風速稍增可大幅提高功率", "葉片越長掃掠面積越大", "理論效率存在上限", "實際輸出需考量切入與停機風速"] }
     ],
     gravity: [
-      { id: "cavendish-balance", title: "卡文迪西扭秤與萬有引力常數", interactive: I, concept: "兩個鉛球間極微弱的萬有引力會扭轉細線；量測角位移可反推重力常數的量級。", formula: R`\( F=G\frac{Mm}{r^2},\quad \tau=\kappa\theta \)`, points: ["實驗量到的是極微弱作用力", "距離平方反比很關鍵", "扭絲提供回復力矩", "G 可連結地球與天體尺度"] },
-      { id: "planetary-weight", title: "不同星球的重量與質量", interactive: I, concept: "質量是物體本身的量，重量是重力造成的力；到不同星球時質量不變，重量隨重力加速度改變。", formula: R`\( W=mg \)`, points: ["公斤是質量單位", "牛頓是力的單位", "月球重力較小所以較輕", "慣性由質量決定而非重量"] },
-      { id: "gravity-field-map", title: "萬有引力場與等位能線", interactive: I, concept: "引力場以向量表示受力方向與強弱，等位能線則連結位能相同的位置。", formula: R`\( g=\frac{GM}{r^2},\quad U=-\frac{GMm}{r} \)`, points: ["場線越密代表場越強", "引力方向指向質量中心", "等位能線與場線垂直", "靠近天體時位能更低"] }
+      { id: "cavendish-balance", title: "卡文迪西扭秤與萬有引力常數", interactive: I, concept: "兩個鉛球間極微弱的萬有引力會扭轉細線；量測角位移可反推重力常數的量級。", formula: R`\( F=G\frac{Mm}{r^2},\quad \tau=\kappa\theta \)`, points: ["實驗量到的是極微弱作用力", "距離平方反比很關鍵", "扭絲提供回復力矩", "G 可連結地球與天體尺度"] }
     ],
     shm: [
       { id: "physical-pendulum", title: "物理擺與轉動慣量", interactive: I, concept: "剛體繞固定軸小角度擺動時，週期同時取決於轉動慣量、質量與質心到支點距離。", formula: R`\( T=2\pi\sqrt{\frac{I}{mgd}} \)`, points: ["質量分布影響週期", "不是所有擺都等同單擺", "小角度近似簡諧運動", "可用週期研究轉動慣量"] },
@@ -62,8 +59,7 @@
       { id: "density-lab", title: "密度量測與沉浮判斷", interactive: I, concept: "密度是質量除以體積；比較物體與液體密度即可預測下沉、懸浮或漂浮。", formula: R`\( \rho=\frac{m}{V} \)`, points: ["同體積時密度大者質量較大", "密度小於液體會漂浮", "密度相同可懸浮", "可用排水量測不規則體積"] },
       { id: "atmospheric-pressure", title: "大氣壓力與馬德堡半球", interactive: I, concept: "抽出兩半球間的空氣後，外界大氣壓力造成很大的合力，顯示空氣雖看不見仍有壓力。", formula: R`\( F=\Delta P\,A \)`, points: ["大氣壓隨高度上升而降低", "壓差作用於整個面積", "真空不是吸力而是壓差結果", "吸盤與注射器是應用"] },
       { id: "surface-tension", title: "液面張力與毛細現象", interactive: I, concept: "液體表面分子受力不均而像拉緊的薄膜；細管中液面上升或下降由表面張力與潤濕性決定。", formula: R`\( h=\frac{2\gamma\cos\theta}{\rho gr} \)`, points: ["細管越細毛細高度越大", "水潤濕玻璃會上升", "表面張力可支撐小物", "清潔劑會降低表面張力"] },
-      { id: "calorimetry-mixing", title: "熱量計與混合水溫", interactive: I, concept: "熱水放熱與冷水吸熱在理想情況下相等；由平衡溫度可比較熱量與質量的關係。", formula: R`\( m_hc(T_h-T_f)=m_cc(T_f-T_c) \)`, points: ["熱水放出的熱等於冷水吸收的熱", "平衡時溫度相同", "質量大的一方影響較明顯", "容器吸熱會造成誤差"] },
-      { id: "greenhouse-radiation", title: "輻射平衡與溫室效應", interactive: I, concept: "地表吸收太陽短波後放出紅外線；溫室氣體增加會改變向外散熱效率，使平衡溫度上升。", formula: R`\( P_{\text{吸收}}=P_{\text{放射}},\quad P=\sigma AT^4 \)`, points: ["溫度由能量收支決定", "紅外線吸收會降低散熱", "這是簡化的輻射模型", "氣候還受雲、水氣與循環影響"] }
+      { id: "calorimetry-mixing", title: "熱量計與混合水溫", interactive: I, concept: "熱水放熱與冷水吸熱在理想情況下相等；由平衡溫度可比較熱量與質量的關係。", formula: R`\( m_hc(T_h-T_f)=m_cc(T_f-T_c) \)`, points: ["熱水放出的熱等於冷水吸收的熱", "平衡時溫度相同", "質量大的一方影響較明顯", "容器吸熱會造成誤差"] }
     ],
     waves: [
       { id: "string-wave-speed", title: "弦波速、張力與線密度", interactive: I, concept: "繩上的橫波速率由張力與每單位長度的質量決定；張力越大波走得越快。", formula: R`\( v=\sqrt{\frac{T}{\mu}} \)`, points: ["波速由介質性質決定", "張力增加使波速增加", "線密度增加使波速降低", "頻率與波長以 v=f\lambda 連結"] },
