@@ -8,6 +8,9 @@
 
   function energyBars(cv, x, y, w, parts, total) {
     const ctx = cv.ctx; let yy = y;
+    // 長條墊在一張卡片上：直接畫在木桌或牆上會看不清楚
+    const A = PL.apparatus;
+    if (A && A.infoCard) A.infoCard(ctx, x - 10, y - 8, w + 58, parts.length * 20 + 10);
     parts.forEach(p => {
       D.text(ctx, p.label, x, yy + 10, { color: PL.col("text-dim"), size: 11 });
       D.rect(ctx, x + 52, yy, w - 52, 13, { fill: "rgba(255,255,255,0.05)", r: 4 });
@@ -37,12 +40,18 @@
       const F = sF.get(), th = sTh.get() * Math.PI / 180, m = MC();
       const gy = H - 50, sc = (W - 120) / 16, px = 70 + (x % 16) * sc;
       AP().benchTop && AP().benchTop(ctx, W, H, gy + 4);
-      D.line(ctx, 20, gy, W - 20, gy, "rgba(150,140,120,0.55)", 2);
       AP().cart ? AP().cart(ctx, px, gy, 62, 36)
                 : D.rect(ctx, px - 22, gy - 30, 44, 30, { fill: m, stroke: "rgba(255,255,255,0.4)", r: 5 });
       const fx = F * Math.cos(th), fy = F * Math.sin(th);
-      D.arrow(ctx, px, gy - 15, px + fx * 5, gy - 15 - fy * 5, { color: PL.col("accent-2"), width: 2.5, label: "F" });
-      D.arrow(ctx, px, gy - 15, px + fx * 5, gy - 15, { color: "#7ee0c0", width: 2, label: "F cosθ", dash: [3, 3] });
+      // 用繩子斜斜地拉車：繩子的方向就是施力方向 θ
+      if (AP().rope) {
+        const hx = px + 34, hy = gy - 20, rl = 70;
+        const ex = hx + rl * Math.cos(th), ey = hy - rl * Math.sin(th);
+        AP().rope(ctx, hx, hy, ex, ey, 2.4, "#c8a46a");
+        AP().hand(ctx, ex + 8 * Math.cos(th), ey - 8 * Math.sin(th), 1, 0.8, { pull: true, ang: -th });
+      }
+      D.arrow(ctx, px, gy - 52, px + fx * 5, gy - 52 - fy * 5, { color: PL.col("accent-2"), width: 2.5, label: "F" });
+      D.arrow(ctx, px, gy - 52, px + fx * 5, gy - 52, { color: "#2fae85", width: 2, label: "F cosθ", dash: [3, 3] });
       PL.ui.caption(cv, "只有沿移動方向的分力 F cosθ 才做功。");
       rW.set(W_, 1); rP.set(fx * sV.get(), 1); rFx.set(fx, 1);
     }
@@ -69,21 +78,20 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const m = sM.get();
-      const gy = 92, sc = (W - 120) / 16, px = 70 + (x % 16) * sc, K = 0.5 * m * v * v;
+      const gy = 104, sc = (W - 120) / 16, px = 70 + (x % 16) * sc, K = 0.5 * m * v * v;
       /*
        * 方塊尺寸跟著質量走。原本固定 40×26，於是靜止時調整質量畫面完全不動，
        * 學生看不出自己改的是「哪一個東西的什麼性質」。
        * 同時也讓「同樣的力推更重的東西，加速度較小」有一個可以先預期的視覺線索。
        */
-      const bw = 26 + m * 4, bh = 20 + m * 2.4;
+      const bw = 40 + m * 7, bh = 24 + m * 2.4;
       AP().benchTop && AP().benchTop(ctx, W, H, gy + 4);
-      D.line(ctx, 20, gy, W - 20, gy, "rgba(150,140,120,0.55)", 2);
       AP().cart ? AP().cart(ctx, px, gy, bw + 10, bh)
                 : D.rect(ctx, px - bw / 2, gy - bh, bw, bh, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 4 });
-      D.text(ctx, PL.fmt(m, 1) + " kg", px, gy - bh / 2 + 4, { color: "#04121a", size: 10, align: "center", weight: "700" });
+      D.text(ctx, PL.fmt(m, 1) + " kg", px, gy - bh - 14, { color: PL.col("text"), size: 10, align: "center", weight: "700" });
       D.arrow(ctx, px + bw / 2, gy - bh / 2, px + bw / 2 + sF.get() * 4, gy - bh / 2, { color: KEc, width: 2.2, label: "F" });
       if (sFr.get() > 0) D.arrow(ctx, px - bw / 2, gy - bh / 2, px - bw / 2 - sFr.get() * 4, gy - bh / 2, { color: THc, width: 2, label: "f" });
-      energyBars(cv, 40, gy + 40, W - 120, [{ label: "淨功", v: Wnet, c: MC() }, { label: "動能 K", v: K, c: KEc }], Math.max(Wnet, K, 10));
+      energyBars(cv, 40, gy + 56, W - 120, [{ label: "淨功", v: Wnet, c: MC() }, { label: "動能 K", v: K, c: KEc }], Math.max(Wnet, K, 10));
       PL.ui.caption(cv, "淨功 = 動能變化：兩條長條始終等長");
       rWn.set(Wnet, 1); rK.set(K, 1); rV.set(v, 2);
     }
@@ -308,8 +316,23 @@
       const py = hm => groundY - hm * sc;
       cv.calibrate(sc, "m");
 
-      // 地面
-      D.line(ctx, 20, groundY, W - 20, groundY, PL.col("text-faint"), 1.5);
+      /* 場景：戶外滑板場。軌道是有支架的木造滑板坡道 */
+      AP().outdoor(ctx, W, H, groundY, { ground: "asphalt", t: t, hills: true, sunX: W * 0.35 });
+      ctx.save();
+      ctx.beginPath();
+      for (let x = 0; x <= tk.length; x += 0.2) { const X = px(x), Y = py(tk.h(x)); x === 0 ? ctx.moveTo(X, Y) : ctx.lineTo(X, Y); }
+      ctx.lineTo(px(tk.length), groundY); ctx.lineTo(px(0), groundY); ctx.closePath();
+      const rg = ctx.createLinearGradient(0, topY, 0, groundY);
+      rg.addColorStop(0, PL.theme.isLight() ? "#d9b27c" : "#6a4d30"); rg.addColorStop(1, PL.theme.isLight() ? "#b7894f" : "#4a341f");
+      ctx.fillStyle = rg; ctx.fill();
+      ctx.clip();
+      // 木板接縫與支架
+      ctx.strokeStyle = "rgba(90,56,24,0.35)"; ctx.lineWidth = 1;
+      for (let x = 0; x <= tk.length; x += 2) { ctx.beginPath(); ctx.moveTo(px(x), topY); ctx.lineTo(px(x), groundY); ctx.stroke(); }
+      ctx.strokeStyle = "rgba(90,56,24,0.22)";
+      for (let x = 0; x < tk.length; x += 4) { ctx.beginPath(); ctx.moveTo(px(x), groundY); ctx.lineTo(px(x + 2), py(tk.h(x + 2)) + 6); ctx.stroke(); }
+      ctx.restore();
+      PL.theme.note(ctx, PL.theme.isLight() ? "#c99d66" : "#5a4128", px(0), py(2), px(tk.length) - px(0), groundY - py(2));
 
       // 軌道本體
       ctx.save();
@@ -353,13 +376,11 @@
       const bx = px(s), by = py(hNow);
       const tilt = -Math.atan(slope(s));
       ctx.save();
-      ctx.translate(bx, by);
+      ctx.translate(bx, by - 2);
       ctx.rotate(tilt);
-      D.rect(ctx, -13, -3, 26, 4, { fill: m, r: 2 });                 // 滑板
-      D.disc(ctx, -8, 2, 2.6, { fill: PL.theme.pale(0.5) });          // 輪
-      D.disc(ctx, 8, 2, 2.6, { fill: PL.theme.pale(0.5) });
-      D.rect(ctx, -4, -20, 8, 17, { fill: PL.col("accent-2"), r: 3 }); // 身體
-      D.disc(ctx, 0, -25, 5.5, { fill: "#e8b48c" });                   // 頭
+      const hk = 30 + (sMass.get() - 20) / 70 * 14;                   // 越重的滑板者畫得越高大
+      AP().skateboard(ctx, 0, 1, hk * 0.95, { color: "#e2574c" });
+      AP().person(ctx, 0, -hk * 0.2, hk, { pose: "arms-up", shirt: "#2f7fd8", facing: v >= 0 ? 1 : -1 });
       ctx.restore();
 
       // 能量長條：守恆最有說服力的呈現方式
@@ -482,12 +503,19 @@
       const k = sK.get(), x0 = sX.get(), m = sM.get(), Hmax = 0.5 * k * x0 * x0 / (m * g);
       const groundY = H - 30, sc = (H - 80) / (Hmax + 0.6), cx = W * 0.34;
       AP().benchTop && AP().benchTop(ctx, W, H, groundY + 4);
-      D.line(ctx, cx - 60, groundY, cx + 60, groundY, "rgba(150,140,120,0.55)", 2);
+      // 彈簧座：底板＋兩根導桿，物體沿導桿被彈上去
+      AP().steel(ctx, cx - 46, groundY - 6, 92, 10, 6);
+      AP().steel(ctx, cx - 40, 30, 5, groundY - 36, 8);
+      AP().steel(ctx, cx + 35, 30, 5, groundY - 36, 8);
       const springTop = groundY - (0.6 - comp) * sc * 0.4 - 40;
-      D.spring(ctx, cx, groundY, cx, springTop, 9, 10, MC());
-      const by = springTop - 14 - y * sc;
-      AP().cart ? AP().cart(ctx, cx, by + 20, 58, 30)
+      D.spring(ctx, cx, groundY - 6, cx, springTop, 9, 12, "#9aa8b8");
+      AP().steel(ctx, cx - 24, springTop - 4, 48, 5, 10);
+      const by = springTop - 4 - y * sc;
+      const bs = 26 + m * 6;
+      AP().massBlock ? AP().massBlock(ctx, cx, by, bs + 8, bs * 0.8, { color: "#e0703a", label: PL.fmt(m, 1) + " kg", noShadow: true })
                 : D.rect(ctx, cx - 20, by - 20, 40, 20, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 4 });
+      // 高度尺
+      AP().ruler && AP().ruler(ctx, cx + 56, 30, groundY - 8, Math.max(4, sc / 10));
       // 能量長條
       const spE = 0.5 * k * comp * comp, ke = 0.5 * m * v * v, pe = m * g * y;
       energyBars(cv, W * 0.5, 50, W * 0.42, [{ label: "彈性能", v: spE, c: MC() }, { label: "動能", v: ke, c: KEc }, { label: "重力能", v: pe, c: PEc }], Math.max(spE, 0.5 * k * x0 * x0, 1));
@@ -529,7 +557,7 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const sx = (W - 60) / 20, sy = (H - 60) / 12, PX = p => 30 + p.x * sx, PY = p => H - 30 - p.y * sy;
       const pts = pathPts();
-      AP().benchTop && AP().benchTop(ctx, W, H, H - 26);
+      AP().outdoor ? AP().outdoor(ctx, W, H, H - 26, { ground: "grass", hills: false }) : null;
       // 地形填充：路徑以下鋪一層山坡（與路徑同形，落到底部）
       ctx.save();
       ctx.beginPath();
@@ -538,14 +566,20 @@
       ctx.lineTo(PX(pts[0]), H - 26);
       ctx.closePath();
       const hg = ctx.createLinearGradient(0, 60, 0, H - 26);
-      hg.addColorStop(0, "rgba(150,170,120,0.30)");
-      hg.addColorStop(1, "rgba(110,120,90,0.42)");
+      const Lt = PL.theme.isLight();
+      hg.addColorStop(0, Lt ? "#a8d383" : "#2d5232");
+      hg.addColorStop(1, Lt ? "#7fb35a" : "#1d3a22");
       ctx.fillStyle = hg; ctx.fill();
       ctx.restore();
+      PL.theme.note(ctx, Lt ? "#94c56e" : "#26452a", PX(pts[0]), PY(B), PX(pts[pts.length - 1]) - PX(pts[0]), H - 26 - PY(B));
       // 高度參考線
       D.line(ctx, 20, PY(A), W - 20, PY(A), "rgba(160,170,190,0.18)", 1, [3, 3]);
       D.line(ctx, 20, PY(B), W - 20, PY(B), "rgba(160,170,190,0.18)", 1, [3, 3]);
-      ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 3; ctx.beginPath();
+      // 路徑是山坡上的一條泥土步道
+      ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.strokeStyle = PL.theme.isLight() ? "#b98a55" : "#6d5033"; ctx.lineWidth = 9; ctx.beginPath();
+      pts.forEach((p, i) => { const px = PX(p), py = PY(p); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }); ctx.stroke();
+      ctx.strokeStyle = MC(); ctx.lineWidth = 2.5; ctx.setLineDash([6, 5]); ctx.beginPath();
       pts.forEach((p, i) => { const px = PX(p), py = PY(p); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }); ctx.stroke(); ctx.restore();
       D.disc(ctx, PX(A), PY(A), 6, { fill: PL.col("accent-2") }); D.text(ctx, "A", PX(A) - 14, PY(A) + 4, { color: PL.col("accent-2"), size: 13 });
       D.disc(ctx, PX(B), PY(B), 6, { fill: PL.col("warn") }); D.text(ctx, "B", PX(B) + 8, PY(B) + 4, { color: PL.col("warn"), size: 13 });
@@ -554,7 +588,7 @@
       const Wg = m * g * (A.y - B.y), Wf = -sMu.get() * m * g * len;
       // 移動點
       const idx = Math.min(pts.length - 1, Math.floor(s * (pts.length - 1)));
-      D.disc(ctx, PX(pts[idx]), PY(pts[idx]), 8, { fill: MC(), glow: MC(), glowSize: 12 });
+      AP().sportBall ? AP().sportBall(ctx, PX(pts[idx]), PY(pts[idx]) - 9, 9, "steel", s * 12) : D.disc(ctx, PX(pts[idx]), PY(pts[idx]), 8, { fill: MC() });
 
       /*
        * 摩擦係數這根滑桿原本只改變讀數上的數字，畫面完全沒反應。
@@ -567,6 +601,7 @@
        */
       const bx = W - 132, by = 30, bw = 104, rowH = 17;
       const scale = bw / Math.max(1, Math.abs(Wg) * 1.6);
+      AP().infoCard && AP().infoCard(ctx, bx - 10, by - 24, bw + 60, 3 * (rowH + 12) + 26);
       D.text(ctx, "做功比較", bx, by - 8, { color: PL.col("text-dim"), size: 10.5, weight: "700" });
       [["重力功 W_g", Wg, PL.col("ok")],
        ["摩擦功 W_f", Wf, PL.col("danger")],

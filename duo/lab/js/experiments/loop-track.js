@@ -204,9 +204,9 @@
       const PY = y => oy - y * sc;
       cv.calibrate(sc, "m");
 
-      // 地面
-      D.rect(ctx, 20, PY(0), W - 40, H - PY(0) - 6, { fill: PL.theme.shade(0.30), stroke: PL.theme.pale(0.26), width: 1, r: 3 });
-      D.line(ctx, 20, PY(0), W - 20, PY(0), PL.theme.pale(0.35), 2);
+      // 場景：遊樂園。地面就是 y = 0 基準面
+      const AP = PL.apparatus;
+      AP.outdoor(ctx, W, H, PY(0), { ground: "grass", city: true, sunX: W * 0.12, sunY: 34 });
       D.text(ctx, "y = 0 基準面", W - 26, PY(0) + 16,
         { color: PL.col("text-faint"), size: 9.5, align: "right" });
 
@@ -221,23 +221,43 @@
       // 軌道：斜坡＋平段＋圓環 —— 雙鋼軌 + 枕木 + 支撐柱
       // 每影格只重畫「跟著球動」的部分；鋼軌與柱子用靜態圖層，改參數時才重畫。
       const total = loopEnd();
-      if (!draw._railKey || draw._railKey !== [sR.get(), sH.get(), W, H, sc, ox, oy].join("|")) {
-        draw._railKey = [sR.get(), sH.get(), W, H, sc, ox, oy].join("|");
+      const railKey = [sR.get(), sH.get(), W, H, sc, ox, oy, PL.theme.name()].join("|");
+      if (!draw._railKey || draw._railKey !== railKey) {
+        draw._railKey = railKey;
         draw._rails = document.createElement("canvas");
         draw._rails.width = Math.round(W * cv.dpr);
         draw._rails.height = Math.round(H * cv.dpr);
         const rctx = draw._rails.getContext("2d");
         rctx.setTransform(cv.dpr, 0, 0, cv.dpr, 0, 0);
-        rctx.strokeStyle = "rgba(70,82,98,0.9)";
-        rctx.lineWidth = 5; rctx.lineCap = "round";
+        // 立柱先畫（在軌道後面）：白色鋼管
+        rctx.lineCap = "round";
+        for (let i = 4; i <= 32; i += 3) {
+          const p = pointAt(total * i / 36);
+          if (p.part === "loop" || p.y < 0.04) continue;
+          rctx.strokeStyle = "rgba(90,98,112,0.9)"; rctx.lineWidth = 5;
+          rctx.beginPath(); rctx.moveTo(PX(p.x), PY(p.y) + 2); rctx.lineTo(PX(p.x), PY(0)); rctx.stroke();
+          rctx.strokeStyle = "rgba(235,238,242,0.95)"; rctx.lineWidth = 3;
+          rctx.beginPath(); rctx.moveTo(PX(p.x), PY(p.y) + 2); rctx.lineTo(PX(p.x), PY(0)); rctx.stroke();
+          rctx.fillStyle = "rgba(120,126,136,0.9)"; rctx.fillRect(PX(p.x) - 5, PY(0) - 3, 10, 4);
+        }
+        // 圓環底下的支撐 A 字架
+        {
+          const lc = { x: RAMP_LEN() + FLAT_LEN, y: sR.get() };
+          rctx.strokeStyle = "rgba(235,238,242,0.9)"; rctx.lineWidth = 3;
+          rctx.beginPath();
+          rctx.moveTo(PX(lc.x - sR.get() * 0.7), PY(0)); rctx.lineTo(PX(lc.x), PY(lc.y));
+          rctx.lineTo(PX(lc.x + sR.get() * 0.7), PY(0)); rctx.stroke();
+        }
+        rctx.strokeStyle = "rgba(150,24,20,0.95)";
+        rctx.lineWidth = 6; rctx.lineCap = "round";
         rctx.beginPath();
         for (let i = 0; i <= 160; i++) {
           const p = pointAt(total * i / 160);
           i ? rctx.lineTo(PX(p.x), PY(p.y)) : rctx.moveTo(PX(p.x), PY(p.y));
         }
         rctx.stroke();
-        rctx.strokeStyle = "rgba(168,182,200,0.85)";
-        rctx.lineWidth = 2.2;
+        rctx.strokeStyle = "rgba(236,86,70,0.95)";
+        rctx.lineWidth = 2.6;
         rctx.beginPath();
         for (let i = 0; i <= 160; i++) {
           const p = pointAt(total * i / 160);
@@ -258,19 +278,6 @@
           rctx.moveTo(PX(p.x - nx), PY(p.y - ny));
           rctx.lineTo(PX(p.x + nx), PY(p.y + ny));
           rctx.stroke();
-        }
-        // 立柱
-        rctx.strokeStyle = "rgba(86,96,112,0.55)";
-        rctx.lineWidth = 2.4;
-        rctx.fillStyle = "rgba(70,78,92,0.7)";
-        for (let i = 4; i <= 32; i += 3) {
-          const p = pointAt(total * i / 36);
-          if (p.part === "loop" || p.y < 0.04) continue;
-          rctx.beginPath();
-          rctx.moveTo(PX(p.x), PY(p.y) + 2);
-          rctx.lineTo(PX(p.x), PY(0));
-          rctx.stroke();
-          rctx.fillRect(PX(p.x) - 3, PY(0) - 2, 6, 3);
         }
       }
       if (draw._rails) ctx.drawImage(draw._rails, 0, 0, W, H);
@@ -320,7 +327,11 @@
       ctx.strokeStyle = PE_C;
       ctx.beginPath(); ctx.arc(PX(bx), PY(by), r0 + 5, -Math.PI / 2 + TAU * keFrac, -Math.PI / 2 + TAU); ctx.stroke();
       ctx.restore();
-      D.disc(ctx, PX(bx), PY(by), r0, { fill: MC(), stroke: PL.theme.pale(0.5), width: 1.5, glow: MC(), glowSize: 10 });
+      // 車廂沿切線擺放（脫軌後沿速度方向）；車越重畫得越大
+      let tang;
+      if (detached) tang = Math.atan2(-detached.vy, detached.vx);
+      else { const pA = pointAt(Math.min(s, total)), pB = pointAt(Math.min(total, Math.min(s, total) + 0.01)); tang = Math.atan2(-(pB.y - pA.y), pB.x - pA.x || 1e-6); }
+      AP.coasterCar(ctx, PX(bx), PY(by) + 1, tang, r0 * 2.3, "#e0473c");
 
       D.text(ctx, "小球外圈：", 40, 24, { color: PL.col("text-faint"), size: 9.5 });
       D.disc(ctx, 104, 21, 4, { fill: KE_C });

@@ -264,7 +264,7 @@
       const { W, H } = cv; cv.clear(); D.bg(cv);
       layout(W, H);
       const sol = solve();
-      AP.benchTop(ctx, W, H, GEO.bat.y + GEO.bat.h + 18);
+      AP.circuitBoard(ctx, W, H, false);
 
       if (view === "schematic") {
         drawWiresSchematic(sol);

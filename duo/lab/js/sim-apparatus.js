@@ -73,8 +73,10 @@
     const g = ctx.createRadialGradient(cx, y, 1, cx, y, w);
     g.addColorStop(0, "rgba(0,0,0,0.34)");
     g.addColorStop(1, "rgba(0,0,0,0)");
+    // 長條器材（軌道、桌子）的影子只能是一條扁帶，不能是一大團黑霧
+    const k = Math.min(0.24, 12 / Math.max(1, w));
     ctx.save(); ctx.fillStyle = g;
-    ctx.translate(cx, y); ctx.scale(1, 0.24); ctx.translate(-cx, -y);
+    ctx.translate(cx, y); ctx.scale(1, k); ctx.translate(-cx, -y);
     ctx.beginPath(); ctx.arc(cx, y, w, 0, TAU); ctx.fill();
     ctx.restore();
   }
@@ -1820,6 +1822,24 @@
     return { top: by };
   }
 
+
+  /*
+   * 只佔畫面上方一條的場景：上面放實驗裝置、下面還要畫圖表的實驗用。
+   * h 是場景高度，benchY 是桌面高度（通常 h 的上方一點點）。
+   */
+  function labStrip(ctx, W, h, benchY, o) {
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, h); ctx.clip();
+    labRoom(ctx, W, h, benchY, o);
+    ctx.restore();
+    ctx.fillStyle = isLight() ? "rgba(40,60,90,0.18)" : "rgba(255,255,255,0.10)"; ctx.fillRect(0, h - 1, W, 1);
+  }
+  function outdoorStrip(ctx, W, h, groundY, o) {
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, h); ctx.clip();
+    outdoor(ctx, W, h, groundY, o);
+    ctx.restore();
+    ctx.fillStyle = isLight() ? "rgba(40,60,90,0.18)" : "rgba(255,255,255,0.10)"; ctx.fillRect(0, h - 1, W, 1);
+  }
+
   /* 牆上的窗：淺色主題看得到藍天白雲，深色主題是夜空 */
   function labWindow(ctx, x, y, w, h) {
     const L = isLight();
@@ -2901,7 +2921,7 @@
     o = o || {};
     s = s || 1; dir = dir || 1;
     ctx.save();
-    ctx.translate(x, y); ctx.scale(dir * s, s);
+    ctx.translate(x, y); if (o.ang) ctx.rotate(o.ang); ctx.scale(dir * s, s);
     const skin = "rgb(240,196,156)", skinD = "rgb(206,150,112)";
     // 袖口與前臂
     ctx.fillStyle = o.sleeve || "#3b82c4";
@@ -2999,6 +3019,783 @@
     steel(ctx, cx - bw * 0.7, topY + h, bw * 1.4, 6, 6);
   }
 
+
+
+  /* 雲霄飛車車廂：沿軌道切線擺放，(x, y) 是車廂中心、ang 為切線角（canvas 座標）。size 為車長 */
+  function coasterCar(ctx, x, y, ang, size, color) {
+    const c = hexRgb(color || "#e0473c"), L2 = size / 2, h = size * 0.42;
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(ang);
+    // 乘客（舉手尖叫）
+    ctx.fillStyle = "rgb(240,200,160)";
+    ctx.beginPath(); ctx.arc(-L2 * 0.1, -h - size * 0.16, size * 0.13, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "rgb(240,200,160)"; ctx.lineWidth = Math.max(1.5, size * 0.07); ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(-L2 * 0.25, -h * 0.9); ctx.lineTo(-L2 * 0.45, -h - size * 0.4); ctx.moveTo(L2 * 0.05, -h * 0.9); ctx.lineTo(L2 * 0.25, -h - size * 0.4); ctx.stroke();
+    // 車身
+    const g = ctx.createLinearGradient(0, -h, 0, 0);
+    g.addColorStop(0, rgbStr(shadeRgb(c, 0.35))); g.addColorStop(1, rgbStr(shadeRgb(c, -0.35)));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(-L2, -h * 0.2); ctx.quadraticCurveTo(-L2, -h, -L2 * 0.55, -h);
+    ctx.lineTo(L2 * 0.35, -h); ctx.quadraticCurveTo(L2 * 1.05, -h * 0.9, L2, -h * 0.1);
+    ctx.lineTo(L2, 0); ctx.lineTo(-L2, 0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = rgbStr(shadeRgb(c, -0.6), 0.8); ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.fillRect(-L2 * 0.7, -h * 0.72, L2 * 1.3, 1.6);
+    // 輪子
+    ctx.fillStyle = "rgb(40,42,48)";
+    [-L2 * 0.6, L2 * 0.6].forEach(wx => { ctx.beginPath(); ctx.arc(wx, 1, size * 0.12, 0, TAU); ctx.fill(); });
+    ctx.restore();
+  }
+
+  /* ===============================================================
+     器材 v2：動量與碰撞
+     =============================================================== */
+
+  /* 氣墊軌道：三角鋁軌 + 出氣孔 + 兩端緩衝座 + 鼓風機軟管。y 為滑車底面 */
+  function airTrack(ctx, x0, x1, y, o) {
+    o = o || {};
+    const L = isLight();
+    contactShadow(ctx, (x0 + x1) / 2, y + 26, (x1 - x0) * 0.5);
+    // 支腳
+    [x0 + 30, x1 - 30].forEach(lx => { steel(ctx, lx - 4, y + 10, 8, 16, -6); steel(ctx, lx - 16, y + 24, 32, 5, -8); });
+    // 軌身（梯形斷面）
+    const g = ctx.createLinearGradient(0, y - 2, 0, y + 12);
+    g.addColorStop(0, "rgb(222,228,236)"); g.addColorStop(0.35, "rgb(176,186,198)"); g.addColorStop(1, "rgb(110,120,134)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.moveTo(x0, y + 12); ctx.lineTo(x0 + 4, y - 1); ctx.lineTo(x1 - 4, y - 1); ctx.lineTo(x1, y + 12); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "rgba(40,48,60,0.55)"; ctx.lineWidth = 1; ctx.stroke();
+    // 出氣孔
+    ctx.fillStyle = "rgba(40,48,60,0.5)";
+    for (let x = x0 + 14; x < x1 - 10; x += 12) { ctx.beginPath(); ctx.arc(x, y + 4, 1.1, 0, TAU); ctx.fill(); }
+    // 端座
+    steel(ctx, x0 - 8, y - 16, 10, 30, 10); steel(ctx, x1 - 2, y - 16, 10, 30, 10);
+    // 鼓風機軟管
+    if (o.hose !== false) {
+      ctx.strokeStyle = L ? "rgb(70,76,86)" : "rgb(50,56,66)"; ctx.lineWidth = 6; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(x1 + 8, y + 2); ctx.bezierCurveTo(x1 + 30, y + 2, x1 + 20, y + 30, x1 + 38, y + 40); ctx.stroke();
+    }
+    note(ctx, "rgb(176,186,198)", x0, y - 1, x1 - x0, 13);
+  }
+
+  /*
+   * 氣墊滑車：跨在軌道上的倒 V 鋁件 + 頂部擋光片 + 緩衝器。
+   * (cx, y) 的 y 是軌道頂面；o.tint 車身漆色；o.bumper: "spring" | "clay" | "rubber"（朝 o.bumperSide 那一側）
+   */
+  function glider(ctx, cx, y, w, h, o) {
+    o = o || {};
+    const c = hexRgb(o.tint || "#9aa6b6");
+    const top = y - h;
+    ctx.save();
+    const g = ctx.createLinearGradient(0, top, 0, y);
+    g.addColorStop(0, rgbStr(shadeRgb(c, 0.45))); g.addColorStop(0.5, rgbStr(c)); g.addColorStop(1, rgbStr(shadeRgb(c, -0.35)));
+    ctx.fillStyle = g;
+    // 側面是一整片鋁板（倒 V 的側視），下緣兩端微微外撇、跨在軌道兩側
+    ctx.beginPath();
+    ctx.moveTo(cx - w / 2 - 2, y + 5); ctx.lineTo(cx - w / 2 + 2, top + 5); ctx.lineTo(cx - w / 2 + 7, top);
+    ctx.lineTo(cx + w / 2 - 7, top); ctx.lineTo(cx + w / 2 - 2, top + 5); ctx.lineTo(cx + w / 2 + 2, y + 5);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = rgbStr(shadeRgb(c, -0.6), 0.8); ctx.lineWidth = 1; ctx.stroke();
+    // 折彎線：看得出是彎折的鋁板
+    ctx.strokeStyle = "rgba(255,255,255,0.28)";
+    ctx.beginPath(); ctx.moveTo(cx - w / 2 + 6, top + 7); ctx.lineTo(cx + w / 2 - 6, top + 7); ctx.stroke();
+    ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.fillRect(cx - w / 2 + 1, y - 2, w - 2, 7);
+    // 側面刻字板
+    ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.fillRect(cx - w / 2 + 8, top + 1.5, w - 16, 2);
+    // 擋光片
+    ctx.fillStyle = "rgb(40,44,52)"; ctx.fillRect(cx - 1.5, top - 14, 3, 14);
+    ctx.fillRect(cx - 7, top - 16, 14, 4);
+    if (o.label) {
+      ctx.font = "700 " + Math.max(9, Math.min(12, h * 0.5)) + "px 'Segoe UI','PingFang TC',system-ui,sans-serif";
+      ctx.fillStyle = "rgba(20,26,36,0.9)"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(o.label, cx, top + h * 0.62);
+    }
+    // 緩衝器
+    const side = o.bumperSide || 0;
+    if (side) {
+      const bx = cx + side * w / 2, by = top + h * 0.4;
+      if (o.bumper === "clay") {
+        ctx.fillStyle = "rgb(214,120,70)";
+        ctx.beginPath(); ctx.ellipse(bx + side * 3, by, 4.5, 6, 0, 0, TAU); ctx.fill();
+      } else if (o.bumper === "rubber") {
+        ctx.strokeStyle = "rgb(40,40,44)"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(bx, by - 6); ctx.quadraticCurveTo(bx + side * 9, by, bx, by + 6); ctx.stroke();
+      } else {
+        // 彈簧撞針
+        ctx.strokeStyle = "rgb(160,168,180)"; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(bx, by);
+        for (let i = 1; i <= 6; i++) ctx.lineTo(bx + side * i * 1.6, by + (i % 2 ? -4 : 4));
+        ctx.lineTo(bx + side * 11, by); ctx.stroke();
+        ctx.fillStyle = "rgb(180,188,200)"; ctx.fillRect(bx + side * 11 - 1.5, by - 5, 3, 10);
+      }
+    }
+    ctx.restore();
+  }
+
+  /* 風扇車：小車 + 馬達 + 螺旋槳。on 時葉片轉動、後方畫氣流。回傳車身頂 y */
+  function fanCart(ctx, cx, baseY, w, h, spin, on) {
+    cart(ctx, cx, baseY, w, h);
+    const r = Math.max(4, Math.min(9, h * 0.26));
+    const top = baseY - r * 1.1 - h;
+    // 馬達座
+    steel(ctx, cx - 5, top - 16, 10, 16, 6);
+    ctx.fillStyle = "rgb(60,64,72)"; rrPath(ctx, cx - 12, top - 26, 18, 12, 4); ctx.fill();
+    // 螺旋槳（側視：扁平葉片，轉動時用模糊圓盤表現）
+    const hx = cx - 14, hy = top - 20;
+    if (on) {
+      ctx.fillStyle = "rgba(180,190,205,0.35)";
+      ctx.beginPath(); ctx.ellipse(hx, hy, 3, 17, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = "rgba(160,200,240,0.55)"; ctx.lineWidth = 1.3;
+      for (let i = 0; i < 4; i++) {
+        const yy = hy - 12 + i * 8, ph = (spin * 3 + i) % 1;
+        ctx.beginPath(); ctx.moveTo(hx - 8 - ph * 10, yy); ctx.lineTo(hx - 22 - ph * 10, yy); ctx.stroke();
+      }
+    } else {
+      ctx.fillStyle = "rgb(90,96,108)";
+      const k = Math.cos(spin || 0);
+      ctx.fillRect(hx - 1.5, hy - 16 * Math.abs(k), 3, 32 * Math.abs(k) + 2);
+    }
+    brassDisc(ctx, hx, hy, 2.5);
+    return top;
+  }
+
+  /* 撞球檯（俯視）：木框 + 綠色檯呢 + 六個袋口。回傳內框 { x, y, w, h } */
+  function billiardTable(ctx, x, y, w, h) {
+    const L = isLight(), rail = Math.max(14, Math.min(26, Math.min(w, h) * 0.06));
+    contactShadow(ctx, x + w / 2, y + h + 6, w * 0.5);
+    const wg = ctx.createLinearGradient(x, y, x, y + h);
+    wg.addColorStop(0, "rgb(128,76,40)"); wg.addColorStop(1, "rgb(92,52,24)");
+    rrPath(ctx, x, y, w, h, rail * 0.8); ctx.fillStyle = wg; ctx.fill();
+    const ix = x + rail, iy = y + rail, iw = w - 2 * rail, ih = h - 2 * rail;
+    const fg = ctx.createRadialGradient(ix + iw / 2, iy + ih / 2, 10, ix + iw / 2, iy + ih / 2, Math.max(iw, ih) * 0.7);
+    fg.addColorStop(0, L ? "rgb(46,142,84)" : "rgb(30,108,62)"); fg.addColorStop(1, L ? "rgb(30,110,62)" : "rgb(18,76,42)");
+    ctx.fillStyle = fg; ctx.fillRect(ix, iy, iw, ih);
+    note(ctx, L ? "rgb(38,126,72)" : "rgb(24,92,52)", ix, iy, iw, ih);
+    // 檯邊橡膠
+    ctx.strokeStyle = "rgba(10,60,30,0.8)"; ctx.lineWidth = 3; ctx.strokeRect(ix + 1.5, iy + 1.5, iw - 3, ih - 3);
+    // 袋口
+    ctx.fillStyle = "rgb(12,12,14)";
+    [[ix, iy], [ix + iw / 2, iy - 2], [ix + iw, iy], [ix, iy + ih], [ix + iw / 2, iy + ih + 2], [ix + iw, iy + ih]].forEach(p => {
+      ctx.beginPath(); ctx.arc(p[0], p[1], rail * 0.55, 0, TAU); ctx.fill();
+    });
+    // 定位點（木框上的鑽石點）
+    ctx.fillStyle = "rgba(240,230,200,0.85)";
+    for (let i = 1; i < 8; i++) {
+      if (i === 4) continue;
+      ctx.beginPath(); ctx.arc(x + w * i / 8, y + rail / 2, 1.8, 0, TAU); ctx.arc(x + w * i / 8, y + h - rail / 2, 1.8, 0, TAU); ctx.fill();
+    }
+    return { x: ix, y: iy, w: iw, h: ih };
+  }
+
+  /* 撞球：kind "cue"（白球）或號碼球（color + number） */
+  function poolBall(ctx, x, y, r, color, num) {
+    const c = hexRgb(color || "#f2f2ee");
+    const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r);
+    g.addColorStop(0, rgbStr(shadeRgb(c, 0.55))); g.addColorStop(0.6, rgbStr(c)); g.addColorStop(1, rgbStr(shadeRgb(c, -0.45)));
+    contactShadow(ctx, x + 2, y + r * 0.9, r * 1.05);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+    if (num != null) {
+      ctx.fillStyle = "rgba(255,255,255,0.95)"; ctx.beginPath(); ctx.arc(x, y, r * 0.45, 0, TAU); ctx.fill();
+      ctx.fillStyle = "#111"; ctx.font = "700 " + Math.max(8, r * 0.6) + "px system-ui,sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(num), x, y + 0.5);
+    }
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.beginPath(); ctx.ellipse(x - r * 0.35, y - r * 0.42, r * 0.2, r * 0.12, -0.6, 0, TAU); ctx.fill();
+  }
+
+  /* 彈簧發射器（彈道擺的槍）：槍管 + 握把 + 扳機。(x, y) 為槍口 */
+  function launcher(ctx, x, y, s, facing) {
+    s = s || 1; facing = facing || 1;
+    ctx.save(); ctx.translate(x, y); ctx.scale(facing * s, s);
+    const g = ctx.createLinearGradient(0, -7, 0, 7);
+    g.addColorStop(0, "rgb(120,126,136)"); g.addColorStop(0.5, "rgb(58,62,70)"); g.addColorStop(1, "rgb(30,32,36)");
+    ctx.fillStyle = g; ctx.fillRect(-70, -6, 70, 12);
+    ctx.fillStyle = "rgb(24,26,30)"; ctx.fillRect(-4, -7, 4, 14);
+    ctx.fillStyle = "rgb(130,86,48)";
+    ctx.beginPath(); ctx.moveTo(-70, -6); ctx.lineTo(-96, -2); ctx.lineTo(-100, 14); ctx.lineTo(-78, 12); ctx.lineTo(-60, 6); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgb(110,72,40)";
+    ctx.beginPath(); ctx.moveTo(-54, 6); ctx.lineTo(-46, 6); ctx.lineTo(-42, 22); ctx.lineTo(-52, 22); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "rgb(60,62,70)"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(-58, 10, 5, 0, Math.PI); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.25)"; ctx.fillRect(-68, -4.5, 60, 1.5);
+    ctx.restore();
+  }
+
+
+  /* ===============================================================
+     器材 v2：俯視桌面、轉盤、氣墊桌、飛輪（圓周運動）
+     =============================================================== */
+
+  /* 俯視的木頭桌面（鋪滿整個畫面） */
+  function deskTop(ctx, x, y, w, h) {
+    const L = isLight();
+    const g = ctx.createLinearGradient(x, y, x + w, y + h);
+    g.addColorStop(0, L ? "#dcbb8c" : "#4d3825"); g.addColorStop(1, L ? "#cba373" : "#3c2b1c");
+    ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+    const rnd = seeded(Math.round(w * 3 + h));
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    // 木板接縫
+    ctx.strokeStyle = L ? "rgba(110,72,34,0.28)" : "rgba(0,0,0,0.35)"; ctx.lineWidth = 1.2;
+    const plank = Math.max(60, h / 5);
+    for (let py = y + plank; py < y + h; py += plank) { ctx.beginPath(); ctx.moveTo(x, py); ctx.lineTo(x + w, py); ctx.stroke(); }
+    // 木紋
+    ctx.lineWidth = 1;
+    for (let i = 0; i < w * h / 2600; i++) {
+      const gx = x + rnd() * w, gy = y + rnd() * h, gl = 30 + rnd() * 110;
+      ctx.strokeStyle = L ? `rgba(120,78,36,${0.08 + rnd() * 0.12})` : `rgba(0,0,0,${0.12 + rnd() * 0.15})`;
+      ctx.beginPath(); ctx.moveTo(gx, gy); ctx.quadraticCurveTo(gx + gl / 2, gy + (rnd() - 0.5) * 4, gx + gl, gy); ctx.stroke();
+    }
+    ctx.restore();
+    note(ctx, L ? "#d3b07f" : "#453221", x, y, w, h);
+  }
+
+
+  /*
+   * 電路實驗的底：實物圖是俯視的木頭實驗桌；電路圖模式改成桌上一張白紙，
+   * 課本符號用深色墨線畫在紙上，兩種主題都看得清楚。
+   */
+  function circuitBoard(ctx, W, H, schematic) {
+    deskTop(ctx, 0, 0, W, H);
+    if (!schematic) return;
+    const L = isLight(), m = 10;
+    ctx.fillStyle = "rgba(0,0,0,0.22)"; ctx.fillRect(m + 3, m + 4, W - 2 * m, H - 2 * m);
+    ctx.fillStyle = L ? "#fbfaf6" : "#dcd8cd"; ctx.fillRect(m, m, W - 2 * m, H - 2 * m);
+    ctx.strokeStyle = "rgba(60,90,140,0.09)"; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = m + 20; x < W - m; x += 20) { ctx.moveTo(Math.round(x) + 0.5, m); ctx.lineTo(Math.round(x) + 0.5, H - m); }
+    for (let y = m + 20; y < H - m; y += 20) { ctx.moveTo(m, Math.round(y) + 0.5); ctx.lineTo(W - m, Math.round(y) + 0.5); }
+    ctx.stroke();
+    note(ctx, L ? "#fbfaf6" : "#dcd8cd", m, m, W - 2 * m, H - 2 * m);
+  }
+
+  /* 馬達轉盤（俯視）：金屬盤 + 橡膠墊同心紋 + 標記線（跟著轉） */
+  function turntable(ctx, cx, cy, R, ang) {
+    contactShadow(ctx, cx + 4, cy + R * 0.12, R * 1.08);
+    // 底座
+    ctx.fillStyle = "rgb(52,56,64)";
+    rrPath(ctx, cx - R * 1.12, cy - R * 1.12, R * 2.24, R * 2.24, R * 0.18); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.06)"; rrPath(ctx, cx - R * 1.12, cy - R * 1.12, R * 2.24, 6, 3); ctx.fill();
+    // 盤面
+    const g = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.35, R * 0.1, cx, cy, R);
+    g.addColorStop(0, "rgb(84,90,100)"); g.addColorStop(1, "rgb(40,44,52)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "rgb(170,178,190)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy, R - 1.5, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.07)"; ctx.lineWidth = 1;
+    for (let r = R * 0.3; r < R - 6; r += 6) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.stroke(); }
+    // 半徑刻度（跟著盤轉，讓「轉動」看得見）
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang || 0);
+    ctx.strokeStyle = "rgba(255,230,150,0.7)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(R - 6, 0); ctx.stroke();
+    ctx.fillStyle = "rgba(255,230,150,0.7)";
+    for (let r = R * 0.2; r < R - 6; r += R * 0.2) ctx.fillRect(r - 0.75, -4, 1.5, 8);
+    ctx.restore();
+    brassDisc(ctx, cx, cy, Math.max(5, R * 0.07));
+    note(ctx, "rgb(60,64,72)", cx - R * 0.7, cy - R * 0.7, R * 1.4, R * 1.4);
+  }
+
+  /* 氣墊桌（俯視）：白色桌面 + 滿布的出氣孔 + 鋁框。回傳內框 */
+  function airTable(ctx, x, y, w, h, o) {
+    o = o || {};
+    const L = isLight();
+    contactShadow(ctx, x + w / 2, y + h + 5, w * 0.5);
+    ctx.fillStyle = "rgb(150,158,170)"; rrPath(ctx, x, y, w, h, 10); ctx.fill();
+    const ix = x + 10, iy = y + 10, iw = w - 20, ih = h - 20;
+    const g = ctx.createLinearGradient(ix, iy, ix + iw, iy + ih);
+    g.addColorStop(0, L ? "#f7f9fb" : "#2a3038"); g.addColorStop(1, L ? "#e6ebf0" : "#22272e");
+    ctx.fillStyle = g; ctx.fillRect(ix, iy, iw, ih);
+    ctx.fillStyle = L ? "rgba(90,100,116,0.22)" : "rgba(255,255,255,0.10)";
+    for (let yy = iy + 8; yy < iy + ih; yy += 14) for (let xx = ix + 8 + ((yy - iy) / 14 % 2) * 7; xx < ix + iw; xx += 14) {
+      ctx.beginPath(); ctx.arc(xx, yy, 1.1, 0, TAU); ctx.fill();
+    }
+    if (o.hole) {
+      ctx.fillStyle = "rgb(20,22,26)"; ctx.beginPath(); ctx.arc(o.hole.x, o.hole.y, 7, 0, TAU); ctx.fill();
+      ctx.strokeStyle = "rgb(170,178,190)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(o.hole.x, o.hole.y, 8, 0, TAU); ctx.stroke();
+    }
+    note(ctx, L ? "#eef2f5" : "#262b33", ix, iy, iw, ih);
+    return { x: ix, y: iy, w: iw, h: ih };
+  }
+
+  /* 橡皮塞（向心力實驗的旋轉物）：俯視看是一個有厚度的紅色圓 */
+  function stopper(ctx, x, y, r) {
+    contactShadow(ctx, x + 2, y + r * 0.7, r * 1.1);
+    const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.35, r * 0.1, x, y, r);
+    g.addColorStop(0, "rgb(236,110,96)"); g.addColorStop(0.7, "rgb(196,56,46)"); g.addColorStop(1, "rgb(130,30,24)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "rgba(90,16,12,0.6)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, r * 0.62, 0, TAU); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.beginPath(); ctx.ellipse(x - r * 0.35, y - r * 0.4, r * 0.22, r * 0.13, -0.6, 0, TAU); ctx.fill();
+  }
+
+  /*
+   * 飛輪（正視）：鋼製輪框 + 輻條 + 可滑動的配重塊。
+   * massR 是配重到軸心的距離（px），用來把「轉動慣量」畫成看得見的位置。
+   */
+  function flywheel(ctx, cx, cy, R, ang, massR, nMass) {
+    const n = nMass || 6;
+    // 輪框
+    ctx.save();
+    ctx.strokeStyle = "rgb(60,66,76)"; ctx.lineWidth = 12;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = "rgb(170,178,190)"; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.45)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, R + 1.5, Math.PI * 1.05, Math.PI * 1.6); ctx.stroke();
+    // 輻條
+    for (let k = 0; k < n; k++) {
+      const a = ang + k * TAU / n;
+      ctx.strokeStyle = "rgb(120,128,140)"; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * (R - 5), cy + Math.sin(a) * (R - 5)); ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * (R - 5), cy + Math.sin(a) * (R - 5)); ctx.stroke();
+    }
+    // 配重塊（黃銅圓柱）
+    for (let k = 0; k < n; k++) {
+      const a = ang + k * TAU / n, mx = cx + Math.cos(a) * massR, my = cy + Math.sin(a) * massR;
+      ctx.save(); ctx.translate(mx, my); ctx.rotate(a);
+      brass(ctx, -7, -6, 14, 12);
+      ctx.strokeStyle = "rgba(80,60,20,0.7)"; ctx.lineWidth = 1; ctx.strokeRect(-7, -6, 14, 12);
+      ctx.restore();
+    }
+    // 輪轂與繞線槽
+    ctx.fillStyle = "rgb(80,86,96)"; ctx.beginPath(); ctx.arc(cx, cy, 16, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "rgb(200,170,110)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy, 12, 0, TAU); ctx.stroke();
+    brassDisc(ctx, cx, cy, 6);
+    ctx.restore();
+  }
+
+
+  /* ===============================================================
+     器材 v2：熱學（汽缸、加熱器、酒精燈、直立彈簧秤、熱量計）
+     =============================================================== */
+
+  /*
+   * 直立的玻璃汽缸 + 活塞。x, topY 為缸口左上；pistonY 為活塞下緣（氣體頂面）。
+   * o.gas 氣體顏色（依溫度）；o.weights 活塞上的砝碼數；o.particles 畫幾顆分子示意
+   */
+  function cylinderPiston(ctx, x, topY, w, h, pistonY, o) {
+    o = o || {};
+    const botY = topY + h, L = isLight();
+    contactShadow(ctx, x + w / 2, botY + 8, w * 0.8);
+    // 底座
+    steel(ctx, x - 14, botY, w + 28, 9, -6);
+    // 氣體
+    const gc = hexRgb(o.gas || "#e57373");
+    const gg = ctx.createLinearGradient(0, pistonY, 0, botY);
+    gg.addColorStop(0, rgbStr(gc, 0.30)); gg.addColorStop(1, rgbStr(gc, 0.45));
+    ctx.fillStyle = gg; ctx.fillRect(x + 3, pistonY, w - 6, botY - pistonY);
+    if (o.particles) {
+      const rnd = seeded(7), n = o.particles, t = o.t || 0;
+      ctx.fillStyle = rgbStr(shadeRgb(gc, -0.3), 0.85);
+      for (let i = 0; i < n; i++) {
+        const px = x + 8 + ((rnd() * (w - 16) + t * (20 + rnd() * 40) * (rnd() < 0.5 ? 1 : -1)) % (w - 16) + (w - 16)) % (w - 16);
+        const py = pistonY + 6 + ((rnd() * (botY - pistonY - 12) + t * 30 * rnd()) % Math.max(1, botY - pistonY - 12));
+        ctx.beginPath(); ctx.arc(px, py, 2.2, 0, TAU); ctx.fill();
+      }
+    }
+    // 玻璃壁
+    const glass = ctx.createLinearGradient(x, 0, x + w, 0);
+    glass.addColorStop(0, "rgba(226,244,252,0.45)"); glass.addColorStop(0.15, "rgba(255,255,255,0.12)");
+    glass.addColorStop(0.85, "rgba(200,224,238,0.10)"); glass.addColorStop(1, "rgba(226,244,252,0.45)");
+    ctx.fillStyle = glass; ctx.fillRect(x, topY, w, h);
+    ctx.strokeStyle = L ? "rgba(90,130,160,0.75)" : "rgba(206,232,244,0.8)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x, topY); ctx.lineTo(x, botY); ctx.moveTo(x + w, topY); ctx.lineTo(x + w, botY); ctx.stroke();
+    // 刻度
+    ctx.strokeStyle = L ? "rgba(60,90,120,0.5)" : "rgba(206,232,244,0.5)"; ctx.lineWidth = 1;
+    for (let i = 1; i < 10; i++) { const yy = botY - h * i / 10; ctx.beginPath(); ctx.moveTo(x + w - 10, yy); ctx.lineTo(x + w - 2, yy); ctx.stroke(); }
+    // 活塞
+    steel(ctx, x + 2, pistonY - 12, w - 4, 12, 6);
+    ctx.fillStyle = "rgba(20,24,30,0.55)"; ctx.fillRect(x + 2, pistonY - 3, w - 4, 3);
+    steel(ctx, x + w / 2 - 4, pistonY - 12 - (o.rod || 22), 8, o.rod || 22, 10);
+    // 砝碼
+    const nW = o.weights || 0;
+    let wy = pistonY - 12 - (o.rod || 22);
+    for (let i = 0; i < nW; i++) {
+      const ww = Math.min(w * 0.7, 46), wh = 9;
+      weight(ctx, x + w / 2, wy - wh, ww, wh, null);
+      wy -= wh + 1;
+    }
+    return { pistonTop: pistonY - 12 };
+  }
+
+
+  /* 試管（局部座標）：管底中心在 (0,0)、管口在 (0,-h)。waterH 為水高，o.tint 水色 */
+  function testTube(ctx, w, h, waterH, o) {
+    o = o || {};
+    const r = w / 2, L = isLight();
+    ctx.save();
+    // 水
+    if (waterH > 0) {
+      const wc = hexRgb(o.tint || "#5aa2e0");
+      ctx.beginPath();
+      ctx.moveTo(-r + 3, -Math.max(r, waterH)); ctx.lineTo(-r + 3, -r); ctx.arc(0, -r, r - 3, Math.PI, 0, true);
+      ctx.lineTo(r - 3, -Math.max(r, waterH)); ctx.closePath();
+      ctx.fillStyle = rgbStr(wc, 0.45); ctx.fill();
+      ctx.fillStyle = rgbStr(shadeRgb(wc, 0.5), 0.8);
+      ctx.beginPath(); ctx.ellipse(0, -Math.max(r, waterH), r - 3, 3, 0, 0, TAU); ctx.fill();
+    }
+    // 玻璃
+    ctx.beginPath();
+    ctx.moveTo(-r, -h); ctx.lineTo(-r, -r); ctx.arc(0, -r, r, Math.PI, 0, true); ctx.lineTo(r, -h);
+    const g = ctx.createLinearGradient(-r, 0, r, 0);
+    g.addColorStop(0, "rgba(226,244,252,0.45)"); g.addColorStop(0.2, "rgba(255,255,255,0.14)");
+    g.addColorStop(0.8, "rgba(200,224,238,0.10)"); g.addColorStop(1, "rgba(226,244,252,0.45)");
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = L ? "rgba(90,130,160,0.8)" : "rgba(206,232,244,0.85)"; ctx.lineWidth = 2; ctx.stroke();
+    // 管口翻邊
+    ctx.strokeStyle = L ? "rgba(90,130,160,0.9)" : "rgba(220,240,250,0.9)"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-r - 2, -h); ctx.lineTo(-r + 1, -h); ctx.moveTo(r - 1, -h); ctx.lineTo(r + 2, -h); ctx.stroke();
+    // 高光
+    ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-r + 5, -h + 8); ctx.lineTo(-r + 5, -r - 4); ctx.stroke();
+    ctx.restore();
+  }
+
+  /* 軟木塞（局部座標，中心在 (0,0)），上寬下窄 */
+  function cork(ctx, w, h) {
+    const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
+    g.addColorStop(0, "rgb(170,122,70)"); g.addColorStop(0.45, "rgb(214,168,110)"); g.addColorStop(1, "rgb(156,110,60)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.moveTo(-w / 2, -h / 2); ctx.lineTo(w / 2, -h / 2); ctx.lineTo(w * 0.4, h / 2); ctx.lineTo(-w * 0.4, h / 2); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "rgba(90,56,24,0.6)"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = "rgba(90,56,24,0.35)";
+    const rnd = seeded(Math.round(w * 7 + h));
+    for (let i = 0; i < 10; i++) { ctx.beginPath(); ctx.arc((rnd() - 0.5) * w * 0.7, (rnd() - 0.5) * h * 0.8, 0.9, 0, TAU); ctx.fill(); }
+  }
+
+  /* 電熱板：heat 0..1 讓線圈發紅 */
+  function hotPlate(ctx, cx, baseY, w, heat) {
+    const hh = Math.max(14, w * 0.18), k = clamp01(heat || 0);
+    contactShadow(ctx, cx, baseY + 2, w * 0.6);
+    const g = ctx.createLinearGradient(0, baseY - hh, 0, baseY);
+    g.addColorStop(0, "rgb(236,238,242)"); g.addColorStop(1, "rgb(186,190,198)");
+    ctx.fillStyle = g; rrPath(ctx, cx - w / 2, baseY - hh, w, hh, 4); ctx.fill();
+    ctx.strokeStyle = "rgba(60,66,76,0.5)"; ctx.lineWidth = 1; ctx.stroke();
+    // 頂面加熱盤
+    ctx.fillStyle = `rgb(${Math.round(60 + 170 * k)},${Math.round(60 + 30 * k)},${Math.round(64 - 30 * k)})`;
+    ctx.fillRect(cx - w * 0.42, baseY - hh - 4, w * 0.84, 5);
+    if (k > 0.05) {
+      ctx.save(); ctx.globalAlpha = k * 0.6;
+      const hg = ctx.createRadialGradient(cx, baseY - hh - 2, 2, cx, baseY - hh - 2, w * 0.5);
+      hg.addColorStop(0, "rgba(255,120,40,0.8)"); hg.addColorStop(1, "rgba(255,120,40,0)");
+      ctx.fillStyle = hg; ctx.fillRect(cx - w * 0.6, baseY - hh - w * 0.5, w * 1.2, w * 0.5);
+      ctx.restore();
+    }
+    // 旋鈕與指示燈
+    ctx.fillStyle = "rgb(60,64,72)"; ctx.beginPath(); ctx.arc(cx + w * 0.3, baseY - hh / 2, hh * 0.28, 0, TAU); ctx.fill();
+    ctx.fillStyle = k > 0.05 ? "rgb(255,70,50)" : "rgb(120,40,36)"; ctx.beginPath(); ctx.arc(cx - w * 0.32, baseY - hh / 2, 2.5, 0, TAU); ctx.fill();
+    return baseY - hh - 4;
+  }
+
+  /* 酒精燈：玻璃瓶身 + 燈芯 + 火焰（lit 0..1 火焰大小） */
+  function alcoholLamp(ctx, cx, baseY, s, lit) {
+    s = s || 1;
+    const w = 44 * s, h = 30 * s;
+    contactShadow(ctx, cx, baseY + 2, w * 0.7);
+    const g = ctx.createRadialGradient(cx - w * 0.2, baseY - h * 0.6, 2, cx, baseY - h * 0.4, w * 0.7);
+    g.addColorStop(0, "rgba(240,250,255,0.75)"); g.addColorStop(1, "rgba(170,205,225,0.55)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(cx, baseY - h * 0.45, w / 2, h * 0.5, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = "rgba(120,170,220,0.35)"; ctx.fillRect(cx - w * 0.42, baseY - h * 0.35, w * 0.84, h * 0.3);
+    ctx.strokeStyle = "rgba(140,180,205,0.9)"; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.ellipse(cx, baseY - h * 0.45, w / 2, h * 0.5, 0, 0, TAU); ctx.stroke();
+    // 瓶頸與燈芯座
+    brass(ctx, cx - 7 * s, baseY - h - 6 * s, 14 * s, 8 * s);
+    ctx.fillStyle = "rgb(240,236,220)"; ctx.fillRect(cx - 2 * s, baseY - h - 11 * s, 4 * s, 6 * s);
+    const k = clamp01(lit == null ? 1 : lit);
+    if (k > 0.02) {
+      const fy = baseY - h - 11 * s, fh = (16 + 18 * k) * s;
+      ctx.save();
+      ctx.shadowColor = "rgba(255,170,60,0.8)"; ctx.shadowBlur = 14;
+      let fg = ctx.createRadialGradient(cx, fy - fh * 0.3, 1, cx, fy - fh * 0.35, fh * 0.6);
+      fg.addColorStop(0, "rgba(255,244,190,0.95)"); fg.addColorStop(0.5, "rgba(255,160,50,0.8)"); fg.addColorStop(1, "rgba(255,110,20,0)");
+      ctx.fillStyle = fg;
+      ctx.beginPath(); ctx.ellipse(cx, fy - fh * 0.42, 7 * s * (0.7 + k * 0.4), fh * 0.55, 0, 0, TAU); ctx.fill();
+      ctx.shadowBlur = 0;
+      fg = ctx.createRadialGradient(cx, fy - fh * 0.2, 0.5, cx, fy - fh * 0.2, fh * 0.3);
+      fg.addColorStop(0, "rgba(140,190,255,0.9)"); fg.addColorStop(1, "rgba(140,190,255,0)");
+      ctx.fillStyle = fg; ctx.beginPath(); ctx.ellipse(cx, fy - fh * 0.18, 3.5 * s, fh * 0.22, 0, 0, TAU); ctx.fill();
+      ctx.restore();
+    }
+    return { flameTop: baseY - h - 11 * s - (16 + 18 * k) * s };
+  }
+
+  /* 直立彈簧秤：上端掛環 + 透明管 + 刻度 + 紅色指針 + 下端掛鉤。回傳掛鉤座標 */
+  function springScaleV(ctx, cx, topY, len, frac, text) {
+    const w = 24, f = clamp01(frac || 0);
+    ctx.strokeStyle = "rgb(160,170,184)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, topY - 6, 5, 0, TAU); ctx.stroke();
+    const g = ctx.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
+    g.addColorStop(0, "rgb(210,160,60)"); g.addColorStop(0.4, "rgb(250,214,110)"); g.addColorStop(1, "rgb(190,140,50)");
+    ctx.fillStyle = g; rrPath(ctx, cx - w / 2, topY, w, len, 5); ctx.fill();
+    ctx.strokeStyle = "rgba(90,60,20,0.6)"; ctx.lineWidth = 1; ctx.stroke();
+    // 刻度窗
+    ctx.fillStyle = "rgba(255,255,248,0.95)"; ctx.fillRect(cx - w / 2 + 5, topY + 8, w - 10, len - 16);
+    ctx.strokeStyle = "rgba(40,40,40,0.7)";
+    for (let i = 0; i <= 10; i++) {
+      const yy = topY + 10 + (len - 20) * i / 10;
+      ctx.beginPath(); ctx.moveTo(cx - w / 2 + 5, yy); ctx.lineTo(cx - w / 2 + 5 + (i % 5 === 0 ? 8 : 4), yy); ctx.stroke();
+    }
+    const ny = topY + 10 + (len - 20) * f;
+    ctx.fillStyle = "rgb(214,52,40)"; ctx.fillRect(cx - w / 2 + 3, ny - 1.5, w - 6, 3);
+    // 下端拉桿與掛鉤
+    steel(ctx, cx - 2, topY + len, 4, 12, 8);
+    ctx.strokeStyle = "rgb(150,160,176)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, topY + len + 17, 4.5, -Math.PI * 0.5, Math.PI * 0.9); ctx.stroke();
+    if (text) {
+      ctx.font = "700 10px system-ui,sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      ctx.fillStyle = isLight() ? "rgba(20,30,46,0.9)" : "rgba(235,240,248,0.95)";
+      ctx.fillText(text, cx + w / 2 + 6, ny);
+    }
+    return { x: cx, y: topY + len + 21 };
+  }
+
+  /* 熱量計：保麗龍杯 + 蓋子 + 攪拌棒 + 溫度計。level 0..1，color 為水色 */
+  function calorimeter(ctx, cx, baseY, w, h, level, color, thermoFrac) {
+    contactShadow(ctx, cx, baseY + 2, w * 0.7);
+    // 杯身（白色保麗龍）
+    const g = ctx.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
+    g.addColorStop(0, "rgb(214,216,220)"); g.addColorStop(0.35, "rgb(250,250,252)"); g.addColorStop(1, "rgb(200,202,208)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.moveTo(cx - w / 2, baseY - h); ctx.lineTo(cx + w / 2, baseY - h); ctx.lineTo(cx + w * 0.42, baseY); ctx.lineTo(cx - w * 0.42, baseY); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "rgba(120,124,132,0.6)"; ctx.lineWidth = 1; ctx.stroke();
+    // 水（從杯口斜切面看得到一點）
+    const wc = hexRgb(color || "#6fb7e0");
+    ctx.fillStyle = rgbStr(wc, 0.85);
+    ctx.beginPath(); ctx.ellipse(cx, baseY - h, w / 2 - 2, 5, 0, 0, TAU); ctx.fill();
+    // 蓋子
+    ctx.fillStyle = "rgb(236,238,242)"; ctx.fillRect(cx - w / 2 - 3, baseY - h - 6, w + 6, 6);
+    // 攪拌棒與溫度計
+    steel(ctx, cx - w * 0.22, baseY - h - 40, 3, 44, 12);
+    ctx.fillStyle = "rgb(150,160,176)"; ctx.fillRect(cx - w * 0.22 - 6, baseY - h - 42, 15, 3);
+    thermometer(ctx, cx + w * 0.2, baseY - h - 70, baseY - h + 10, 9, thermoFrac == null ? 0.4 : thermoFrac);
+  }
+
+
+  /* ===============================================================
+     器材 v2：波動與聲音（示波器、喇叭、麥克風、俯視車輛與人）
+     =============================================================== */
+
+  /*
+   * 示波器：機殼 + 螢光幕（固定深色，兩種主題都一樣）+ 旋鈕。
+   * 回傳螢幕區 { x, y, w, h }，呼叫端在裡面畫波形（建議用亮色：黃、青、洋紅）。
+   */
+  function oscilloscope(ctx, x, y, w, h, o) {
+    o = o || {};
+    const L = isLight();
+    contactShadow(ctx, x + w / 2, y + h + 4, w * 0.5);
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, L ? "rgb(214,218,224)" : "rgb(70,76,86)"); g.addColorStop(1, L ? "rgb(170,176,186)" : "rgb(46,50,58)");
+    rrPath(ctx, x, y, w, h, 8); ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = "rgba(20,24,30,0.5)"; ctx.lineWidth = 1; ctx.stroke();
+    const panel = Math.min(90, w * 0.2);
+    const sx = x + 10, sy = y + 10, sw = w - panel - 24, sh = h - 20;
+    // 螢幕
+    ctx.fillStyle = "rgb(10,22,18)"; rrPath(ctx, sx - 3, sy - 3, sw + 6, sh + 6, 5); ctx.fill();
+    const sg = ctx.createRadialGradient(sx + sw / 2, sy + sh / 2, 10, sx + sw / 2, sy + sh / 2, Math.max(sw, sh) * 0.7);
+    sg.addColorStop(0, "rgb(18,44,34)"); sg.addColorStop(1, "rgb(8,22,16)");
+    ctx.fillStyle = sg; ctx.fillRect(sx, sy, sw, sh);
+    ctx.strokeStyle = "rgba(120,220,170,0.16)"; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 1; i < 10; i++) { const gx = Math.round(sx + sw * i / 10) + 0.5; ctx.moveTo(gx, sy); ctx.lineTo(gx, sy + sh); }
+    for (let i = 1; i < 8; i++) { const gy = Math.round(sy + sh * i / 8) + 0.5; ctx.moveTo(sx, gy); ctx.lineTo(sx + sw, gy); }
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(120,220,170,0.32)";
+    ctx.beginPath(); ctx.moveTo(sx, sy + sh / 2); ctx.lineTo(sx + sw, sy + sh / 2); ctx.moveTo(sx + sw / 2, sy); ctx.lineTo(sx + sw / 2, sy + sh); ctx.stroke();
+    note(ctx, "rgb(14,34,26)", sx, sy, sw, sh);
+    // 控制面板：旋鈕與接頭
+    const px = x + w - panel - 6;
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 2; c++) {
+      const kx = px + 18 + c * (panel - 30), ky = y + 22 + r * Math.min(34, (h - 60) / 3);
+      ctx.fillStyle = "rgb(40,44,52)"; ctx.beginPath(); ctx.arc(kx, ky, 8, 0, TAU); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(kx + 6 * Math.cos(-1 + r + c), ky + 6 * Math.sin(-1 + r + c)); ctx.stroke();
+    }
+    ["#e0c030", "#30c0e0"].forEach((cc, i) => {
+      const bx = px + 18 + i * (panel - 30), by = y + h - 22;
+      ctx.fillStyle = "rgb(180,150,70)"; ctx.beginPath(); ctx.arc(bx, by, 6, 0, TAU); ctx.fill();
+      ctx.fillStyle = cc; ctx.beginPath(); ctx.arc(bx, by, 3, 0, TAU); ctx.fill();
+    });
+    if (o.label) {
+      ctx.fillStyle = L ? "rgba(30,36,46,0.8)" : "rgba(220,226,236,0.8)";
+      ctx.font = "700 9px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+      ctx.fillText(o.label, px + panel / 2, y + h - 36);
+    }
+    return { x: sx, y: sy, w: sw, h: sh };
+  }
+
+  /* 喇叭（側視）：箱體 + 錐盆，pulse 0..1 讓錐盆鼓動。facing 1 向右 */
+  function speaker(ctx, cx, cy, s, pulse, facing) {
+    s = s || 1; facing = facing || 1;
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(facing * s, s);
+    const g = ctx.createLinearGradient(0, -34, 0, 34);
+    g.addColorStop(0, "rgb(70,60,52)"); g.addColorStop(1, "rgb(40,34,30)");
+    ctx.fillStyle = g; rrPath(ctx, -26, -34, 26, 68, 4); ctx.fill();
+    const k = (pulse || 0) * 3;
+    ctx.fillStyle = "rgb(30,30,34)";
+    ctx.beginPath(); ctx.moveTo(0, -24); ctx.lineTo(10 + k, -12); ctx.lineTo(10 + k, 12); ctx.lineTo(0, 24); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgb(150,156,166)"; ctx.beginPath(); ctx.ellipse(10 + k, 0, 3, 12, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = "rgb(210,214,220)"; ctx.beginPath(); ctx.arc(-13, 22, 3, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+
+  /* 麥克風（立式）：底座 + 桿 + 頭 */
+  function microphone(ctx, cx, baseY, h, facing) {
+    facing = facing || 1;
+    contactShadow(ctx, cx, baseY + 1, 16);
+    ctx.fillStyle = "rgb(50,54,62)"; ctx.beginPath(); ctx.ellipse(cx, baseY - 2, 14, 4, 0, 0, TAU); ctx.fill();
+    steel(ctx, cx - 1.5, baseY - h, 3, h - 2, 8);
+    ctx.save(); ctx.translate(cx, baseY - h); ctx.rotate(facing > 0 ? -0.5 : 0.5 + Math.PI);
+    ctx.fillStyle = "rgb(60,64,72)"; rrPath(ctx, 0, -4, 20, 8, 3); ctx.fill();
+    ctx.fillStyle = "rgb(160,166,176)"; ctx.beginPath(); ctx.arc(22, 0, 6.5, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "rgba(60,64,72,0.7)"; ctx.lineWidth = 0.8;
+    for (let i = -4; i <= 4; i += 2) { ctx.beginPath(); ctx.moveTo(16, i); ctx.lineTo(28, i); ctx.stroke(); }
+    ctx.restore();
+  }
+
+  /* 俯視救護車：白色車身 + 紅色十字 + 警示燈（blink 決定紅藍） */
+  function ambulanceTop(ctx, cx, cy, len, blink) {
+    const w = len * 0.45;
+    ctx.save(); ctx.translate(cx, cy);
+    ctx.fillStyle = "rgba(0,0,0,0.25)"; rrPath(ctx, -len / 2 + 2, -w / 2 + 3, len, w, 5); ctx.fill();
+    const g = ctx.createLinearGradient(0, -w / 2, 0, w / 2);
+    g.addColorStop(0, "rgb(252,252,250)"); g.addColorStop(1, "rgb(214,218,222)");
+    ctx.fillStyle = g; rrPath(ctx, -len / 2, -w / 2, len, w, 5); ctx.fill();
+    ctx.strokeStyle = "rgba(60,66,76,0.6)"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = "rgb(214,52,44)"; ctx.fillRect(-len / 2, -2, len, 4);
+    ctx.fillStyle = "rgba(90,130,170,0.9)"; rrPath(ctx, len * 0.26, -w / 2 + 3, len * 0.14, w - 6, 3); ctx.fill();
+    // 紅十字
+    ctx.fillStyle = "rgb(214,52,44)"; ctx.fillRect(-len * 0.2 - 6, -2, 12, 4); ctx.fillRect(-len * 0.2 - 2, -6, 4, 12);
+    // 警示燈
+    ctx.save();
+    ctx.shadowColor = blink ? "rgba(255,40,40,0.9)" : "rgba(60,120,255,0.9)"; ctx.shadowBlur = 12;
+    ctx.fillStyle = blink ? "rgb(255,60,50)" : "rgb(60,130,255)"; ctx.fillRect(len * 0.12, -w / 2 + 2, 6, w * 0.35);
+    ctx.fillStyle = !blink ? "rgb(255,60,50)" : "rgb(60,130,255)"; ctx.fillRect(len * 0.12, w / 2 - 2 - w * 0.35, 6, w * 0.35);
+    ctx.restore();
+    ctx.restore();
+  }
+
+  /* 俯視的人：肩膀 + 頭 */
+  function personTop(ctx, x, y, s, shirt) {
+    s = s || 1;
+    ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.beginPath(); ctx.ellipse(x + 2, y + 3, 12 * s, 7 * s, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = shirt || "#2f7fd8"; ctx.beginPath(); ctx.ellipse(x, y, 12 * s, 7 * s, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = "rgb(60,44,34)"; ctx.beginPath(); ctx.arc(x, y, 5.5 * s, 0, TAU); ctx.fill();
+  }
+
+
+  /* ===============================================================
+     器材 v2：光學（光源箱、狹縫板、偏振片、稜鏡、白色光屏、光柵片）
+     =============================================================== */
+
+  /* 光源箱：黑色燈箱 + 散熱孔 + 出光口。(x, cy) 為出光口中心；glow 為出光顏色 */
+  function lampHouse(ctx, x, cy, s, glow) {
+    s = s || 1;
+    const w = 58 * s, h = 46 * s;
+    contactShadow(ctx, x - w / 2, cy + h / 2 + 12 * s, w * 0.6);
+    const g = ctx.createLinearGradient(0, cy - h / 2, 0, cy + h / 2);
+    g.addColorStop(0, "rgb(78,84,94)"); g.addColorStop(1, "rgb(34,38,44)");
+    ctx.fillStyle = g; rrPath(ctx, x - w, cy - h / 2, w, h, 5 * s); ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    for (let i = 0; i < 4; i++) ctx.fillRect(x - w + 10 * s + i * 9 * s, cy - h / 2 + 5 * s, 5 * s, 8 * s);
+    steel(ctx, x - 14 * s, cy + h / 2, 8 * s, 12 * s, 6);
+    steel(ctx, x - w * 0.7, cy + h / 2 + 10 * s, w * 0.5, 5 * s, -6);
+    // 出光口
+    ctx.fillStyle = "rgb(20,22,26)"; ctx.fillRect(x - 2, cy - 9 * s, 6 * s, 18 * s);
+    ctx.save();
+    ctx.shadowColor = glow || "rgba(255,244,210,0.9)"; ctx.shadowBlur = 14;
+    ctx.fillStyle = glow || "rgb(255,248,225)"; ctx.fillRect(x + 1, cy - 6 * s, 2.5 * s, 12 * s);
+    ctx.restore();
+  }
+
+  /*
+   * 狹縫板：裝在支座上的金屬板。openings 為開口相對中心的 y 位移（px），
+   * gap 為開口高度；light 為穿過開口的光色（沒有光就傳 null）。
+   */
+  function slitPlate(ctx, x, cy, h, openings, gap, light) {
+    const w = 10, top = cy - h / 2;
+    // 板面（金屬）分段畫，開口處留空
+    const cuts = (openings || []).map(o => [cy + o - gap / 2, cy + o + gap / 2]).sort((a, b) => a[0] - b[0]);
+    let y = top;
+    cuts.concat([[top + h, top + h]]).forEach(c => {
+      if (c[0] > y) steel(ctx, x - w / 2, y, w, c[0] - y, -18);
+      y = Math.max(y, c[1]);
+    });
+    ctx.strokeStyle = "rgba(20,24,30,0.6)"; ctx.lineWidth = 1; ctx.strokeRect(x - w / 2 + 0.5, top + 0.5, w - 1, h - 1);
+    if (light) {
+      ctx.save(); ctx.shadowColor = light; ctx.shadowBlur = 10; ctx.fillStyle = light;
+      cuts.forEach(c => ctx.fillRect(x - 1.5, c[0], 3, Math.max(1.5, c[1] - c[0])));
+      ctx.restore();
+    }
+    // 支座
+    steel(ctx, x - 3, top + h, 6, 14, 8);
+  }
+
+  /* 偏振片：黑色環框 + 灰色濾片 + 透光軸刻線 + 把手。ang 為透光軸與鉛直的夾角 */
+  function polarizer(ctx, x, cy, r, ang, label) {
+    // 支桿
+    steel(ctx, x - 3, cy + r, 6, 26, 8);
+    ctx.save();
+    // 濾片
+    const g = ctx.createRadialGradient(x - r * 0.3, cy - r * 0.3, 2, x, cy, r);
+    g.addColorStop(0, "rgba(120,130,140,0.45)"); g.addColorStop(1, "rgba(70,78,88,0.6)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, cy, r - 4, 0, TAU); ctx.fill();
+    // 細紋：沿透光軸方向的細線（代表長鏈分子排列）
+    ctx.beginPath(); ctx.arc(x, cy, r - 4, 0, TAU); ctx.clip();
+    ctx.translate(x, cy); ctx.rotate(ang || 0);
+    ctx.strokeStyle = "rgba(255,255,255,0.25)"; ctx.lineWidth = 1;
+    for (let o = -r; o <= r; o += 5) { ctx.beginPath(); ctx.moveTo(o, -r); ctx.lineTo(o, r); ctx.stroke(); }
+    ctx.restore();
+    // 環框與刻度
+    ctx.strokeStyle = "rgb(30,32,36)"; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(x, cy, r - 1, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 1;
+    for (let d = 0; d < 360; d += 15) {
+      const a = d * Math.PI / 180;
+      ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * (r - 3), cy + Math.sin(a) * (r - 3)); ctx.lineTo(x + Math.cos(a) * (r + 1), cy + Math.sin(a) * (r + 1)); ctx.stroke();
+    }
+    // 把手（在透光軸方向上）
+    const hx = x + Math.sin(ang || 0) * (r + 6), hy = cy - Math.cos(ang || 0) * (r + 6);
+    ctx.fillStyle = "rgb(214,168,60)"; ctx.beginPath(); ctx.arc(hx, hy, 4.5, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "rgba(80,60,20,0.8)"; ctx.lineWidth = 1; ctx.stroke();
+  }
+
+  /* 玻璃三稜鏡：傳入三個頂點 */
+  function prismGlass(ctx, A, B, C) {
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.lineTo(C.x, C.y); ctx.closePath();
+    const g = ctx.createLinearGradient(B.x, A.y, C.x, B.y);
+    g.addColorStop(0, "rgba(200,232,246,0.55)"); g.addColorStop(0.5, "rgba(236,248,255,0.35)"); g.addColorStop(1, "rgba(170,210,232,0.55)");
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = isLight() ? "rgba(80,120,150,0.85)" : "rgba(210,236,250,0.85)"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(A.x + (B.x - A.x) * 0.15 + 4, A.y + (B.y - A.y) * 0.15); ctx.lineTo(A.x + (B.x - A.x) * 0.7 + 4, A.y + (B.y - A.y) * 0.7); ctx.stroke();
+    ctx.restore();
+    contactShadow(ctx, (B.x + C.x) / 2, Math.max(B.y, C.y) + 2, Math.abs(C.x - B.x) * 0.55);
+  }
+
+  /* 白色光屏（正面看）：卡紙 + 金屬框 + 支座。回傳紙面 { x, y, w, h } */
+  function paperScreen(ctx, cx, cy, w, h) {
+    steel(ctx, cx - w / 2 - 4, cy - h / 2 - 4, w + 8, h + 8, -16);
+    const g = ctx.createLinearGradient(0, cy - h / 2, 0, cy + h / 2);
+    g.addColorStop(0, "rgb(250,249,244)"); g.addColorStop(1, "rgb(228,226,218)");
+    ctx.fillStyle = g; ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+    steel(ctx, cx - 3, cy + h / 2 + 4, 6, 16, 8);
+    note(ctx, "rgb(244,243,236)", cx - w / 2, cy - h / 2, w, h);
+    return { x: cx - w / 2, y: cy - h / 2, w, h };
+  }
+
+  /* 光柵片：幻燈片框 + 中央刻線區（看起來會微微反光出彩虹） */
+  function gratingSlide(ctx, x, cy, h) {
+    const w = 12;
+    ctx.fillStyle = "rgb(236,236,230)"; ctx.fillRect(x - w / 2 - 3, cy - h / 2 - 6, w + 6, h + 12);
+    ctx.strokeStyle = "rgba(90,90,80,0.6)"; ctx.lineWidth = 1; ctx.strokeRect(x - w / 2 - 3, cy - h / 2 - 6, w + 6, h + 12);
+    const g = ctx.createLinearGradient(0, cy - h / 2, 0, cy + h / 2);
+    ["#8a4bff", "#4b8bff", "#3fd07a", "#f2e04a", "#ff9a3a", "#ff4a4a"].forEach((c, i, a) => g.addColorStop(i / (a.length - 1), c));
+    ctx.globalAlpha = 0.35; ctx.fillStyle = g; ctx.fillRect(x - w / 2, cy - h / 2, w, h); ctx.globalAlpha = 1;
+    ctx.strokeStyle = "rgba(40,40,50,0.5)"; ctx.lineWidth = 0.6;
+    for (let y = cy - h / 2 + 2; y < cy + h / 2; y += 2.2) { ctx.beginPath(); ctx.moveTo(x - w / 2, y); ctx.lineTo(x + w / 2, y); ctx.stroke(); }
+    steel(ctx, x - 3, cy + h / 2 + 6, 6, 14, 8);
+  }
+
   window.PhysicsLab.apparatus = {
     steel, brass, brassDisc, contactShadow,
     bench, carrier, benchTop,
@@ -3014,12 +3811,17 @@
     barMagnet, coilWinding, ironCore, thermometer, polePiece,
     stopwatch, clampHead, dataPad,
     /* 場景層 v2 */
-    labRoom, benchSlab, labWindow, whiteboard, cloud, outdoor, skyline, ground, road, water, tree, flag,
+    labRoom, labStrip, outdoorStrip, benchSlab, labWindow, whiteboard, cloud, outdoor, skyline, ground, road, water, tree, flag,
     targetBoard, building, cliff,
     smokePuff, muzzleFlash, dustKick, confetti, splash,
     /* 器材 v2：力學 */
     paperTape, infoCard, spokedWheel, cannon, cannonWheelDrop, sportBall, massBlock, crate, table, car, boatTop, person, skateboard,
     wallBlock, ceilingBeam, hookPlate, rope, conveyor, hand, forceTableTop, knifeEdge,
+    coasterCar, airTrack, glider, fanCart, billiardTable, poolBall, launcher,
+    deskTop, circuitBoard, turntable, airTable, stopper, flywheel,
+    cylinderPiston, testTube, cork, hotPlate, alcoholLamp, springScaleV, calorimeter,
+    oscilloscope, speaker, microphone, ambulanceTop, personTop,
+    lampHouse, slitPlate, polarizer, prismGlass, paperScreen, gratingSlide,
     rrPath, isLight
   };
 })();

@@ -19,25 +19,24 @@
     const rT = PL.ui.readout(L.readouts, { label: "週期 T", unit: "s" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      AP().starfield && AP().starfield(ctx, W, H, 11);
-      const cx = W / 2, cy = H / 2, r = sR.get(), w = sW.get(), R = Math.min(W, H) * 0.34 * (r / 5) + 40;
+      const A = AP();
+      const cx = W / 2, cy = H / 2, r = sR.get(), w = sW.get(), R = Math.min(W, H) * 0.3 * (r / 5) + 34;
+      /* 俯視的實驗桌：馬達轉盤等速轉動，鋼珠黏在盤上距軸心 r 的位置 */
+      if (A.deskTop) {
+        A.deskTop(ctx, 0, 0, W, H);
+        A.turntable(ctx, cx, cy, Math.min(W, H) * 0.3 + 50, ang);
+      }
       // 軌道：實線細環＋已走過的弧（淡色），「圓周」看得見
-      D.ring(ctx, cx, cy, R, "rgba(128,150,190,0.38)", 2);
-      ctx.save(); ctx.strokeStyle = "rgba(90,162,255,0.30)"; ctx.lineWidth = 6; ctx.lineCap = "round";
+      D.ring(ctx, cx, cy, R, "rgba(180,200,230,0.45)", 2);
+      ctx.save(); ctx.strokeStyle = "rgba(120,190,255,0.45)"; ctx.lineWidth = 6; ctx.lineCap = "round";
       ctx.beginPath(); ctx.arc(cx, cy, R, ang - 1.1, ang); ctx.stroke(); ctx.restore();
-      // 中心樞軸：金屬柱
-      const pg = ctx.createLinearGradient(cx - 10, 0, cx + 10, 0);
-      pg.addColorStop(0, "rgb(120,128,144)"); pg.addColorStop(0.5, "rgb(196,204,218)"); pg.addColorStop(1, "rgb(104,112,128)");
-      ctx.fillStyle = pg;
-      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(cx - 10, cy - 16, 20, 32, 4) : ctx.rect(cx - 10, cy - 16, 20, 32); ctx.fill();
-      ctx.strokeStyle = "rgba(70,78,94,0.6)"; ctx.lineWidth = 1; ctx.stroke();
       const bx = cx + R * Math.cos(ang), by = cy + R * Math.sin(ang);
       // 半徑
       D.line(ctx, cx, cy, bx, by, "rgba(255,255,255,0.2)", 1.5);
       // 速度（切線）與加速度（向心）
       D.arrow(ctx, bx, by, bx - 46 * Math.sin(ang), by + 46 * Math.cos(ang), { color: PL.col("accent-2"), width: 2.4, label: "v" });
       D.arrow(ctx, bx, by, bx + (cx - bx) * 0.34, by + (cy - by) * 0.34, { color: PL.col("danger"), width: 2.4, label: "a_c" });
-      D.disc(ctx, bx, by, 11, { fill: MC(), glow: MC(), glowSize: 14 });
+      A.sportBall ? A.sportBall(ctx, bx, by, 11, "steel") : D.disc(ctx, bx, by, 11, { fill: MC() });
       rV.set(w * r, 2); rA.set(w * w * r, 2); rT.set(TAU / w, 2);
     }
     const anim = PL.loop(dt => { if (dt) ang += sW.get() * dt; draw(); });
@@ -60,13 +59,17 @@
     const rV = PL.ui.readout(L.readouts, { label: "線速率 v", unit: "m/s" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      AP().starfield && AP().starfield(ctx, W, H, 22);
+      const A = AP();
       const cx = W / 2, cy = H / 2, r = sR.get(), w = sW.get(), R = Math.min(W, H) * 0.3 * (r / 4) + 40;
-      D.ring(ctx, cx, cy, R, "rgba(128,150,190,0.26)", 1.5, [4, 4]);
-      AP().planet && AP().planet(ctx, cx, cy, 15, [120, 190, 235], "earth");
+      /* 向心力實驗器（俯視）：繩子穿過握在手中的玻璃管，另一端綁著橡皮塞 */
+      A.deskTop && A.deskTop(ctx, 0, 0, W, H);
+      D.ring(ctx, cx, cy, R, "rgba(90,60,30,0.35)", 1.5, [4, 4]);
+      ctx.fillStyle = "rgba(210,236,248,0.65)"; ctx.beginPath(); ctx.arc(cx, cy, 13, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(120,160,190,0.9)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy, 13, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = "rgba(30,40,50,0.8)"; ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill();
       if (!broken) {
         bx = cx + R * Math.cos(ang); by = cy + R * Math.sin(ang);
-        D.line(ctx, cx, cy, bx, by, MC(), 2);
+        A.cord ? A.cord(ctx, cx, cy, bx, by) : D.line(ctx, cx, cy, bx, by, MC(), 2);
         /*
          * 「質量 m」原本只出現在讀數裡：球永遠畫成半徑 10，
          * 向心力箭頭長度永遠是半徑的 0.4 倍，與 m 無關。
@@ -82,7 +85,7 @@
       } else {
         D.arrow(ctx, bx, by, bx + fx * 0.4, by + fy * 0.4, { color: PL.col("accent-2"), width: 2, label: "沿切線飛出" });
       }
-      D.disc(ctx, bx, by, 7 + sM.get() * 3.2, { fill: MC(), glow: MC(), glowSize: 12 });
+      A.stopper ? A.stopper(ctx, bx, by, 7 + sM.get() * 3.2) : D.disc(ctx, bx, by, 7 + sM.get() * 3.2, { fill: MC() });
       rF.set(sM.get() * w * w * r, 2); rV.set(w * r, 2);
     }
     const anim = PL.loop(dt => {
@@ -117,16 +120,21 @@
     const rV = PL.ui.readout(L.readouts, { label: "線速率 v", unit: "m/s" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      AP().starfield && AP().starfield(ctx, W, H, 66);
+      const A = AP();
       const cx = W / 2, cy = H / 2, r = sR.get(), R = 30 + r * 42;
       const w = Lmom / (m * r * r), v = w * r;
-      D.ring(ctx, cx, cy, R, "rgba(128,150,190,0.26)", 1.5, [4, 4]);
-      AP().planet && AP().planet(ctx, cx, cy, 11, [235, 170, 96], "star");
+      /* 氣墊桌（幾乎無摩擦）中央開一個洞，繩子穿過洞，從桌下把繩子往下拉 → 半徑變小 */
+      if (A.airTable) {
+        A.deskTop(ctx, 0, 0, W, H);
+        A.airTable(ctx, cx - Math.min(W * 0.46, 210), 8, Math.min(W * 0.92, 420), H - 16, { hole: { x: cx, y: cy } });
+      }
+      D.ring(ctx, cx, cy, R, "rgba(90,110,140,0.35)", 1.5, [4, 4]);
       const bx = cx + R * Math.cos(ang), by = cy + R * Math.sin(ang);
-      D.line(ctx, cx, cy, bx, by, MC(), 2);
+      A.cord ? A.cord(ctx, cx, cy, bx, by) : D.line(ctx, cx, cy, bx, by, MC(), 2);
       D.arrow(ctx, cx, cy, cx + (bx - cx) * 0.4, cy + (by - cy) * 0.4, { color: PL.col("danger"), width: 2, label: "拉力" });
       const va = 18 + v * 6; D.arrow(ctx, bx, by, bx - va * Math.sin(ang), by + va * Math.cos(ang), { color: PL.col("accent-2"), width: 2, label: "v" });
-      D.disc(ctx, bx, by, 11, { fill: MC(), glow: MC(), glowSize: 12 });
+      A.poolBall ? A.poolBall(ctx, bx, by, 12, "#2f6fd0", null) : D.disc(ctx, bx, by, 11, { fill: MC() });
+      D.text(ctx, "繩子從洞口往下拉", cx + 14, cy + 22, { color: PL.col("text-dim"), size: 10 });
       rL.set(Lmom, 1); rW.set(w, 2); rV.set(v, 2);
     }
     const anim = PL.loop(dt => { if (dt) { const r = sR.get(); ang += (Lmom / (m * r * r)) * dt; } draw(); });
@@ -150,23 +158,18 @@
     const rW = PL.ui.readout(L.readouts, { label: "角速度 ω", unit: "rad/s" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.32;
-      // 轉盤：金屬質感圓盤（徑向漸層）＋輻條陰影
-      const dg = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
-      dg.addColorStop(0, "rgba(255,225,160,0.30)");
-      dg.addColorStop(0.55, "rgba(214,178,98,0.16)");
-      dg.addColorStop(1, "rgba(120,96,44,0.22)");
-      ctx.fillStyle = dg;
-      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
-      D.disc(ctx, cx, cy, R, { fill: "rgba(255,213,79,0.06)", stroke: MC(), width: 2 });
-      for (let k = 0; k < 6; k++) { const a = ang + k * Math.PI / 3; D.line(ctx, cx, cy, cx + R * Math.cos(a), cy + R * Math.sin(a), k === 0 ? MC() : "rgba(150,140,120,0.30)", k === 0 ? 3 : 1.5); }
-      // 輻端小球有質感
-      for (let k = 0; k < 6; k++) {
-        const a = ang + k * Math.PI / 3;
-        const bxp = cx + R * Math.cos(a), byp = cy + R * Math.sin(a);
-        AP().moonBall && AP().moonBall(ctx, bxp, byp, 5, [222, 184, 96]);
+      const cx = W / 2, cy = H * 0.46, R = Math.min(W, H) * 0.32;
+      const A = AP();
+      /* 轉動慣量實驗：飛輪架在支架上。I 越大，配重塊被推得離軸越遠 */
+      if (A.flywheel) {
+        A.benchTop(ctx, W, H, H - 30);
+        A.steel(ctx, cx - 7, cy, 14, H - 30 - cy, 8);
+        A.steel(ctx, cx - 60, H - 38, 120, 9, -6);
+        const massR = R * (0.28 + 0.62 * Math.sqrt((sI.get() - 1) / 9));
+        A.flywheel(ctx, cx, cy, R, ang, massR, 6);
+        // 標記線：看得出轉了幾圈
+        D.line(ctx, cx, cy, cx + (R - 8) * Math.cos(ang), cy + (R - 8) * Math.sin(ang), MC(), 3);
       }
-      D.disc(ctx, cx, cy, 6, { fill: "#fff" });
       ctx.save(); ctx.strokeStyle = PL.col("danger"); ctx.lineWidth = 2.4; ctx.beginPath(); ctx.arc(cx, cy, R + 16, -0.7, 0.7); ctx.stroke(); ctx.restore();
       D.arrow(ctx, cx + (R + 16) * Math.cos(0.7), cy + (R + 16) * Math.sin(0.7), cx + (R + 16) * Math.cos(0.86), cy + (R + 16) * Math.sin(0.86), { color: PL.col("danger"), width: 2.4, label: "τ" });
       rI.set(sI.get(), 1); rA.set(sTau.get() / sI.get(), 2); rW.set(w, 2);
@@ -195,25 +198,23 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const r = sR.get(), cx = W / 2, cy = H * 0.46, R = Math.min(W, H) * 0.3;
-      // 軌道：雙線金屬環＋支架（比虛線圓更像「繫繞的圓周」）
-      ctx.save();
-      ctx.strokeStyle = "rgba(150,160,180,0.55)"; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
-      ctx.strokeStyle = "rgba(110,120,140,0.30)"; ctx.lineWidth = 1.2;
-      ctx.beginPath(); ctx.arc(cx, cy, R - 5, 0, Math.PI * 2); ctx.stroke();
-      ctx.restore();
-      // 支柱：從環底兩側斜下到畫面底
-      D.line(ctx, cx - R * 0.5, cy + R * 0.87, cx - R * 0.62, H - 8, "rgba(150,160,180,0.5)", 3);
-      D.line(ctx, cx + R * 0.5, cy + R * 0.87, cx + R * 0.62, H - 8, "rgba(150,160,180,0.5)", 3);
-      D.disc(ctx, cx, cy, 4, { fill: PL.col("text-faint") });
+      const A = AP();
+      /* 鐵架上的轉軸：小球綁在繩子一端，在鉛直面上繞著轉軸甩 */
+      if (A.standRod) {
+        A.benchTop(ctx, W, H, H - 20);
+        A.standRod(ctx, cx - R - 50, H - 18, cy - 30);
+        A.crossArm(ctx, cx - R - 50, cy, cx);
+      }
+      D.ring(ctx, cx, cy, R, "rgba(120,130,150,0.35)", 1.4, [5, 5]);
+      A.brassDisc ? A.brassDisc(ctx, cx, cy, 6) : D.disc(ctx, cx, cy, 4, { fill: PL.col("text-faint") });
       let ballx, bally;
       if (mode === "circle") {
         ballx = cx + R * Math.sin(beta); bally = cy + R * Math.cos(beta);
-        D.line(ctx, cx, cy, ballx, bally, MC(), 2);
+        A.cord ? A.cord(ctx, cx, cy, ballx, bally) : D.line(ctx, cx, cy, ballx, bally, MC(), 2);
         const v2 = Math.max(0, speed2(beta)), T = m * v2 / r + m * g * Math.cos(beta);
         if (T > 0) { const f = PL.clamp(T / 80, 0.12, 0.5); D.arrow(ctx, ballx, bally, ballx + (cx - ballx) * f, bally + (cy - bally) * f, { color: PL.col("danger"), width: 2, label: "T" }); }
       } else { ballx = px; bally = py; D.text(ctx, "繩鬆脫，物體脫離圓周！", cx, H - 14, { color: PL.col("danger"), size: 12, align: "center" }); }
-      D.disc(ctx, ballx, bally, 11, { fill: MC(), glow: MC(), glowSize: 12 });
+      A.sportBall ? A.sportBall(ctx, ballx, bally, 12, "steel") : D.disc(ctx, ballx, bally, 11, { fill: MC() });
       const vt2 = speed2(Math.PI);
       rTop.set(vt2 > 0 ? Math.sqrt(vt2) : 0, 2); rT.set(m * sV.get() * sV.get() / r + m * g, 1); rMin.set(Math.sqrt(g * r), 2);
     }

@@ -342,22 +342,27 @@
       const A = PL.apparatus || {};
       const objectX = 58, screenX = W - 54, baseY = H - 38, cy = H * 0.5, span = screenX - objectX;
       const lensX = objectX + s.x / s.Dcm * span, focalPx = s.f / s.Dcm * span;
-      // 金屬光具座導軌（雙軌）
-      const rg1 = ctx.createLinearGradient(0, baseY, 0, baseY + 10);
-      rg1.addColorStop(0, "rgba(150,155,168,0.55)");
-      rg1.addColorStop(0.5, "rgba(198,204,216,0.65)");
-      rg1.addColorStop(1, "rgba(118,124,138,0.55)");
-      ctx.fillStyle = rg1; ctx.fillRect(objectX - 20, baseY, span + 40, 10);
-      for (let i = 0; i <= 6; i++) { const xx = objectX + span * i / 6; D.line(ctx, xx, baseY - 4, xx, baseY + 4, "rgba(110,118,132,0.7)", 1); }
+      // 實驗室裡的光具座：導軌上有公分刻度，蠟燭、透鏡、光屏都夾在滑座上
+      if (A.bench) {
+        A.benchTop(ctx, W, H, baseY + 26);
+        A.bench(ctx, objectX, screenX, baseY, { pxPerCm: span / s.Dcm, cm0: 0 });
+      }
       // 物體：蠟燭（擬真）
-      if (A.candle) A.candle(ctx, objectX, baseY, { h: 46 });
+      // 蠟燭立在滑座的立柱上，燭焰高度對準光軸上方（光線從燭焰出發）
+      if (A.candle) { A.carrier(ctx, objectX, baseY, cy - 35 + 13 + 46); A.candle(ctx, objectX, cy - 35 + 13 + 46, { h: 46 }); }
       else D.arrow(ctx, objectX, cy + 48, objectX, cy - 35, { color: PL.col("warn"), width: 3, label: "物體" });
       // 光屏：擬真（支架＋屏面）
-      if (A.screen) A.screen(ctx, screenX, cy, 30, 150, false);
-      else { D.line(ctx, screenX, 24, screenX, baseY, PL.col("accent-2"), 3); }
+      const clarityNow = s.valid && s.x > s.f ? PL.clamp(1 - s.blur * 18, 0, 1) : 0;
+      const imgH = s.valid && s.x > s.f ? PL.clamp(-70 * s.q / s.x, -64, 64) : 0;
+      if (A.screen) {
+        A.carrier(ctx, screenX, baseY, cy + 75);
+        A.screen(ctx, screenX, cy, 30, 150, c2 => {
+          if (imgH) A.projectedFlame(c2, screenX, cy, Math.abs(imgH) * Math.max(0.35, clarityNow), true, clarityNow);
+        });
+      } else { D.line(ctx, screenX, 24, screenX, baseY, PL.col("accent-2"), 3); }
       D.text(ctx, "光屏", screenX, 20, { color: PL.col("accent-2"), size: 11, align: "center" });
       // 透鏡：擬真鏡片（描邊＋漸層玻璃）
-      if (A.lens) A.lens(ctx, lensX, cy, Math.min(64, H * 0.30), true);
+      if (A.lens) { A.carrier(ctx, lensX, baseY, cy + Math.min(64, H * 0.30) + 6); A.lens(ctx, lensX, cy, Math.min(64, H * 0.30), true); }
       else { ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(lensX, 38); ctx.quadraticCurveTo(lensX - 14, cy, lensX, H - 56); ctx.quadraticCurveTo(lensX + 14, cy, lensX, 38); ctx.stroke(); ctx.restore(); }
       [lensX - focalPx, lensX + focalPx].forEach(xx => { if (xx > objectX && xx < screenX) { D.line(ctx, xx, cy - 5, xx, cy + 5, MC(), 1); D.text(ctx, "F", xx, cy + 20, { color: MC(), size: 10, align: "center" }); } });
       if (s.valid && s.x > s.f) {
@@ -366,8 +371,8 @@
         D.line(ctx, objectX, rayY, lensX, rayY, "rgba(255,224,138,0.75)", 1.8); D.line(ctx, lensX, rayY, imageX, cy, "rgba(255,224,138,0.75)", 1.8);
         D.line(ctx, objectX, rayY, lensX, cy, "rgba(255,255,255,0.35)", 1.4); D.line(ctx, lensX, cy, imageX, cy - imageH, "rgba(255,255,255,0.35)", 1.4);
         const clarity = PL.clamp(1 - s.blur * 18, 0, 1), displayH = imageH * clarity;
-        D.arrow(ctx, screenX, cy, screenX, cy - displayH, { color: clarity > 0.85 ? MC() : PL.col("text-faint"), width: 2.5, label: clarity > 0.85 ? "清晰像" : "模糊像" });
-        if (s.blur > 0.05) D.ring(ctx, screenX, cy - displayH, 7 + s.blur * 80, "rgba(240,98,146,0.45)", 1.5);
+        D.text(ctx, clarity > 0.85 ? "清晰像（倒立）" : "模糊像", screenX - 22, cy - 84, { color: clarity > 0.85 ? MC() : PL.col("text-dim"), size: 11, align: "right", weight: "700" });
+        if (s.blur > 0.05) D.ring(ctx, screenX, cy - displayH * 0.5, 7 + s.blur * 60, "rgba(240,98,146,0.45)", 1.5);
       }
       D.text(ctx, "D=" + s.Dcm + " cm", (objectX + screenX) / 2, baseY + 23, { color: PL.col("text-dim"), size: 11, align: "center" });
       rX.set(s.x, 1); rFocus.set(s.valid ? (s.blur <= 0.05 ? "清晰" : "尚未清晰") : "D ≤ 4f"); rN.set(recorded.length, 0); note.textContent = feedback;
@@ -533,14 +538,11 @@
       const mmToPx = (H - 70) / (2 * half);
       const py = yMm => cy - yMm * mmToPx;
 
-      // 光具座：雙軌金屬導軌
-      ctx.save();
-      const rg1 = ctx.createLinearGradient(0, H - 32, 0, H - 24);
-      rg1.addColorStop(0, "rgba(150,155,168,0.5)");
-      rg1.addColorStop(0.5, "rgba(196,202,214,0.6)");
-      rg1.addColorStop(1, "rgba(120,126,140,0.5)");
-      ctx.fillStyle = rg1; ctx.fillRect(24, H - 32, W - 48, 8);
-      ctx.restore();
+      // 光具座：實驗室長桌上的導軌，雷射、狹縫板、光屏都立在滑座上
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, H - 20);
+      AP.bench(ctx, 24, W - 24, H - 46, { pxPerCm: 6 });
+      AP.carrier(ctx, laserX, H - 46, cy + 15);
 
       // 雷射：金屬外殼（圓柱漸層）＋散熱環＋出光口
       const lamColor = wavelengthColor(sLam.get());
@@ -573,11 +575,9 @@
 
       // 狹縫板
       const slitHalf = (sD.get() / 2) * mmToPx * 6;   // 視覺放大，否則看不見
-      D.rect(ctx, slitX - 5, 24, 10, H - 78, { fill: PL.theme.pale(0.3) });
       const openings = mode === "single" ? [0] : [-slitHalf, slitHalf];
-      openings.forEach(off => {
-        D.rect(ctx, slitX - 5, cy + off - 5, 10, 10, { fill: PL.theme.shade(0.85), stroke: PL.theme.pale(0.26), width: 1 });
-      });
+      AP.carrier(ctx, slitX, H - 46, H - 50);
+      AP.slitPlate(ctx, slitX, (24 + H - 54) / 2, H - 78, openings.map(o => o + cy - (24 + H - 54) / 2), 9, beamAlpha > 0.02 ? lamColor : null);
       if (mode !== "single") {
         // 縫距標註：兩縫之間畫帶箭頭的標註線
         const ay = Math.min(cy + slitHalf + 26, H - 60);
@@ -610,13 +610,15 @@
       });
 
       // 螢幕與累積的光點
-      D.rect(ctx, screenX, 24, 10, H - 78, { fill: PL.theme.pale(0.10), stroke: PL.theme.pale(0.25) });
-      hits.forEach(y => {
+      // 光屏正面：光點一顆一顆打上去，慢慢排成一條一條的亮紋
+      AP.carrier(ctx, screenX + 18, H - 46, H - 50);
+      const paper = AP.paperScreen(ctx, screenX + 18, (24 + H - 54) / 2, 40, H - 78);
+      hits.forEach((y, i) => {
         const Y = py(y);
         if (Y < 24 || Y > H - 54) return;
         ctx.save();
-        ctx.globalAlpha = 0.55;
-        D.disc(ctx, screenX + 5 + (Math.random() - 0.5) * 4, Y, 1.5, { fill: lamColor });
+        ctx.globalAlpha = 0.6;
+        D.disc(ctx, paper.x + 3 + ((i * 7919) % 97) / 97 * (paper.w - 6), Y, 1.5, { fill: lamColor });
         ctx.restore();
       });
 
@@ -626,10 +628,10 @@
         for (let n = -4; n <= 4; n += 1) {
           const Y = py(n * dx);
           if (Y < 30 || Y > H - 56) continue;
-          D.line(ctx, screenX + 14, Y, screenX + 22, Y, m, 1.4);
+          D.line(ctx, screenX + 42, Y, screenX + 50, Y, m, 1.4);
         }
-        D.text(ctx, "Δx=" + dx.toFixed(2) + "mm", screenX + 24, py(0) - 6,
-          { color: m, size: 10 });
+        D.text(ctx, "Δx=" + dx.toFixed(2) + "mm", screenX - 4, 18,
+          { color: m, size: 10, weight: "700" });
       }
 
       const vis = visibility();
@@ -732,8 +734,11 @@
       const sinc = b => Math.abs(b) < 1e-4 ? 1 : (Math.sin(b) / b) ** 2;
       const scr = W - 60, scale = 90;                 // u = (螢幕位置)/scale
       const beta = u => Math.PI * a * u / lam;          // 相位參數
-      // 屏上亮度帶
-      for (let y = 10; y < H - 10; y += 2) { const I = sinc(beta((y - H / 2) / scale)); ctx.globalAlpha = I; ctx.fillStyle = col; ctx.fillRect(scr, y, 26, 2); }
+      // 實驗室牆上的光屏：屏上亮度帶就是 sinc² 分布
+      const AP = PL.apparatus;
+      AP.labRoom(ctx, W, H, H + 1, { bench: "none" });
+      const paper = AP.paperScreen(ctx, scr + 13, H / 2, 30, H - 26);
+      for (let y = paper.y; y < paper.y + paper.h; y += 2) { const I = sinc(beta((y - H / 2) / scale)); ctx.globalAlpha = I; ctx.fillStyle = col; ctx.fillRect(paper.x + 1, y, paper.w - 2, 2); }
       ctx.globalAlpha = 1;
       // 強度曲線
       const bx = 44, by = 26, bw = scr - bx - 16, bh = H - 52, um = (H / 2 - 10) / scale;
@@ -742,7 +747,6 @@
       g.fn(u => sinc(beta(u)), { color: col, width: 2.2, samples: 240 });
       g.vline(lam / a, { color: "rgba(255,255,255,0.25)", dash: [3, 3], width: 1 });
       g.vline(-lam / a, { color: "rgba(255,255,255,0.25)", dash: [3, 3], width: 1 });
-      D.line(ctx, scr, 10, scr, H - 10, PL.col("text-faint"), 2);
       rW.set(lam / a, 2);
     }
     cv.onResize(draw); draw();
@@ -758,13 +762,22 @@
     const rI = PL.ui.readout(L.readouts, { label: "穿透強度 I/I₀", unit: "" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const th = sTh.get() * Math.PI / 180, cy = H / 2, I = Math.cos(th) ** 2;
-      const p1x = W * 0.34, p2x = W * 0.62, r = 40;
+      const th = sTh.get() * Math.PI / 180, cy = H * 0.46, I = Math.cos(th) ** 2;
+      const p1x = W * 0.36, p2x = W * 0.62, r = 40;
+      const AP = PL.apparatus;
+      /* 光具座上：光源箱 → 偏振片 1 → 偏振片 2 → 照度計 */
+      AP.benchTop(ctx, W, H, H - 18);
+      AP.bench(ctx, 30, W - 30, H - 44, { pxPerCm: 5 });
+      AP.lampHouse(ctx, 86, cy, 0.9);
+      AP.carrier(ctx, p1x, H - 44, cy + r + 20); AP.carrier(ctx, p2x, H - 44, cy + r + 20);
       // 光束（亮度分段）
       const beam = (x0, x1, alpha, col) => { ctx.save(); ctx.globalAlpha = alpha; ctx.strokeStyle = col; ctx.lineWidth = 14; ctx.beginPath(); ctx.moveTo(x0, cy); ctx.lineTo(x1, cy); ctx.stroke(); ctx.restore(); };
-      beam(20, p1x, 0.5, "#ffe08a"); beam(p1x, p2x, 0.5, MC()); beam(p2x, W - 20, Math.max(0.04, I * 0.9), MC());
-      const disc = (x, ang, lab) => { D.ring(ctx, x, cy, r, "#fff", 2); for (let o = -r + 6; o <= r - 6; o += 8) { const px = x + o; D.line(ctx, px, cy - Math.sqrt(Math.max(0, r * r - o * o)) + 3, px, cy + Math.sqrt(Math.max(0, r * r - o * o)) - 3, "rgba(255,255,255,0.35)", 1); } D.arrow(ctx, x, cy, x + r * Math.sin(ang), cy - r * Math.cos(ang), { color: PL.col("accent-2"), width: 2 }); D.text(ctx, lab, x, cy + r + 16, { color: PL.col("text-dim"), size: 11, align: "center" }); };
+      beam(90, p1x, 0.5, "#ffe08a"); beam(p1x, p2x, 0.5, MC()); beam(p2x, W - 96, Math.max(0.04, I * 0.9), MC());
+      const disc = (x, ang, lab) => { AP.polarizer(ctx, x, cy, r, ang); D.arrow(ctx, x, cy, x + r * 0.8 * Math.sin(ang), cy - r * 0.8 * Math.cos(ang), { color: PL.col("accent-2"), width: 2.2 }); D.text(ctx, lab, x, cy - r - 12, { color: PL.col("text"), size: 11, align: "center", weight: "700" }); };
       disc(p1x, 0, "偏振片1"); disc(p2x, th, "偏振片2（θ=" + sTh.get() + "°）");
+      // 照度計：指針就是穿透強度
+      AP.carrier(ctx, W - 70, H - 44, cy + 30);
+      AP.meter(ctx, W - 70, cy, 24, I, "照度");
       rI.set(I, 3);
     }
     cv.onResize(draw); draw();
@@ -780,19 +793,31 @@
     const rSpread = PL.ui.readout(L.readouts, { label: "色散角（紫−紅）", unit: "°" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const cx = W / 2, cy = H / 2, s = 70;
+      const cx = W * 0.44, cy = H / 2, s = 76;
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, cy + s * 0.6 + 2);
       // 稜鏡三角形
       const A = { x: cx, y: cy - s }, B = { x: cx - s * 0.9, y: cy + s * 0.6 }, C = { x: cx + s * 0.9, y: cy + s * 0.6 };
-      ctx.save(); ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.lineTo(C.x, C.y); ctx.closePath();
-      ctx.fillStyle = PL.theme.pale(0.06); ctx.fill(); ctx.strokeStyle = PL.col("text-faint"); ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
+      AP.prismGlass(ctx, A, B, C);
       // 入射白光打在左面中點
       const P = { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 };
       const th = sTh.get() * Math.PI / 180;
-      D.arrow(ctx, P.x - 120 * Math.cos(th), P.y - 120 * Math.sin(th) + 40, P.x, P.y, { color: "#fff", width: 2.4, label: "白光" });
+      const S = { x: P.x - 150 * Math.cos(th), y: P.y - 150 * Math.sin(th) + 40 };
+      ctx.save(); ctx.translate(S.x, S.y); ctx.rotate(Math.atan2(P.y - S.y, P.x - S.x)); AP.lampHouse(ctx, 0, 0, 0.62); ctx.restore();
+      D.arrow(ctx, S.x, S.y, P.x, P.y, { color: "#fff6d8", width: 3, label: "白光" });
       // 出射彩色扇形（近似）
       const cols = [[400, "#8a2be2"], [450, "#4b6bff"], [500, "#33cc66"], [560, "#e8e83a"], [610, "#ff9a3a"], [660, "#ff3a3a"]];
       const exit = { x: (A.x + C.x) / 2, y: (A.y + C.y) / 2 };
-      cols.forEach((c, i) => { const ang = 0.18 + i * 0.05; D.line(ctx, P.x, P.y, exit.x, exit.y, "rgba(255,255,255,0.15)", 1); D.arrow(ctx, exit.x, exit.y, exit.x + 150 * Math.cos(ang), exit.y + 150 * Math.sin(ang), { color: nmColor(c[0]), width: 2.4 }); });
+      // 光屏接住光譜
+      const xS = exit.x + 170;
+      const paper = AP.paperScreen(ctx, xS + 10, exit.y + 170 * Math.tan(0.3), 20, 120);
+      cols.forEach((c, i) => {
+        const ang = 0.18 + i * 0.05, yS = exit.y + (xS - exit.x) * Math.tan(ang);
+        D.line(ctx, P.x, P.y, exit.x, exit.y, "rgba(255,255,255,0.35)", 1.4);
+        ctx.save(); ctx.globalAlpha = 0.9; ctx.strokeStyle = nmColor(c[0]); ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.moveTo(exit.x, exit.y); ctx.lineTo(xS, yS); ctx.stroke(); ctx.restore();
+        ctx.fillStyle = nmColor(c[0]); ctx.fillRect(paper.x + 1, yS - 3, paper.w - 2, 6);
+      });
       rSpread.set(( (0.18 + 5 * 0.05) - 0.18) * 180 / Math.PI, 1);
     }
     cv.onResize(draw); draw();
@@ -812,12 +837,15 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const lines = sN.get(), d = 1e6 / lines, lam = sLam.get(), col = nmColor(lam);
-      const gx = 74, cy = H / 2, scr = W - 46;
-      for (let y = cy - 42; y <= cy + 42; y += 4) D.line(ctx, gx, y, gx, y + 2, MC(), 2);
-      D.text(ctx, "光柵", gx, cy - 52, { color: MC(), size: 11, align: "center" });
-      D.line(ctx, scr, 18, scr, H - 18, PL.col("text-faint"), 2);
+      const gx = 120, cy = H / 2, scr = W - 46;
+      const AP = PL.apparatus;
+      AP.labRoom(ctx, W, H, H - 16, {});
+      AP.laser(ctx, gx - 30, cy, 0, { len: 60 });
+      AP.gratingSlide(ctx, gx, cy, 84);
+      D.text(ctx, "光柵", gx, cy - 56, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
+      AP.paperScreen(ctx, scr + 6, H / 2, 22, H - 40);
       for (let mm = -5; mm <= 5; mm++) { const s = mm * lam / d; if (Math.abs(s) <= 1) { const th = Math.asin(s), yy = cy + Math.tan(th) * (scr - gx); if (yy > 14 && yy < H - 14) { D.line(ctx, gx, cy, scr, yy, "rgba(255,255,255,0.1)", 1); D.disc(ctx, scr + 6, yy, mm === 0 ? 6 : 5, { fill: col, glow: col, glowSize: 8 }); D.text(ctx, "m=" + mm, scr - 8, yy + 3, { color: PL.col("text-faint"), size: 9, align: "right" }); } } }
-      D.arrow(ctx, 22, cy, gx - 4, cy, { color: "#fff", width: 2 });
+      D.line(ctx, gx - 30, cy, gx - 4, cy, col, 2.4);
       const th1 = Math.asin(PL.clamp(lam / d, -1, 1)) * 180 / Math.PI;
       rD.set(d, 0); rTh.set(th1, 1); rOrders.set("±" + Math.floor(d / lam));
     }
