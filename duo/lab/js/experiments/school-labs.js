@@ -394,12 +394,11 @@
       const baseX = 54, baseY = H - 58, run = W - 150;
       const tipY = baseY - run * Math.tan(rad);
 
-      // 斜面本體
-      ctx.save();
-      ctx.beginPath(); ctx.moveTo(baseX, baseY); ctx.lineTo(baseX + run, baseY); ctx.lineTo(baseX + run, tipY); ctx.closePath();
-      ctx.fillStyle = PL.theme.pale(0.08); ctx.fill();
-      ctx.strokeStyle = PL.col("text-faint"); ctx.lineWidth = 2; ctx.stroke();
-      ctx.restore();
+      // 斜面本體：一端鉸接在桌上、慢慢抬起的木板
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, baseY + 6);
+      AP.ramp(ctx, baseX, baseY, run / Math.cos(rad), rad);
+      AP.brassDisc(ctx, baseX, baseY + 2, 5);
 
       // 角度弧與標示
       D.ring(ctx, baseX, baseY, 46, PL.theme.pale(0.3), 1);
@@ -412,9 +411,8 @@
       ctx.translate(bx, by);
       ctx.rotate(-rad);
       const bw = 46, bh = 26 + sM.get() * 6;
-      D.rect(ctx, -bw / 2, -bh, bw, bh, { fill: MC(), stroke: PL.theme.pale(0.4), width: 1.5, r: 4 });
-      D.text(ctx, sM.get().toFixed(1) + "kg", 0, -bh / 2 + 4, { color: "#08131c", size: 11, align: "center", weight: "700" });
       ctx.restore();
+      AP.massBlock(ctx, bx, by, bw, bh, { color: MC(), label: sM.get().toFixed(1) + "kg", ang: -rad, noShadow: true });
 
       // 狀態徽章：靜止 / 剛好要滑 / 滑動
       const state = sliding ? "滑動中" : (angle >= thc - 0.4 ? "即將滑動" : "靜止（靜摩擦力足夠）");
@@ -508,25 +506,28 @@
       const y = H * 0.46;
       const thick = 3 + sD.get() * 7;                                // 直徑直接對應線粗
 
-      // 導線與夾具
-      D.rect(ctx, x0 - 14, y - 16, 14, 32, { fill: PL.col("text-faint"), r: 3 });
-      D.rect(ctx, x1, y - 16, 14, 32, { fill: PL.col("text-faint"), r: 3 });
+      // 俯視的實驗桌：待測導線拉直、兩端鎖在黃銅接線座上
+      const AP = PL.apparatus;
+      AP.deskTop(ctx, 0, 0, W, H);
+      [x0 - 14, x1].forEach(cx0 => { AP.brass(ctx, cx0, y - 16, 14, 32); AP.brassDisc(ctx, cx0 + 7, y - 9, 3.5); AP.brassDisc(ctx, cx0 + 7, y + 9, 3.5); });
       ctx.save();
-      ctx.strokeStyle = mat.color; ctx.lineWidth = thick; ctx.lineCap = "round";
+      ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = thick; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(x0, y + 2); ctx.lineTo(x1, y + 2); ctx.stroke();
+      ctx.strokeStyle = mat.color; ctx.lineWidth = thick;
       ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,0.45)"; ctx.lineWidth = Math.max(1, thick * 0.3);
+      ctx.beginPath(); ctx.moveTo(x0, y - thick * 0.2); ctx.lineTo(x1, y - thick * 0.2); ctx.stroke();
       ctx.restore();
 
       ruler(ctx, x0, y + 34, x1 - x0, "ℓ = " + sLen.get().toFixed(1) + " m");
       D.text(ctx, "d = " + sD.get().toFixed(1) + " mm", (x0 + x1) / 2, y - thick / 2 - 12,
         { color: PL.col("accent-2"), size: 12, align: "center" });
 
-      // 歐姆計
-      const mW = 118, mX = W - mW - 16, mY = 18;
-      D.rect(ctx, mX, mY, mW, 62, { fill: PL.theme.shade(0.5), stroke: PL.theme.pale(0.25), r: 7 });
-      D.text(ctx, "歐姆計", mX + 12, mY + 20, { color: PL.col("text-faint"), size: 10 });
-      D.text(ctx, PL.fmt(resistance(), 2) + " Ω", mX + 12, mY + 45, { color: MC(), size: 18, weight: "700" });
-      D.line(ctx, mX, mY + 40, x1 + 14, y - 10, PL.col("text-faint"), 1.5);
-      D.line(ctx, mX, mY + 52, x0 - 14, y + 10, PL.col("text-faint"), 1.5);
+      // 三用電表（歐姆檔）：紅黑探棒夾在導線兩端
+      const mW = 104, mH = 128, mX = W - mW - 16, mY = 12;
+      const jacks = AP.multimeter(ctx, mX, mY, mW, mH, PL.fmt(resistance(), 2), { unit: "Ω" });
+      AP.cable(ctx, [jacks.red, { x: jacks.red.x, y: mY + mH + 30 }, { x: x1 + 7, y: y + 9 }], "rgb(200,44,40)", 2.6, 8);
+      AP.cable(ctx, [jacks.black, { x: jacks.black.x, y: mY + mH + 44 }, { x: x0 - 7, y: y + 9 }], "rgb(30,32,36)", 2.6, 10);
 
       D.text(ctx, mat.label + "：ρ = " + mat.rho.toExponential(2) + " Ω·m",
         16, H - 16, { color: PL.col("text-faint"), size: 11 });
@@ -627,12 +628,15 @@
       const { ctx, W, H } = cv;
       cv.clear(); D.bg(cv);
       const T = sT.get();
-      const beakerX = 40, beakerY = 46, beakerW = W * 0.44, beakerH = H - 100;
-
-      // 水浴：水位固定，顏色隨溫度由藍轉紅，讓「溫度」在畫面上是看得見的
+      const AP = PL.apparatus;
+      const beakerX = 40, beakerW = W * 0.44;
+      // 水浴放在電熱板上：溫度越高加熱盤越紅、水色越暖
       const warm = Math.max(0, Math.min(1, T / 100));
       const water = "rgb(" + Math.round(60 + warm * 170) + "," + Math.round(140 - warm * 90) + "," + Math.round(210 - warm * 150) + ")";
-      D.rect(ctx, beakerX, beakerY + 20, beakerW, beakerH - 20, { fill: water, stroke: PL.col("text-faint"), width: 2, r: 4 });
+      AP.labRoom(ctx, W, H, H - 20, {});
+      const plateTop = AP.hotPlate(ctx, beakerX + beakerW / 2, H - 20, beakerW + 24, warm);
+      const beakerY = 46, beakerH = plateTop - beakerY;
+      AP.beaker(ctx, beakerX + beakerW / 2, plateTop, beakerW, beakerH, (beakerH - 20) / beakerH, water);
 
       // 加熱時冒出的氣泡數量隨溫度增加
       const bubbles = Math.round(warm * 14);
@@ -644,19 +648,21 @@
 
       // 溫度計
       const tx = beakerX + beakerW + 34;
-      D.rect(ctx, tx, beakerY, 16, beakerH, { fill: PL.theme.pale(0.10), stroke: PL.col("text-faint"), r: 8 });
-      const col = beakerH * warm;
-      D.rect(ctx, tx + 4, beakerY + beakerH - col, 8, col, { fill: PL.col("danger"), r: 4 });
-      D.disc(ctx, tx + 8, beakerY + beakerH + 8, 11, { fill: PL.col("danger") });
-      D.text(ctx, T + " °C", tx + 26, beakerY + beakerH - col + 4, { color: PL.col("danger"), size: 14, weight: "700" });
+      AP.thermometer(ctx, tx + 8, beakerY, beakerY + beakerH, 16, warm);
+      const col = (beakerH - 30) * warm;
+      D.text(ctx, T + " °C", tx + 26, beakerY + beakerH - 20 - col + 4, { color: PL.col("danger"), size: 14, weight: "700" });
 
       // 兩顆待測元件浸在水裡，各自顯示即時電阻
       const items = [
         { label: "金屬 Pt100", value: metalR(T), color: PL.col("accent-2"), y: beakerY + beakerH * 0.35 },
         { label: "熱敏 NTC", value: ntcR(T), color: PL.col("accent-3"), y: beakerY + beakerH * 0.68 }
       ];
-      items.forEach(item => {
-        D.rect(ctx, beakerX + 22, item.y - 12, 54, 24, { fill: item.color, r: 4 });
+      items.forEach((item, k) => {
+        // 感測元件吊在導線上浸入水中：Pt100 是金屬探棒、NTC 是黑色小珠
+        ctx.strokeStyle = PL.theme.isLight() ? "rgba(40,44,52,0.8)" : "rgba(220,226,236,0.8)"; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(beakerX + 49, beakerY - 16); ctx.lineTo(beakerX + 49, item.y - 12); ctx.stroke();
+        if (k === 0) AP.steel(ctx, beakerX + 22, item.y - 8, 54, 16, 10);
+        else { ctx.fillStyle = "rgb(30,32,36)"; ctx.beginPath(); ctx.ellipse(beakerX + 49, item.y, 10, 8, 0, 0, Math.PI * 2); ctx.fill(); }
         D.text(ctx, item.label, beakerX + 84, item.y - 2, { color: PL.col("text"), size: 11 });
         D.text(ctx, PL.fmt(item.value, 1) + " Ω", beakerX + 84, item.y + 12, { color: item.color, size: 12, weight: "700" });
       });
@@ -750,10 +756,13 @@
       const env = sEnv.get(), T = temperature(t);
       const warm = Math.max(0, Math.min(1, (T - 5) / 95));
 
-      // 燒杯與水
+      // 燒杯與水：放在隔熱墊上的一杯熱水，水色隨溫度由紅轉藍
+      const AP = PL.apparatus;
       const bx = 46, by = 40, bw = W * 0.4, bh = H - 92;
       const water = "rgb(" + Math.round(60 + warm * 175) + "," + Math.round(150 - warm * 100) + "," + Math.round(215 - warm * 160) + ")";
-      D.rect(ctx, bx, by, bw, bh, { fill: water, stroke: PL.col("text-faint"), width: 2, r: 4 });
+      AP.labRoom(ctx, W, H, by + bh + 6, {});
+      ctx.fillStyle = "rgb(214,210,196)"; ctx.fillRect(bx - 8, by + bh, bw + 16, 6);
+      AP.beaker(ctx, bx + bw / 2, by + bh, bw, bh + 10, bh / (bh + 10) * 0.92, water);
 
       // 蒸氣：溫差越大冒得越多，直接對應「散熱速率正比於溫差」
       const steam = Math.max(0, Math.min(10, Math.round((T - env) / 7)));
@@ -766,15 +775,15 @@
 
       // 溫度計
       const tx = bx + bw + 32;
-      D.rect(ctx, tx, by - 6, 16, bh, { fill: PL.theme.pale(0.10), stroke: PL.col("text-faint"), r: 8 });
-      const col = (bh - 12) * warm;
-      D.rect(ctx, tx + 4, by - 6 + bh - 6 - col, 8, col, { fill: PL.col("danger"), r: 4 });
+      AP.thermometer(ctx, tx + 8, by - 6, by - 6 + bh, 16, warm);
+      const col = (bh - 36) * warm;
       D.text(ctx, T.toFixed(1) + " °C", tx + 26, by - 6 + bh - 10 - col, { color: PL.col("danger"), size: 15, weight: "700" });
       D.text(ctx, "室溫 " + env + " °C", tx + 26, by + bh - 4, { color: PL.col("accent-2"), size: 11 });
 
       // 即時的溫差條，讓「溫差」不只是數字
       const diff = T - env;
       const barX = tx + 26, barY = by + 22, barW = Math.max(0, Math.min(W - barX - 24, diff * 2.4));
+      AP.infoCard(ctx, barX - 10, barY - 24, Math.min(W - barX - 14, 260), 46);
       D.text(ctx, "溫差 ΔT = " + diff.toFixed(1) + " °C", barX, barY - 6, { color: PL.col("text-dim"), size: 11 });
       D.rect(ctx, barX, barY, barW, 12, { fill: MC(), r: 6 });
       PL.ui.caption(cv, "散熱速率 ∝ ΔT，所以溫差越小、降得越慢。");
@@ -861,18 +870,15 @@
       const scale = Math.min((lensX - 60) / 0.85, (W - lensX - 60) / Math.max(0.35, v));
       cv.calibrate(scale, "m");   // 可自己量物距與像距，不必只信讀數
 
-      // 光具座軌道
-      D.rect(ctx, 24, axisY + 62, W - 48, 8, { fill: PL.theme.pale(0.12), r: 4 });
+      // 光具座：導軌 + 滑座
+      const AP = PL.apparatus;
+      AP.benchTop(ctx, W, H, axisY + 88);
+      AP.bench(ctx, 24, W - 24, axisY + 62, { pxPerCm: scale / 100 });
       D.line(ctx, 24, axisY, W - 24, axisY, PL.theme.pale(0.22), 1, [5, 4]);
 
       // 透鏡
-      ctx.save();
-      ctx.strokeStyle = MC(); ctx.lineWidth = 2.4;
-      ctx.beginPath();
-      ctx.ellipse(lensX, axisY, 11, 56, 0, 0, TAU);
-      ctx.stroke();
-      ctx.fillStyle = "rgba(120,190,220,0.16)"; ctx.fill();
-      ctx.restore();
+      AP.carrier(ctx, lensX, axisY + 62, axisY + 62);
+      AP.lens(ctx, lensX, axisY, 56, true);
       D.text(ctx, "凸透鏡", lensX, axisY + 84, { color: MC(), size: 11, align: "center" });
 
       // 焦點
@@ -884,17 +890,19 @@
 
       // 物體（向上的箭頭）
       const objX = lensX - u * scale, objH = 42;
-      D.arrow(ctx, objX, axisY, objX, axisY - objH, { color: PL.col("accent-2"), width: 3, head: 10 });
+      // 物體：蠟燭（燭焰頂端就是物高）
+      AP.carrier(ctx, objX, axisY + 62, axisY + 9);
+      AP.candle(ctx, objX, axisY + 9, { h: 30 });
       D.text(ctx, "物體", objX, axisY + 20, { color: PL.col("accent-2"), size: 11, align: "center" });
 
       // 像（倒立實像），高度依放大率縮放
       const imgX = lensX + v * scale, imgH = objH * (v / u);
       const onScreen = imgX < W - 26;
       if (onScreen) {
-        D.arrow(ctx, imgX, axisY, imgX, axisY + imgH, { color: PL.col("ok"), width: 3, head: 10 });
-        D.text(ctx, "倒立實像", imgX, axisY - 10, { color: PL.col("ok"), size: 11, align: "center" });
-        // 白色紙屏
-        D.rect(ctx, imgX - 3, axisY - 62, 6, 124, { fill: PL.theme.pale(0.3) });
+        // 白色紙屏上的倒立燭焰
+        AP.carrier(ctx, imgX, axisY + 62, axisY + 62);
+        AP.screen(ctx, imgX, axisY, 24, 124, c2 => AP.projectedFlame(c2, imgX, axisY, Math.min(56, Math.abs(imgH)), true, 1));
+        D.text(ctx, "倒立實像", imgX, axisY - 70, { color: PL.col("ok"), size: 11, align: "center", weight: "700" });
         // 三條特徵光線：平行→過焦點、過中心→不偏折
         D.line(ctx, objX, axisY - objH, lensX, axisY - objH, PL.col("warn"), 1.4);
         D.line(ctx, lensX, axisY - objH, imgX, axisY + imgH, PL.col("warn"), 1.4);
@@ -987,9 +995,13 @@
       cv.calibrate(scale, "m");   // 可自己量空氣柱長度，對照理論共鳴長
       const waterY = top + Lm * scale;
 
-      // 管壁與水柱
-      D.rect(ctx, tubeX, top, tubeW, span, { fill: PL.theme.pale(0.05), stroke: PL.col("text-faint"), width: 2, r: 4 });
-      D.rect(ctx, tubeX + 3, waterY, tubeW - 6, bottom - waterY - 3, { fill: "rgba(70,150,215,0.55)", r: 3 });
+      // 管壁與水柱：鐵架夾住的玻璃共鳴管，管內水位可以上下調
+      const AP = PL.apparatus;
+      AP.labRoom(ctx, W, H, bottom + 20, {});
+      AP.standRod(ctx, tubeX - 60, bottom + 20, top - 10);
+      AP.clampHead(ctx, tubeX - 60, top + 40, 52, 0);
+      AP.clampHead(ctx, tubeX - 60, bottom - 60, 52, 0);
+      AP.glassTube(ctx, tubeX + tubeW / 2, top, bottom, tubeW, waterY);
       D.text(ctx, "水位", tubeX + tubeW + 10, waterY + 4, { color: PL.col("accent-2"), size: 11 });
 
       // 空氣柱長度標示
@@ -1013,14 +1025,13 @@
 
       // 音叉：振動幅度固定，聲音大小由共鳴決定
       const forkX = tubeX + tubeW / 2, forkY = top - 22;
-      const wob = Math.sin(TAU * 8 * t) * 3;
-      D.line(ctx, forkX - 9 + wob, forkY - 24, forkX - 9 + wob, forkY, PL.col("text-dim"), 3);
-      D.line(ctx, forkX + 9 - wob, forkY - 24, forkX + 9 - wob, forkY, PL.col("text-dim"), 3);
-      D.line(ctx, forkX, forkY, forkX, forkY + 12, PL.col("text-dim"), 3);
+      const wob = Math.sin(TAU * 8 * t) * 1.5;
+      AP.tuningFork(ctx, forkX + wob, forkY + 12, 36);
       D.text(ctx, f + " Hz", forkX + 24, forkY - 8, { color: PL.col("text-dim"), size: 11 });
 
       // 音量計：共鳴時衝到滿格，是最直觀的「找到了」訊號
       const mX = W - 150, mY = 60, mW = 118, mH = 16;
+      AP.infoCard(ctx, mX - 12, mY - 28, mW + 24, 100);
       D.text(ctx, "耳朵聽到的音量", mX, mY - 10, { color: PL.col("text-faint"), size: 11 });
       D.rect(ctx, mX, mY, mW, mH, { fill: PL.theme.pale(0.10), stroke: PL.theme.pale(0.22), r: 8 });
       const barColor = loud > 0.85 ? PL.col("ok") : (loud > 0.4 ? PL.col("warn") : PL.col("text-faint"));

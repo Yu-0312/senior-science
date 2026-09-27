@@ -30,6 +30,19 @@
     function scene() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const cy = H * 0.5, cath = 92, anode = W - 92, emit = Kmax() > 0, col = nmColor(700 - (sF.get() - 3) / 9 * 320);
+      const AP = PL.apparatus;
+      /* 光電管：真空玻璃管裡一片光陰極、一支陽極，放在實驗桌上照光 */
+      AP.benchTop(ctx, W, H, H - 14);
+      {
+        const gx0 = cath - 40, gx1 = anode + 40, gy0 = cy - 92, gy1 = cy + 92;
+        const gg = ctx.createLinearGradient(0, gy0, 0, gy1);
+        gg.addColorStop(0, "rgba(226,244,252,0.30)"); gg.addColorStop(0.12, "rgba(255,255,255,0.10)");
+        gg.addColorStop(0.88, "rgba(200,224,238,0.08)"); gg.addColorStop(1, "rgba(226,244,252,0.30)");
+        AP.rrPath(ctx, gx0, gy0, gx1 - gx0, gy1 - gy0, 60); ctx.fillStyle = gg; ctx.fill();
+        ctx.strokeStyle = PL.theme.isLight() ? "rgba(90,130,160,0.6)" : "rgba(206,232,244,0.6)"; ctx.lineWidth = 2; ctx.stroke();
+        AP.steel(ctx, (gx0 + gx1) / 2 - 30, gy1, 60, H - 14 - gy1, 8);
+        D.text(ctx, "真空光電管", (gx0 + gx1) / 2, gy0 - 8, { color: PL.col("text-dim"), size: 10.5, align: "center", weight: "700" });
+      }
       // 紫外/可見光源：燈管本體（石英管）＋燈座，斜向照射
       const lx = 20, ly = cy - 108;
       ctx.save();
@@ -129,8 +142,25 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const remain = nuclei.reduce((a, b) => a + b, 0);
       // 核格
-      const cols = 18, cellW = (W * 0.42 - 20) / cols, r = Math.min(cellW, 9) * 0.42;
-      nuclei.forEach((alive, i) => { const cxp = 20 + (i % cols) * cellW + cellW / 2, cyp = 30 + Math.floor(i / cols) * cellW + cellW / 2; D.disc(ctx, cxp, cyp, r, { fill: alive ? MC() : "rgba(255,255,255,0.12)" }); });
+      const AP = PL.apparatus;
+      /* 教室裡的經典模擬：一盤 144 枚硬幣，每隔一段時間搖一次，翻成反面（灰色）就代表那顆核衰變了 */
+      AP.deskTop(ctx, 0, 0, W, H);
+      const cols = 12, trayW = W * 0.44, cellW = (trayW - 24) / cols, r = Math.min(cellW * 0.42, 13);
+      const rowsN = Math.ceil(N0 / cols), trayH = rowsN * cellW + 24;
+      ctx.fillStyle = "rgba(0,0,0,0.22)"; ctx.fillRect(16, 20, trayW, trayH);
+      ctx.fillStyle = PL.theme.isLight() ? "#7a4a2a" : "#4a2e1c"; ctx.fillRect(12, 16, trayW, trayH);
+      ctx.fillStyle = PL.theme.isLight() ? "#2f6b4a" : "#1f4a34"; ctx.fillRect(22, 26, trayW - 20, trayH - 20);
+      PL.theme.note(ctx, "#2a5e42", 22, 26, trayW - 20, trayH - 20);
+      nuclei.forEach((alive, i) => {
+        const cxp = 24 + (i % cols) * cellW + cellW / 2, cyp = 28 + Math.floor(i / cols) * cellW + cellW / 2;
+        const g2 = ctx.createRadialGradient(cxp - r * 0.3, cyp - r * 0.35, 1, cxp, cyp, r);
+        if (alive) { g2.addColorStop(0, "rgb(255,236,150)"); g2.addColorStop(0.7, "rgb(214,166,60)"); g2.addColorStop(1, "rgb(150,108,30)"); }
+        else { g2.addColorStop(0, "rgb(214,218,224)"); g2.addColorStop(0.7, "rgb(150,156,166)"); g2.addColorStop(1, "rgb(100,106,116)"); }
+        ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(cxp, cyp, r, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = alive ? "rgba(120,84,20,0.7)" : "rgba(70,74,82,0.7)"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(cxp, cyp, r * 0.72, 0, Math.PI * 2); ctx.stroke();
+      });
+      D.text(ctx, "金色＝尚未衰變　灰色＝已衰變", 16, trayH + 36, { color: PL.col("text"), size: 10.5, weight: "700" });
       // 衰變曲線
       const bx = W * 0.5, by = 24, bw = W - bx - 20, bh = H - 48, Tm = sT.get() * 5;
       const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: Tm, y0: 0, y1: N0 });
@@ -164,10 +194,25 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const q = n * e, E = sV.get() / d, Fnet = q * E - mass * g;
       const topY = 40, botY = H - 40, cx = W / 2;
-      D.rect(ctx, cx - 90, topY - 8, 180, 8, { fill: "#ff6b6b" }); D.text(ctx, "＋ " + sV.get() + "V", cx - 90, topY - 14, { color: "#ff6b6b", size: 11 });
-      D.rect(ctx, cx - 90, botY, 180, 8, { fill: "#5aa2ff" }); D.text(ctx, "－", cx - 90, botY + 16, { color: "#5aa2ff", size: 11 });
+      const AP = PL.apparatus;
+      /* 密立根裝置：兩片黃銅平行板（中間夾透明絕緣環），側面打光，用顯微鏡看油滴 */
+      AP.labRoom(ctx, W, H, H - 12, {});
+      AP.brass(ctx, cx - 100, topY - 12, 200, 12); AP.brass(ctx, cx - 100, botY, 200, 12);
+      ctx.fillStyle = "rgba(210,236,248,0.18)"; ctx.fillRect(cx - 92, topY, 184, botY - topY);
+      ctx.strokeStyle = PL.theme.isLight() ? "rgba(90,130,160,0.5)" : "rgba(206,232,244,0.5)"; ctx.lineWidth = 1.5;
+      ctx.strokeRect(cx - 92, topY, 184, botY - topY);
+      AP.steel(ctx, cx - 60, botY + 12, 120, H - 12 - botY - 12, 6);
+      // 側光燈與顯微鏡
+      AP.lampHouse(ctx, cx - 120, (topY + botY) / 2, 0.7, "rgb(255,248,225)");
+      ctx.save(); ctx.globalAlpha = 0.18; ctx.fillStyle = "#fff6d0";
+      ctx.beginPath(); ctx.moveTo(cx - 118, (topY + botY) / 2 - 6); ctx.lineTo(cx + 92, (topY + botY) / 2 - 40); ctx.lineTo(cx + 92, (topY + botY) / 2 + 40); ctx.lineTo(cx - 118, (topY + botY) / 2 + 6); ctx.fill(); ctx.restore();
+      AP.steel(ctx, cx + 110, (topY + botY) / 2 - 9, 70, 18, 10);
+      AP.steel(ctx, cx + 176, (topY + botY) / 2 - 13, 16, 26, -4);
+      D.text(ctx, "顯微鏡", cx + 146, (topY + botY) / 2 - 16, { color: PL.col("text-dim"), size: 10, align: "center" });
+      D.text(ctx, "＋ " + sV.get() + "V", cx - 100, topY - 18, { color: "#d9463b", size: 11, weight: "700" });
+      D.text(ctx, "－", cx - 100, botY + 26, { color: "#2f6fd0", size: 12, weight: "700" });
       const dropY = PL.clamp(botY - 20 - y, topY + 14, botY - 12);
-      D.disc(ctx, cx, dropY, 8, { fill: "#ffe08a", glow: "#ffe08a", glowSize: 10 });
+      D.disc(ctx, cx, dropY, 7, { fill: "#ffe08a", glow: "#ffe08a", glowSize: 12 });
       D.arrow(ctx, cx + 22, dropY, cx + 22, dropY + 30, { color: PL.col("warn"), width: 2, label: "mg" });
       if (E > 0) D.arrow(ctx, cx - 22, dropY, cx - 22, dropY - PL.clamp(q * E * 4e13, 6, 40), { color: "#5aa2ff", width: 2, label: "qE" });
       const bal = Math.abs(Fnet) < mass * g * 0.04;
@@ -200,6 +245,22 @@
        * 核半徑取 Z^(1/3)：這正是核物理 R ∝ A^(1/3) 的比例，不是隨便放大。
        */
       const Z = sZ.get(), nr = 6 + 5 * Math.cbrt(Z / 79);
+      /* 左上角的小圖：實驗裝置全貌（鉛盒 α 源 → 金箔 → 硫化鋅螢光屏＋顯微鏡）。主畫面是放大到一顆金原子核附近 */
+      {
+        const AP = PL.apparatus, ix = 12, iy = 12, iw = 190, ih = 104;
+        AP.infoCard(ctx, ix, iy, iw, ih);
+        const cyI = iy + ih / 2 + 6;
+        ctx.fillStyle = "rgb(70,74,82)"; ctx.fillRect(ix + 12, cyI - 12, 30, 24);
+        ctx.fillStyle = "rgb(40,42,48)"; ctx.fillRect(ix + 38, cyI - 3, 6, 6);
+        ctx.strokeStyle = "rgba(255,200,80,0.9)"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(ix + 44, cyI); ctx.lineTo(ix + 100, cyI); ctx.stroke();
+        ctx.fillStyle = "rgb(222,182,70)"; ctx.fillRect(ix + 100, cyI - 22, 3, 44);
+        ctx.strokeStyle = "rgba(120,200,150,0.9)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(ix + 101, cyI, 42, -1.2, 1.2); ctx.stroke();
+        ctx.strokeStyle = "rgba(255,200,80,0.7)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(ix + 102, cyI); ctx.lineTo(ix + 136, cyI - 26); ctx.moveTo(ix + 102, cyI); ctx.lineTo(ix + 70, cyI - 30); ctx.stroke();
+        D.text(ctx, "α 源", ix + 27, cyI + 24, { color: PL.col("text-dim"), size: 9, align: "center" });
+        D.text(ctx, "金箔", ix + 101, cyI + 34, { color: PL.col("text-dim"), size: 9, align: "center" });
+        D.text(ctx, "螢光屏", ix + 160, cyI + 4, { color: PL.col("text-dim"), size: 9, align: "center" });
+        D.text(ctx, "實驗裝置（俯視）↘ 放大到一顆原子核", ix + 8, iy + 14, { color: PL.col("text"), size: 9.5, weight: "700" });
+      }
       D.disc(ctx, N.x, N.y, nr, { fill: PL.col("danger"), glow: PL.col("danger"), glowSize: 16 });
       D.text(ctx, "原子核 Z = " + Z, N.x, N.y - nr - 8, { color: PL.col("danger"), size: 11, align: "center" });
       alphas.forEach(p => { ctx.save(); ctx.strokeStyle = p.hl ? MC() : "rgba(255,255,255,0.22)"; ctx.lineWidth = p.hl ? 2 : 1; ctx.beginPath(); p.trail.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke(); ctx.restore(); D.disc(ctx, p.x, p.y, p.hl ? 5 : 3, { fill: p.hl ? MC() : "#ffe08a" }); });

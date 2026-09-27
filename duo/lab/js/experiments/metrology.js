@@ -498,6 +498,8 @@
     function draw() {
       const { ctx, W, H } = cv;
       cv.clear(); D.bg(cv);
+      // 量具平放在實驗桌上（俯視）：鋼尺的金屬色在木桌上最像真的
+      if (PL.apparatus && PL.apparatus.deskTop) PL.apparatus.deskTop(ctx, 0, 0, W, H);
 
       let readingText, digits;
       if (tool === "vernier") {
