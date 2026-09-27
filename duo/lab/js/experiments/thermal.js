@@ -71,17 +71,21 @@
     function draw() {
       const { ctx, W, H } = cv, s = data(); cv.clear(); D.bg(cv);
       const AP = PL.apparatus;
-      const tankL = W * 0.45, tankR = W - 36, surface = H * 0.31, floor = H - 28;
+      const tankL = W * 0.45, tankR = W - 36, surface = H * 0.5, floor = H - 28;
       AP.benchTop(ctx, W, H, floor - 2);
       AP.beaker(ctx, (tankL + tankR) / 2, floor, tankR - tankL, floor - surface + 26,
         (floor - surface) / (floor - surface + 26));
       D.text(ctx, s.rhoL + " kg/m³", tankL + 12, surface + 19, { color: PL.col("accent-2"), size: 11 });
-      const sx = W * 0.22, sy = H * 0.25, boxW = 72, boxH = 56;
-      drawScale(sx, sy, s.T);
-      const top = surface - boxH * (1 - s.frac), cx = W * 0.7;
-      D.line(ctx, sx, sy + 42, cx, top - 4, PL.col("text-faint"), 1.4);
-      D.rect(ctx, cx - boxW / 2, top, boxW, boxH, { fill: MC(), stroke: "rgba(255,255,255,0.45)", width: 1.4, r: 5 });
-      D.text(ctx, "金屬塊", cx, top + 33, { color: "#fff", size: 11, align: "center", weight: "700" });
+      const boxW = 72, boxH = 56;
+      const top = surface - boxH * (1 - s.frac), cx = (tankL + tankR) / 2;
+      /* 鐵架吊著彈簧秤，彈簧秤下掛金屬塊：浸得越深，整組跟著放低 */
+      const len = Math.max(60, H * 0.16), scaleTop = top - 18 - 21 - len;
+      AP.standRod(ctx, tankL - 40, floor, 14);
+      AP.crossArm(ctx, tankL - 40, 24, cx);
+      AP.cord(ctx, cx, 33, cx, scaleTop - 11);
+      const hook = AP.springScaleV(ctx, cx, scaleTop, len, PL.clamp(s.T / 20, 0, 1), PL.fmt(s.T, 2) + " N");
+      AP.cord(ctx, cx, hook.y, cx, top);
+      AP.massBlock(ctx, cx, top + boxH, boxW, boxH, { color: "#8d97a6", label: "金屬塊", noShadow: true });
       const mid = top + boxH / 2;
       D.arrow(ctx, cx - 32, mid, cx - 32, mid + 42, { color: PL.col("warn"), width: 2.2, label: "W" });
       D.arrow(ctx, cx + 32, mid, cx + 32, mid - 42 * (s.Fb / Math.max(s.W, 0.01)), { color: PL.col("accent-2"), width: 2.2, label: "F_b" });
@@ -116,18 +120,35 @@
     for (let i = 0; i < 70; i++) parts.push({ x: Math.random(), y: Math.random() * 2 - 1 });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const midY = H * 0.42, x0 = 30, x1 = W - 30, PW = x1 - x0;
-      ctx.save(); ctx.strokeStyle = PL.col("text-faint"); ctx.lineWidth = 2; ctx.beginPath();
-      for (let i = 0; i <= 100; i++) { const x = x0 + PW * i / 100, h = shape(PW * i / 100, PW); i ? ctx.lineTo(x, midY - h) : ctx.moveTo(x, midY - h); } ctx.stroke();
-      ctx.beginPath(); for (let i = 0; i <= 100; i++) { const x = x0 + PW * i / 100, h = shape(PW * i / 100, PW); i ? ctx.lineTo(x, midY + h) : ctx.moveTo(x, midY + h); } ctx.stroke(); ctx.restore();
+      const midY = H * 0.5, x0 = 30, x1 = W - 30, PW = x1 - x0;
+      const AP = PL.apparatus;
+      /* 文氏管：透明玻璃管裡流著水，上面接三支壓力計玻璃管 */
+      AP.benchTop(ctx, W, H, H - 24);
+      [0.12, 0.88].forEach(t => { AP.steel(ctx, x0 + PW * t - 4, midY + 46, 8, H - 24 - midY - 46, 8); AP.steel(ctx, x0 + PW * t - 18, H - 30, 36, 7, -6); });
+      ctx.save();
+      ctx.beginPath();
+      for (let i = 0; i <= 100; i++) { const x = x0 + PW * i / 100, h = shape(PW * i / 100, PW); i ? ctx.lineTo(x, midY - h) : ctx.moveTo(x, midY - h); }
+      for (let i = 100; i >= 0; i--) { const x = x0 + PW * i / 100, h = shape(PW * i / 100, PW); ctx.lineTo(x, midY + h); }
+      ctx.closePath();
+      const wg = ctx.createLinearGradient(0, midY - 46, 0, midY + 46);
+      wg.addColorStop(0, "rgba(120,196,230,0.55)"); wg.addColorStop(0.5, "rgba(80,160,210,0.45)"); wg.addColorStop(1, "rgba(60,130,190,0.6)");
+      ctx.fillStyle = wg; ctx.fill();
+      ctx.strokeStyle = PL.theme.isLight() ? "rgba(70,110,140,0.85)" : "rgba(200,230,245,0.85)"; ctx.lineWidth = 2.4; ctx.stroke();
+      ctx.restore();
+      PL.theme.note(ctx, "#4f93c4", x0, midY - 46, PW, 92);
       // 粒子
       const v1 = sV.get(), A1 = 46;
       parts.forEach(p => {
         const h = shape(p.x * PW, PW), v = v1 * A1 / h;
-        D.disc(ctx, x0 + p.x * PW, midY + p.y * (h - 6), 2.2, { fill: MC() });
+        D.disc(ctx, x0 + p.x * PW, midY + p.y * (h - 6), 2.2, { fill: "rgba(235,248,255,0.9)" });
       });
       // 壓力管（越窄壓力越低）
-      const gauge = (t, label) => { const x = x0 + PW * t, h = shape(PW * t, PW), v = v1 * A1 / h; const P = 0.5 * rho * (v1 * v1 - v * v); const col = "rgba(90,162,255,0.5)"; const gh = 50 - P / 40; D.rect(ctx, x - 6, midY - h - Math.max(8, gh), 12, Math.max(8, gh), { fill: col }); D.text(ctx, label, x, midY - h - Math.max(8, gh) - 6, { color: PL.col("text-dim"), size: 10, align: "center" }); };
+      const gauge = (t, label) => {
+        const x = x0 + PW * t, h = shape(PW * t, PW), v = v1 * A1 / h; const P = 0.5 * rho * (v1 * v1 - v * v);
+        const gh = Math.max(8, 50 - P / 40), tubeTop = Math.max(26, midY - 170);
+        AP.glassTube(ctx, x, tubeTop, midY - h + 2, 12, midY - h - gh);
+        D.text(ctx, label, x, tubeTop - 8, { color: PL.col("text-dim"), size: 10, align: "center", weight: "700" });
+      };
       gauge(0.12, "P₁ 高"); gauge(0.5, "P₂ 低"); gauge(0.88, "P₃");
       const v2 = v1 * A1 / shape(PW * 0.5, PW);
       rV2.set(v2, 2); rDp.set(0.5 * rho * (v2 * v2 - v1 * v1), 0);
@@ -284,6 +305,10 @@
       const py = ym => oy + ym / BOX_H * boxH;
 
       const AP = PL.apparatus;
+      AP.labRoom(ctx, W, H, oy + boxH + 36, { bench: "wood" });
+      // 汽缸架在支腳上，底下的電熱板溫度越高越紅
+      [ox + 20, ox + boxW - 30].forEach(lx => AP.steel(ctx, lx, oy + boxH, 8, 36, 8));
+      AP.hotPlate(ctx, ox + boxW * 0.45, oy + boxH + 36, 120, (sT.get() - 100) / 800);
       // 容器：厚壁玻璃汽缸，看得出來是一個「裝著氣體的東西」
       D.rect(ctx, ox, oy, boxW, boxH, { fill: PL.theme.shade(0.28), stroke: PL.theme.pale(0.35), width: 2 });
       ctx.save();
@@ -322,9 +347,7 @@
       const barX = W - 62;
       D.text(ctx, sT.get() + " K", barX + 16, oy + 12, { color: PL.col("danger"), size: 12, align: "center", weight: "700" });
       const warm = Math.min(1, (sT.get() - 100) / 800);
-      D.rect(ctx, barX + 8, oy + 22, 16, boxH - 30, { fill: PL.theme.pale(0.12), r: 8 });
-      D.rect(ctx, barX + 10, oy + 22 + (boxH - 34) * (1 - warm), 12, (boxH - 34) * warm,
-        { fill: PL.col("danger"), r: 6 });
+      AP.thermometer(ctx, barX + 16, oy + 22, oy + boxH, 16, 0.08 + 0.9 * warm);
 
       // 壓力過高的警示：把活塞推到極端時該有的反應
       const volume = pistonX;
@@ -404,12 +427,19 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const s = state();
       // 汽缸
-      const cylX = 40, cylW = 80, cylTop = 30, cylBot = H - 30, fullH = cylBot - cylTop;
+      const AP = PL.apparatus;
+      const cylX = 40, cylW = 80, cylTop = 70, cylBot = H - 56, fullH = cylBot - cylTop;
       const gasH = fullH * PL.clamp(s.V / 3.2, 0.1, 1);
-      D.rect(ctx, cylX, cylTop, cylW, fullH, { stroke: PL.col("text-faint"), width: 2, r: 3 });
-      D.rect(ctx, cylX, cylBot - gasH, cylW, gasH, { fill: "rgba(229,115,115,0.2)" });
-      D.rect(ctx, cylX - 4, cylBot - gasH - 10, cylW + 8, 10, { fill: PL.col("text-faint"), r: 2 }); // 活塞
-      D.text(ctx, "氣體", cylX + cylW / 2, cylBot - gasH / 2, { color: MC(), size: 12, align: "center" });
+      AP.benchTop(ctx, W, H, H - 30);
+      /* 等溫：壓力靠活塞上的砝碼決定（砝碼越多壓力越大）；等壓：砝碼不變、底下加熱 */
+      const iso = sProc.get() === "iso";
+      AP.hotPlate(ctx, cylX + cylW / 2, H - 30, cylW + 30, iso ? 0 : (s.T - 120) / 360);
+      const hue = PL.clamp((s.T - 120) / 360, 0, 1);
+      AP.cylinderPiston(ctx, cylX, cylTop, cylW, fullH, cylBot - gasH, {
+        gas: "rgb(" + Math.round(120 + 110 * hue) + "," + Math.round(150 - 60 * hue) + "," + Math.round(220 - 150 * hue) + ")",
+        weights: Math.max(1, Math.round(s.P / 110)), rod: 16
+      });
+      D.text(ctx, "氣體", cylX + cylW / 2, cylBot - gasH / 2, { color: PL.col("text"), size: 12, align: "center", weight: "700" });
       // P–V 圖
       const bx = cylX + cylW + 40, by = 40, bw = W - bx - 20, bh = H - 70;
       const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: 3.4, y0: 0, y1: 700 });
@@ -511,12 +541,23 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const Q = sQ.get(), Wk = sW.get(), dU = Q - Wk;
       // 汽缸示意
-      const cylX = 34, cylW = 78, cylBot = H - 30, gasH = 90 + Wk * 0.4;
-      D.rect(ctx, cylX, cylBot - gasH, cylW, gasH, { fill: "rgba(229,115,115,0.16)", stroke: PL.col("text-faint"), width: 2 });
-      D.rect(ctx, cylX - 4, cylBot - gasH - 10, cylW + 8, 10, { fill: PL.col("text-faint"), r: 2 });
-      if (Q !== 0) D.arrow(ctx, cylX + cylW / 2, cylBot + 16, cylX + cylW / 2, cylBot - 6, { color: PL.col("danger"), width: 2, label: Q > 0 ? "Q 入" : "Q 出" });
+      const AP = PL.apparatus;
+      const cylX = 34, cylW = 78, cylBot = H - 56, gasH = 90 + Wk * 0.4;
+      AP.benchTop(ctx, W, H, H - 30);
+      // 吸熱時底下的電熱板發紅；放熱時換成一盆冰
+      if (Q >= 0) AP.hotPlate(ctx, cylX + cylW / 2, H - 30, cylW + 26, Q / 100);
+      else {
+        ctx.fillStyle = "rgba(170,215,240,0.9)"; ctx.fillRect(cylX - 10, H - 50, cylW + 20, 20);
+        for (let i = 0; i < 6; i++) { ctx.fillStyle = "rgba(235,248,255,0.95)"; ctx.fillRect(cylX - 6 + i * 16, H - 54 + (i % 2) * 3, 12, 10); }
+      }
+      const hue = PL.clamp(0.5 + dU / 200, 0, 1);
+      AP.cylinderPiston(ctx, cylX, cylBot - 190, cylW, 190, cylBot - gasH, {
+        gas: "rgb(" + Math.round(120 + 110 * hue) + "," + Math.round(150 - 60 * hue) + "," + Math.round(220 - 150 * hue) + ")", rod: 18
+      });
+      if (Q !== 0) D.arrow(ctx, cylX + cylW + 18, cylBot + 10, cylX + cylW + 18, cylBot - 30, { color: PL.col("danger"), width: 2, label: Q > 0 ? "Q 入" : "Q 出" });
       // 能量條
-      const bx = cylX + cylW + 46, bw = W - bx - 24; let y = 46;
+      const bx = cylX + cylW + 64, bw = W - bx - 24; let y = 46;
+      AP.infoCard(ctx, bx - 12, 8, bw + 30, 150);
       const bar = (lab, val, c) => { D.text(ctx, lab, bx, y - 4, { color: PL.col("text-dim"), size: 12 }); D.rect(ctx, bx + 40, y - 14, bw - 40, 16, { fill: "rgba(255,255,255,0.05)", r: 4 }); const mid = (bw - 40) / 2; D.rect(ctx, bx + 40 + mid, y - 14, mid * PL.clamp(val / 100, -1, 1), 16, { fill: c, r: 2 }); D.text(ctx, PL.fmt(val, 0) + " J", bx + bw + 4, y, { color: c, size: 11, align: "right" }); y += 40; };
       D.text(ctx, "ΔU = Q − W", bx, 24, { color: PL.col("text-dim"), size: 12 });
       bar("Q", Q, PL.col("danger")); bar("W", Wk, PL.col("accent-2")); bar("ΔU", dU, MC());
@@ -628,19 +669,15 @@
       const tubeX = W * 0.20, tubeBot = baseY - 70, tubeTop = tubeBot - tubeH;
       if (AP && AP.benchTop) AP.benchTop(ctx, W, H, baseY + 6);
 
-      D.line(ctx, tubeX - 52, baseY, tubeX - 52, tubeTop + 24, PL.theme.pale(0.35), 4);
-      D.line(ctx, tubeX - 52, tubeTop + 40, tubeX - 10, tubeTop + 40, PL.theme.pale(0.3), 3);
+      // 鐵架與試管夾
+      AP.standRod(ctx, tubeX - 70, baseY + 6, tubeTop + 10);
+      AP.clampHead(ctx, tubeX - 70, tubeTop + 50, 40, 0);
 
       ctx.save();
       ctx.translate(tubeX, tubeBot);
       ctx.rotate(-0.1);
-      D.rect(ctx, -tubeW / 2, -tubeH, tubeW, tubeH, {
-        fill: PL.theme.pale(0.05), stroke: PL.theme.pale(0.42), width: 2.5, r: 10
-      });
       const waterH = tubeH * (0.16 + water / 40 * 0.40);
-      D.rect(ctx, -tubeW / 2 + 5, -waterH, tubeW - 10, waterH - 4, {
-        fill: "rgba(90,162,255,0.32)", stroke: PL.col("accent-2"), width: 1, r: 4
-      });
+      AP.testTube(ctx, tubeW, tubeH, waterH, {});
       if (stage === 1 || stage === 2) {
         const n = Math.round(3 + heat / 18);
         for (let i = 0; i < n; i++) {
@@ -658,8 +695,9 @@
       let cx0 = 0, cy0 = -tubeH - 2;
       if (stage >= 3) { cx0 = corkX; cy0 = -tubeH - 2 - corkX * 0.4; }
       else if (stage === 2) cx0 = Math.sin(elapsed * 26) * 1.6;
-      D.rect(ctx, -corkW / 2 + cx0, cy0 - corkH / 2, corkW, corkH,
-        { fill: "#c4a574", stroke: "rgba(40,30,20,0.55)", width: 1.5, r: 3 });
+      ctx.save(); ctx.translate(cx0, cy0); ctx.rotate(stage >= 3 ? corkX * 0.02 : 0);
+      AP.cork(ctx, corkW, corkH);
+      ctx.restore();
 
       if (fog > 0.02) {
         for (let i = 0; i < 16; i++) {
@@ -674,14 +712,8 @@
       ctx.restore();
 
       const lampX = tubeX + 14, lampY = baseY - 16;
-      D.rect(ctx, lampX - 24, lampY - 38, 48, 38,
-        { fill: "rgba(180,80,60,0.5)", stroke: PL.theme.pale(0.3), r: 6 });
-      D.rect(ctx, lampX - 8, lampY - 50, 16, 14, { fill: "rgba(80,70,60,0.7)", r: 2 });
-      if (heat > 5 && stage < 3) {
-        D.disc(ctx, lampX, lampY - 56 - heat * 0.08, 5 + heat * 0.05,
-          { fill: "rgba(255,170,60,0.88)", glow: "#ff9a3c", glowSize: 14 + heat * 0.1 });
-        D.disc(ctx, lampX, lampY - 50 - heat * 0.04, 3.2, { fill: "rgba(255,230,120,0.95)" });
-      }
+      // 酒精燈：火焰大小跟著加熱功率
+      AP.alcoholLamp(ctx, lampX, baseY + 6, 1.15, heat > 5 && stage < 3 ? heat / 100 : 0);
       D.text(ctx, "酒精燈", lampX, baseY + 24, { color: PL.col("text-faint"), size: 10, align: "center" });
       D.text(ctx, "熱機原理 · 試管噴塞", 18, 22, { color: PL.col("text-dim"), size: 12, weight: "700" });
 

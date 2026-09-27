@@ -28,24 +28,26 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const AP = PL.apparatus;
       const gy = H - 46, sc = (W - 60) / TR, ox = 30;
-      // 氣墊軌道：兩台力學小車在同一條軌道上對撞，車身寬度隨質量
-      AP.benchTop(ctx, W, H, gy + 10);
-      AP.steel(ctx, ox - 8, gy, W - 44 - ox, 8, -6);
-      const w1 = 26 + sm1.get() * 3, w2 = 26 + sm2.get() * 3;
+      // 氣墊軌道：兩台滑車浮在軌道上對撞（幾乎沒有摩擦），車身寬度隨質量
+      AP.benchTop(ctx, W, H, gy + 30);
+      AP.airTrack(ctx, ox - 8, W - 38, gy);
+      const w1 = 40 + sm1.get() * 7, w2 = 40 + sm2.get() * 7;
       const p = sm1.get() * v1 + sm2.get() * v2, K = 0.5 * sm1.get() * v1 * v1 + 0.5 * sm2.get() * v2 * v2;
-      AP.cart(ctx, ox + x1 * sc, gy, w1, 28);
-      D.text(ctx, "m₁", ox + x1 * sc, gy - 34, { color: PL.col("text-dim"), size: 11, align: "center", weight: "700" });
-      AP.cart(ctx, ox + x2 * sc, gy, w2, 28);
-      D.text(ctx, "m₂", ox + x2 * sc, gy - 34, { color: PL.col("text-dim"), size: 11, align: "center", weight: "700" });
-      D.arrow(ctx, ox + x1 * sc, gy - 42, ox + x1 * sc + v1 * 6, gy - 42, { color: "#fff", width: 2, label: PL.fmt(v1, 1) });
-      D.arrow(ctx, ox + x2 * sc, gy - 42, ox + x2 * sc + v2 * 6, gy - 42, { color: "#fff", width: 2, label: PL.fmt(v2, 1) });
+      // 緩衝器種類就是回復係數：彈簧撞針（e≈1）、橡皮筋（中間）、黏土（e≈0，碰後黏在一起）
+      const e = se.get(), bumper = e >= 0.9 ? "spring" : e <= 0.1 ? "clay" : "rubber";
+      AP.glider(ctx, ox + x1 * sc, gy, w1, 34, { tint: "#b48ad6", label: "m₁", bumperSide: 1, bumper });
+      AP.glider(ctx, ox + x2 * sc, gy, w2, 34, { tint: "#7ec7ff", label: "m₂", bumperSide: -1, bumper });
+      D.text(ctx, bumper === "spring" ? "緩衝器：彈簧撞針" : bumper === "clay" ? "緩衝器：黏土（會黏在一起）" : "緩衝器：橡皮筋",
+        W - 44, 26, { color: PL.col("text-dim"), size: 10.5, align: "right", weight: "700" });
+      D.arrow(ctx, ox + x1 * sc, gy - 66, ox + x1 * sc + v1 * 8, gy - 66, { color: "#fff", width: 2.2, label: PL.fmt(v1, 1) + " m/s" });
+      D.arrow(ctx, ox + x2 * sc, gy - 66, ox + x2 * sc + v2 * 8, gy - 66, { color: "#fff", width: 2.2, label: PL.fmt(v2, 1) + " m/s" });
       rP.set(p, 1); rK.set(K, 1);
       rStat.set(se.get() >= 0.99 ? "彈性碰撞" : se.get() <= 0.01 ? "完全非彈性" : "非彈性碰撞");
     }
     const anim = PL.loop(dt => {
       if (dt) {
         x1 += v1 * dt; x2 += v2 * dt;
-        const m1 = sm1.get(), m2 = sm2.get(), e = se.get(), gap = (26 + m1 * 3 + 26 + m2 * 3) / 2 / ((cv.W - 60) / TR);
+        const m1 = sm1.get(), m2 = sm2.get(), e = se.get(), gap = (40 + m1 * 7 + 40 + m2 * 7) / 2 / ((cv.W - 60) / TR);
         if (!collided && x2 - x1 <= gap && (v1 - v2) > 0) {
           const nv1 = (m1 * v1 + m2 * v2 - m2 * e * (v1 - v2)) / (m1 + m2);
           const nv2 = (m1 * v1 + m2 * v2 + m1 * e * (v1 - v2)) / (m1 + m2);
@@ -78,15 +80,20 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const gy = 120, sc = (W - 60) / TR, ox = 30;
-      D.line(ctx, ox, gy, W - 30, gy, PL.col("text-faint"), 2);
+      const AP = PL.apparatus;
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, gy + 34); ctx.clip();
+      AP.labRoom(ctx, W, gy + 34, gy + 30, { bench: "wood" });
+      ctx.restore();
+      AP.airTrack(ctx, ox - 8, W - 38, gy, { hose: false });
       const m1 = sm1.get(), m2 = sm2.get(), p = m1 * v1 + m2 * v2, K = 0.5 * m1 * v1 * v1 + 0.5 * m2 * v2 * v2;
-      const w1 = 24 + m1 * 3, w2 = 24 + m2 * 3;
-      D.rect(ctx, ox + x1 * sc - w1 / 2, gy - 28, w1, 28, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 4 });
-      D.rect(ctx, ox + x2 * sc - w2 / 2, gy - 28, w2, 28, { fill: CB, stroke: "rgba(255,255,255,0.4)", r: 4 });
-      D.arrow(ctx, ox + x1 * sc, gy - 40, ox + x1 * sc + m1 * v1 * 3, gy - 40, { color: MC(), width: 3, label: "p₁" });
-      D.arrow(ctx, ox + x2 * sc, gy - 40, ox + x2 * sc + m2 * v2 * 3, gy - 40, { color: CB, width: 3, label: "p₂" });
+      const w1 = 36 + m1 * 6, w2 = 36 + m2 * 6;
+      // 完全非彈性：兩台滑車相對的一面貼著黏土，一碰就黏在一起
+      AP.glider(ctx, ox + x1 * sc, gy, w1, 30, { tint: "#b48ad6", label: "m₁", bumperSide: 1, bumper: "clay" });
+      AP.glider(ctx, ox + x2 * sc, gy, w2, 30, { tint: "#7ec7ff", label: "m₂", bumperSide: -1, bumper: "clay" });
+      D.arrow(ctx, ox + x1 * sc, gy - 56, ox + x1 * sc + m1 * v1 * 3, gy - 56, { color: MC(), width: 3, label: "p₁" });
+      D.arrow(ctx, ox + x2 * sc, gy - 56, ox + x2 * sc + m2 * v2 * 3, gy - 56, { color: CB, width: 3, label: "p₂" });
       // 長條：p1, p2, 總p, 總K
-      const bx = 40, by = gy + 30, bw = W - 80, bh = H - by - 20;
+      const bx = 40, by = gy + 46, bw = W - 80, bh = H - by - 20;
       D.text(ctx, "總動量 p = " + PL.fmt(p, 1) + " kg·m/s（守恆）", bx, by + 6, { color: MC(), size: 12 });
       D.text(ctx, "總動能 K = " + PL.fmt(K, 1) + " J（碰後下降）", bx, by + 26, { color: PL.col("warn"), size: 12 });
       const drawBar = (label, val, max, y, c) => {
@@ -102,7 +109,7 @@
     const anim = PL.loop(dt => {
       if (dt) {
         x1 += v1 * dt; x2 += v2 * dt;
-        const m1 = sm1.get(), m2 = sm2.get(), gap = (24 + m1 * 3 + 24 + m2 * 3) / 2 / ((cv.W - 60) / TR);
+        const m1 = sm1.get(), m2 = sm2.get(), gap = (36 + m1 * 6 + 36 + m2 * 6) / 2 / ((cv.W - 60) / TR);
         if (!collided && x2 - x1 <= gap && (v1 - v2) > 0) { const vf = (m1 * v1 + m2 * v2) / (m1 + m2); v1 = v2 = vf; collided = true; }
         if (x1 < 1 || x2 > TR - 1) reset();
       }
@@ -130,14 +137,20 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const F = sF.get(), Dt = sDt.get(), m = sM.get(), J = F * Dt;
-      const gy = 96;
-      D.line(ctx, 20, gy, W - 20, gy, PL.col("text-faint"), 2);
+      const gy = 128;
+      const AP = PL.apparatus;
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, gy + 22); ctx.clip();
+      AP.labRoom(ctx, W, gy + 22, gy, { bench: "wood" });
+      ctx.restore();
       const sc = (W - 120) / 20, px = 60 + (x % 20) * sc;
-      D.rect(ctx, px - 18, gy - 26, 36, 26, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 4 });
-      if (t < Dt) D.arrow(ctx, px + 18, gy - 13, px + 18 + F * 5, gy - 13, { color: PL.col("accent-2"), width: 2.4, label: "F" });
-      else if (v > 0) D.arrow(ctx, px + 18, gy - 13, px + 18 + v * 5, gy - 13, { color: "#fff", width: 2, label: "v" });
+      // 風扇車：風扇只在 Δt 內轉動，推力就是 F——「力作用多久」看得見
+      const pushing = t < Dt && t > 0;
+      AP.fanCart(ctx, px, gy, 70, 28, t, pushing);
+      D.text(ctx, m + " kg", px + 22, gy - 50, { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
+      if (t < Dt) D.arrow(ctx, px + 38, gy - 16, px + 38 + F * 5, gy - 16, { color: PL.col("accent-2"), width: 2.4, label: "F" });
+      else if (v > 0) D.arrow(ctx, px + 38, gy - 16, px + 38 + v * 5, gy - 16, { color: "#fff", width: 2, label: "v" });
       // F–t 圖，面積=衝量
-      const bx = 40, by = gy + 24, bw = W - 80, bh = H - by - 20;
+      const bx = 40, by = gy + 40, bw = W - 80, bh = H - by - 20;
       const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: Math.max(3, sDt.get() + 0.5), y0: 0, y1: 22 });
       g.frame({ title: "F – t（面積＝衝量＝Δp）", xlabel: "t (s)", ylabel: "F (N)" }); g.grid(6, 4);
       g.area([[0, F], [Dt, F]], { fill: "rgba(186,104,204,0.22)" });
@@ -180,9 +193,13 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const ox = W * 0.5, oy = H * 0.5;
-      D.line(ctx, 0, oy, W, oy, "rgba(255,255,255,0.06)", 1, [4, 4]);
-      const S = (o) => D.disc(ctx, ox + o.x, oy + o.y, o.r, { fill: o.c, glow: o.c, glowSize: 10, stroke: "rgba(255,255,255,0.3)" });
-      S(p1); S(p2);
+      const AP = PL.apparatus;
+      /* 撞球檯：白球（球 1）去撞號碼球（球 2），球 2 越重畫得越大 */
+      AP.labRoom(ctx, W, H, H + 1, { bench: "none", panels: false });
+      AP.billiardTable(ctx, 8, 8, W - 16, H - 16);
+      D.line(ctx, 30, oy, W - 30, oy, "rgba(255,255,255,0.18)", 1, [4, 4]);
+      AP.poolBall(ctx, ox + p2.x, oy + p2.y, p2.r, "#d9463b", 3);
+      AP.poolBall(ctx, ox + p1.x, oy + p1.y, p1.r, "#f4f2ea", null);
       [p1, p2].forEach(o => { const sp = Math.hypot(o.vx, o.vy); if (sp > 1) D.arrow(ctx, ox + o.x, oy + o.y, ox + o.x + o.vx * 0.3, oy + o.y + o.vy * 0.3, { color: "#fff", width: 2 }); });
       const a1 = Math.atan2(-p1.vy, p1.vx) * 180 / Math.PI, a2 = Math.atan2(-p2.vy, p2.vx) * 180 / Math.PI;
       rA1.set(done ? a1 : 0, 1); rA2.set(done ? a2 : 0, 1); rAng.set(done ? Math.abs(a1 - a2) : 0, 1);
@@ -213,7 +230,7 @@
   PL.register("recoil", { build(root) {
     const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.5);
-    let x1, x2, v1, v2, fired;
+    let x1, x2, v1, v2, fired, age = 0;
     const sM1 = PL.ui.slider(L.controls, { label: "砲身質量 M", min: 4, max: 30, step: 1, value: 16, unit: "kg", digits: 0, onInput: reset });
     const sM2 = PL.ui.slider(L.controls, { label: "砲彈質量 m", min: 0.5, max: 6, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: reset });
     const sE = PL.ui.slider(L.controls, { label: "爆炸釋放（砲彈速度）", min: 4, max: 20, step: 1, value: 12, unit: "m/s", digits: 0, onInput: reset });
@@ -223,21 +240,22 @@
     const rV1 = PL.ui.readout(L.readouts, { label: "砲身後座 V", unit: "m/s" });
     const rV2 = PL.ui.readout(L.readouts, { label: "砲彈速度 v", unit: "m/s" });
     const rP = PL.ui.readout(L.readouts, { label: "總動量 p", unit: "kg·m/s" });
-    function reset() { x1 = 0; x2 = 0; v1 = 0; v2 = 0; fired = false; }
+    function reset() { x1 = 0; x2 = 0; v1 = 0; v2 = 0; fired = false; age = 0; }
     reset();
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const AP = PL.apparatus;
-      const gy = H - 46, cx = W / 2;
+      const gy = H - 46, cx = W * 0.42;
       AP.benchTop(ctx, W, H, gy + 10);
       AP.steel(ctx, 20, gy, W - 40, 8, -6);
       const M = sM1.get(), m = sM2.get();
       if (fired && v2 === 0) { v2 = sE.get(); v1 = -m * v2 / M; }
-      const bw = 30 + M * 1.5;
-      // 砲台是一台小車，反衝時整台往後退；砲彈是金屬球
-      AP.cart(ctx, cx + x1 * 30, gy, bw, 30);
-      D.text(ctx, "M", cx + x1 * 30, gy - 36, { color: PL.col("text-dim"), size: 12, align: "center", weight: "700" });
-      AP.bob(ctx, cx + 40 + x2 * 30, gy - 18, 8 + m);
+      // 大砲放在軌道上、輪子可以自由滾：開砲時整台往後退
+      const cs = 1.0 + M / 30 * 0.8, pivotY = gy - AP.cannonWheelDrop(cs), barrel = 58 * cs;
+      const ballR = 5 + m * 1.3;
+      AP.sportBall(ctx, cx + barrel - ballR + x2 * 30, pivotY, ballR, "cannonball", x2);
+      AP.cannon(ctx, cx + x1 * 30, pivotY, 0, { s: cs, fired: fired ? age : null, roll: x1 * 30 / (12 * cs) });
+      D.text(ctx, "M = " + M + " kg", cx + x1 * 30 - 10, gy + 26, { color: PL.col("text-dim"), size: 11, align: "center", weight: "700" });
       /*
        * 「爆炸釋放（砲彈速度）」原本只在按下發射之後才影響畫面。
        * 動量守恆的重點是「兩邊的 mv 大小相等、方向相反」，
@@ -245,17 +263,17 @@
        */
       if (!fired) {
         const vp2 = sE.get(), vp1 = -m * vp2 / M;
-        D.arrow(ctx, cx, gy - 52, cx + vp1 * 6, gy - 52,
+        D.arrow(ctx, cx, gy - 70, cx + vp1 * 6, gy - 70,
           { color: MC(), width: 2, head: 7, label: "預期後座 " + PL.fmt(Math.abs(vp1), 2) + " m/s" });
-        D.arrow(ctx, cx + 40, gy - 52, cx + 40 + vp2 * 6, gy - 52,
+        D.arrow(ctx, cx + 40, gy - 70, cx + 40 + vp2 * 6, gy - 70,
           { color: CB, width: 2, head: 7, label: "預期砲彈 " + PL.fmt(vp2, 1) + " m/s" });
         D.text(ctx, "兩邊的動量大小相同：M·v₁ = m·v₂ = " + PL.fmt(m * vp2, 1) + " kg·m/s",
           cx, 28, { color: PL.col("text-dim"), size: 11, align: "center" });
       }
-      if (fired) { D.arrow(ctx, cx + x1 * 30, gy - 44, cx + x1 * 30 + v1 * 6, gy - 44, { color: MC(), width: 2, label: "後座" }); D.arrow(ctx, cx + 40 + x2 * 30, gy - 40, cx + 40 + x2 * 30 + v2 * 6, gy - 40, { color: CB, width: 2, label: "砲彈" }); }
+      if (fired) { D.arrow(ctx, cx + x1 * 30, gy - 62, cx + x1 * 30 + v1 * 6, gy - 62, { color: MC(), width: 2, label: "後座" }); D.arrow(ctx, cx + barrel + x2 * 30, gy - 40, cx + barrel + x2 * 30 + v2 * 6, gy - 40, { color: CB, width: 2, label: "砲彈" }); }
       rV1.set(Math.abs(v1), 2); rV2.set(v2, 1); rP.set(M * v1 + m * v2, 2);
     }
-    const anim = PL.loop(dt => { if (dt && fired) { x1 += v1 * dt; x2 += v2 * dt; if (cv.W / 2 + 40 + x2 * 30 > cv.W - 20) anim.stop(); } draw(); });
+    const anim = PL.loop(dt => { if (dt && fired) { age += dt; x1 += v1 * dt; x2 += v2 * dt; if (cv.W * 0.42 + 90 + x2 * 30 > cv.W - 20) anim.stop(); } draw(); });
     cv.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
@@ -305,19 +323,24 @@
         D.text(ctx, "預期擺升 " + PL.fmt(hPred, 3) + " m", px - Lpx * 0.75, py + Lpx - hPx - 6,
           { color: PL.col("warn"), size: 10.5 });
       }
+      // 發射器架在左邊的桌上，槍口對準木塊
+      const gunX = 118;
+      AP.steel(ctx, gunX - 70, byp + 12, 12, H - 22 - byp - 12, 8);
+      AP.steel(ctx, gunX - 88, H - 30, 48, 8, -6);
+      AP.launcher(ctx, gunX, byp, 0.95, 1);
       if (phase === "ready") {
         // 待發射的子彈停在槍口，大小隨質量；箭頭長度隨初速
-        D.disc(ctx, 40, byp, br, { fill: "#ff6b6b", glow: "#ff6b6b", glowSize: 8 });
-        D.arrow(ctx, 40 + br, byp, 40 + br + v0 * 0.12, byp,
+        AP.sportBall(ctx, gunX + br, byp, br, "steel");
+        D.arrow(ctx, gunX + 2 * br + 2, byp - 14, gunX + 2 * br + 2 + v0 * 0.12, byp - 14,
           { color: "#ff6b6b", width: 2, head: 7, label: PL.fmt(m, 2) + "kg · " + v0 + "m/s" });
       }
-      if (phase === "fly") { const bulletX = 40 + bx; D.disc(ctx, bulletX, byp, 5, { fill: "#ff6b6b", glow: "#ff6b6b" }); D.arrow(ctx, bulletX, byp, bulletX + 26, byp, { color: "#ff6b6b", width: 2 }); }
+      if (phase === "fly") { const bulletX = gunX + bx; AP.sportBall(ctx, bulletX, byp, Math.max(4, br), "steel"); AP.smokePuff(ctx, gunX + 6, byp, bx / 420, { dir: 0, scale: 0.6, seed: 9 }); D.arrow(ctx, bulletX + 6, byp, bulletX + 30, byp, { color: "#ff6b6b", width: 2 }); }
       D.text(ctx, "h = " + PL.fmt(hmax, 3) + " m", px + 34, py + 18, { color: PL.col("text-dim"), size: 11 });
       rV.set(V, 2); rH.set(hmax, 3); rTh.set(Math.acos(PL.clamp(1 - hmax / Lp, -1, 1)) * 180 / Math.PI, 1);
     }
     const anim = PL.loop(dt => {
       if (dt) {
-        if (phase === "fly") { bx += 420 * dt; if (40 + bx >= cv.W * 0.6 - 22) { phase = "swing"; t = 0; } }
+        if (phase === "fly") { bx += 420 * dt; if (118 + bx >= cv.W * 0.6 - 22 - 4 * sM.get()) { phase = "swing"; t = 0; } }
         else if (phase === "swing") { t += dt; const thMax = Math.acos(PL.clamp(1 - hmax / Lp, -1, 1)), w = Math.sqrt(g / Lp); th = thMax * Math.sin(w * t) * Math.exp(-0.08 * t); if (t > 14) { phase = "ready"; th = 0; anim.stop(); } }
       }
       draw();

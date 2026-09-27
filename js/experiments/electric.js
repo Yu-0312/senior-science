@@ -17,14 +17,24 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const q1 = sQ1.get(), q2 = sQ2.get(), r = sR.get(), F = 9 * q1 * q2 / (r * r);
-      const attract = q1 * q2 < 0, cy = 96, ox = 70, sc = (W - 140) / 10, x1 = ox, x2 = ox + r * sc;
-      const drawQ = (x, q) => { D.disc(ctx, x, cy, 10 + Math.abs(q) * 2, { fill: q >= 0 ? POS : NEG, glow: q >= 0 ? POS : NEG, glowSize: 10 }); D.text(ctx, (q >= 0 ? "+" : "−") + Math.abs(q), x, cy + 4, { color: "#fff", size: 12, align: "center", weight: "700" }); };
+      const attract = q1 * q2 < 0, cy = 88, ox = 70, sc = (W - 140) / 10, x1 = ox, x2 = ox + r * sc;
+      const AP = PL.apparatus;
+      /* 兩顆帶電金屬球，各自架在絕緣支架上 */
+      AP.labStrip(ctx, W, 146, 138, {});
+      const drawQ = (x, q) => {
+        const rr = 10 + Math.abs(q) * 2;
+        ctx.fillStyle = "rgba(230,236,244,0.85)"; ctx.fillRect(x - 2.5, cy + rr, 5, 138 - cy - rr);
+        AP.steel(ctx, x - 14, 134, 28, 5, -6);
+        AP.sportBall(ctx, x, cy, rr, "steel");
+        ctx.save(); ctx.globalAlpha = 0.35; D.disc(ctx, x, cy, rr + 3, { fill: q >= 0 ? POS : NEG, glow: q >= 0 ? POS : NEG, glowSize: 14 }); ctx.restore();
+        D.text(ctx, (q >= 0 ? "+" : "−") + Math.abs(q), x, cy + 4, { color: q >= 0 ? "#b3261e" : "#1d4ed8", size: 12, align: "center", weight: "800" });
+      };
       drawQ(x1, q1); drawQ(x2, q2);
       const fl = PL.clamp(Math.abs(F) * 3, 6, 70), dir = attract ? -1 : 1;
-      D.arrow(ctx, x1, cy - 26, x1 + dir * fl, cy - 26, { color: PL.col("warn"), width: 2.4 });
-      D.arrow(ctx, x2, cy - 26, x2 - dir * fl, cy - 26, { color: PL.col("warn"), width: 2.4 });
-      D.line(ctx, x1, cy + 26, x2, cy + 26, PL.col("text-faint"), 1, [3, 3]); D.text(ctx, "r = " + r + " cm", (x1 + x2) / 2, cy + 40, { color: PL.col("text-dim"), size: 11, align: "center" });
-      const bx = 44, by = 150, bw = W - 80, bh = H - by - 16;
+      D.arrow(ctx, x1, cy - 30, x1 + dir * fl, cy - 30, { color: PL.col("warn"), width: 2.4 });
+      D.arrow(ctx, x2, cy - 30, x2 - dir * fl, cy - 30, { color: PL.col("warn"), width: 2.4 });
+      D.line(ctx, x1, cy + 32, x2, cy + 32, PL.col("text-dim"), 1, [3, 3]); D.text(ctx, "r = " + r + " cm", (x1 + x2) / 2, cy + 46, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
+      const bx = 44, by = 164, bw = W - 80, bh = H - by - 16;
       const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 2, x1: 10, y0: 0, y1: 9 * Math.abs(q1 * q2) / 4 * 1.1 + 1 });
       g.frame({ title: "靜電力大小對距離（平方反比）", xlabel: "r", ylabel: "|F|" }); g.grid(4, 4);
       g.fn(rr => 9 * Math.abs(q1 * q2) / (rr * rr), { color: MC(), width: 2.2 });
@@ -163,8 +173,8 @@
       const wireColor = live ? "rgb(186,54,48)" : "rgb(128,120,118)";
       const ink = live ? "rgba(34,42,54,0.92)" : "rgba(34,42,54,0.45)";
 
-      // 檯面：讓元件看起來是擺在桌上接起來的，不是符號圖
-      A.benchTop(ctx, W, H, y1 + 42);
+      // 檯面：實物圖是俯視的實驗桌，電路圖是桌上的一張白紙
+      A.circuitBoard(ctx, W, H, view === "schematic");
 
       const by = (y0 + y1) / 2;
       const bulbX = (x0 + x1) / 2, bulbY = y0;
@@ -433,7 +443,7 @@
       const { ctx, W, H } = cv, s = state(); cv.clear(); D.bg(cv);
       const top = 58, bot = H - 42, left = 48, right = W - 46, mid = (top + bot) / 2;
       const AP = PL.apparatus, active = MC();
-      AP.benchTop(ctx, W, H, bot + 34);
+      AP.circuitBoard(ctx, W, H, view === "schematic");
       const wireColor = "rgb(186,54,48)";
       const rvx = right - 54, rx = W * 0.48, vx = W * 0.76, vy = mid;
 
@@ -610,63 +620,40 @@
     function drawCircuit() {
       const { ctx, W, H } = cv, s = circuitState();
       cv.clear(); D.bg(cv);
-      const top = H * 0.28, bottom = H * 0.75, left = 46, right = W - 44;
-      const switchX = left + 44, meterX = W * 0.48, resistorX = W * 0.74, sourceX = W * 0.3;
-      const resistorW = Math.min(88, W * 0.17), batteryW = Math.min(106, W * 0.3);
-      const wire = closed ? "rgba(237,245,250,0.82)" : PL.col("text-faint");
-      const active = closed ? MC() : PL.col("text-faint");
-
-      const line = (x1, y1, x2, y2, color, width) => D.line(ctx, x1, y1, x2, y2, color || wire, width || 2);
-      const meter = (x, y, value, unit, label, color, limit) => {
-        const over = value > limit + 1e-8, meterColor = over ? PL.col("danger", "#ff6b6b") : color;
-        D.disc(ctx, x, y, 29, { fill: PL.col("panel-2"), stroke: meterColor, width: 2, glow: meterColor, glowSize: 8 });
-        D.ring(ctx, x, y, 20, PL.col("border"), 1);
-        for (let i = 0; i < 5; i++) {
-          const a = Math.PI * (1.12 + i * 0.19);
-          line(x + Math.cos(a) * 17, y + Math.sin(a) * 17, x + Math.cos(a) * 21, y + Math.sin(a) * 21, PL.col("text-faint"), 1);
-        }
-        const ratio = PL.clamp(value / limit, 0, 1);
-        const needle = Math.PI * (1.12 + ratio * 0.76);
-        line(x, y, x + Math.cos(needle) * 16, y + Math.sin(needle) * 16, over ? meterColor : PL.col("warn"), 1.7);
-        D.disc(ctx, x, y, 2.5, { fill: over ? meterColor : PL.col("warn") });
-        D.text(ctx, label, x, y - 6, { color: PL.col("text-faint"), size: 10, align: "center" });
-        D.text(ctx, over ? "超量程" : PL.fmt(value, 2) + " " + unit, x, y + 12, { color: over ? meterColor : "#fff", size: 10, align: "center", weight: "700" });
-        D.text(ctx, "0-" + PL.fmt(limit, 1) + " " + unit, x, y + 42, { color: PL.col("text-faint"), size: 8.5, align: "center" });
+      const AP = PL.apparatus;
+      /* 俯視的實驗桌：電池盒、閘刀開關、安培計、滑動變阻器、伏特計用導線接成閉合電路 */
+      AP.circuitBoard(ctx, W, H, false);
+      const top = H * 0.30, bottom = H * 0.76, left = 46, right = W - 44;
+      const switchX = left + 64, meterX = W * 0.46, resistorX = W * 0.74, sourceX = W * 0.30;
+      const resistorW = Math.min(120, W * 0.2), batteryW = Math.min(96, W * 0.24);
+      const red = "rgb(186,54,48)", black = "rgb(40,44,52)", blue = "rgb(52,98,178)";
+      const meter = (x, y, value, unit, label, limit) => {
+        const over = value > limit + 1e-8;
+        AP.meter(ctx, x, y, 26, over ? 1 : PL.clamp(value / limit, 0, 1), label);
+        D.text(ctx, over ? "超量程！" : PL.fmt(value, 2) + " " + unit, x, y + 50, { color: over ? PL.col("danger") : PL.col("text"), size: 11, align: "center", weight: "700" });
+        D.text(ctx, "量程 0–" + PL.fmt(limit, 1) + " " + unit, x, y + 64, { color: PL.col("text-dim"), size: 9, align: "center" });
       };
-      const resistor = (x, y, w, label) => {
-        ctx.save(); ctx.strokeStyle = active; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x, y);
-        for (let i = 0; i < 7; i++) ctx.lineTo(x + (i + 1) * w / 8, y + (i % 2 ? 9 : -9));
-        ctx.lineTo(x + w, y); ctx.stroke(); ctx.restore();
-        D.text(ctx, label, x + w / 2, y - 17, { color: active, size: 11, align: "center" });
-      };
-
-      line(left, top, switchX - 14, top);
-      D.disc(ctx, switchX - 14, top, 3, { fill: closed ? active : PL.col("text-faint") });
-      D.disc(ctx, switchX + 14, top, 3, { fill: closed ? active : PL.col("text-faint") });
-      line(switchX - 14, top, switchX + 14, closed ? top : top - 17, active, 2.5);
-      D.text(ctx, closed ? "S 閉合" : "S 斷開", switchX, top + 23, { color: active, size: 10, align: "center" });
-      line(switchX + 14, top, meterX - 34, top);
-      meter(meterX, top, s.I, "A", "A", MC(), +sAmRange.get());
-      line(meterX + 34, top, resistorX - resistorW / 2, top);
-      resistor(resistorX - resistorW / 2, top, resistorW, "滑動變阻器 R=" + PL.fmt(s.R, 1) + "Ω");
-      line(resistorX + resistorW / 2, top, right, top);
-      line(right, top, right, bottom);
-      line(right, bottom, sourceX + batteryW / 2, bottom);
-
-      D.rect(ctx, sourceX - batteryW / 2, bottom - 29, batteryW, 58, { fill: PL.col("panel-2"), stroke: active, width: 1.5, r: 7 });
-      line(sourceX - 13, bottom - 18, sourceX - 13, bottom + 18, "#fff", 3);
-      line(sourceX + 9, bottom - 11, sourceX + 9, bottom + 11, "#fff", 1.6);
-      D.text(ctx, "E=" + PL.fmt(s.E, 1) + "V", sourceX - 25, bottom + 43, { color: PL.col("warn"), size: 10, align: "center" });
-      D.text(ctx, "r=" + PL.fmt(s.r, 1) + "Ω", sourceX + 27, bottom + 43, { color: MC(), size: 10, align: "center" });
-      line(sourceX - batteryW / 2, bottom, left, bottom);
-      line(left, bottom, left, top);
-
-      const vmX = W * 0.58, vmY = bottom;
-      line(sourceX + batteryW / 2, bottom, vmX - 34, bottom, "rgba(90,162,255,0.64)", 1.5);
-      meter(vmX, vmY, s.U, "V", "V", "#5aa2ff", +sVmRange.get());
-      line(vmX + 34, bottom, right, bottom, "rgba(90,162,255,0.64)", 1.5);
-      if (closed) D.arrow(ctx, meterX + 38, top - 14, resistorX - 56, top - 14, { color: PL.col("warn"), width: 1.7, label: "I" });
-      D.text(ctx, closed ? "閉合電路：E = U + Ir" : "開關斷開：I = 0，U = E", W / 2, 30, { color: closed ? PL.col("text-dim") : PL.col("text-faint"), size: 12, align: "center", weight: "600" });
+      // 上排：開關 → 安培計 → 變阻器
+      const sw = AP.knifeSwitch(ctx, switchX, top + 10, 64, closed ? 0 : 1);
+      D.text(ctx, closed ? "S 閉合" : "S 斷開", switchX, top + 30, { color: PL.col("text"), size: 10, align: "center", weight: "700" });
+      const rh = AP.rheostat(ctx, resistorX, top + 16, resistorW, PL.clamp((s.R - Number(sR.el ? sR.el.min : 0)) / Math.max(1e-9, (sR.el ? Number(sR.el.max) - Number(sR.el.min) : 1)), 0, 1));
+      D.text(ctx, "滑動變阻器 R = " + PL.fmt(s.R, 1) + " Ω", resistorX, top - 34, { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
+      // 下排：電池盒（內阻 r）與伏特計
+      const bh = 44;
+      AP.battery(ctx, sourceX - batteryW / 2, bottom - bh / 2, batteryW, bh);
+      D.text(ctx, "E = " + PL.fmt(s.E, 1) + " V　r = " + PL.fmt(s.r, 1) + " Ω", sourceX, bottom + bh / 2 + 18, { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
+      const vmX = W * 0.62, vmY = bottom - 8;
+      // 導線（主迴路紅線，伏特計並聯在電池兩端用藍線）
+      AP.cable(ctx, [{ x: sourceX - batteryW / 2 - 1, y: bottom }, { x: left, y: bottom }, { x: left, y: top + 8 }, sw.left], red, 3, 3);
+      AP.cable(ctx, [sw.right, { x: meterX - 20, y: top + 8 + 26 * 1.12 + 4 }], red, 3, 4);
+      AP.cable(ctx, [{ x: meterX + 20, y: top + 8 + 26 * 1.12 + 4 }, rh.posts.tubeL], red, 3, 4);
+      AP.cable(ctx, [rh.slider, { x: right, y: top - 14 }, { x: right, y: bottom }, { x: sourceX + batteryW / 2 + 1, y: bottom }], black, 3, 3);
+      AP.cable(ctx, [{ x: sourceX + batteryW / 2 + 1, y: bottom + 8 }, { x: vmX - 20, y: vmY + 26 * 1.12 + 4 }], blue, 2.2, 5);
+      AP.cable(ctx, [{ x: vmX + 20, y: vmY + 26 * 1.12 + 4 }, { x: right - 6, y: bottom + 6 }], blue, 2.2, 5);
+      meter(meterX, top + 8, s.I, "A", "A", +sAmRange.get());
+      meter(vmX, vmY, s.U, "V", "V", +sVmRange.get());
+      if (closed) D.arrow(ctx, meterX + 36, top - 18, resistorX - resistorW / 2 - 10, top - 18, { color: PL.col("warn"), width: 1.8, label: "I" });
+      D.text(ctx, closed ? "閉合電路：E = U + Ir" : "開關斷開：I = 0，U = E", W / 2, 24, { color: PL.col("text"), size: 12, align: "center", weight: "700" });
     }
 
     function drawFitChart(s) {
@@ -775,6 +762,7 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const R1 = sR1.get(), R2 = sR2.get(), V = sV.get(), series = sCfg.get() === "series";
       const Req = series ? R1 + R2 : R1 * R2 / (R1 + R2), Itot = V / Req;
+      PL.apparatus.circuitBoard(ctx, W, H, false);
       const x0 = 56, x1 = W - 56, cy = H / 2 + 16, top = cy - 62;
 
       // 電池組：高度仍正比於電壓，讓「電壓大小」看得見
@@ -894,18 +882,30 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const R1 = sR1.get(), R2 = sR2.get(), R3 = sR3.get(), Rx = sRx.get();
-      const cx = W / 2, cy = H / 2, s = Math.min(W, H) * 0.34;
+      const cx = W / 2, cy = H / 2 + 8, s = Math.min(W, H) * 0.34;
+      const AP = PL.apparatus;
+      /* 桌上的惠斯登電橋：四顆電阻接成菱形，中間跨一個檢流計，上方接電池盒 */
+      AP.circuitBoard(ctx, W, H, false);
       const T = { x: cx, y: cy - s }, B = { x: cx, y: cy + s }, Ln = { x: cx - s, y: cy }, Rn = { x: cx + s, y: cy };
-      const arm = (a, b, lab, c) => { D.line(ctx, a.x, a.y, b.x, b.y, c, 2); D.text(ctx, lab, (a.x + b.x) / 2 + 12, (a.y + b.y) / 2 - 4, { color: c, size: 11, align: "center" }); };
+      const red = "rgb(186,54,48)";
+      const arm = (a, b, lab, c) => {
+        AP.cable(ctx, [a, b], red, 2.6, 0);
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, ang = Math.atan2(b.y - a.y, b.x - a.x);
+        ctx.save(); ctx.translate(mx, my); ctx.rotate(ang); AP.resistorBox(ctx, 0, 0, s * 0.5, null, false); ctx.restore();
+        D.text(ctx, lab, mx + (mx < cx ? -30 : 30), my + (my < cy ? -8 : 18), { color: c, size: 11.5, align: "center", weight: "800" });
+      };
       arm(T, Ln, "R₁=" + R1, PL.col("accent-2")); arm(T, Rn, "R₂=" + R2, PL.col("accent-2"));
       arm(Ln, B, "R₃=" + R3, MC()); arm(Rn, B, "Rₓ=" + Rx, MC());
-      D.disc(ctx, T.x, T.y, 4, { fill: "#fff" }); D.disc(ctx, B.x, B.y, 4, { fill: "#fff" });
-      D.text(ctx, "＋電池－", T.x, T.y - 12, { color: PL.col("warn"), size: 11, align: "center" });
-      D.line(ctx, Ln.x, Ln.y, Rn.x, Rn.y, PL.col("text-faint"), 1.5);
-      const gm = { x: cx, y: cy }; D.disc(ctx, gm.x, gm.y, 16, { fill: PL.col("panel-2"), stroke: PL.col("text-faint"), width: 2 });
-      const VL = R3 / (R1 + R3), VR = Rx / (R2 + Rx), diff = VL - VR, needle = PL.clamp(diff * 4, -1, 1) * Math.PI / 3;
-      D.line(ctx, gm.x, gm.y, gm.x + 13 * Math.sin(needle), gm.y - 13 * Math.cos(needle), PL.col("danger"), 2);
-      D.text(ctx, "G", gm.x, gm.y + 30, { color: PL.col("text-dim"), size: 11, align: "center" });
+      // 電池盒接在上下兩個節點之間（繞到左側）
+      AP.battery(ctx, cx - s - 96, cy - 22, 54, 44);
+      AP.cable(ctx, [T, { x: cx - s - 69, y: T.y }, { x: cx - s - 69, y: cy - 24 }], red, 2.6, 2);
+      AP.cable(ctx, [{ x: cx - s - 69, y: cy + 24 }, { x: cx - s - 69, y: B.y }, B], "rgb(40,44,52)", 2.6, 2);
+      // 檢流計跨在左右兩節點之間
+      const VL = R3 / (R1 + R3), VR = Rx / (R2 + Rx), diff = VL - VR;
+      AP.cable(ctx, [Ln, { x: cx - 30, y: cy }], "rgb(52,98,178)", 2.2, 2);
+      AP.cable(ctx, [{ x: cx + 30, y: cy }, Rn], "rgb(52,98,178)", 2.2, 2);
+      AP.meter(ctx, cx, cy - 6, 22, PL.clamp(0.5 + diff * 2, 0, 1), "G");
+      [T, B, Ln, Rn].forEach(p => AP.brassDisc(ctx, p.x, p.y, 4));
       const balanced = Math.abs(R1 * Rx - R2 * R3) < 0.5;
       rG.set(diff * 100, 1); rBal.set(balanced ? "平衡 ✓" : "不平衡"); rRx.set(R2 * R3 / R1, 2);
     }
@@ -925,7 +925,10 @@
     const rAng = PL.ui.readout(L.readouts, { label: "出射角", unit: "°" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const cy = H / 2, plateL = 128, plateR = W * 0.58, gap = 74, v = sV.get(), E = sE.get(), K = E / (v * v) * 0.9;
+      const cy = H / 2 - 8, plateL = 128, plateR = W * 0.58, gap = 74, v = sV.get(), E = sE.get(), K = E / (v * v) * 0.9;
+      const AP = PL.apparatus;
+      AP.labRoom(ctx, W, H, cy + 150, {});
+      [W * 0.22, W * 0.78].forEach(sx => { AP.steel(ctx, sx - 4, cy + 120, 8, 30, 8); AP.steel(ctx, sx - 22, cy + 146, 44, 6, -6); });
       // 真空管外殼（玻璃管質感）
       ctx.save();
       const tube = ctx.createLinearGradient(0, cy - 120, 0, cy + 120);

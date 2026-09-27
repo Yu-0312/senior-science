@@ -30,14 +30,32 @@
        */
       const midY = H / 2, V = W * 0.30, f = sF.get();
       const lambda = V / f, k = TAU / lambda, w = TAU * f, A = sA.get();
+      const AP = PL.apparatus;
+      AP.labRoom(ctx, W, H, H - 28, {});
       if (sType.get() === "trans") {
-        ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 2.4; ctx.beginPath();
-        for (let x = 30; x <= W - 30; x += 3) { const y = midY + A * Math.sin(k * x - w * t); x === 30 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
-        for (let i = 0; i < 14; i++) { const x = 40 + i * (W - 80) / 13; const y = midY + A * Math.sin(k * x - w * t); D.disc(ctx, x, y, i === 4 ? 6 : 3.5, { fill: i === 4 ? PL.col("danger") : "rgba(255,255,255,0.4)" }); if (i === 4) D.line(ctx, x, midY - A - 6, x, midY + A + 6, "rgba(255,107,107,0.3)", 1, [3, 3]); }
+        /* 橫波：手抓著繩子上下抖，繩子另一端綁在牆柱上 */
+        const post = AP.wallPost(ctx, W - 24, H - 28, midY - 44, midY);
+        ctx.save(); ctx.lineCap = "round";
+        ctx.strokeStyle = "rgb(140,100,52)"; ctx.lineWidth = 5.5; ctx.beginPath();
+        for (let x = 30; x <= post.x; x += 3) { const y = midY + A * Math.sin(k * x - w * t) * Math.min(1, (post.x - x) / 30); x === 30 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke();
+        ctx.strokeStyle = "rgb(214,170,100)"; ctx.lineWidth = 3.5; ctx.stroke(); ctx.restore();
+        AP.hand(ctx, 34, midY + A * Math.sin(k * 30 - w * t), 1, 0.9, { pull: true });
+        for (let i = 0; i < 14; i++) { const x = 40 + i * (W - 80) / 13; const y = midY + A * Math.sin(k * x - w * t) * Math.min(1, (post.x - x) / 30); D.disc(ctx, x, y, i === 4 ? 6 : 3.5, { fill: i === 4 ? PL.col("danger") : "rgba(255,255,255,0.85)" }); if (i === 4) D.line(ctx, x, midY - A - 6, x, midY + A + 6, "rgba(255,107,107,0.45)", 1, [3, 3]); }
       } else {
-        for (let i = 0; i < 60; i++) { const x0 = 34 + i * (W - 68) / 59; const dx = A * 0.7 * Math.sin(k * x0 - w * t); const dens = 1 - Math.cos(k * x0 - w * t) * 0.5; D.disc(ctx, x0 + dx, midY, 3, { fill: i === 20 ? PL.col("danger") : `rgba(121,134,203,${0.4 + dens * 0.4})` }); }
-        D.text(ctx, "疏部", 34 + (W - 68) * 0.25, midY - 30, { color: PL.col("text-faint"), size: 10, align: "center" });
-        D.text(ctx, "密部", 34 + (W - 68) * 0.5, midY - 30, { color: PL.col("text-dim"), size: 10, align: "center" });
+        /* 縱波：手推拉一條彈簧（Slinky），線圈疏密往右傳 */
+        AP.hand(ctx, 34 + A * 0.7 * Math.sin(k * 34 - w * t) - 18, midY, 1, 0.9);
+        for (let i = 0; i < 60; i++) {
+          const x0 = 34 + i * (W - 68) / 59; const dx = A * 0.7 * Math.sin(k * x0 - w * t);
+          const red = i === 20;
+          ctx.save();
+          ctx.strokeStyle = red ? "rgb(214,52,44)" : "rgb(150,158,172)"; ctx.lineWidth = red ? 2.6 : 1.8;
+          ctx.beginPath(); ctx.ellipse(x0 + dx, midY, 3.2, 20, 0, 0, Math.PI * 2); ctx.stroke();
+          ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 0.8;
+          ctx.beginPath(); ctx.ellipse(x0 + dx - 0.8, midY, 2.2, 18, 0, Math.PI * 1.1, Math.PI * 1.6); ctx.stroke();
+          ctx.restore();
+        }
+        D.text(ctx, "疏部", 34 + (W - 68) * 0.25, midY - 32, { color: PL.col("text-dim"), size: 10.5, align: "center", weight: "700" });
+        D.text(ctx, "密部", 34 + (W - 68) * 0.5, midY - 32, { color: PL.col("text-dim"), size: 10.5, align: "center", weight: "700" });
       }
       // 以「畫面寬度為 1」的無因次尺度呈現，讓兩個讀數可以直接互相印證
       rV.set(V / W, 2); rLam.set(lambda / W, 2);
@@ -59,15 +77,27 @@
     const rSum = PL.ui.readout(L.readouts, { label: "合成振幅", unit: "" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const k = TAU / (W * 0.32), w = 2.2, A1 = sA1.get(), A2 = sA2.get(), ph = sPh.get() * Math.PI / 180;
-      const rows = [H * 0.22, H * 0.5, H * 0.78];
-      const wave = (y0, f, col, wid) => { ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = wid; ctx.beginPath(); for (let x = 30; x <= W - 30; x += 2) { const y = y0 - f(x); x === 30 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore(); D.line(ctx, 30, y0, W - 30, y0, "rgba(255,255,255,0.08)", 1); };
-      wave(rows[0], x => A1 * Math.sin(k * x - w * t), PL.col("accent-2"), 1.8);
-      wave(rows[1], x => A2 * Math.sin(k * x - w * t + ph), PL.col("accent-3"), 1.8);
-      wave(rows[2], x => A1 * Math.sin(k * x - w * t) + A2 * Math.sin(k * x - w * t + ph), MC(), 2.6);
-      D.text(ctx, "波 1", 34, rows[0] - 34, { color: PL.col("accent-2"), size: 11 });
-      D.text(ctx, "波 2", 34, rows[1] - 34, { color: PL.col("accent-3"), size: 11 });
-      D.text(ctx, "合成波", 34, rows[2] - 34, { color: MC(), size: 11 });
+      const AP = PL.apparatus;
+      /* 兩台訊號產生器接到示波器：CH1、CH2 與相加後的波形同時顯示在螢光幕上 */
+      AP.labRoom(ctx, W, H, H - 22, {});
+      const scr = AP.oscilloscope(ctx, 16, 12, W - 32, H - 44, { label: "CH1 + CH2" });
+      const k = TAU / (scr.w * 0.36), w = 2.2, ph = sPh.get() * Math.PI / 180;
+      const amp = scr.h / 330, A1 = sA1.get() * amp, A2 = sA2.get() * amp;
+      const rows = [scr.y + scr.h * 0.2, scr.y + scr.h * 0.47, scr.y + scr.h * 0.78];
+      const wave = (y0, f, col, wid) => {
+        ctx.save(); ctx.beginPath(); ctx.rect(scr.x, scr.y, scr.w, scr.h); ctx.clip();
+        ctx.shadowColor = col; ctx.shadowBlur = 6; ctx.strokeStyle = col; ctx.lineWidth = wid; ctx.beginPath();
+        for (let x = scr.x; x <= scr.x + scr.w; x += 2) { const y = y0 - f(x); x === scr.x ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+        ctx.stroke(); ctx.restore();
+      };
+      wave(rows[0], x => A1 * Math.sin(k * x - w * t), "#f5d442", 1.8);
+      wave(rows[1], x => A2 * Math.sin(k * x - w * t + ph), "#4fd8ff", 1.8);
+      wave(rows[2], x => A1 * Math.sin(k * x - w * t) + A2 * Math.sin(k * x - w * t + ph), "#7dff9a", 2.6);
+      ctx.save(); ctx.font = "700 11px system-ui,sans-serif"; ctx.textAlign = "left";
+      ctx.fillStyle = "#f5d442"; ctx.fillText("CH1  波 1", scr.x + 8, rows[0] - scr.h * 0.12);
+      ctx.fillStyle = "#4fd8ff"; ctx.fillText("CH2  波 2", scr.x + 8, rows[1] - scr.h * 0.12);
+      ctx.fillStyle = "#7dff9a"; ctx.fillText("CH1 + CH2  合成波", scr.x + 8, rows[2] - scr.h * 0.13);
+      ctx.restore();
       const sum = Math.sqrt(A1 * A1 + A2 * A2 + 2 * A1 * A2 * Math.cos(ph));
       rState.set(sPh.get() < 30 || sPh.get() > 330 ? "相長干涉" : Math.abs(sPh.get() - 180) < 30 ? "相消干涉" : "部分干涉");
       rSum.set(sum, 1);
@@ -217,9 +247,11 @@
       const py = ym => roadY + ym * sc;
       cv.calibrate(sc, "m");
 
-      // 馬路
-      D.rect(ctx, 20, roadY - 13, W - 40, 26, { fill: PL.theme.pale(0.10), r: 3 });
-      D.line(ctx, 20, roadY, W - 20, roadY, PL.theme.pale(0.28), 1.5, [12, 10]);
+      // 俯視街景：草地中間一條馬路
+      const AP = PL.apparatus;
+      AP.ground(ctx, 0, W, 0, H, "grass");
+      AP.road(ctx, 0, W, roadY - 18, 36, { laneAt: 0.5 });
+      for (let i = 0; i < 7; i++) AP.tree(ctx, 40 + i * (W - 60) / 6, roadY - 30, 26, 11 + i);
 
       // 波前：每一圈都是在某個時刻、某個位置發出的，之後以聲速等速擴散
       if (layers.has("fronts")) {
@@ -255,21 +287,16 @@
 
       // 救護車：認得出來的物件比抽象的點更容易理解
       const carX = px(sourceX);
-      D.rect(ctx, carX - 20, roadY - 16, 40, 18, { fill: "#eef2f7", stroke: PL.theme.pale(0.4), r: 3 });
-      D.rect(ctx, carX - 6, roadY - 14, 24, 9, { fill: "#8fb8dd", r: 2 });
-      D.disc(ctx, carX - 12, roadY + 3, 4.5, { fill: "#2b3440" });
-      D.disc(ctx, carX + 12, roadY + 3, 4.5, { fill: "#2b3440" });
       // 閃燈：頻率固定，和聲音無關，但讓畫面活起來
       const blink = Math.floor(t * 4) % 2 === 0;
-      D.disc(ctx, carX, roadY - 20, 3.5, { fill: blink ? PL.col("danger") : PL.col("accent-2"), glow: blink ? PL.col("danger") : PL.col("accent-2"), glowSize: 9 });
-      D.text(ctx, vs + " m/s", carX, roadY + 26, { color: PL.col("text-dim"), size: 10.5, align: "center" });
+      AP.ambulanceTop(ctx, carX, roadY - 8, 44, blink);
+      D.text(ctx, vs + " m/s", carX, roadY + 32, { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
 
       // 觀測者
       const obsY = sObsY.get();
       const ox = W / 2, oy = py(obsY);
-      D.disc(ctx, ox, oy - 7, 5.5, { fill: "#e8b48c" });
-      D.rect(ctx, ox - 4, oy - 2, 8, 14, { fill: PL.col("accent-2"), r: 2 });
-      D.text(ctx, "觀測者", ox, oy + 26, { color: PL.col("accent-2"), size: 10.5, align: "center" });
+      AP.personTop(ctx, ox, oy + (obsY < 12 ? 22 : 0), 1, "#2f7fd8");
+      D.text(ctx, "觀測者", ox, oy + 26 + (obsY < 12 ? 22 : 0), { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
 
       if (layers.has("obs")) {
         D.line(ctx, carX, roadY, ox, oy, PL.theme.pale(0.22), 1, [4, 4]);
@@ -342,12 +369,20 @@
     const rBeat = PL.ui.readout(L.readouts, { label: "拍頻 |f₁−f₂|", unit: "Hz" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const f1 = sF1.get(), f2 = sF2.get(), midY = H / 2, A = H * 0.3, x0 = 30, span = W - 60;
+      const AP = PL.apparatus;
+      /* 兩支音叉同時敲響，麥克風把聲音送進示波器：看得到響度一強一弱 */
+      AP.labRoom(ctx, W, H, H - 24, {});
+      AP.tuningFork(ctx, 34, H - 24, 96); AP.tuningFork(ctx, 84, H - 24, 88);
+      D.text(ctx, "f₁", 34, H - 128, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
+      D.text(ctx, "f₂", 84, H - 120, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
+      AP.microphone(ctx, 130, H - 24, 70, 1);
+      const scr = AP.oscilloscope(ctx, 170, 14, W - 186, H - 46, { label: "MIC" });
+      const f1 = sF1.get(), f2 = sF2.get(), midY = scr.y + scr.h / 2, A = scr.h * 0.2, x0 = scr.x, span = scr.w;
       // 包絡
-      ctx.save(); ctx.strokeStyle = PL.theme.pale(0.15); ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+      ctx.save(); ctx.strokeStyle = "rgba(125,255,154,0.35)"; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
       ctx.beginPath(); for (let i = 0; i <= span; i += 2) { const x = x0 + i, tt = i / span * 2 + t; const env = 2 * A * Math.abs(Math.cos(Math.PI * (f1 - f2) * tt)); ctx.lineTo(x, midY - env); } ctx.stroke();
       ctx.beginPath(); for (let i = 0; i <= span; i += 2) { const x = x0 + i, tt = i / span * 2 + t; const env = 2 * A * Math.abs(Math.cos(Math.PI * (f1 - f2) * tt)); ctx.lineTo(x, midY + env); } ctx.stroke(); ctx.restore();
-      ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 2; ctx.beginPath();
+      ctx.save(); ctx.strokeStyle = "#7dff9a"; ctx.shadowColor = "#7dff9a"; ctx.shadowBlur = 5; ctx.lineWidth = 1.8; ctx.beginPath();
       for (let i = 0; i <= span; i += 1) { const x = x0 + i, tt = i / span * 2 + t; const y = midY - A * (Math.sin(TAU * f1 * tt) + Math.sin(TAU * f2 * tt)); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
       rBeat.set(Math.abs(f1 - f2), 1);
     }

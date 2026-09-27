@@ -33,6 +33,8 @@
       cv.calibrate(sc, "m");      // 尺可直接量振幅與位移
       const mx = eqX + x * sc;
 
+      // 場景：上半是實驗桌上的彈簧振子，下半是圖表
+      AP.labStrip(ctx, W, 150, railY + 8, {});
       // 滑軌與牆面固定柱（含掛簧螺栓座）
       AP.steel(ctx, wallX - 10, railY, W - wallX - 26, 8, 4);
       const post = AP.wallPost(ctx, wallX - 4, railY - 1, ay - 32, ay);
@@ -123,7 +125,7 @@
       const px = W / 2, py = 46, Lpx = Math.min((H - 96), (W * 0.42)) * (Lm / 4) + 40;
 
       /* 鐵架吊起的單擺：擺長是從夾頭量到球心，架子畫出來學生才知道那一段從哪算起 */
-      A.benchTop(ctx, W, H, H - 24);
+      A.benchTop(ctx, W, H, H - 24, { window: { x: W * 0.72, w: Math.min(150, W * 0.18), h: H * 0.34 } });
       A.standRod(ctx, px - 118, H - 22, py - 26);
       A.crossArm(ctx, px - 118, py - 16, px);
 
@@ -132,7 +134,7 @@
       const bx = px + Lpx * Math.sin(th), by = py + Lpx * Math.cos(th);
       D.line(ctx, px, py, px, py + Lpx, PL.theme.pale(0.18), 1, [4, 4]);
       A.cord(ctx, px, py, bx, by);
-      A.bob(ctx, bx, by, 15);
+      A.bob(ctx, bx, by, 17);
       rT.set(TAU / w, 2); rTh.set(th * 180 / Math.PI, 1);
     }
     const anim = PL.loop(dt => { if (dt) t += dt; draw(); });
@@ -165,6 +167,7 @@
       const midY = 58, sc = (W - 120) / (2 * A_MAX), eqX = W / 2, mx = eqX + x * sc;
       const cartW = 42, railY = midY + 27;
       // 牆柱、軌道與平衡位置：振子畫成真的彈簧掛車，不是幾何符號
+      AP.labStrip(ctx, W, 112, railY + 8, {});
       AP.steel(ctx, 28, railY, W - 52, 8, 4);
       const postE = AP.wallPost(ctx, 30, railY - 1, midY - 30, midY);
       D.line(ctx, eqX, midY - 48, eqX, railY + 12, "rgba(255,255,255,0.22)", 1, [4, 4]);
@@ -208,8 +211,15 @@
       const AP = PL.apparatus;
       const midY = 56, eqX = W / 2, x = A * 26 * Math.sin(wd * t);
       const cartW = 42, railY = midY + 25;
+      AP.labStrip(ctx, W, 100, railY + 8, {});
       AP.steel(ctx, 46, railY, W - 72, 8, 4);
-      const postR = AP.wallPost(ctx, 42, railY - 1, midY - 26, midY);
+      // 驅動器：馬達帶動偏心輪，把彈簧左端以頻率 f 來回推——「驅動頻率」看得見
+      const crank = wd * t, drvX = 34 + 4 * Math.cos(crank);
+      AP.steel(ctx, 8, midY - 22, 30, 44, -10);
+      AP.brassDisc(ctx, 23, midY, 11);
+      AP.brassDisc(ctx, 23 + 7 * Math.cos(crank), midY + 7 * Math.sin(crank), 2.6);
+      AP.steel(ctx, drvX + 4, midY - 3, 12, 6, 8);
+      const postR = { x: drvX + 16, y: midY };
       D.line(ctx, eqX, midY - 44, eqX, railY + 12, "rgba(255,255,255,0.22)", 1, [4, 4]);
       D.text(ctx, "x = 0", eqX, midY - 50, { color: PL.theme.pale(0.8), size: 10.5, align: "center" });
       D.spring(ctx, postR.x, midY, eqX + x - cartW / 2 - 1, midY, 10, 9, MC());
