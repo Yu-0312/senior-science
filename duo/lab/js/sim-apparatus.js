@@ -1273,15 +1273,21 @@
   }
 
   /* 燒杯與水位。level 0..1 是水面高度比例。 */
-  function beaker(ctx, cx, baseY, w, h, level) {
+  function beaker(ctx, cx, baseY, w, h, level, tint) {
     const x0 = cx - w / 2, yTop = baseY - h;
     const lv = Math.max(0, Math.min(1, level == null ? 0.6 : level));
     const wy = baseY - h * lv;
     contactShadow(ctx, cx, baseY + 3, w * 0.72);
-    // 水
+    // 水（tint 可以指定水色，例如熱水偏紅）
     const wg = ctx.createLinearGradient(0, wy, 0, baseY);
-    wg.addColorStop(0, "rgba(120,196,226,0.30)");
-    wg.addColorStop(1, "rgba(58,142,182,0.40)");
+    if (tint) {
+      const tc = PL.theme.parseColor(tint) || [120, 196, 226, 1];
+      wg.addColorStop(0, `rgba(${tc[0]},${tc[1]},${tc[2]},0.45)`);
+      wg.addColorStop(1, `rgba(${Math.round(tc[0] * 0.75)},${Math.round(tc[1] * 0.75)},${Math.round(tc[2] * 0.75)},0.62)`);
+    } else {
+      wg.addColorStop(0, "rgba(120,196,226,0.30)");
+      wg.addColorStop(1, "rgba(58,142,182,0.40)");
+    }
     ctx.fillStyle = wg; ctx.fillRect(x0 + 2, wy, w - 4, baseY - wy - 2);
     // 水面
     ctx.fillStyle = "rgba(198,238,250,0.75)";
@@ -3569,6 +3575,69 @@
   }
 
 
+
+
+  /*
+   * 數位三用電表：黃色外殼 + 液晶螢幕 + 旋鈕 + 紅黑接孔。
+   * (x, y) 左上角；text 顯示在液晶上。回傳 { red, black } 接孔座標。
+   */
+  function multimeter(ctx, x, y, w, h, text, o) {
+    o = o || {};
+    contactShadow(ctx, x + w / 2, y + h + 3, w * 0.6);
+    ctx.fillStyle = "rgb(236,186,40)"; rrPath(ctx, x, y, w, h, 8); ctx.fill();
+    ctx.fillStyle = "rgb(44,48,56)"; rrPath(ctx, x + 5, y + 5, w - 10, h - 10, 6); ctx.fill();
+    // 液晶
+    const lx = x + 11, ly = y + 12, lw = w - 22, lh = Math.min(34, h * 0.28);
+    const lg = ctx.createLinearGradient(0, ly, 0, ly + lh);
+    lg.addColorStop(0, "rgb(186,204,170)"); lg.addColorStop(1, "rgb(156,176,142)");
+    ctx.fillStyle = lg; ctx.fillRect(lx, ly, lw, lh);
+    ctx.fillStyle = "rgb(24,30,24)"; ctx.font = "700 " + Math.round(lh * 0.62) + "px 'Courier New',monospace";
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    ctx.fillText(text || "0.00", lx + lw - 6, ly + lh / 2 + 1);
+    if (o.unit) { ctx.font = "700 9px system-ui,sans-serif"; ctx.textAlign = "left"; ctx.fillText(o.unit, lx + 4, ly + 9); }
+    // 旋鈕
+    const kx = x + w / 2, ky = ly + lh + (h - lh - 40) / 2 + 6, kr = Math.min(w * 0.22, 18);
+    ctx.fillStyle = "rgb(70,76,86)"; ctx.beginPath(); ctx.arc(kx, ky, kr, 0, TAU); ctx.fill();
+    ctx.fillStyle = "rgb(30,32,38)"; ctx.fillRect(kx - 2.5, ky - kr + 2, 5, kr * 0.9);
+    ctx.fillStyle = "rgba(236,240,246,0.8)"; ctx.font = "8px system-ui,sans-serif"; ctx.textAlign = "center";
+    ["V", "Ω", "A"].forEach((t, i) => { const a = -Math.PI / 2 + (i - 1) * 0.8; ctx.fillText(t, kx + Math.cos(a) * (kr + 7), ky + Math.sin(a) * (kr + 7)); });
+    // 接孔
+    const jy = y + h - 14;
+    const red = { x: x + w * 0.68, y: jy }, black = { x: x + w * 0.32, y: jy };
+    ctx.fillStyle = "rgb(200,40,36)"; ctx.beginPath(); ctx.arc(red.x, red.y, 4.5, 0, TAU); ctx.fill();
+    ctx.fillStyle = "rgb(20,20,22)"; ctx.beginPath(); ctx.arc(black.x, black.y, 4.5, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(red.x, red.y, 4.5, 0, TAU); ctx.arc(black.x, black.y, 4.5, 0, TAU); ctx.stroke();
+    return { red, black };
+  }
+
+  /* 小羅盤：黃銅框 + 白色錶面 + 紅藍磁針。ang 為 N 極所指方向（canvas 弧度） */
+  function compass(ctx, cx, cy, r, ang) {
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.beginPath(); ctx.arc(cx + 1.5, cy + 2, r, 0, TAU); ctx.fill();
+    brassDisc(ctx, cx, cy, r);
+    ctx.fillStyle = "rgb(248,248,244)"; ctx.beginPath(); ctx.arc(cx, cy, r * 0.8, 0, TAU); ctx.fill();
+    ctx.translate(cx, cy); ctx.rotate(ang);
+    const L2 = r * 0.72, w = r * 0.18;
+    ctx.fillStyle = "rgb(214,52,44)"; ctx.beginPath(); ctx.moveTo(L2, 0); ctx.lineTo(0, -w); ctx.lineTo(0, w); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgb(52,98,178)"; ctx.beginPath(); ctx.moveTo(-L2, 0); ctx.lineTo(0, -w); ctx.lineTo(0, w); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgb(60,64,72)"; ctx.beginPath(); ctx.arc(0, 0, r * 0.1, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+
+  /* 電磁鐵的圓形磁極面（俯視）：磁場垂直穿過紙面時的「底座」 */
+  function poleFace(ctx, cx, cy, R) {
+    const L = isLight();
+    contactShadow(ctx, cx + 4, cy + R * 0.1, R * 1.05);
+    const g = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.35, R * 0.1, cx, cy, R);
+    g.addColorStop(0, L ? "rgb(176,184,196)" : "rgb(92,100,112)"); g.addColorStop(1, L ? "rgb(120,128,140)" : "rgb(52,58,68)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "rgba(20,24,30,0.55)"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 1;
+    for (let r = R * 0.2; r < R; r += R * 0.16) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.stroke(); }
+    note(ctx, L ? "rgb(150,158,170)" : "rgb(72,80,92)", cx - R * 0.7, cy - R * 0.7, R * 1.4, R * 1.4);
+  }
+
   /* ===============================================================
      器材 v2：波動與聲音（示波器、喇叭、麥克風、俯視車輛與人）
      =============================================================== */
@@ -3668,6 +3737,33 @@
     ctx.shadowColor = blink ? "rgba(255,40,40,0.9)" : "rgba(60,120,255,0.9)"; ctx.shadowBlur = 12;
     ctx.fillStyle = blink ? "rgb(255,60,50)" : "rgb(60,130,255)"; ctx.fillRect(len * 0.12, -w / 2 + 2, 6, w * 0.35);
     ctx.fillStyle = !blink ? "rgb(255,60,50)" : "rgb(60,130,255)"; ctx.fillRect(len * 0.12, w / 2 - 2 - w * 0.35, 6, w * 0.35);
+    ctx.restore();
+    ctx.restore();
+  }
+
+
+  /* 俯視汽車：車身 + 擋風玻璃 + 車頂 + 車燈。brake 為真時尾燈亮紅光 */
+  function carTop(ctx, cx, cy, len, color, o) {
+    o = o || {};
+    const c = hexRgb(color || "#2f7fd8"), w = len * 0.46, f = o.facing || 1;
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(f, 1);
+    ctx.fillStyle = "rgba(0,0,0,0.25)"; rrPath(ctx, -len / 2 + 2, -w / 2 + 3, len, w, w * 0.35); ctx.fill();
+    const g = ctx.createLinearGradient(0, -w / 2, 0, w / 2);
+    g.addColorStop(0, rgbStr(shadeRgb(c, 0.35))); g.addColorStop(0.5, rgbStr(c)); g.addColorStop(1, rgbStr(shadeRgb(c, -0.35)));
+    ctx.fillStyle = g; rrPath(ctx, -len / 2, -w / 2, len, w, w * 0.35); ctx.fill();
+    ctx.strokeStyle = rgbStr(shadeRgb(c, -0.6), 0.8); ctx.lineWidth = 1; ctx.stroke();
+    // 擋風玻璃與後窗
+    ctx.fillStyle = "rgba(40,60,80,0.85)";
+    rrPath(ctx, len * 0.12, -w * 0.36, len * 0.14, w * 0.72, 3); ctx.fill();
+    rrPath(ctx, -len * 0.34, -w * 0.33, len * 0.1, w * 0.66, 3); ctx.fill();
+    // 車頂
+    ctx.fillStyle = rgbStr(shadeRgb(c, 0.15)); rrPath(ctx, -len * 0.22, -w * 0.36, len * 0.32, w * 0.72, 4); ctx.fill();
+    // 車燈
+    ctx.fillStyle = "rgba(255,248,200,0.95)"; ctx.fillRect(len / 2 - 3, -w * 0.4, 3, w * 0.18); ctx.fillRect(len / 2 - 3, w * 0.22, 3, w * 0.18);
+    ctx.save();
+    if (o.brake) { ctx.shadowColor = "rgba(255,40,30,0.95)"; ctx.shadowBlur = 12; }
+    ctx.fillStyle = o.brake ? "rgb(255,50,40)" : "rgb(150,30,30)";
+    ctx.fillRect(-len / 2, -w * 0.42, 3, w * 0.2); ctx.fillRect(-len / 2, w * 0.22, 3, w * 0.2);
     ctx.restore();
     ctx.restore();
   }
@@ -3820,7 +3916,7 @@
     coasterCar, airTrack, glider, fanCart, billiardTable, poolBall, launcher,
     deskTop, circuitBoard, turntable, airTable, stopper, flywheel,
     cylinderPiston, testTube, cork, hotPlate, alcoholLamp, springScaleV, calorimeter,
-    oscilloscope, speaker, microphone, ambulanceTop, personTop,
+    multimeter, compass, poleFace, oscilloscope, speaker, microphone, ambulanceTop, carTop, personTop,
     lampHouse, slitPlate, polarizer, prismGlass, paperScreen, gratingSlide,
     rrPath, isLight
   };

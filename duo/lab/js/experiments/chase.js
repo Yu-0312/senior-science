@@ -181,13 +181,17 @@
       const px = m => 40 + (m / X_MAX) * (W - 80);
       cv.calibrate((W - 80) / X_MAX, "m");
 
-      // 路面
-      D.rect(ctx, 34, roadTop, W - 68, roadBot - roadTop, { fill: PL.theme.shade(0.42), stroke: PL.theme.pale(0.26), width: 1, r: 4 });
-      D.line(ctx, 34, roadTop, W - 34, roadTop, PL.theme.pale(0.30), 2);
-      D.line(ctx, 34, roadBot, W - 34, roadBot, PL.theme.pale(0.30), 2);
+      // 俯視的雙線道公路：兩側草地與行道樹
+      const AP = PL.apparatus;
+      AP.ground(ctx, 0, W, 0, H, "grass");
+      AP.ground(ctx, 0, W, roadTop, roadBot - roadTop, "asphalt");
+      ctx.fillStyle = PL.theme.isLight() ? "#d9dcdf" : "#50555c";
+      ctx.fillRect(0, roadTop - 4, W, 4); ctx.fillRect(0, roadBot, W, 4);
+      for (let i = 0; i < 9; i++) AP.tree(ctx, 30 + i * (W - 40) / 8, roadTop - 8, 24, 5 + i);
       // 車道分隔虛線
       const mid = (roadTop + roadBot) / 2;
-      D.line(ctx, 40, mid, W - 40, mid, PL.theme.pale(0.18), 2, [16, 14]);
+      ctx.fillStyle = PL.theme.isLight() ? "rgba(255,255,255,0.9)" : "rgba(235,235,200,0.6)";
+      for (let x = 20; x < W; x += 34) ctx.fillRect(x, mid - 1.5, 18, 3);
       // 距離刻度
       for (let m = 0; m <= X_MAX; m += 10) {
         const x = px(m);
@@ -223,23 +227,16 @@
     }
 
     function drawCar(ctx, x, y, color, name, v, stopped) {
-      const w = 46, h = 20;
-      D.rect(ctx, x - w / 2, y - h / 2, w, h, { fill: color, stroke: PL.theme.pale(0.4), width: 1.2, r: 5 });
-      D.rect(ctx, x - w * 0.18, y - h / 2 - 7, w * 0.42, 8,
-        { fill: color, stroke: PL.theme.pale(0.3), width: 1, r: 3 });
-      D.disc(ctx, x - w * 0.28, y + h / 2, 5, { fill: "#20262e" });
-      D.disc(ctx, x + w * 0.28, y + h / 2, 5, { fill: "#20262e" });
+      const w = 52, h = 24;
       // 剎車燈：剎停或減速中亮起，這是「前車在剎車」最直接的視覺線索
-      if (stopped || v < 0.05) {
-        D.disc(ctx, x - w / 2 - 3, y, 3.5, { fill: PL.col("danger"), glow: PL.col("danger"), glowSize: 8 });
-      }
+      PL.apparatus.carTop(ctx, x, y, w, color, { brake: stopped || v < 0.05 });
       // 速度箭頭：長度正比於速率
       if (v > 0.05) {
         D.arrow(ctx, x + w / 2 + 3, y, x + w / 2 + 3 + v * 3.2, y,
           { color: PL.theme.pale(0.55), width: 2, head: 6 });
       }
-      D.text(ctx, name + " v = " + PL.fmt(v, 1) + " m/s", x, y - h / 2 - 14,
-        { color: color, size: 11, align: "center", weight: "700" });
+      D.text(ctx, name + " v = " + PL.fmt(v, 1) + " m/s", x, y - h / 2 - 10,
+        { color: PL.theme.isLight() ? "#ffffff" : "#f2f4f8", size: 11, align: "center", weight: "800" });
     }
 
     /* ---------------- 三張圖 ---------------- */

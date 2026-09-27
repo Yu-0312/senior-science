@@ -17,6 +17,28 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const cx = W / 2, cy = H / 2, out = sDir.get() === "out", ccw = out ? 1 : -1, I = sI.get();
+      const AP = PL.apparatus;
+      /* 奧斯特實驗（俯視）：直導線垂直穿過一塊硬紙板，紙板上的鐵粉排成同心圓，小羅盤沿圓切線指向 */
+      AP.deskTop(ctx, 0, 0, W, H);
+      const card = Math.min(W, H) * 0.46;
+      ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fillRect(cx - card + 4, cy - card + 5, card * 2, card * 2);
+      ctx.fillStyle = PL.theme.isLight() ? "#f3f0e6" : "#d8d3c4"; ctx.fillRect(cx - card, cy - card, card * 2, card * 2);
+      PL.theme.note(ctx, "#ece8dc", cx - card, cy - card, card * 2, card * 2);
+      // 鐵粉：沿切線排的短線，離導線越近越密、越整齊
+      {
+        let sd = 91;
+        const rnd = () => { sd = (sd * 1664525 + 1013904223) | 0; return ((sd >>> 8) & 0xffffff) / 0xffffff; };
+        ctx.save(); ctx.beginPath(); ctx.rect(cx - card, cy - card, card * 2, card * 2); ctx.clip();
+        ctx.strokeStyle = "rgba(50,50,56,0.55)"; ctx.lineWidth = 1;
+        for (let i = 0; i < 900; i++) {
+          const rr = 18 + Math.pow(rnd(), 0.8) * card * 1.35, a = rnd() * TAU;
+          const keep = Math.min(1, (I / 5) * 60 / rr);
+          if (rnd() > keep) continue;
+          const px = cx + rr * Math.cos(a), py = cy + rr * Math.sin(a), ta = a + Math.PI / 2 + (rnd() - 0.5) * 0.25;
+          ctx.beginPath(); ctx.moveTo(px - Math.cos(ta) * 2.5, py - Math.sin(ta) * 2.5); ctx.lineTo(px + Math.cos(ta) * 2.5, py + Math.sin(ta) * 2.5); ctx.stroke();
+        }
+        ctx.restore();
+      }
       // 導線截面
       D.disc(ctx, cx, cy, 12, { fill: MC(), glow: MC(), glowSize: 12 });
       if (out) D.disc(ctx, cx, cy, 4, { fill: "#fff" });
@@ -42,6 +64,11 @@
         D.arrow(ctx, ax - Math.cos(ta) * len, ay - Math.sin(ta) * len,
           ax + Math.cos(ta) * len, ay + Math.sin(ta) * len, { color: MC(), width: 1.6, head: 6 });
       }
+      // 四個小羅盤擺在第三圈上：N 極沿磁場方向（逆時針或順時針）
+      [0, 1, 2, 3].forEach(k => {
+        const a = k * Math.PI / 2 + Math.PI / 4, R = 28 + 3 * 26;
+        AP.compass(ctx, cx + R * Math.cos(a), cy + R * Math.sin(a), 13, a + ccw * Math.PI / 2);
+      });
       rB.set(I, 1);
     }
     const anim = PL.loop(dt => { if (dt) t += dt * sI.get(); draw(); });
@@ -64,10 +91,14 @@
     const cc = PL.ui.chart(PL.ui.charts(root), { title: "迴轉半徑 r – 速率 v", cap: "r = mv/qB：定磁場下半徑與速率成正比（直線過原點）；磁場越強、半徑越小。" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      // 俯視：電磁鐵的磁極面就在粒子下方，B 垂直穿入紙面
+      const AP = PL.apparatus;
+      AP.deskTop(ctx, 0, 0, W, H);
+      AP.poleFace(ctx, W / 2, H / 2, Math.min(W, H) * 0.46);
       // B 進入頁面：叉叉密度隨 B 變強（磁場看得見）
       const bNorm = (sB.get() - 1) / 5;
       const spacing = Math.round(60 - bNorm * 26);
-      ctx.save(); ctx.strokeStyle = PL.theme.pale(0.08 + bNorm * 0.10); ctx.lineWidth = 1;
+      ctx.save(); ctx.strokeStyle = "rgba(235,240,248," + (0.25 + bNorm * 0.3) + ")"; ctx.lineWidth = 1;
       for (let x = 30; x < W - 20; x += spacing) for (let y = 30; y < H - 20; y += spacing) { ctx.beginPath(); ctx.moveTo(x - 3.5, y - 3.5); ctx.lineTo(x + 3.5, y + 3.5); ctx.moveTo(x - 3.5, y + 3.5); ctx.lineTo(x + 3.5, y - 3.5); ctx.stroke(); } ctx.restore();
       D.text(ctx, "B 進入頁面 ⊗  B = " + PL.fmt(sB.get(), 1) + " 單位", W - 24, 22, { color: PL.col("text-faint"), size: 11, align: "right" });
       const pos = sQ.get() === "pos", sgn = pos ? 1 : -1;
@@ -678,7 +709,7 @@
 
       // 鐵芯：疊片矽鋼片疊成的口字形閉合磁路
       const AP = PL.apparatus;
-      AP.benchTop(ctx, W, H, cy + coreH / 2 + 46);
+      AP.circuitBoard(ctx, W, H, false);
       AP.ironCore(ctx, cx - coreW / 2, cy - coreH / 2, coreW, coreH, 18);
 
       // 磁通：交流時在鐵芯裡循環流動；直流時靜止且畫成灰色，一眼看出「沒有變化」
@@ -816,6 +847,17 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const v = sE.get() / sB.get(), r = radius(), selY = H * 0.28, selX0 = 30, selX1 = W * 0.44, entryX = selX1;
+      const AP = PL.apparatus;
+      /* 質譜儀：真空腔體（鋼殼）裡，右半邊整片是磁極面 */
+      AP.labRoom(ctx, W, H, H + 1, { bench: "none" });
+      AP.steel(ctx, 16, selY - 40, W - 32, H - selY + 30, -30);
+      {
+        const regionH0 = H - selY - 34, regionW0 = W - entryX - 26;
+        const pg = ctx.createLinearGradient(entryX, selY, entryX + regionW0, selY + regionH0);
+        pg.addColorStop(0, PL.theme.isLight() ? "rgb(170,176,190)" : "rgb(78,84,98)"); pg.addColorStop(1, PL.theme.isLight() ? "rgb(126,132,148)" : "rgb(52,56,68)");
+        ctx.fillStyle = pg; ctx.fillRect(entryX, selY, regionW0, regionH0);
+        PL.theme.note(ctx, PL.theme.isLight() ? "rgb(150,156,170)" : "rgb(66,70,82)", entryX, selY, regionW0, regionH0);
+      }
       // 速度選擇器：金屬腔體＋上下極板
       const sel = ctx.createLinearGradient(0, selY - 22, 0, selY + 22);
       sel.addColorStop(0, "rgba(160,168,184,0.18)");
