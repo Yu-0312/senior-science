@@ -18,7 +18,7 @@ document.documentElement.getAttribute = () => "dark";
 /* 這裡的「沒有關係」本身就是結論：法拉第籠殼內場強恆為零 */
 const FLAT_OK = new Set(["electrostatic-shield"]);
 
-const FILES = ["extended", "advanced", "comprehensive", "open-labs"];
+const FILES = ["extended", "advanced", "comprehensive", "comprehensive-2", "open-labs"];
 const all = {};
 FILES.forEach(f => {
   const p = "js/experiments/" + f + ".js";
