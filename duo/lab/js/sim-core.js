@@ -756,7 +756,18 @@
 
     function fit() {
       const rect = wrap.getBoundingClientRect();
-      const w = Math.max(240, Math.min(rect.width || maxW, maxW));
+      /*
+       * 可用寬度要扣掉容器的左右內距。
+       * getBoundingClientRect() 量到的是含內距的外框寬，.sim-canvas-wrap 左右各有 12px 內距，
+       * 畫布照外框寬畫就會往右凸出 24px，被 .sim-visual-panel 的 overflow:hidden 切掉右緣約 12px——
+       * 貼在右上角的讀數卡、右側的器材因此一直少了一截。
+       */
+      let avail = rect.width || maxW;
+      try {
+        const cs = window.getComputedStyle ? window.getComputedStyle(wrap) : null;
+        if (cs && rect.width) avail -= (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+      } catch (e) { /* 測試環境沒有 getComputedStyle */ }
+      const w = Math.max(240, Math.min(avail, maxW));
       /*
        * 高度上限
        *
