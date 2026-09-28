@@ -964,9 +964,14 @@
       const rail1 = 78, rail2 = 234, rx0 = 56, rx1 = W - 40;
       const mToPx = x => rx0 + x * PX_PER_M;
 
-      // 磁場：垂直紙面（×記號鋪滿導軌間）
+      /* 俯視的實驗桌：導軌下方鋪一整片磁鐵，磁場垂直穿入桌面（×） */
+      AP.deskTop(ctx, 0, 0, W, 282);
+      const mg = ctx.createLinearGradient(0, rail1, 0, rail2);
+      mg.addColorStop(0, "rgb(70,76,90)"); mg.addColorStop(1, "rgb(46,50,60)");
+      ctx.fillStyle = mg; ctx.fillRect(rx0 - 10, rail1 + 4, rx1 - rx0 + 20, rail2 - rail1);
+      PL.theme.note(ctx, "rgb(58,63,75)", rx0 - 10, rail1 + 4, rx1 - rx0 + 20, rail2 - rail1);
       ctx.save();
-      ctx.strokeStyle = "rgba(201,140,255,0.30)"; ctx.lineWidth = 1.4;
+      ctx.strokeStyle = "rgba(214,176,255,0.55)"; ctx.lineWidth = 1.4;
       for (let y = rail1 + 22; y < rail2 - 6; y += 30) {
         for (let x = rx0 + 24; x < rx1; x += 34) {
           ctx.beginPath();
@@ -976,7 +981,7 @@
         }
       }
       ctx.restore();
-      D.text(ctx, "B（垂直紙面向內）", rx1 - 8, rail1 - 12, { color: "rgba(201,140,255,0.75)", size: 10, align: "right" });
+      D.text(ctx, "磁鐵：B 垂直穿入桌面（×）", rx1 - 8, rail2 - 10, { color: "rgba(226,206,255,0.9)", size: 10, align: "right", weight: "700" });
 
       // 兩條導軌（鋼條）
       AP.steel(ctx, rx0, rail1, rx1 - rx0, 7, 4);
@@ -987,8 +992,11 @@
         const px = mToPx(xm);
         const g = ctx.createLinearGradient(px - 5, 0, px + 5, 0);
         g.addColorStop(0, "rgba(255,255,255,0.35)");
-        ctx.fillStyle = tint;
-        D.rect(ctx, px - 5, rail1 - 6, 10, rail2 - rail1 + 12, { fill: tint, stroke: "rgba(16,22,30,0.8)", r: 4 });
+        const cg = ctx.createLinearGradient(px - 6, 0, px + 6, 0);
+        cg.addColorStop(0, "rgb(150,86,40)"); cg.addColorStop(0.45, "rgb(236,170,110)"); cg.addColorStop(1, "rgb(140,80,36)");
+        ctx.fillStyle = cg; AP.rrPath(ctx, px - 6, rail1 - 8, 12, rail2 - rail1 + 16, 5); ctx.fill();
+        ctx.strokeStyle = "rgba(60,30,10,0.7)"; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = tint; ctx.fillRect(px - 6, rail1 - 8, 12, 6); ctx.fillRect(px - 6, rail2 + 2, 12, 6);
         D.text(ctx, lab, px, rail2 + 24, { color: tint, size: 10.5, align: "center", weight: "700" });
         // 速度箭頭
         const vpx = (lab === "棒1" ? v1 : v2) * 16;
@@ -1039,9 +1047,9 @@
 
       // 收斂提示
       if (settled > 0) {
-        D.text(ctx, W / 2, 44, (merged ? "兩棒接觸" : "磁場完成動量傳遞") + "：以共同速度 v* = " + PL.fmt(vStar, 2) + " m/s 一起前進，電流歸零",
+        D.text(ctx, (merged ? "兩棒接觸" : "磁場完成動量傳遞") + "：以共同速度 v* = " + PL.fmt(vStar, 2) + " m/s 一起前進，電流歸零", W / 2, 22,
           { color: PL.col("ok"), size: 11.5, align: "center", weight: "700" });
-        D.text(ctx, W / 2, 62, "少掉的動能 " + PL.fmt(KE0 - 0.5 * (M1 + M2) * vStar * vStar, 3) + " J 已變成迴路的焦耳熱",
+        D.text(ctx, "少掉的動能 " + PL.fmt(KE0 - 0.5 * (M1 + M2) * vStar * vStar, 3) + " J 已變成迴路的焦耳熱", W / 2, 38,
           { color: PL.col("text-faint"), size: 10.5, align: "center" });
       }
 

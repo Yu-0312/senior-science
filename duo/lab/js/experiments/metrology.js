@@ -669,7 +669,23 @@
       rCount.set(readings.length, 0);
       rTask.set(taskState());
 
+      const AP = PL.apparatus;
+      /* 鋼尺（實物）：銀色尺身＋刻線＋數字；tickAt(i) 回傳第 i 條刻線的 x */
+      const steelRuler = (xa, xb, y, h) => {
+        const g = ctx.createLinearGradient(0, y, 0, y + h);
+        g.addColorStop(0, "rgb(236,239,243)"); g.addColorStop(0.55, "rgb(204,209,216)"); g.addColorStop(1, "rgb(160,166,176)");
+        ctx.fillStyle = g; ctx.fillRect(xa, y, xb - xa, h);
+        ctx.strokeStyle = "rgba(40,46,56,0.55)"; ctx.lineWidth = 1; ctx.strokeRect(xa + 0.5, y + 0.5, xb - xa - 1, h - 1);
+        PL.theme.note(ctx, "rgb(214,218,224)", xa, y, xb - xa, h);
+      };
+      const steelRod = (xa, xb, y, h) => {
+        const g = ctx.createLinearGradient(0, y, 0, y + h);
+        g.addColorStop(0, "rgb(150,156,166)"); g.addColorStop(0.35, "rgb(236,240,245)"); g.addColorStop(1, "rgb(96,102,112)");
+        ctx.fillStyle = g; AP.rrPath(ctx, xa, y, xb - xa, h, h / 2); ctx.fill();
+        ctx.strokeStyle = "rgba(40,46,56,0.5)"; ctx.lineWidth = 1; ctx.stroke();
+      };
       if (!readings.length) {
+        AP.labRoom(ctx, W, H, H * 0.74, {});
         D.text(ctx, "同一支金屬棒：用尺讀長度", W / 2, H * 0.34, { color: PL.col("text"), size: 16, align: "center", weight: "700" });
         D.text(ctx, "按「量測一次」——每一次都當作你真的讀了一格刻度", W / 2, H * 0.34 + 26,
           { color: PL.col("text-faint"), size: 12, align: "center" });
@@ -677,21 +693,21 @@
           " mm · 建議至少 " + target + " 筆", W / 2, H * 0.34 + 48,
           { color: PL.col("text-dim"), size: 11, align: "center" });
         // 靜態示意：尺（刻度密疏跟解析度）與棒（位置跟零點偏移）
-        const x0 = 80, x1 = W - 80, y = H * 0.55;
-        D.rect(ctx, x0, y, x1 - x0, 36, { fill: "rgba(255,255,255,0.05)", stroke: "rgba(255,255,255,0.2)", r: 4 });
+        const x0 = 80, x1 = W - 80, y = H * 0.74 - 34;
+        steelRuler(x0, x1, y, 34);
         // 解析度越粗，刻度越疏
         const ticks = PL.clamp(Math.round(40 * (1 / Math.max(0.1, resolution))), 8, 40);
+        ctx.strokeStyle = "rgba(30,34,40,0.85)"; ctx.lineWidth = 1;
         for (let i = 0; i <= ticks; i++) {
-          const x = x0 + (x1 - x0) * i / ticks, major = i % 5 === 0;
-          D.line(ctx, x, y, x, y + (major ? 18 : 10), "rgba(255,255,255,0.36)", 1);
+          const x = Math.round(x0 + (x1 - x0) * i / ticks) + 0.5, major = i % 5 === 0;
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + (major ? 16 : 9)); ctx.stroke();
         }
-        // 棒中心隨零點偏移左右微移（放大 8 倍才看得出來）
+        // 棒子擺在尺上，整支隨零點偏移左右微移（放大 8 倍才看得出來）
         const shift = bias * 8;
-        D.rect(ctx, x0 + (x1 - x0) * 0.42 + shift, y + 6, (x1 - x0) * 0.16, 14,
-          { fill: "rgba(255,204,102,0.55)", stroke: PL.col("warn"), r: 3 });
-        D.text(ctx, "待測金屬棒", x0 + (x1 - x0) * 0.5 + shift, y + 16, { color: "#151b27", size: 9, align: "center", weight: "700" });
+        steelRod(x0 + (x1 - x0) * 0.2 + shift, x0 + (x1 - x0) * 0.8 + shift, y - 16, 18);
+        D.text(ctx, "待測金屬棒", x0 + (x1 - x0) * 0.5 + shift, y - 22, { color: PL.col("text"), size: 10, align: "center", weight: "700" });
         // 建議次數進度格
-        const gx = x0, gy = y + 56, cell = Math.min(22, (x1 - x0) / Math.max(8, target));
+        const gx = x0, gy = y + 66, cell = Math.min(22, (x1 - x0) / Math.max(8, target));
         D.text(ctx, "建議量測進度", gx, gy - 6, { color: PL.col("text-faint"), size: 9 });
         for (let i = 0; i < target; i++) {
           D.rect(ctx, gx + i * (cell + 3), gy, cell, 8, { fill: PL.theme.pale(0.10), r: 2 });
@@ -707,18 +723,21 @@
       const min = trueLength - halfRange, max = trueLength + halfRange;
       const x0 = 60, x1 = W - 42, mapX = value => x0 + (value - min) / (max - min) * (x1 - x0);
 
+      AP.labStrip(ctx, W, 92, 86, {});
       D.text(ctx, "任務：量這支金屬棒（已記錄 " + readings.length + " 筆）", x0, 25, { color: PL.col("text"), size: 12, weight: "700" });
       D.text(ctx, revealed ? "真值 " + trueLength + " mm（僅供對照）" : "真值尚未揭曉", x1, 25, { color: PL.col("text-faint"), size: 9, align: "right" });
 
       // 尺與棒
-      D.rect(ctx, x0, 42, x1 - x0, 34, { fill: "rgba(255,255,255,0.05)", stroke: "rgba(255,255,255,0.2)", r: 4 });
+      steelRuler(x0, x1, 52, 34);
+      ctx.strokeStyle = "rgba(30,34,40,0.85)"; ctx.lineWidth = 1;
       for (let value = Math.ceil(min); value <= Math.floor(max); value++) {
-        const x = mapX(value), major = value % 2 === 0;
-        D.line(ctx, x, 42, x, 42 + (major ? 18 : 10), "rgba(255,255,255,0.36)", 1);
-        if (major) D.text(ctx, String(value), x, 72, { color: PL.col("text-faint"), size: 8.5, align: "center" });
+        const x = Math.round(mapX(value)) + 0.5, major = value % 2 === 0;
+        ctx.beginPath(); ctx.moveTo(x, 52); ctx.lineTo(x, 52 + (major ? 16 : 9)); ctx.stroke();
+        if (major) D.text(ctx, String(value), x, 82, { color: PL.col("text-dim"), size: 8.5, align: "center" });
       }
-      D.rect(ctx, mapX(trueLength - 1.7), 48, Math.max(10, mapX(trueLength + 1.7) - mapX(trueLength - 1.7)), 14, { fill: "rgba(255,204,102,0.55)", stroke: PL.col("warn"), r: 3 });
-      D.text(ctx, "待測金屬棒", mapX(trueLength), 58, { color: "#151b27", size: 8.5, align: "center", weight: "700" });
+      // 棒子由左邊伸進來，右端停在真實長度的位置（放大檢視棒子末端附近）
+      steelRod(x0 - 12, mapX(trueLength), 36, 16);
+      D.text(ctx, "棒子末端（放大檢視）", Math.max(x0 + 60, mapX(trueLength) - 70), 32, { color: PL.col("text"), size: 9.5, align: "center", weight: "700" });
 
       // 散布：每一筆是一顆綠點，按記錄順序排開
       const scatterTop = H * 0.28, scatterBottom = H * 0.51;
