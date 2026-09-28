@@ -34,8 +34,10 @@
       // 半徑
       D.line(ctx, cx, cy, bx, by, "rgba(255,255,255,0.2)", 1.5);
       // 速度（切線）與加速度（向心）
-      D.arrow(ctx, bx, by, bx - 46 * Math.sin(ang), by + 46 * Math.cos(ang), { color: PL.col("accent-2"), width: 2.4, label: "v" });
-      D.arrow(ctx, bx, by, bx + (cx - bx) * 0.34, by + (cy - by) * 0.34, { color: PL.col("danger"), width: 2.4, label: "a_c" });
+      /* 箭頭長度跟著 v = ωr 與 a = ω²r：角速度一變，箭頭就變，暫停時也看得出來 */
+      const vl = PL.clamp(14 + w * r * 5, 14, 96), al = PL.clamp(10 + w * w * r * 1.6, 10, R * 0.85) / R;
+      D.arrow(ctx, bx, by, bx - vl * Math.sin(ang), by + vl * Math.cos(ang), { color: PL.col("accent-2"), width: 2.4, label: "v" });
+      D.arrow(ctx, bx, by, bx + (cx - bx) * al, by + (cy - by) * al, { color: PL.col("danger"), width: 2.4, label: "a_c" });
       A.sportBall ? A.sportBall(ctx, bx, by, 11, "steel") : D.disc(ctx, bx, by, 11, { fill: MC() });
       rV.set(w * r, 2); rA.set(w * w * r, 2); rT.set(TAU / w, 2);
     }
@@ -170,8 +172,13 @@
         // 標記線：看得出轉了幾圈
         D.line(ctx, cx, cy, cx + (R - 8) * Math.cos(ang), cy + (R - 8) * Math.sin(ang), MC(), 3);
       }
-      ctx.save(); ctx.strokeStyle = PL.col("danger"); ctx.lineWidth = 2.4; ctx.beginPath(); ctx.arc(cx, cy, R + 16, -0.7, 0.7); ctx.stroke(); ctx.restore();
-      D.arrow(ctx, cx + (R + 16) * Math.cos(0.7), cy + (R + 16) * Math.sin(0.7), cx + (R + 16) * Math.cos(0.86), cy + (R + 16) * Math.sin(0.86), { color: PL.col("danger"), width: 2.4, label: "τ" });
+      /* 力矩箭頭的弧長 ∝ τ；配重所在半徑畫成虛線圈，I 一變就看得到 */
+      if (A.flywheel) D.ring(ctx, cx, cy, R * (0.28 + 0.62 * Math.sqrt((sI.get() - 1) / 9)), "rgba(255,210,110,0.55)", 1.4, [4, 4]);
+      const tq = sTau.get(), span = 0.12 + 1.1 * tq / 12;
+      if (tq > 0) {
+        ctx.save(); ctx.strokeStyle = PL.col("danger"); ctx.lineWidth = 2.4; ctx.beginPath(); ctx.arc(cx, cy, R + 16, -span, span); ctx.stroke(); ctx.restore();
+        D.arrow(ctx, cx + (R + 16) * Math.cos(span), cy + (R + 16) * Math.sin(span), cx + (R + 16) * Math.cos(span + 0.16), cy + (R + 16) * Math.sin(span + 0.16), { color: PL.col("danger"), width: 2.4, label: "τ" });
+      }
       rI.set(sI.get(), 1); rA.set(sTau.get() / sI.get(), 2); rW.set(w, 2);
     }
     const anim = PL.loop(dt => { if (dt) { w += (sTau.get() / sI.get()) * dt; ang += w * dt; } draw(); });

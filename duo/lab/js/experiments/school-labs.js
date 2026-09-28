@@ -763,6 +763,11 @@
       AP.labRoom(ctx, W, H, by + bh + 6, {});
       ctx.fillStyle = "rgb(214,210,196)"; ctx.fillRect(bx - 8, by + bh, bw + 16, 6);
       AP.beaker(ctx, bx + bw / 2, by + bh, bw, bh + 10, bh / (bh + 10) * 0.92, water);
+      /* 保溫套：k 越小（保溫越好）套子越厚，暫停時拉滑桿也看得到差別 */
+      const ins = 3 + 19 * (1 - (sK.get() - 0.004) / 0.046);
+      ctx.fillStyle = "rgba(226,196,146,0.8)"; ctx.fillRect(bx - ins, by + 10, ins, bh - 10); ctx.fillRect(bx + bw, by + 10, ins, bh - 10);
+      ctx.strokeStyle = "rgba(150,110,60,0.45)"; ctx.lineWidth = 1;
+      for (let yy = by + 18; yy < by + bh; yy += 10) { ctx.beginPath(); ctx.moveTo(bx - ins, yy); ctx.lineTo(bx, yy + 4); ctx.moveTo(bx + bw, yy); ctx.lineTo(bx + bw + ins, yy + 4); ctx.stroke(); }
 
       // 蒸氣：溫差越大冒得越多，直接對應「散熱速率正比於溫差」
       const steam = Math.max(0, Math.min(10, Math.round((T - env) / 7)));
