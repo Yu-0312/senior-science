@@ -283,7 +283,7 @@
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     const g = 9.8, Lp = 2; let phase = "ready", bx = 0, th = 0, V = 0, hmax = 0, t = 0;
-    const sm = PL.ui.slider(L.controls, { label: "子彈質量 m", min: 0.01, max: 0.2, step: 0.01, value: 0.05, unit: "kg", digits: 2 });
+    const sm = PL.ui.slider(L.controls, { label: "子彈質量 m", min: 0.005, max: 0.1, step: 0.005, value: 0.01, unit: "kg", digits: 3 });
     const sM = PL.ui.slider(L.controls, { label: "木塊質量 M", min: 1, max: 5, step: 0.5, value: 2, unit: "kg", digits: 1 });
     const sv = PL.ui.slider(L.controls, { label: "子彈初速 v", min: 100, max: 500, step: 10, value: 300, unit: "m/s", digits: 0 });
     PL.ui.button(PL.ui.buttonRow(L.controls), "發射", () => { const m = sm.get(), M = sM.get(); V = m * sv.get() / (m + M); hmax = V * V / (2 * g); phase = "fly"; bx = 0; th = 0; t = 0; anim.start(); }, { primary: true, trigger: true });
@@ -308,7 +308,9 @@
       const m = sm.get(), M = sM.get(), v0 = sv.get();
       const bw = 30 + M * 8, bh = 26 + M * 5;      // 1kg→38×31，5kg→70×51
       const br = 3 + m * 18;                        // 0.01kg→3.2，0.2kg→6.6
-      const bxp = px + Lpx * Math.sin(th), byp = py + Lpx * Math.cos(th);
+      /* 擺角超過約 100° 時繩子會鬆弛（題目只考小角度），畫面上最多畫到 100° */
+      const thD = PL.clamp(th, -1.75, 1.75), restY = py + Lpx;
+      const bxp = px + Lpx * Math.sin(thD), byp = py + Lpx * Math.cos(thD);
       AP.cord(ctx, px, py, bxp, byp);
       AP.woodBlock(ctx, bxp, byp + bh / 2, bw, bh, 0);
       D.text(ctx, "M = " + PL.fmt(M, 1) + " kg", bxp, byp + bh / 2 + 14,
@@ -323,18 +325,19 @@
         D.text(ctx, "預期擺升 " + PL.fmt(hPred, 3) + " m", px - Lpx * 0.75, py + Lpx - hPx - 6,
           { color: PL.col("warn"), size: 10.5 });
       }
-      // 發射器架在左邊的桌上，槍口對準木塊
+      // 發射器固定架在左邊，槍口對準木塊靜止時的高度（不會跟著木塊一起動）
       const gunX = 118;
-      AP.steel(ctx, gunX - 70, byp + 12, 12, H - 22 - byp - 12, 8);
+      AP.steel(ctx, gunX - 70, restY + 12, 12, H - 22 - restY - 12, 8);
       AP.steel(ctx, gunX - 88, H - 30, 48, 8, -6);
-      AP.launcher(ctx, gunX, byp, 0.95, 1);
+      AP.launcher(ctx, gunX, restY, 0.95, 1);
       if (phase === "ready") {
         // 待發射的子彈停在槍口，大小隨質量；箭頭長度隨初速
-        AP.sportBall(ctx, gunX + br, byp, br, "steel");
-        D.arrow(ctx, gunX + 2 * br + 2, byp - 14, gunX + 2 * br + 2 + v0 * 0.12, byp - 14,
+        AP.sportBall(ctx, gunX + br, restY, br, "steel");
+        D.arrow(ctx, gunX + 2 * br + 2, restY - 14, gunX + 2 * br + 2 + v0 * 0.12, restY - 14,
           { color: "#ff6b6b", width: 2, head: 7, label: PL.fmt(m, 2) + "kg · " + v0 + "m/s" });
       }
-      if (phase === "fly") { const bulletX = gunX + bx; AP.sportBall(ctx, bulletX, byp, Math.max(4, br), "steel"); AP.smokePuff(ctx, gunX + 6, byp, bx / 420, { dir: 0, scale: 0.6, seed: 9 }); D.arrow(ctx, bulletX + 6, byp, bulletX + 30, byp, { color: "#ff6b6b", width: 2 }); }
+      if (phase === "fly") { const bulletX = gunX + bx; AP.sportBall(ctx, bulletX, restY, Math.max(4, br), "steel"); AP.smokePuff(ctx, gunX + 6, restY, bx / 420, { dir: 0, scale: 0.6, seed: 9 }); D.arrow(ctx, bulletX + 6, restY, bulletX + 30, restY, { color: "#ff6b6b", width: 2 }); }
+      if (hmax > Lp) D.text(ctx, "上升高度超過擺長：實際上繩子會鬆弛，彈道擺只適用小角度", W / 2, H - 34, { color: PL.col("danger"), size: 11, align: "center", weight: "700" });
       D.text(ctx, "h = " + PL.fmt(hmax, 3) + " m", px + 34, py + 18, { color: PL.col("text-dim"), size: 11 });
       rV.set(V, 2); rH.set(hmax, 3); rTh.set(Math.acos(PL.clamp(1 - hmax / Lp, -1, 1)) * 180 / Math.PI, 1);
     }
