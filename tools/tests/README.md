@@ -17,7 +17,7 @@ node tools/tests/render-test.js      # 單獨跑某一支
 
 | 檔案 | 守的東西 |
 |---|---|
-| `render-test.js` | 246 個實驗在兩種主題下都能建置、重繪、停止 |
+| `render-test.js` | 203 個實驗在兩種主題下都能建置、重繪、停止 |
 | `theme-audit.js` | 不該出現「刺眼白塊」或「黑洞」——注入真實 CSS 變數值後掃描全站填色 |
 | `meaning-audit.js` | 每一根滑桿都必須讓畫面產生看得見的變化 |
 | `ink-test.js` | 墨色層的顏色語意：主題衍生色放行、寫死顏色搶救 |
