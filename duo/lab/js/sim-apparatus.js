@@ -4211,6 +4211,45 @@
     return { red, black };
   }
 
+
+  /* 多邊形（填色＋描邊） */
+  function poly(ctx, pts, fill, stroke) {
+    ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath();
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
+  }
+  /* 斜投影：x 向右、y 往畫面深處（右上）、z 向上。回傳 (x,y,z) → 畫面座標的函式 */
+  function oblique(ox, oy, sc) { return (x, y, z) => ({ x: ox + (x + y * 0.55) * sc, y: oy - (z + y * 0.38) * sc }); }
+  /* 斜投影方塊：看得到頂面、前面、右側面 */
+  function obBox(ctx, P, x0, x1, y0, y1, z0, z1, top, front, side) {
+    poly(ctx, [P(x0, y0, z1), P(x1, y0, z1), P(x1, y1, z1), P(x0, y1, z1)], top, "rgba(20,24,30,0.45)");
+    poly(ctx, [P(x0, y0, z0), P(x1, y0, z0), P(x1, y0, z1), P(x0, y0, z1)], front, "rgba(20,24,30,0.45)");
+    poly(ctx, [P(x1, y0, z0), P(x1, y1, z0), P(x1, y1, z1), P(x1, y0, z1)], side, "rgba(20,24,30,0.45)");
+  }
+  /* 木地板（側視）：floorY 以下 */
+  function woodFloor(ctx, W, H, floorY) {
+    const L = isLight();
+    const g = ctx.createLinearGradient(0, floorY, 0, H);
+    g.addColorStop(0, L ? "#caa27a" : "#4a3626"); g.addColorStop(1, L ? "#b08558" : "#33251a");
+    ctx.fillStyle = g; ctx.fillRect(0, floorY, W, H - floorY);
+    note(ctx, L ? "#c09670" : "#402e20", 0, floorY, W, H - floorY);
+    ctx.strokeStyle = L ? "rgba(110,70,36,0.3)" : "rgba(0,0,0,0.35)"; ctx.lineWidth = 1;
+    for (let i = 1; i < 5; i++) { const y = Math.round(floorY + (H - floorY) * i * i / 25) + 0.5; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    ctx.fillStyle = L ? "rgba(255,244,222,0.5)" : "rgba(255,255,255,0.06)"; ctx.fillRect(0, floorY, W, 1.5);
+  }
+  /* 水泥地（車庫、工地） */
+  function concreteFloor(ctx, W, H, floorY) {
+    const L = isLight();
+    const g = ctx.createLinearGradient(0, floorY, 0, H);
+    g.addColorStop(0, L ? "#b9bcc0" : "#3a3d42"); g.addColorStop(1, L ? "#a3a7ac" : "#2b2e33");
+    ctx.fillStyle = g; ctx.fillRect(0, floorY, W, H - floorY);
+    note(ctx, L ? "#aeb2b6" : "#33363b", 0, floorY, W, H - floorY);
+    const rnd = seeded(Math.round(W + floorY));
+    ctx.fillStyle = L ? "rgba(80,80,80,0.12)" : "rgba(0,0,0,0.25)";
+    for (let i = 0; i < W * (H - floorY) / 90; i++) ctx.fillRect(rnd() * W, floorY + rnd() * (H - floorY), 1.4, 1.4);
+    ctx.fillStyle = L ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.06)"; ctx.fillRect(0, floorY, W, 1.5);
+  }
+
   /* 波長（nm）→ 看得見的顏色；範圍外回傳 null（紫外、紅外看不見） */
   function nmColor(nm, a) {
     if (!(nm >= 380 && nm <= 780)) return null;
@@ -4264,6 +4303,7 @@
     lampHouse, slitPlate, polarizer, prismGlass, paperScreen, gratingSlide,
     rrPath, isLight,
     /* 器材 v3 */
-    lcd, balance, powerSupply, horseshoe, ringCoil, laptop, electroscope, flowDots, heatWaves, bubbles, dial, nmColor, kColor
+    lcd, balance, powerSupply, horseshoe, ringCoil, laptop, electroscope, flowDots, heatWaves, bubbles, dial, nmColor, kColor,
+    poly, oblique, obBox, woodFloor, concreteFloor
   };
 })();
