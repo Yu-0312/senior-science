@@ -37,23 +37,35 @@
     const rFx = PL.ui.readout(L.readouts, { label: "有效分力", unit: "N" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const F = sF.get(), th = sTh.get() * Math.PI / 180, m = MC();
-      const gy = H - 50, sc = (W - 120) / 16, px = 70 + (x % 16) * sc;
-      AP().benchTop && AP().benchTop(ctx, W, H, gy + 4);
-      AP().cart ? AP().cart(ctx, px, gy, 62, 36)
-                : D.rect(ctx, px - 22, gy - 30, 44, 30, { fill: m, stroke: "rgba(255,255,255,0.4)", r: 5 });
-      const fx = F * Math.cos(th), fy = F * Math.sin(th);
-      // 用繩子斜斜地拉車：繩子的方向就是施力方向 θ
-      if (AP().rope) {
-        const hx = px + 34, hy = gy - 20, rl = 70;
-        const ex = hx + rl * Math.cos(th), ey = hy - rl * Math.sin(th);
-        AP().rope(ctx, hx, hy, ex, ey, 2.4, "#c8a46a");
-        AP().hand(ctx, ex + 8 * Math.cos(th), ey - 8 * Math.sin(th), 1, 0.8, { pull: true, ang: -th });
+      const A = AP(), F = sF.get(), th = sTh.get() * Math.PI / 180, v = sV.get();
+      const k = Math.max(0.6, Math.min(1.5, W / 800)), gy = H * 0.8, sc = (W - 190 * k) / 16, px = 70 * k + (x % 16) * sc;
+      /* 操場上用繩子斜拉一箱木頭雪橇：繩子方向就是施力方向 θ，地上的標線看得出走了多遠 */
+      if (A.outdoor) {
+        A.outdoor(ctx, W, H, gy, { t: x * 0.3, hills: true, ground: "field", sunX: W * 0.5 });
+        for (let mm = 0; mm <= 16; mm += 2) { const mx = 70 * k + mm * sc; ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.fillRect(mx - 1, gy + 2, 2, 10 * k); D.text(ctx, mm + " m", mx, gy + 24 * k, { color: PL.col("text"), size: 9.5, align: "center" }); }
+        const fx0 = 70 * k + Math.min(x % 16, 16) * sc;
+        ctx.fillStyle = "rgba(47,174,133,0.35)"; ctx.fillRect(70 * k, gy + 12 * k, Math.max(0, fx0 - 70 * k), 5 * k);
+        ctx.strokeStyle = "rgb(120,84,44)"; ctx.lineWidth = 3 * k; ctx.beginPath(); ctx.moveTo(px - 34 * k, gy - 3 * k); ctx.lineTo(px + 30 * k, gy - 3 * k); ctx.quadraticCurveTo(px + 42 * k, gy - 4 * k, px + 40 * k, gy - 16 * k); ctx.stroke();
+        A.crate(ctx, px, gy - 6 * k, 62 * k, 44 * k, { label: "木箱" });
       }
-      D.arrow(ctx, px, gy - 52, px + fx * 5, gy - 52 - fy * 5, { color: PL.col("accent-2"), width: 2.5, label: "F" });
-      D.arrow(ctx, px, gy - 52, px + fx * 5, gy - 52, { color: "#2fae85", width: 2, label: "F cosθ", dash: [3, 3] });
-      PL.ui.caption(cv, "只有沿移動方向的分力 F cosθ 才做功。");
-      rW.set(W_, 1); rP.set(fx * sV.get(), 1); rFx.set(fx, 1);
+      const fx = F * Math.cos(th), fy = F * Math.sin(th);
+      if (A.rope) {
+        const hx = px + 38 * k, hy = gy - 18 * k, rl = 110 * k;
+        const ex = hx + rl * Math.cos(th), ey = hy - rl * Math.sin(th);
+        A.rope(ctx, hx, hy, ex, ey, 2.6 * k, "#c8a46a");
+        A.hand(ctx, ex + 8 * Math.cos(th), ey - 8 * Math.sin(th), 1, 0.9 * k, { pull: true, ang: -th });
+        ctx.save(); ctx.strokeStyle = PL.col("text-dim"); ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + 70 * k, hy); ctx.stroke(); ctx.setLineDash([]); ctx.beginPath(); ctx.arc(hx, hy, 34 * k, -th, 0); ctx.stroke(); ctx.restore();
+        D.text(ctx, "θ = " + sTh.get() + "°", hx + 40 * k, hy - 6 * k, { color: PL.col("text"), size: 10.5, weight: "700" });
+      }
+      const ay = gy - 80 * k;
+      D.arrow(ctx, px, ay, px + fx * 6 * k, ay - fy * 6 * k, { color: PL.col("accent-2"), width: 2.6, label: "F" });
+      D.arrow(ctx, px, ay, px + fx * 6 * k, ay, { color: "#2fae85", width: 2.2, label: "F cosθ", dash: [3, 3] });
+      /* 速率 v 也要畫得出來：速度箭頭與功率錶（P = F cosθ · v）跟著滑桿變 */
+      D.arrow(ctx, px - 30 * k, gy - 130 * k, px - 30 * k + v * 24 * k, gy - 130 * k, { color: "#e0843a", width: 2.5, label: "v" });
+      if (A.dial) { A.dial(ctx, W - 74 * k, 70 * k, 38 * k, fx * v / 80, { max: 80, unit: "W", majors: 4 }); D.text(ctx, "功率 P = F cosθ · v", W - 74 * k, 22 * k, { color: PL.col("text"), size: 11, align: "center", weight: "700" }); }
+      if (A.lcd) A.lcd(ctx, 20 * k, 20 * k, 150 * k, 26 * k, "W = " + PL.fmt(W_, 1) + " J", { color: "rgb(130,240,170)" });
+      PL.ui.caption(cv, "只有沿移動方向的分力 F cosθ 才做功：W = F cosθ × 位移");
+      rW.set(W_, 1); rP.set(fx * v, 1); rFx.set(fx, 1);
     }
     const anim = PL.loop(dt => { if (dt) { const F = sF.get(), th = sTh.get() * Math.PI / 180, v = sV.get(); const dx = v * dt; x += dx; W_ += F * Math.cos(th) * dx; if (x > 32) reset(); } draw(); });
     cv.onResize(draw); anim.start();

@@ -135,6 +135,9 @@
       D.line(ctx, px, py, px, py + Lpx, PL.theme.pale(0.18), 1, [4, 4]);
       A.cord(ctx, px, py, bx, by);
       A.bob(ctx, bx, by, 17);
+      /* 重力箭頭長度 ∝ g：月球、地球、木星上同一個擺，拉的力不一樣 */
+      D.arrow(ctx, bx, by + 18, bx, by + 18 + g * 3.2, { color: PL.col("danger"), width: 2.2, label: "mg" });
+      D.text(ctx, g < 2.5 ? "像在月球上" : g < 5 ? "像在火星上" : g < 11 ? "地球表面" : "像在木星附近", W - 20, 34, { color: PL.col("text"), size: 12, align: "right", weight: "700" });
       rT.set(TAU / w, 2); rTh.set(th * 180 / Math.PI, 1);
     }
     const anim = PL.loop(dt => { if (dt) t += dt; draw(); });

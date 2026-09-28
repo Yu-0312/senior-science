@@ -137,8 +137,10 @@
       D.text(ctx, "振動器", x0 - 26, midY + 42, { color: PL.col("text-faint"), size: 10, align: "center" });
       AP.pulley(ctx, x1 + 16, midY, 13);
       AP.cord(ctx, x1 + 16, midY + 13, x1 + 16, midY + 46);
-      AP.weight(ctx, x1 + 16, midY + 46, 20, 24, null);
-      D.text(ctx, "張力", x1 + 16, midY + 84, { color: PL.col("text-faint"), size: 10, align: "center" });
+      /* 波速 v = √(T/μ)：波速越快代表張力越大，掛的重物畫得越大 */
+      const q = (vWave - 40) / 160, wwid = 18 + 10 * q, whgt = 14 + 30 * q * q;
+      AP.weight(ctx, x1 + 16, midY + 46, wwid, whgt, null);
+      D.text(ctx, "張力", x1 + 16, midY + 60 + whgt, { color: PL.col("text-faint"), size: 10, align: "center" });
 
       // 包絡
       ctx.save(); ctx.strokeStyle = PL.theme.pale(0.12); ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
