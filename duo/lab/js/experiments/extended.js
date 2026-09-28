@@ -888,7 +888,7 @@
     const { ctx, W, H, a: Lcm, b: f, t, s, c, v: vs } = k;
     const benchY = H * 0.9;
     AP.labRoom(ctx, W, H, benchY, {});
-    const cx = W * 0.4, wY = H * 0.6;
+    const cx = W * 0.4, wY = H * 0.7;
     const p = Math.min((wY - 72 * s) / 122, 2.4 * s);
     const tubeTop = wY - Lcm * p, tubeBot = tubeTop + 128 * p, tw = 28 * s, jw = 74 * s, jTop = wY - 16 * s;
     const L = isL();
