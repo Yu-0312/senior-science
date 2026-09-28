@@ -44,6 +44,7 @@ const EXPERIMENTS = [
   "js/experiments/extended.js",
   "js/experiments/advanced.js",
   "js/experiments/comprehensive.js",
+  "js/experiments/comprehensive-2.js",
   "js/experiments/open-labs.js",
   "js/experiments/circuit-sandbox.js",
   "js/experiments/school-labs.js",
