@@ -810,7 +810,10 @@
    * 底色用 panel-2 主題變數——深色主題是暗面板、淺色主題自動變白，不會出現黑洞。
    */
   function valueChip(ctx, x, y, text, tint) {
-    const w = Math.max(34, text.length * 6.4 + 12), h = 17;
+    // 中日文字約是英數字的 1.6 倍寬；只用字數估寬，中文標籤會衝出晶片外
+    let tw = 0;
+    for (const ch of String(text)) tw += /[\u2E80-\u9FFF\uFF00-\uFFEF]/.test(ch) ? 10 : 6.2;
+    const w = Math.max(34, tw + 12), h = 17;
     D.rect(ctx, x, y, w, h, { fill: PL.col("panel-2", "rgba(10,14,20,0.62)"), stroke: tint || PL.col("accent-2", "rgba(120,190,255,0.7)"), width: 1, r: 5 });
     D.text(ctx, text, x + w / 2, y + 12, { color: tint || PL.col("accent-2", "rgba(120,190,255,0.95)"), size: 9.5, align: "center", weight: "700" });
     return { x, y, w, h };
@@ -1025,7 +1028,10 @@
   /* 細繩 */
   function cord(ctx, x1, y1, x2, y2) {
     ctx.save();
-    ctx.strokeStyle = "rgba(232,226,210,0.9)"; ctx.lineWidth = 1.6;
+    // 深色描邊＋淺色線芯：淺色牆面（白天的實驗室）上也看得見細繩
+    ctx.strokeStyle = "rgba(70,60,44,0.55)"; ctx.lineWidth = 2.8;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.strokeStyle = "rgba(236,230,214,0.95)"; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
     ctx.restore();
   }
@@ -1237,7 +1243,7 @@
     g.addColorStop(0.82, "rgba(200,224,238,0.12)");
     g.addColorStop(1.00, "rgba(226,244,252,0.34)");
     ctx.fillStyle = g; ctx.fillRect(cx - w / 2, yTop, w, yBot - yTop);
-    ctx.strokeStyle = "rgba(206,232,244,0.8)"; ctx.lineWidth = 1.4;
+    ctx.strokeStyle = isLight() ? "rgba(84,124,152,0.8)" : "rgba(206,232,244,0.8)"; ctx.lineWidth = 1.4;
     ctx.strokeRect(cx - w / 2, yTop, w, yBot - yTop);
   }
 
@@ -1299,7 +1305,7 @@
     gg.addColorStop(0.85, "rgba(200,224,238,0.14)");
     gg.addColorStop(1.00, "rgba(226,244,252,0.34)");
     ctx.fillStyle = gg; ctx.fillRect(x0, yTop, w, h);
-    ctx.strokeStyle = "rgba(206,232,244,0.85)"; ctx.lineWidth = 1.6;
+    ctx.strokeStyle = isLight() ? "rgba(84,124,152,0.8)" : "rgba(206,232,244,0.85)"; ctx.lineWidth = 1.6;
     ctx.beginPath();
     ctx.moveTo(x0, yTop); ctx.lineTo(x0, baseY); ctx.lineTo(x0 + w, baseY); ctx.lineTo(x0 + w, yTop);
     ctx.stroke();
@@ -1437,7 +1443,7 @@
       ctx.moveTo(x + w / 2 - (major ? 8 : 5), gy); ctx.lineTo(x + w / 2 - 1, gy);
       ctx.stroke();
     }
-    ctx.strokeStyle = "rgba(206,232,244,0.8)"; ctx.lineWidth = 1.2;
+    ctx.strokeStyle = isLight() ? "rgba(84,124,152,0.75)" : "rgba(206,232,244,0.8)"; ctx.lineWidth = 1.2;
     ctx.strokeRect(x - w / 2, yTop, w, bulbY - yTop);
     ctx.restore();
   }
@@ -3892,6 +3898,344 @@
     steel(ctx, x - 3, cy + h / 2 + 6, 6, 14, 8);
   }
 
+
+  /* ===============================================================
+     器材 v3：數字窗、電子秤、電源供應器、U 形磁鐵、環形線圈、筆電、
+     驗電器、流動電流點、熱氣／氣泡特效、光色換算
+     =============================================================== */
+
+  /* 數字窗（液晶／LED）：固定深色底 + 發光數字，兩種主題都一樣 */
+  function lcd(ctx, x, y, w, h, text, o) {
+    o = o || {};
+    const bg = o.bg || "rgb(16,24,20)", fg = o.color || "rgb(126,240,164)";
+    ctx.save();
+    rrPath(ctx, x, y, w, h, Math.min(5, h * 0.22));
+    ctx.fillStyle = bg; ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.05)"; ctx.fillRect(x + 2, y + 2, w - 4, h * 0.34);
+    const fs = o.size || Math.max(8, Math.min(h * 0.64, 26));
+    ctx.font = "700 " + fs + "px 'Courier New',ui-monospace,monospace";
+    ctx.fillStyle = fg; ctx.shadowColor = fg; ctx.shadowBlur = 5;
+    const al = o.align || "right";
+    ctx.textAlign = al; ctx.textBaseline = "middle";
+    ctx.fillText(String(text), al === "center" ? x + w / 2 : al === "left" ? x + 5 : x + w - 5, y + h / 2 + 1);
+    ctx.restore();
+    note(ctx, bg, x, y, w, h);
+  }
+
+  /* 電子秤：銀色機身 + 秤盤 + 前方數字窗。回傳秤盤頂面 y */
+  function balance(ctx, cx, baseY, w, text, o) {
+    o = o || {};
+    const h = Math.max(18, Math.min(34, w * 0.24));
+    contactShadow(ctx, cx, baseY + 2, w * 0.62);
+    const g = ctx.createLinearGradient(0, baseY - h, 0, baseY);
+    g.addColorStop(0, "rgb(236,240,245)"); g.addColorStop(0.6, "rgb(200,207,216)"); g.addColorStop(1, "rgb(150,158,170)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.moveTo(cx - w / 2, baseY); ctx.lineTo(cx - w / 2 + 5, baseY - h); ctx.lineTo(cx + w / 2 - 5, baseY - h); ctx.lineTo(cx + w / 2, baseY); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "rgba(50,58,70,0.5)"; ctx.lineWidth = 1; ctx.stroke();
+    note(ctx, "rgb(206,212,220)", cx - w / 2, baseY - h, w, h);
+    const lw = Math.min(w * 0.46, 96), lh = Math.max(11, h * 0.58);
+    lcd(ctx, cx - w * 0.08 - lw / 2, baseY - h / 2 - lh / 2, lw, lh, text == null ? "0.0" : text, { color: o.color || "rgb(130,230,255)" });
+    [0, 1].forEach(i => {
+      ctx.fillStyle = i ? "rgb(70,150,90)" : "rgb(190,70,60)";
+      ctx.beginPath(); ctx.arc(cx + w * (0.25 + i * 0.1), baseY - h / 2, Math.max(2.5, h * 0.12), 0, TAU); ctx.fill();
+    });
+    const panY = baseY - h - 7;
+    steel(ctx, cx - 5, panY + 2, 10, 6, 10);
+    const pg = ctx.createLinearGradient(0, panY - 2, 0, panY + 4);
+    pg.addColorStop(0, "rgb(244,247,250)"); pg.addColorStop(1, "rgb(150,160,172)");
+    ctx.fillStyle = pg; rrPath(ctx, cx - w * 0.42, panY - 2, w * 0.84, 5, 2); ctx.fill();
+    ctx.strokeStyle = "rgba(50,58,70,0.45)"; ctx.lineWidth = 1; ctx.stroke();
+    return panY - 2;
+  }
+
+  /* 實驗室電源供應器／訊號產生器：機殼 + 數字窗 + 旋鈕 + 紅黑端子。回傳 { red, black } */
+  function powerSupply(ctx, x, y, w, h, text, o) {
+    o = o || {};
+    contactShadow(ctx, x + w / 2, y + h + 2, w * 0.6);
+    const face = hexRgb(o.face || "#c9d0d8");
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, rgbStr(shadeRgb(face, 0.3))); g.addColorStop(1, rgbStr(shadeRgb(face, -0.25)));
+    rrPath(ctx, x, y, w, h, 6); ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = "rgba(30,36,46,0.55)"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = "rgb(44,50,60)"; rrPath(ctx, x + 5, y + 5, w - 10, h - 10, 4); ctx.fill();
+    note(ctx, "rgb(44,50,60)", x + 5, y + 5, w - 10, h - 10);
+    const lh = Math.max(12, Math.min(24, h * 0.36));
+    lcd(ctx, x + 10, y + 10, w * 0.58, lh, text == null ? "0.00" : text, { color: o.color || "rgb(255,132,96)" });
+    const kr = Math.max(5, Math.min(10, h * 0.15)), kx = x + w - 11 - kr, ky = y + 10 + lh / 2;
+    ctx.fillStyle = "rgb(22,24,28)"; ctx.beginPath(); ctx.arc(kx, ky, kr, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = 1.5;
+    const ka = -Math.PI * 1.25 + (o.knob == null ? 0.5 : clamp01(o.knob)) * Math.PI * 1.5;
+    ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(kx + Math.cos(ka) * kr * 0.85, ky + Math.sin(ka) * kr * 0.85); ctx.stroke();
+    if (o.label) {
+      ctx.fillStyle = "rgba(220,226,236,0.85)"; ctx.font = "700 8.5px system-ui,sans-serif";
+      ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+      ctx.fillText(o.label, x + 11, y + h - 9);
+    }
+    const ty = y + h - 13;
+    const red = { x: x + w - 36, y: ty }, black = { x: x + w - 17, y: ty };
+    [[red, "rgb(214,52,44)"], [black, "rgb(30,30,34)"]].forEach(p => {
+      ctx.fillStyle = p[1]; ctx.beginPath(); ctx.arc(p[0].x, p[0].y, 5, 0, TAU); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.lineWidth = 1; ctx.stroke();
+      brassDisc(ctx, p[0].x, p[0].y, 2);
+    });
+    return { red, black };
+  }
+
+  /* U 形磁鐵：dir 為開口方向 "up" | "down" | "left" | "right"。
+     (cx, cy) 為兩極面連線的中點；gap 兩臂內距；len 臂長（含彎部）；t 臂厚。
+     回傳兩極面中心 { n, s }。N 臂紅、S 臂藍、彎部為鐵灰。 */
+  function horseshoe(ctx, cx, cy, gap, len, t, dir) {
+    const ang = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 }[dir || "up"];
+    const ri = gap / 2, ro = gap / 2 + t, bx = -len + ro;
+    const ca = Math.cos(ang), sa = Math.sin(ang);
+    const rot = (x, y) => ({ x: cx + x * ca - y * sa, y: cy + x * sa + y * ca });
+    contactShadow(ctx, cx - ca * len * 0.5, cy + Math.abs(ca) * ro + Math.abs(sa) * len * 0.02 + 4, Math.max(ro, len * Math.abs(ca)) * 0.9);
+    ctx.save();
+    ctx.translate(cx, cy); ctx.rotate(ang);
+    ctx.beginPath();
+    ctx.moveTo(0, -ro); ctx.lineTo(bx, -ro);
+    ctx.arc(bx, 0, ro, -Math.PI / 2, Math.PI / 2, true);
+    ctx.lineTo(0, ro); ctx.lineTo(0, ri); ctx.lineTo(bx, ri);
+    ctx.arc(bx, 0, ri, Math.PI / 2, -Math.PI / 2, false);
+    ctx.lineTo(0, -ri); ctx.closePath();
+    const g = ctx.createLinearGradient(0, -ro, 0, ro);
+    g.addColorStop(0, "rgb(170,178,190)"); g.addColorStop(0.5, "rgb(104,112,126)"); g.addColorStop(1, "rgb(150,158,170)");
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = "rgba(20,24,30,0.6)"; ctx.lineWidth = 1; ctx.stroke();
+    const arm = Math.max(t * 1.2, (len - ro) * 0.62);
+    const ng = ctx.createLinearGradient(0, -ro, 0, -ri);
+    ng.addColorStop(0, "rgb(236,120,120)"); ng.addColorStop(0.5, "rgb(206,58,58)"); ng.addColorStop(1, "rgb(150,34,38)");
+    ctx.fillStyle = ng; ctx.fillRect(-arm, -ro, arm, t);
+    const sg = ctx.createLinearGradient(0, ri, 0, ro);
+    sg.addColorStop(0, "rgb(130,164,220)"); sg.addColorStop(0.5, "rgb(62,100,170)"); sg.addColorStop(1, "rgb(36,62,114)");
+    ctx.fillStyle = sg; ctx.fillRect(-arm, ri, arm, t);
+    ctx.strokeStyle = "rgba(20,24,30,0.55)"; ctx.strokeRect(-arm, -ro, arm, t); ctx.strokeRect(-arm, ri, arm, t);
+    ctx.fillStyle = "rgba(255,255,255,0.28)";
+    ctx.fillRect(-arm + 2, -ro + 1.5, arm - 4, Math.max(1.5, t * 0.14));
+    ctx.fillRect(-arm + 2, ri + 1.5, arm - 4, Math.max(1.5, t * 0.14));
+    ctx.fillStyle = "#fff"; ctx.font = "700 " + Math.max(9, Math.min(15, t * 0.7)) + "px system-ui,sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.save(); ctx.translate(-arm * 0.45, -(ri + ro) / 2); ctx.rotate(-ang); ctx.fillText("N", 0, 0.5); ctx.restore();
+    ctx.save(); ctx.translate(-arm * 0.45, (ri + ro) / 2); ctx.rotate(-ang); ctx.fillText("S", 0, 0.5); ctx.restore();
+    ctx.restore();
+    return { n: rot(0, -(ri + ro) / 2), s: rot(0, (ri + ro) / 2) };
+  }
+
+  /* 圓形線圈（軸線水平，透視成直立橢圓）。o.part："back" 後半圈｜"front" 前半圈｜省略畫全圈。
+     o.turns 圈數沿軸向排開，o.depth 為線圈厚度，o.w 線徑 */
+  function ringCoil(ctx, cx, cy, rx, ry, o) {
+    o = o || {};
+    const n = Math.max(1, o.turns || 5), depth = o.depth == null ? 10 : o.depth, part = o.part;
+    ctx.save();
+    ctx.lineCap = "round";
+    for (let i = 0; i < n; i++) {
+      const ox = n === 1 ? 0 : (i / (n - 1) - 0.5) * depth;
+      const seg = (a0, a1, back) => {
+        ctx.strokeStyle = back ? "rgb(122,72,34)" : "rgb(204,128,60)"; ctx.lineWidth = o.w || 3;
+        ctx.beginPath(); ctx.ellipse(cx + ox, cy, rx, ry, 0, a0, a1); ctx.stroke();
+        if (!back) {
+          ctx.strokeStyle = "rgba(255,222,176,0.6)"; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.ellipse(cx + ox - 0.7, cy - 0.7, rx, ry, 0, a0, a1); ctx.stroke();
+        }
+      };
+      if (part !== "front") seg(Math.PI / 2, Math.PI * 1.5, true);
+      if (part !== "back") seg(-Math.PI / 2, Math.PI / 2, false);
+    }
+    ctx.restore();
+  }
+
+  /* 筆電（資料擷取器）：螢幕 + 鍵盤底座。回傳螢幕可畫範圍（固定深色） */
+  function laptop(ctx, x, y, w, h) {
+    const sh = Math.round(h * 0.84);
+    contactShadow(ctx, x + w / 2, y + h + 2, w * 0.62);
+    rrPath(ctx, x, y, w, sh, 7); ctx.fillStyle = "rgb(38,42,50)"; ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 1; ctx.stroke();
+    const sx = x + 7, sy = y + 7, sw = w - 14, shh = sh - 14;
+    const g = ctx.createLinearGradient(0, sy, 0, sy + shh);
+    g.addColorStop(0, "rgb(22,30,44)"); g.addColorStop(1, "rgb(12,18,28)");
+    ctx.fillStyle = g; ctx.fillRect(sx, sy, sw, shh);
+    note(ctx, "rgb(16,23,34)", sx, sy, sw, shh);
+    const by = y + sh, bh = h - sh;
+    const bg = ctx.createLinearGradient(0, by, 0, by + bh);
+    bg.addColorStop(0, "rgb(206,212,220)"); bg.addColorStop(1, "rgb(140,148,160)");
+    ctx.fillStyle = bg;
+    ctx.beginPath(); ctx.moveTo(x + 4, by); ctx.lineTo(x + w - 4, by); ctx.lineTo(x + w + 10, by + bh); ctx.lineTo(x - 10, by + bh); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "rgba(40,48,60,0.45)"; ctx.stroke();
+    return { x: sx, y: sy, w: sw, h: shh };
+  }
+
+  /* 金箔驗電器：玻璃瓶 + 軟木塞 + 金屬桿 + 頂端金屬球 + 兩片金箔。
+     (cx, baseY) 為瓶底；spread 為單片金箔與鉛直線的夾角（弧度）。回傳 { ball, pivot } */
+  function electroscope(ctx, cx, baseY, s, spread) {
+    s = s || 1;
+    const jw = 64 * s, jh = 78 * s, top = baseY - jh;
+    contactShadow(ctx, cx, baseY + 2, jw * 0.6);
+    const pivotY = baseY - jh * 0.46, ballY = top - 34 * s;
+    // 金屬桿與頂球
+    steel(ctx, cx - 2 * s, ballY, 4 * s, pivotY - ballY, 12);
+    const bg = ctx.createRadialGradient(cx - 4 * s, ballY - 4 * s, 1, cx, ballY, 9 * s);
+    bg.addColorStop(0, "rgb(246,248,252)"); bg.addColorStop(0.6, "rgb(170,180,194)"); bg.addColorStop(1, "rgb(96,106,120)");
+    ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(cx, ballY, 9 * s, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "rgba(30,36,46,0.5)"; ctx.lineWidth = 1; ctx.stroke();
+    // 金箔
+    const L2 = 28 * s, a = Math.max(0.03, Math.min(1.3, spread || 0));
+    [-1, 1].forEach(sg => {
+      ctx.save(); ctx.translate(cx, pivotY); ctx.rotate(-sg * a);
+      const lg = ctx.createLinearGradient(-3 * s, 0, 3 * s, 0);
+      lg.addColorStop(0, "rgb(214,168,48)"); lg.addColorStop(0.5, "rgb(252,224,120)"); lg.addColorStop(1, "rgb(196,150,40)");
+      ctx.fillStyle = lg;
+      ctx.beginPath(); ctx.moveTo(-1.2 * s, 0); ctx.lineTo(1.2 * s, 0); ctx.lineTo(3 * s, L2); ctx.lineTo(-3 * s, L2); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    });
+    // 瓶身（畫在金箔之後，玻璃罩住）
+    const g = ctx.createLinearGradient(cx - jw / 2, 0, cx + jw / 2, 0);
+    g.addColorStop(0, "rgba(226,244,252,0.40)"); g.addColorStop(0.2, "rgba(255,255,255,0.12)");
+    g.addColorStop(0.8, "rgba(200,224,238,0.08)"); g.addColorStop(1, "rgba(226,244,252,0.40)");
+    rrPath(ctx, cx - jw / 2, top, jw, jh, 10 * s); ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = isLight() ? "rgba(80,120,150,0.8)" : "rgba(206,232,244,0.85)"; ctx.lineWidth = 1.6; ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.45)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx - jw / 2 + 6, top + 12); ctx.lineTo(cx - jw / 2 + 6, baseY - 12); ctx.stroke();
+    steel(ctx, cx - jw / 2 - 4, baseY - 5, jw + 8, 7, -10);
+    ctx.save(); ctx.translate(cx, top + 2); cork(ctx, 26 * s, 12 * s); ctx.restore();
+    return { ball: { x: cx, y: ballY }, pivot: { x: cx, y: pivotY } };
+  }
+
+  /* 沿導線流動的電流小點：pts 為路徑（依電流方向排列），speed 為 px/s */
+  function flowDots(ctx, pts, t, speed, o) {
+    o = o || {};
+    if (!pts || pts.length < 2 || !speed) return;
+    const segs = []; let total = 0;
+    for (let i = 1; i < pts.length; i++) { const l = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y); segs.push(l); total += l; }
+    if (total < 1) return;
+    const gap = o.gap || 22, off = (((t || 0) * speed) % gap + gap) % gap;
+    ctx.save(); ctx.fillStyle = o.color || "rgba(255,226,120,0.95)";
+    if (o.glow !== false) { ctx.shadowColor = o.color || "rgba(255,226,120,0.95)"; ctx.shadowBlur = 5; }
+    let i = 0, acc = 0;
+    for (let d = off; d < total; d += gap) {
+      while (i < segs.length - 1 && acc + segs[i] < d) { acc += segs[i]; i++; }
+      const u = (d - acc) / Math.max(1e-6, segs[i]);
+      const px = pts[i].x + (pts[i + 1].x - pts[i].x) * u, py = pts[i].y + (pts[i + 1].y - pts[i].y) * u;
+      ctx.beginPath(); ctx.arc(px, py, o.r || 2.2, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /* 熱氣：由 (x..x+w, y) 往上飄、逐漸淡去的波浪線；k 0..1 為強度，h 為飄升高度 */
+  function heatWaves(ctx, x, y, w, h, t, k) {
+    k = clamp01(k);
+    if (k < 0.03) return;
+    ctx.save(); ctx.lineCap = "round"; ctx.lineWidth = 1.5;
+    const n = Math.max(2, Math.round(w / 14));
+    for (let i = 0; i < n; i++) {
+      const ph = (((t || 0) * (0.35 + 0.4 * k) + i * 0.618) % 1 + 1) % 1;
+      const bx = x + (i + 0.5) * w / n, by = y - ph * h, len = h * 0.3;
+      ctx.strokeStyle = `rgba(255,${Math.round(170 - 60 * k)},90,${((1 - ph) * 0.6 * k).toFixed(3)})`;
+      ctx.beginPath();
+      for (let j = 0; j <= 8; j++) {
+        const u = j / 8, px = bx + Math.sin(u * 5 + (t || 0) * 5 + i) * 3, py = by + len * (0.5 - u);
+        j ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /* 液體裡上升的氣泡：(x, y, w, h) 為液體範圍，n 顆 */
+  function bubbles(ctx, x, y, w, h, t, n, o) {
+    o = o || {};
+    if (!n || h <= 4 || w <= 6) return;
+    const rnd = seeded(o.seed || 11);
+    ctx.save();
+    ctx.strokeStyle = o.color || "rgba(255,255,255,0.8)"; ctx.lineWidth = 1;
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    for (let i = 0; i < n; i++) {
+      const bx = x + 3 + rnd() * (w - 6), sp = (o.speed || 30) * (0.6 + rnd() * 0.8), r = (o.r || 2.4) * (0.6 + rnd() * 0.8), ph = rnd();
+      const yy = y + h - ((((t || 0) * sp + ph * h) % h) + h) % h;
+      ctx.beginPath(); ctx.arc(bx + Math.sin((t || 0) * 3 + i) * 1.4, yy, r, 0, TAU); ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+
+  /* 指針式錶頭（量程數字可指定）：黑色外殼 + 米白錶面 + 紅指針。
+     frac 0..1 指針位置；o.max 滿刻度數值；o.unit 單位；o.ghost 另一個標記位置（例如真實值）；o.majors 主刻度格數。
+     回傳底部紅黑接線柱 { red, black } */
+  function dial(ctx, cx, cy, r, frac, o) {
+    o = o || {};
+    contactShadow(ctx, cx, cy + r * 1.0, r * 1.3);
+    const bg = ctx.createLinearGradient(0, cy - r, 0, cy + r * 0.9);
+    bg.addColorStop(0, "rgb(74,80,92)"); bg.addColorStop(1, "rgb(30,34,42)");
+    rrPath(ctx, cx - r * 1.1, cy - r, r * 2.2, r * 1.86, r * 0.16); ctx.fillStyle = bg; ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 1; ctx.stroke();
+    const fx = cx - r * 0.98, fy = cy - r * 0.9, fw = r * 1.96, fh = r * 1.24;
+    const face = ctx.createLinearGradient(0, fy, 0, fy + fh);
+    face.addColorStop(0, "rgb(252,250,242)"); face.addColorStop(1, "rgb(226,222,208)");
+    rrPath(ctx, fx, fy, fw, fh, r * 0.1); ctx.fillStyle = face; ctx.fill();
+    note(ctx, "rgb(244,241,230)", fx, fy, fw, fh);
+    const px = cx, py = cy + r * 0.22, R2 = r * 0.9, a0 = Math.PI * 1.22, a1 = Math.PI * 1.78;
+    const n = o.majors || 5, sub = 5, fs = Math.max(7, r * 0.2);
+    ctx.save();
+    ctx.font = fs + "px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (let i = 0; i <= n * sub; i++) {
+      const a = a0 + (a1 - a0) * i / (n * sub), major = i % sub === 0;
+      ctx.strokeStyle = "rgba(40,44,52,0.85)"; ctx.lineWidth = major ? 1.3 : 0.8;
+      const rr = major ? R2 * 0.8 : R2 * 0.88;
+      ctx.beginPath(); ctx.moveTo(px + Math.cos(a) * R2, py + Math.sin(a) * R2); ctx.lineTo(px + Math.cos(a) * rr, py + Math.sin(a) * rr); ctx.stroke();
+      if (major && o.max != null) {
+        const v = o.max * i / (n * sub);
+        ctx.fillStyle = "rgba(34,38,46,0.92)";
+        ctx.fillText(Math.abs(v - Math.round(v)) < 1e-6 ? String(Math.round(v)) : v.toFixed(v < 1 ? 2 : 1), px + Math.cos(a) * R2 * 0.64, py + Math.sin(a) * R2 * 0.64);
+      }
+    }
+    if (o.unit) { ctx.font = "700 " + Math.max(8, r * 0.26) + "px system-ui,sans-serif"; ctx.fillStyle = "rgba(34,38,46,0.85)"; ctx.fillText(o.unit, px, py - R2 * 0.3); }
+    if (o.ghost != null) {
+      const ag = a0 + (a1 - a0) * clamp01(o.ghost);
+      ctx.fillStyle = "rgba(40,150,90,0.95)";
+      ctx.beginPath();
+      ctx.moveTo(px + Math.cos(ag) * R2 * 1.02, py + Math.sin(ag) * R2 * 1.02);
+      ctx.lineTo(px + Math.cos(ag - 0.05) * R2 * 1.14, py + Math.sin(ag - 0.05) * R2 * 1.14);
+      ctx.lineTo(px + Math.cos(ag + 0.05) * R2 * 1.14, py + Math.sin(ag + 0.05) * R2 * 1.14);
+      ctx.closePath(); ctx.fill();
+    }
+    const an = a0 + (a1 - a0) * clamp01(frac || 0);
+    ctx.strokeStyle = "rgb(206,48,40)"; ctx.lineWidth = Math.max(1.4, r * 0.05); ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(px - Math.cos(an) * R2 * 0.12, py - Math.sin(an) * R2 * 0.12); ctx.lineTo(px + Math.cos(an) * R2 * 0.95, py + Math.sin(an) * R2 * 0.95); ctx.stroke();
+    ctx.restore();
+    brassDisc(ctx, px, py, Math.max(2.4, r * 0.08));
+    const red = { x: cx + r * 0.55, y: cy + r * 0.64 }, black = { x: cx - r * 0.55, y: cy + r * 0.64 };
+    [[red, "rgb(210,50,44)"], [black, "rgb(24,24,28)"]].forEach(q => {
+      ctx.fillStyle = q[1]; ctx.beginPath(); ctx.arc(q[0].x, q[0].y, Math.max(3, r * 0.12), 0, TAU); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 1; ctx.stroke();
+    });
+    return { red, black };
+  }
+
+  /* 波長（nm）→ 看得見的顏色；範圍外回傳 null（紫外、紅外看不見） */
+  function nmColor(nm, a) {
+    if (!(nm >= 380 && nm <= 780)) return null;
+    let r = 0, g = 0, b = 0;
+    if (nm < 440) { r = (440 - nm) / 60; b = 1; }
+    else if (nm < 490) { g = (nm - 440) / 50; b = 1; }
+    else if (nm < 510) { g = 1; b = (510 - nm) / 20; }
+    else if (nm < 580) { r = (nm - 510) / 70; g = 1; }
+    else if (nm < 645) { r = 1; g = (645 - nm) / 65; }
+    else r = 1;
+    const f = nm < 420 ? 0.35 + 0.65 * (nm - 380) / 40 : nm > 700 ? 0.35 + 0.65 * (780 - nm) / 80 : 1;
+    const c = v => Math.round(255 * Math.pow(v * f, 0.8));
+    return `rgba(${c(r)},${c(g)},${c(b)},${a == null ? 1 : a})`;
+  }
+
+  /* 黑體溫度（K）→ 發光顏色 */
+  function kColor(K, a) {
+    const t = Math.max(10, K / 100);
+    let r, g, b;
+    if (t <= 66) { r = 255; g = 99.47 * Math.log(t) - 161.12; b = t <= 19 ? 0 : 138.52 * Math.log(t - 10) - 305.04; }
+    else { r = 329.7 * Math.pow(t - 60, -0.1332); g = 288.12 * Math.pow(t - 60, -0.0755); b = 255; }
+    const c = v => Math.round(Math.max(0, Math.min(255, v)));
+    return `rgba(${c(r)},${c(g)},${c(b)},${a == null ? 1 : a})`;
+  }
+
   window.PhysicsLab.apparatus = {
     steel, brass, brassDisc, contactShadow,
     bench, carrier, benchTop,
@@ -3918,6 +4262,8 @@
     cylinderPiston, testTube, cork, hotPlate, alcoholLamp, springScaleV, calorimeter,
     multimeter, compass, poleFace, oscilloscope, speaker, microphone, ambulanceTop, carTop, personTop,
     lampHouse, slitPlate, polarizer, prismGlass, paperScreen, gratingSlide,
-    rrPath, isLight
+    rrPath, isLight,
+    /* 器材 v3 */
+    lcd, balance, powerSupply, horseshoe, ringCoil, laptop, electroscope, flowDots, heatWaves, bubbles, dial, nmColor, kColor
   };
 })();
