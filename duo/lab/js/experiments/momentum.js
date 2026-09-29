@@ -251,7 +251,14 @@
       const M = sM1.get(), m = sM2.get();
       if (fired && v2 === 0) { v2 = sE.get(); v1 = -m * v2 / M; }
       // 大砲放在軌道上、輪子可以自由滾：開砲時整台往後退
-      const cs = 1.0 + M / 30 * 0.8, pivotY = gy - AP.cannonWheelDrop(cs), barrel = 58 * cs;
+      const cs = 1.25 + M / 30 * 0.9, pivotY = gy - AP.cannonWheelDrop(cs), barrel = 58 * cs;
+      // 右端的沙箱接住砲彈；左端的彈簧擋板緩衝後座
+      const sbx = W - 70;
+      AP.woodBlock(ctx, sbx, gy, 70, 44, 0);
+      ctx.fillStyle = "rgb(218,190,130)"; ctx.fillRect(sbx - 31, gy - 44, 62, 8);
+      D.text(ctx, "沙箱", sbx, gy - 50, { color: PL.col("text-dim"), size: 10, align: "center" });
+      AP.steel(ctx, 26, gy - 36, 8, 36, 0);
+      D.spring(ctx, 34, gy - 18, 70, gy - 18, 4, 5, "#9aa8b8");
       const ballR = 5 + m * 1.3;
       AP.sportBall(ctx, cx + barrel - ballR + x2 * 30, pivotY, ballR, "cannonball", x2);
       AP.cannon(ctx, cx + x1 * 30, pivotY, 0, { s: cs, fired: fired ? age : null, roll: x1 * 30 / (12 * cs) });
@@ -271,9 +278,22 @@
           cx, 28, { color: PL.col("text-dim"), size: 11, align: "center" });
       }
       if (fired) { D.arrow(ctx, cx + x1 * 30, gy - 62, cx + x1 * 30 + v1 * 6, gy - 62, { color: MC(), width: 2, label: "後座" }); D.arrow(ctx, cx + barrel + x2 * 30, gy - 40, cx + barrel + x2 * 30 + v2 * 6, gy - 40, { color: CB, width: 2, label: "砲彈" }); }
+      // 動量長條：砲身往左、砲彈往右，一樣長——合起來還是零
+      {
+        const pv = fired ? m * v2 : m * sE.get(), pw = Math.min(280, W * 0.38), px0 = W / 2, py0 = fired ? 22 : 44, bl = Math.min(pw / 2 - 10, pv * (pw / 2 - 10) / 60);
+        AP.infoCard(ctx, px0 - pw / 2, py0, pw, 44);
+        D.line(ctx, px0, py0 + 6, px0, py0 + 38, PL.col("text-faint"), 1);
+        ctx.save(); if (!fired) ctx.globalAlpha = 0.45;
+        D.rect(ctx, px0 - bl, py0 + 12, bl, 12, { fill: MC(), r: 3 });
+        D.rect(ctx, px0, py0 + 12, bl, 12, { fill: CB, r: 3 });
+        ctx.restore();
+        D.text(ctx, "砲身 MV", px0 - 6, py0 + 38, { color: PL.col("text-dim"), size: 9.5, align: "right" });
+        D.text(ctx, "砲彈 mv", px0 + 6, py0 + 38, { color: PL.col("text-dim"), size: 9.5 });
+        D.text(ctx, "總動量 " + PL.fmt(fired ? M * v1 + m * v2 : 0, 1), px0 + pw / 2 - 8, py0 + 10, { color: PL.col("text"), size: 9.5, align: "right", weight: "700" });
+      }
       rV1.set(Math.abs(v1), 2); rV2.set(v2, 1); rP.set(M * v1 + m * v2, 2);
     }
-    const anim = PL.loop(dt => { if (dt && fired) { age += dt; x1 += v1 * dt; x2 += v2 * dt; if (cv.W * 0.42 + 90 + x2 * 30 > cv.W - 20) anim.stop(); } draw(); });
+    const anim = PL.loop(dt => { if (dt && fired) { age += dt; x1 += v1 * dt; x2 += v2 * dt; if (cv.W * 0.42 + 90 + x2 * 30 > cv.W - 100) anim.stop(); } draw(); });
     cv.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
