@@ -223,61 +223,132 @@
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
 
-  /* 拉塞福散射（金箔實驗） */
+  /* 拉塞福散射（金箔實驗）—— 放大到一顆金原子核附近
+   *
+   * 舊版的背景是網格底，α 粒子軌跡用半透明白線——淺色主題下幾乎看不見；
+   * 粒子一格跑 150 px，軌跡只剩幾個折點；畫面剛打開時也空空的。
+   * 現在：
+   *   · 主畫面是固定暗色的「放大視窗」（兩種主題一樣），金原子的電子雲只是淡淡一團
+   *   · 小步長積分，散射角符合 tan(θ/2) = K/(v²b)（K ∝ Z）：b 越小偏得越多，正對時彈回
+   *   · 粒子束均勻鋪滿視窗：多數幾乎直走，極少數被彈回
+   *   · 飛出視窗處閃一下（硫化鋅螢光屏的閃光），右下角累計各角度的次數
+   *   · 進場先預跑幾秒，一打開就看得到殘影
+   */
   PL.register("rutherford", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
-    let alphas = [], hi = null;
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
-    const sZ = PL.ui.slider(L.controls, { label: "原子核電荷 Z", min: 20, max: 90, step: 5, value: 79, unit: "", digits: 0 });
-    const sB = PL.ui.slider(L.controls, { label: "瞄準參數 b", min: 0, max: 60, step: 2, value: 20, unit: "", digits: 0, onInput: () => { hi = spawn(sB.get(), true); alphas.push(hi); } });
-    PL.ui.note(L.controls, "多數 α 粒子直穿；瞄準參數越小、越接近核心，散射角越大。");
+    const V0 = 260, bins = [0, 0, 0, 0];               // 0–10°、10–30°、30–90°、90–180°
+    let alphas = [], ghosts = [], flashes = [], hi = null, seed = 7, acc = 0;
+    const sZ = PL.ui.slider(L.controls, { label: "原子核電荷 Z", min: 20, max: 90, step: 1, value: 79, unit: "", digits: 0 });
+    const sB = PL.ui.slider(L.controls, { label: "瞄準參數 b", min: 0, max: 60, step: 2, value: 20, unit: "", digits: 0, onInput: () => { if (hi) hi.hl = false; hi = spawn(sB.get(), true); alphas.push(hi); } });
+    PL.ui.note(L.controls, "多數 α 粒子幾乎直穿；瞄準參數 b 越小、越接近原子核，散射角越大，正對時會被彈回。右下角累計螢光屏上各角度的閃光次數。");
     const rAng = PL.ui.readout(L.readouts, { label: "此粒子散射角", unit: "°" });
-    const nucleus = () => ({ x: cv.W * 0.62, y: cv.H / 2 });
-    function spawn(b, highlight) { const N = nucleus(); return { x: -10, y: N.y - b, vx: 150, vy: 0, trail: [], hl: highlight }; }
-    function step(p, dt) { const N = nucleus(), K = sZ.get() * 26; for (let i = 0; i < 4; i++) { const dx = p.x - N.x, dy = p.y - N.y, r2 = dx * dx + dy * dy, r = Math.sqrt(r2) + 4, f = K / (r2 + 60); p.vx += f * dx / r * dt / 4; p.vy += f * dy / r * dt / 4; p.x += p.vx * dt / 4; p.y += p.vy * dt / 4; } if (p.trail.length < 220) p.trail.push({ x: p.x, y: p.y }); }
+    const rBack = PL.ui.readout(L.readouts, { label: "反彈（>90°）比例", unit: "%" });
+    const rnd = () => { seed = (seed * 1664525 + 1013904223) | 0; return ((seed >>> 8) & 0xffffff) / 0xffffff; };
+    const nucleus = () => ({ x: cv.W * 0.58, y: cv.H / 2 });
+    const Kof = () => sZ.get() / 79 * 5.75 * V0 * V0;    // Z = 79、b = 10 時散射角約 60°
+    const theta = b => b <= 0 ? 180 : 2 * Math.atan(Kof() / (V0 * V0 * b)) * 180 / Math.PI;
+    function spawn(b, highlight) { const N = nucleus(); return { x: -8, y: N.y - b, vx: V0, vy: 0, tr: [-8, N.y - b], hl: highlight }; }
+    function step(p, dt) {
+      const N = nucleus(), K = Kof(), n = 8, h = dt / n;
+      for (let i = 0; i < n; i++) {
+        const dx = p.x - N.x, dy = p.y - N.y, r2 = dx * dx + dy * dy + 9, r = Math.sqrt(r2), a = K / r2;
+        p.vx += a * dx / r * h; p.vy += a * dy / r * h; p.x += p.vx * h; p.y += p.vy * h;
+      }
+      p.tr.push(p.x, p.y); if (p.tr.length > 600) p.tr.splice(0, 2);
+    }
+    function tick(dt) {
+      const W = cv.W, H = cv.H;
+      acc += dt * 5;
+      while (acc >= 1) { acc -= 1; alphas.push(spawn((rnd() * 2 - 1) * H * 0.48, false)); }
+      alphas.forEach(p => step(p, dt));
+      alphas = alphas.filter(p => {
+        if (p.x < W + 10 && p.x > -20 && p.y > -10 && p.y < H + 10) return true;
+        const deg = Math.atan2(Math.abs(p.vy), p.vx) * 180 / Math.PI;
+        bins[deg < 10 ? 0 : deg < 30 ? 1 : deg < 90 ? 2 : 3]++;
+        flashes.push({ x: PL.clamp(p.x, 3, W - 3), y: PL.clamp(p.y, 3, H - 3), age: 0 });
+        ghosts.push({ tr: p.tr, age: 0, hl: p.hl }); if (ghosts.length > 24) ghosts.shift();
+        return false;
+      });
+      if (!alphas.includes(hi)) { hi = spawn(sB.get(), true); alphas.push(hi); }
+      flashes.forEach(f => f.age += dt / 0.9); flashes = flashes.filter(f => f.age < 1);
+      ghosts.forEach(g => g.age += dt); ghosts = ghosts.filter(g => g.age < 6);
+    }
+    function warm() { for (let i = 0; i < 200; i++) tick(1 / 60); }
+    function restart() { alphas = []; ghosts = []; flashes = []; hi = spawn(sB.get(), true); alphas.push(hi); warm(); }
+    function trail(ctx, tr, color, w) {
+      if (tr.length < 4) return;
+      ctx.strokeStyle = color; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(tr[0], tr[1]);
+      for (let i = 2; i < tr.length; i += 2) ctx.lineTo(tr[i], tr[i + 1]);
+      ctx.stroke();
+    }
     function draw() {
-      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const N = nucleus();
-      /*
-       * 核的大小與標籤跟著 Z 走。
-       * 原本半徑固定 10、標籤永遠是「原子核 +」，於是在射出粒子之前
-       * 調整 Z 完全看不出任何差別——這支滑桿在靜止畫面上等於不存在。
-       * 核半徑取 Z^(1/3)：這正是核物理 R ∝ A^(1/3) 的比例，不是隨便放大。
-       */
-      const Z = sZ.get(), nr = 6 + 5 * Math.cbrt(Z / 79);
-      /* 左上角的小圖：實驗裝置全貌（鉛盒 α 源 → 金箔 → 硫化鋅螢光屏＋顯微鏡）。主畫面是放大到一顆金原子核附近 */
+      const { ctx, W, H } = cv; cv.clear();
+      const AP = PL.apparatus, N = nucleus(), Z = sZ.get(), nr = 4 + 4 * Math.cbrt(Z / 79), b = sB.get();
+      // 固定暗色的放大視窗
+      const bg = ctx.createRadialGradient(N.x, N.y, 10, N.x, N.y, Math.max(W, H) * 0.8);
+      bg.addColorStop(0, "rgb(28,36,56)"); bg.addColorStop(1, "rgb(8,11,20)");
+      ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+      PL.theme.note(ctx, "rgb(14,19,32)", 0, 0, W, H);
+      // 金原子的電子雲（原子其實比核大上萬倍，這裡只能示意）
+      const R = H * 0.46, eg = ctx.createRadialGradient(N.x, N.y, nr, N.x, N.y, R);
+      eg.addColorStop(0, "rgba(120,160,255,0.18)"); eg.addColorStop(0.55, "rgba(120,160,255,0.07)"); eg.addColorStop(1, "rgba(120,160,255,0)");
+      ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(N.x, N.y, R, 0, TAU); ctx.fill();
+      ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ghosts.forEach(g => trail(ctx, g.tr, g.hl ? "rgba(127,231,255," + PL.fmt(0.5 * (1 - g.age / 6), 3) + ")" : "rgba(255,210,110," + PL.fmt(0.3 * (1 - g.age / 6), 3) + ")", g.hl ? 1.6 : 1));
+      alphas.forEach(p => { if (!p.hl) trail(ctx, p.tr, "rgba(255,210,110,0.6)", 1.2); });
+      if (hi) trail(ctx, hi.tr, "rgba(127,231,255,0.95)", 2.2);
+      ctx.restore();
+      alphas.forEach(p => D.disc(ctx, p.x, p.y, p.hl ? 5 : 2.8, { fill: p.hl ? "#7fe7ff" : "#ffd66e", glow: p.hl ? "#7fe7ff" : undefined, glowSize: 8 }));
+      // 原子核
+      D.disc(ctx, N.x, N.y, nr, { fill: "#ff5a4f", glow: "#ff5a4f", glowSize: 16 });
+      D.text(ctx, (Z === 79 ? "金原子核" : "原子核") + "（+" + Z + "e）", N.x, N.y - nr - 12, { color: "#ffb4ab", size: 11, align: "center", weight: "700" });
+      // 瞄準參數 b：入射線到「正對原子核那條線」的垂直距離
+      const hy = N.y - b;
+      D.line(ctx, 0, hy, N.x - 50, hy, "rgba(127,231,255,0.4)", 1, [4, 4]);
+      D.line(ctx, 0, N.y, N.x - nr - 4, N.y, "rgba(255,255,255,0.2)", 1, [2, 4]);
+      if (b >= 6) {
+        const bx = N.x - 56;
+        D.line(ctx, bx, hy, bx, N.y, "rgba(127,231,255,0.85)", 1.2);
+        D.line(ctx, bx - 4, hy, bx + 4, hy, "rgba(127,231,255,0.85)", 1.2); D.line(ctx, bx - 4, N.y, bx + 4, N.y, "rgba(127,231,255,0.85)", 1.2);
+        D.text(ctx, "b", bx - 7, (hy + N.y) / 2 + 4, { color: "#7fe7ff", size: 12, align: "right", weight: "800" });
+      }
+      // 螢光屏上的閃光
+      flashes.forEach(f => D.disc(ctx, f.x, f.y, 2.5 + 5 * (1 - f.age), { fill: "rgba(150,255,176," + PL.fmt(1 - f.age, 2) + ")", glow: "rgba(150,255,176,0.9)", glowSize: 10 }));
+      // 左上：實驗裝置全貌（鉛盒 α 源 → 金箔 → 硫化鋅螢光屏）
       {
-        const AP = PL.apparatus, ix = 12, iy = 12, iw = 190, ih = 104;
+        const ix = 12, iy = 12, iw = 196, ih = 104, cyI = iy + ih / 2 + 6;
         AP.infoCard(ctx, ix, iy, iw, ih);
-        const cyI = iy + ih / 2 + 6;
         ctx.fillStyle = "rgb(70,74,82)"; ctx.fillRect(ix + 12, cyI - 12, 30, 24);
         ctx.fillStyle = "rgb(40,42,48)"; ctx.fillRect(ix + 38, cyI - 3, 6, 6);
-        ctx.strokeStyle = "rgba(255,200,80,0.9)"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(ix + 44, cyI); ctx.lineTo(ix + 100, cyI); ctx.stroke();
+        ctx.strokeStyle = "rgba(230,170,40,0.95)"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(ix + 44, cyI); ctx.lineTo(ix + 100, cyI); ctx.stroke();
         ctx.fillStyle = "rgb(222,182,70)"; ctx.fillRect(ix + 100, cyI - 22, 3, 44);
-        ctx.strokeStyle = "rgba(120,200,150,0.9)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(ix + 101, cyI, 42, -1.2, 1.2); ctx.stroke();
-        ctx.strokeStyle = "rgba(255,200,80,0.7)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(ix + 102, cyI); ctx.lineTo(ix + 136, cyI - 26); ctx.moveTo(ix + 102, cyI); ctx.lineTo(ix + 70, cyI - 30); ctx.stroke();
+        ctx.strokeStyle = "rgba(80,190,120,0.95)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(ix + 101, cyI, 42, -1.2, 1.2); ctx.stroke();
+        ctx.strokeStyle = "rgba(230,170,40,0.8)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(ix + 102, cyI); ctx.lineTo(ix + 138, cyI - 24); ctx.moveTo(ix + 102, cyI); ctx.lineTo(ix + 142, cyI + 6); ctx.moveTo(ix + 102, cyI); ctx.lineTo(ix + 72, cyI - 30); ctx.stroke();
         D.text(ctx, "α 源", ix + 27, cyI + 24, { color: PL.col("text-dim"), size: 9, align: "center" });
         D.text(ctx, "金箔", ix + 101, cyI + 34, { color: PL.col("text-dim"), size: 9, align: "center" });
-        D.text(ctx, "螢光屏", ix + 160, cyI + 4, { color: PL.col("text-dim"), size: 9, align: "center" });
+        D.text(ctx, "螢光屏", ix + 166, cyI + 4, { color: PL.col("text-dim"), size: 9, align: "center" });
         D.text(ctx, "實驗裝置（俯視）↘ 放大到一顆原子核", ix + 8, iy + 14, { color: PL.col("text"), size: 9.5, weight: "700" });
       }
-      D.disc(ctx, N.x, N.y, nr, { fill: PL.col("danger"), glow: PL.col("danger"), glowSize: 16 });
-      D.text(ctx, "原子核 Z = " + Z, N.x, N.y - nr - 8, { color: PL.col("danger"), size: 11, align: "center" });
-      alphas.forEach(p => { ctx.save(); ctx.strokeStyle = p.hl ? MC() : "rgba(255,255,255,0.22)"; ctx.lineWidth = p.hl ? 2 : 1; ctx.beginPath(); p.trail.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke(); ctx.restore(); D.disc(ctx, p.x, p.y, p.hl ? 5 : 3, { fill: p.hl ? MC() : "#ffe08a" }); });
-      if (hi) rAng.set(Math.atan2(-hi.vy, hi.vx) * 180 / Math.PI, 1);
-    }
-    hi = spawn(sB.get(), true); alphas.push(hi);
-    const anim = PL.loop(dt => {
-      if (dt) {
-        dt = Math.min(dt, 0.03);
-        if (Math.random() < 0.25) alphas.push(spawn((Math.random() - 0.5) * 130, false));
-        alphas.forEach(p => step(p, dt * 60));
-        alphas = alphas.filter(p => p.x < cv.W + 30 && p.x > -40 && p.y > -30 && p.y < cv.H + 30);
-        if (!alphas.includes(hi)) { hi = spawn(sB.get(), true); alphas.push(hi); }
+      // 右下：螢光屏各角度的累計閃光次數（對數長度，才看得到最稀少的那一格）
+      const total = bins[0] + bins[1] + bins[2] + bins[3], pw = 196, ph = 104, px = W - pw - 12, py = H - ph - 12;
+      if (W > 460) {
+        AP.rrPath(ctx, px, py, pw, ph, 8); ctx.fillStyle = "rgba(6,10,18,0.82)"; ctx.fill(); ctx.strokeStyle = "rgba(150,255,176,0.35)"; ctx.lineWidth = 1; ctx.stroke();
+        D.text(ctx, "螢光屏閃光計數（散射角）", px + 10, py + 17, { color: "#d7f7df", size: 10.5, weight: "700" });
+        const mx = Math.log10(1 + Math.max(1, ...bins));
+        ["0–10°", "10–30°", "30–90°", ">90°"].forEach((lab, i) => {
+          const yy = py + 36 + i * 17, bw = (pw - 108) * Math.log10(1 + bins[i]) / mx;
+          D.text(ctx, lab, px + 10, yy + 4, { color: "#b9d3c2", size: 9.5 });
+          ctx.fillStyle = i === 3 ? "rgba(255,120,110,0.85)" : "rgba(150,255,176,0.75)"; ctx.fillRect(px + 58, yy - 5, Math.max(1, bw), 9);
+          D.text(ctx, String(bins[i]), px + pw - 10, yy + 4, { color: "#e8f5ec", size: 9.5, align: "right" });
+        });
       }
-      draw();
-    });
-    cv.onResize(draw); anim.start();
+      D.text(ctx, "示意：原子核約 10⁻¹⁴ m、原子約 10⁻¹⁰ m，實際比例差一萬倍", 12, H - 10, { color: "rgba(200,212,236,0.55)", size: 9.5 });
+      rAng.set(theta(b), 1); rBack.set(total ? bins[3] / total * 100 : 0, 2);
+    }
+    restart();
+    const anim = PL.loop(dt => { if (dt) tick(Math.min(dt, 0.04)); draw(); });
+    cv.onResize(() => { restart(); draw(); }); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
 })();
