@@ -533,34 +533,47 @@
     PL.ui.note(L.controls, "ΔU = Q − W。等溫 ΔU=0；等容 W=0（ΔU=Q）；絕熱 Q=0（ΔU=−W）。");
     const rU = PL.ui.readout(L.readouts, { label: "內能變化 ΔU", unit: "J" });
     const rTrend = PL.ui.readout(L.readouts, { label: "溫度趨勢" });
+    let tt = 0;
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const Q = sQ.get(), Wk = sW.get(), dU = Q - Wk;
-      // 汽缸示意
+      const Q = sQ.get(), Wk = sW.get(), dU = Q - Wk, T = 300 + dU * 1.2;
+      /* 汽缸：活塞上壓著砝碼，氣體分子的跑動快慢跟著溫度（內能）走 */
       const AP = PL.apparatus;
-      const cylX = 34, cylW = 78, cylBot = H - 56, gasH = 90 + Wk * 0.4;
-      AP.benchTop(ctx, W, H, H - 30);
+      const benchY = H - 30, cylX = 50, cylW = 116, cylH = Math.min(230, H - 110), cylBot = benchY - 26, gasH = cylH * 0.45 + Wk * 0.5;
+      AP.labRoom(ctx, W, H, benchY, {});
       // 吸熱時底下的電熱板發紅；放熱時換成一盆冰
-      if (Q >= 0) AP.hotPlate(ctx, cylX + cylW / 2, H - 30, cylW + 26, Q / 100);
+      if (Q >= 0) AP.hotPlate(ctx, cylX + cylW / 2, benchY, cylW + 30, Q / 100);
       else {
-        ctx.fillStyle = "rgba(170,215,240,0.9)"; ctx.fillRect(cylX - 10, H - 50, cylW + 20, 20);
-        for (let i = 0; i < 6; i++) { ctx.fillStyle = "rgba(235,248,255,0.95)"; ctx.fillRect(cylX - 6 + i * 16, H - 54 + (i % 2) * 3, 12, 10); }
+        ctx.fillStyle = "rgba(170,215,240,0.9)"; ctx.fillRect(cylX - 12, benchY - 22, cylW + 24, 22);
+        for (let i = 0; i < 7; i++) { ctx.fillStyle = "rgba(235,248,255,0.95)"; ctx.fillRect(cylX - 8 + i * 17, benchY - 26 + (i % 2) * 3, 13, 10); }
       }
       const hue = PL.clamp(0.5 + dU / 200, 0, 1);
-      AP.cylinderPiston(ctx, cylX, cylBot - 190, cylW, 190, cylBot - gasH, {
-        gas: "rgb(" + Math.round(120 + 110 * hue) + "," + Math.round(150 - 60 * hue) + "," + Math.round(220 - 150 * hue) + ")", rod: 18
+      AP.cylinderPiston(ctx, cylX, cylBot - cylH, cylW, cylH, cylBot - gasH, {
+        gas: "#" + [Math.round(120 + 110 * hue), Math.round(150 - 60 * hue), Math.round(220 - 150 * hue)].map(v => v.toString(16).padStart(2, "0")).join(""),
+        rod: 18, weights: 2, particles: 34, t: tt * Math.sqrt(T / 300) * 1.6
       });
-      if (Q !== 0) D.arrow(ctx, cylX + cylW + 18, cylBot + 10, cylX + cylW + 18, cylBot - 30, { color: PL.col("danger"), width: 2, label: Q > 0 ? "Q 入" : "Q 出" });
+      // 溫度計貼在汽缸旁：溫度 ∝ 內能
+      AP.thermometer(ctx, cylX + cylW + 22, cylBot - cylH + 10, cylBot - 4, 12, PL.clamp((T - 150) / 300, 0, 1));
+      D.text(ctx, PL.fmt(T, 0) + " K", cylX + cylW + 22, cylBot - cylH, { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
+      if (Q !== 0) D.arrow(ctx, cylX + cylW / 2 - 30, benchY + 2, cylX + cylW / 2 - 30, cylBot - 30, { color: PL.col("danger"), width: 2.2, label: Q > 0 ? "Q 入" : "Q 出" });
+      if (Wk !== 0) {
+        const py = cylBot - gasH - 12 - 18 - 22, up = Wk > 0;
+        D.arrow(ctx, cylX + 16, py + (up ? 0 : -36), cylX + 16, py + (up ? -36 : 0), { color: PL.col("accent-2"), width: 2.2, label: up ? "W（對外）" : "W（外界對氣體）" });
+      }
       // 能量條
-      const bx = cylX + cylW + 64, bw = W - bx - 24; let y = 46;
+      const bx = cylX + cylW + 80, bw = W - bx - 24; let y = 46;
       AP.infoCard(ctx, bx - 12, 8, bw + 30, 150);
       const bar = (lab, val, c) => { D.text(ctx, lab, bx, y - 4, { color: PL.col("text-dim"), size: 12 }); D.rect(ctx, bx + 40, y - 14, bw - 40, 16, { fill: "rgba(255,255,255,0.05)", r: 4 }); const mid = (bw - 40) / 2; D.rect(ctx, bx + 40 + mid, y - 14, mid * PL.clamp(val / 100, -1, 1), 16, { fill: c, r: 2 }); D.text(ctx, PL.fmt(val, 0) + " J", bx + bw + 4, y, { color: c, size: 11, align: "right" }); y += 40; };
       D.text(ctx, "ΔU = Q − W", bx, 24, { color: PL.col("text-dim"), size: 12 });
       bar("Q", Q, PL.col("danger")); bar("W", Wk, PL.col("accent-2")); bar("ΔU", dU, MC());
+      D.text(ctx, dU > 0 ? "內能增加 → 溫度升高，分子跑得更快" : dU < 0 ? "內能減少 → 溫度降低，分子跑得較慢" : "內能不變 → 溫度不變", bx, 186, { color: PL.col("text-dim"), size: 11 });
+      const kind = Wk === 0 ? "等容過程：W = 0，吸的熱全部變成內能" : Q === 0 ? "絕熱過程：Q = 0，對外作功全靠內能" : dU === 0 ? "等溫過程：ΔU = 0，吸的熱全部拿去作功" : "";
+      if (kind) AP.valueChip(ctx, bx, 200, kind, PL.col("warn"));
       rU.set(dU, 0); rTrend.set(dU > 0 ? "升溫" : dU < 0 ? "降溫" : "不變");
     }
-    cv.onResize(draw); draw();
-    return { stop() { cv.destroy(); }, rerender: draw };
+    const anim = PL.loop(dt => { if (dt) tt += dt; draw(); });
+    cv.onResize(draw); draw(); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
 
   /*
