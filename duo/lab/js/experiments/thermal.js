@@ -71,15 +71,16 @@
     function draw() {
       const { ctx, W, H } = cv, s = data(); cv.clear(); D.bg(cv);
       const AP = PL.apparatus;
-      const tankL = W * 0.45, tankR = W - 36, surface = H * 0.5, floor = H - 28;
+      /* 矮畫面時整組縮小、水面往下移，彈簧秤才掛得在鐵架橫桿底下 */
+      const k = PL.clamp(H / 400, 0.6, 1), boxW = 72 * k, boxH = 56 * k;
+      const tankL = W * 0.45, tankR = W - 36, surface = Math.max(H * 0.5, 113 + boxH), floor = H - 28;
       AP.benchTop(ctx, W, H, floor - 2);
       AP.beaker(ctx, (tankL + tankR) / 2, floor, tankR - tankL, floor - surface + 26,
         (floor - surface) / (floor - surface + 26));
       D.text(ctx, s.rhoL + " kg/m³", tankL + 12, surface + 19, { color: PL.col("accent-2"), size: 11 });
-      const boxW = 72, boxH = 56;
       const top = surface - boxH * (1 - s.frac), cx = (tankL + tankR) / 2;
       /* 鐵架吊著彈簧秤，彈簧秤下掛金屬塊：浸得越深，整組跟著放低 */
-      const len = Math.max(60, H * 0.16), scaleTop = top - 18 - 21 - len;
+      const len = PL.clamp(surface - boxH - 83, 30, Math.max(60, H * 0.16)), scaleTop = top - 18 - 21 - len;
       AP.standRod(ctx, tankL - 40, floor, 14);
       AP.crossArm(ctx, tankL - 40, 24, cx);
       AP.cord(ctx, cx, 33, cx, scaleTop - 11);
@@ -87,8 +88,8 @@
       AP.cord(ctx, cx, hook.y, cx, top);
       AP.massBlock(ctx, cx, top + boxH, boxW, boxH, { color: "#8d97a6", label: "金屬塊", noShadow: true });
       const mid = top + boxH / 2;
-      D.arrow(ctx, cx - 32, mid, cx - 32, mid + 42, { color: PL.col("warn"), width: 2.2, label: "W" });
-      D.arrow(ctx, cx + 32, mid, cx + 32, mid - 42 * (s.Fb / Math.max(s.W, 0.01)), { color: PL.col("accent-2"), width: 2.2, label: "F_b" });
+      D.arrow(ctx, cx - boxW * 0.44, mid, cx - boxW * 0.44, mid + 42, { color: PL.col("warn"), width: 2.2, label: "W" });
+      D.arrow(ctx, cx + boxW * 0.44, mid, cx + boxW * 0.44, mid - 42 * (s.Fb / Math.max(s.W, 0.01)), { color: PL.col("accent-2"), width: 2.2, label: "F_b" });
       D.arrow(ctx, cx, top, cx, top - 34 * (s.T / Math.max(s.W, 0.01)), { color: MC(), width: 2, label: "T" });
       D.text(ctx, "浸入 " + PL.fmt(s.frac * 100, 0) + "%", cx, floor - 9, { color: PL.col("text-dim"), size: 11, align: "center" });
       rW.set(s.W, 2); rT.set(s.T, 2); rFb.set(s.Fb, 2); rVd.set(s.volCm * s.frac, 0);

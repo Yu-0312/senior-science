@@ -295,8 +295,9 @@
       const px = W * 0.6, py = 40, Lpx = Math.min(H - 110, W * 0.4);
       const AP = PL.apparatus;
       AP.benchTop(ctx, W, H, H - 22);
-      AP.standRod(ctx, px - 126, H - 20, py - 26);
-      AP.crossArm(ctx, px - 126, py - 16, px);
+      const sX = px - Math.min(126, W * 0.16);           // 窄畫面時鐵架往內收，才不會擋在槍口前
+      AP.standRod(ctx, sX, H - 20, py - 26);
+      AP.crossArm(ctx, sX, py - 16, px);
       /*
        * 原本木塊固定 44×40、子彈固定半徑 5、而且子彈只在飛行中才畫出來，
        * 於是三根滑桿在按下發射之前對畫面毫無影響。
@@ -322,7 +323,7 @@
       if (phase === "ready" && hPx > 1) {
         D.line(ctx, px - Lpx * 0.75, py + Lpx - hPx, px + Lpx * 0.5, py + Lpx - hPx,
           PL.col("warn"), 1.4, [6, 5]);
-        D.text(ctx, "預期擺升 " + PL.fmt(hPred, 3) + " m", px - Lpx * 0.75, py + Lpx - hPx - 6,
+        D.text(ctx, "預期擺升 " + PL.fmt(hPred, 3) + " m", px + bw / 2 + 8, py + Lpx - hPx - 6,
           { color: PL.col("warn"), size: 10.5 });
       }
       // 發射器固定架在左邊，槍口對準木塊靜止時的高度（不會跟著木塊一起動）
