@@ -824,11 +824,18 @@
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
 
-  /* 電容器充放電 */
+  /* 電容器充放電 —— 木板上接好的 RC 電路
+   *
+   * 舊版幾乎整個畫面都是圖表，電容器只是左上角一個小圖示，
+   * 而且極板間距會隨電壓改變——真正的電容器極板是固定的，會變的是板上的電荷。
+   * 現在上半部是一塊接好的電路板：電池、單刀雙擲開關（充電／放電）、電阻、
+   * 中心零點的安培計（放電時指針往反方向偏）、平行板電容器與跨在兩端的伏特計。
+   * 板上的 + / − 電荷隨 Q = CV 增減，極板面積隨 C 變大（C ∝ A）；下半部保留 V–t 與 I–t 圖。
+   */
   PL.register("capacitor", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
-    let t = 0, mode = "charge";
+    let t = 0, mode = "charge", flow = 0;
     const sR = PL.ui.slider(L.controls, { label: "電阻 R", min: 1, max: 10, step: 0.5, value: 4, unit: "kΩ", digits: 1, onInput: () => t = 0 });
     const sC = PL.ui.slider(L.controls, { label: "電容 C", min: 20, max: 200, step: 10, value: 100, unit: "μF", digits: 0, onInput: () => t = 0 });
     const row = PL.ui.buttonRow(L.controls);
@@ -836,33 +843,129 @@
     PL.ui.button(row, "放電", () => { mode = "discharge"; t = 0; anim.start(); });
     const rTau = PL.ui.readout(L.readouts, { label: "時間常數 τ=RC", unit: "s" });
     const rV = PL.ui.readout(L.readouts, { label: "電容電壓", unit: "×V₀" });
+    const rI = PL.ui.readout(L.readouts, { label: "電流 I", unit: "×V₀/R" });
+    // 指針式電表：bipolar 為中心零點（−1..1），否則 0..1
+    function gauge(ctx, cx, cy, r, val, label, bipolar) {
+      const AP = PL.apparatus, w = r * 2.3, h = r * 1.9, x = cx - w / 2, y = cy - h / 2;
+      AP.contactShadow(ctx, cx, y + h + 3, w * 0.6);
+      AP.rrPath(ctx, x, y, w, h, 6); ctx.fillStyle = "rgb(60,66,78)"; ctx.fill(); ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineWidth = 1; ctx.stroke();
+      PL.theme.note(ctx, "rgb(60,66,78)", x, y, w, h);
+      const fx = x + 5, fy = y + 5, fw = w - 10, fh = h * 0.64;
+      AP.rrPath(ctx, fx, fy, fw, fh, 3); ctx.fillStyle = "rgb(247,243,232)"; ctx.fill();
+      PL.theme.note(ctx, "rgb(247,243,232)", fx, fy, fw, fh);
+      const pcx = cx, pcy = fy + fh * 0.95, R = fh * 0.84, span = 0.62;
+      ctx.save(); ctx.strokeStyle = "rgba(40,44,52,0.85)"; ctx.lineWidth = 1; ctx.beginPath();
+      for (let i = 0; i <= 10; i++) {
+        const a = -Math.PI / 2 + (i / 5 - 1) * span, r0 = i % 5 === 0 ? R * 0.7 : R * 0.82;
+        ctx.moveTo(pcx + Math.cos(a) * r0, pcy + Math.sin(a) * r0); ctx.lineTo(pcx + Math.cos(a) * R * 0.95, pcy + Math.sin(a) * R * 0.95);
+      }
+      ctx.stroke(); ctx.restore();
+      (bipolar ? ["−", "0", "+"] : ["0", "0.5", "1"]).forEach((tx, i) => {
+        const a = -Math.PI / 2 + (i - 1) * span;
+        D.text(ctx, tx, pcx + Math.cos(a) * R * 0.52, pcy + Math.sin(a) * R * 0.52 + 3, { color: "#33363c", size: 8.5, align: "center", weight: "700" });
+      });
+      const f = bipolar ? PL.clamp(val, -1, 1) : PL.clamp(val, 0, 1) * 2 - 1, a = -Math.PI / 2 + f * span;
+      ctx.save(); ctx.strokeStyle = "rgb(198,56,46)"; ctx.lineWidth = 1.8; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(pcx, pcy); ctx.lineTo(pcx + Math.cos(a) * R * 0.92, pcy + Math.sin(a) * R * 0.92); ctx.stroke(); ctx.restore();
+      AP.brassDisc(ctx, pcx, pcy, 2.6);
+      D.text(ctx, label, cx, y + h - 5, { color: "#e8ecf2", size: 10.5, align: "center", weight: "800" });
+      const tl = { x: x + 8, y: y + h - 8 }, tr = { x: x + w - 8, y: y + h - 8 };
+      [[tl, "rgb(196,62,52)"], [tr, "rgb(34,38,46)"]].forEach(q => { ctx.fillStyle = q[1]; ctx.beginPath(); ctx.arc(q[0].x, q[0].y, 4, 0, TAU); ctx.fill(); AP.brassDisc(ctx, q[0].x, q[0].y, 1.8); });
+      return { l: tl, r: tr };
+    }
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const tau = sR.get() * sC.get() / 1000, V0 = 1;
-      const V = mode === "charge" ? V0 * (1 - Math.exp(-t / tau)) : V0 * Math.exp(-t / tau);
-      // 電容器示意
-      const AP = PL.apparatus;
-      const cx = 74, cyc = 70, gap = 22 * (0.3 + V * 0.7);
-      /* 極板畫成有厚度的金屬片，並用導線接出來——電容器是兩片金屬，
-         不是兩條線。極板間距隨電壓變化仍然保留。 */
-      AP.steel(ctx, cx - 26, cyc - gap - 4, 52, 6, 12);
-      AP.steel(ctx, cx - 26, cyc + gap - 2, 52, 6, -18);
-      AP.cable(ctx, [{ x: cx, y: cyc - gap - 4 }, { x: cx, y: cyc - 34 }], "rgb(186,54,48)", 2.4, 3);
-      AP.cable(ctx, [{ x: cx, y: cyc + gap + 4 }, { x: cx, y: cyc + 34 }], "rgb(58,96,168)", 2.4, 3);
-      for (let i = 0; i < Math.round(V * 6); i++) { D.text(ctx, "+", cx - 20 + i * 8, cyc - gap - 4, { color: POS, size: 12 }); D.text(ctx, "−", cx - 20 + i * 8, cyc + gap + 12, { color: NEG, size: 12 }); }
-      D.text(ctx, "電容器", cx, cyc + 40, { color: PL.col("text-dim"), size: 11, align: "center" });
-      // V–t 與 I–t
-      const bx = 150, by = 24, bw = W - bx - 20, bh = H - 48;
-      const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: 5 * tau, y0: 0, y1: 1.05 });
-      g.frame({ title: mode === "charge" ? "充電：電壓上升、電流衰減" : "放電：兩者皆指數衰減", xlabel: "t (s)" }); g.grid(5, 4);
-      g.fn(tt => mode === "charge" ? 1 - Math.exp(-tt / tau) : Math.exp(-tt / tau), { color: MC(), width: 2.2 });
-      g.fn(tt => Math.exp(-tt / tau), { color: PL.col("accent-2"), width: 2, dash: [4, 3] });
-      g.vline(Math.min(t, 5 * tau), { color: "#fff", dash: [3, 3], width: 1 });
+      const AP = PL.apparatus, s = PL.clamp(W / 800, 0.6, 1.4);
+      const tau = sR.get() * sC.get() / 1000, charging = mode === "charge";
+      const e = Math.exp(-t / tau), V = charging ? 1 - e : e, I = charging ? e : -e;
+      const sh = Math.round(H * 0.46);
+      /* 上半部：俯視的電路板 */
+      AP.deskTop(ctx, 0, 0, W, sh);
+      ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.fillRect(0, sh, W, 3);
+      const xL = 44 * s, xS = 170 * s, xR = W - 170 * s, xJ = 250 * s, yT = 46 * s, yB = sh - 40 * s, yM = yB - 38 * s;
+      const yC = (yT + yB) / 2, gap = 36 * s, pw = (44 + sC.get() / 200 * 66) * s, xA = xR - 116 * s, xRes = (xS + xA) / 2;
+      const Cc = { x: xS - 50 * s, y: yT }, Dc = { x: xS - 36 * s, y: yT + 36 * s }, P = { x: xS, y: yT };
+      const bx = xL + 64 * s, bw = 64 * s, bplus = { x: bx - 1, y: yB }, bminus = { x: bx + bw + 1, y: yB };
+      const red = "rgb(186,54,48)", blk = "rgb(40,44,52)";
+      const topPlate = { x: xR, y: yC - gap / 2 - 8 * s }, botPlate = { x: xR, y: yC + gap / 2 + 8 * s };
+      // 導線（先畫，元件蓋在上面）
+      const wBat = [bplus, { x: xL, y: yB }, { x: xL, y: yT }, Cc];
+      const wTop = [P, { x: xR, y: yT }, topPlate];
+      const wBot = [botPlate, { x: xR, y: yB }, bminus];
+      const wDis = [Dc, { x: Dc.x, y: yM }, { x: xJ, y: yM }, { x: xJ, y: yB }];
+      AP.cable(ctx, wBat, red, 2.6, 2); AP.cable(ctx, wTop, red, 2.6, 2);
+      AP.cable(ctx, wBot, blk, 2.6, 2); AP.cable(ctx, wDis, "rgb(58,98,170)", 2.6, 2);
+      // 電流流動（亮點沿著目前那個迴路跑，越跑越慢）
+      if (Math.abs(I) > 0.02) {
+        const o = { r: 2 * s, gap: 20 * s, color: "rgba(255,226,120," + PL.fmt(0.35 + 0.6 * Math.abs(I), 2) + ")" };
+        if (charging) { AP.flowDots(ctx, wBat, flow, 1, o); AP.flowDots(ctx, wTop, flow, 1, o); AP.flowDots(ctx, wBot, flow, 1, o); }
+        else {
+          AP.flowDots(ctx, [topPlate, { x: xR, y: yT }, P], flow, 1, o);
+          AP.flowDots(ctx, [Dc, { x: Dc.x, y: yM }, { x: xJ, y: yM }, { x: xJ, y: yB }, { x: xR, y: yB }, botPlate], flow, 1, o);
+        }
+      }
+      // 電池組
+      AP.battery(ctx, bx, yB - 22 * s, bw, 44 * s);
+      // 單刀雙擲開關（俯視）：電木底座、三個黃銅接點、閘刀倒向充電或放電
+      AP.rrPath(ctx, xS - 64 * s, yT - 16 * s, 80 * s, 68 * s, 6); ctx.fillStyle = "rgb(72,60,54)"; ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 1; ctx.stroke();
+      PL.theme.note(ctx, "rgb(72,60,54)", xS - 64 * s, yT - 16 * s, 80 * s, 68 * s);
+      [P, Cc, Dc].forEach(q => AP.brassDisc(ctx, q.x, q.y, 5 * s));
+      const tip = charging ? Cc : Dc;
+      ctx.save(); ctx.lineCap = "round";
+      ctx.strokeStyle = "rgb(216,180,106)"; ctx.lineWidth = 5 * s; ctx.beginPath(); ctx.moveTo(P.x, P.y); ctx.lineTo(tip.x, tip.y); ctx.stroke();
+      ctx.strokeStyle = "rgb(34,30,28)"; ctx.lineWidth = 8 * s; ctx.beginPath();
+      ctx.moveTo(P.x + (tip.x - P.x) * 0.92, P.y + (tip.y - P.y) * 0.92); ctx.lineTo(P.x + (tip.x - P.x) * 1.22, P.y + (tip.y - P.y) * 1.22); ctx.stroke();
+      ctx.restore();
+      D.text(ctx, "充電", Cc.x + 2 * s, yT - 6 * s, { color: "#f3e6cc", size: 9.5, align: "center", weight: "700" });
+      D.text(ctx, "放電", Dc.x + 22 * s, Dc.y + 12 * s, { color: "#f3e6cc", size: 9.5, align: "center", weight: "700" });
+      // 電阻與安培計（中心零點：放電時電流反向，指針往負邊偏）
+      AP.resistorBox(ctx, xRes, yT, 100 * s, "R = " + PL.fmt(sR.get(), 1) + " kΩ", false);
+      gauge(ctx, xA, yT + 6 * s, 26 * s, I, "A", true);
+      // 平行板電容器：板面積隨 C 變大；電荷量 Q = CV
+      AP.steel(ctx, xR - pw / 2, topPlate.y - 4 * s, pw, 8 * s, 6);
+      AP.steel(ctx, xR - pw / 2, botPlate.y - 4 * s, pw, 8 * s, 6);
+      ctx.fillStyle = "rgba(255,90,80," + PL.fmt(0.5 * V, 2) + ")"; ctx.fillRect(xR - pw / 2, topPlate.y - 4 * s, pw, 8 * s);
+      ctx.fillStyle = "rgba(80,140,255," + PL.fmt(0.5 * V, 2) + ")"; ctx.fillRect(xR - pw / 2, botPlate.y - 4 * s, pw, 8 * s);
+      const nq = Math.round(V * pw / (10 * s));
+      for (let i = 0; i < nq; i++) {
+        const x = xR - pw / 2 + (i + 0.5) * pw / Math.max(1, nq);
+        D.text(ctx, "+", x, topPlate.y + 14 * s, { color: POS, size: 11, align: "center", weight: "800" });
+        D.text(ctx, "−", x, botPlate.y - 7 * s, { color: NEG, size: 11, align: "center", weight: "800" });
+      }
+      const nf = Math.round(V * 4);
+      for (let i = 0; i < nf; i++) {
+        const x = xR - pw / 2 + (i + 0.5) * pw / nf;
+        D.arrow(ctx, x + 4 * s, topPlate.y + 16 * s, x + 4 * s, botPlate.y - 16 * s, { color: "rgba(255,210,110," + PL.fmt(0.3 + 0.6 * V, 2) + ")", width: 1.2, head: 4 });
+      }
+      D.text(ctx, "C = " + sC.get() + " μF", xR - pw / 2 - 8 * s, yC + 4, { color: PL.col("text"), size: 10.5, align: "right", weight: "700" });
+      // 伏特計並聯在電容器兩端
+      const vm = gauge(ctx, xR + 108 * s, yC, 26 * s, V, "V", false);
+      AP.cable(ctx, [{ x: xR + pw / 2, y: topPlate.y }, { x: vm.l.x, y: topPlate.y }, vm.l], red, 2, 2);
+      AP.cable(ctx, [{ x: xR + pw / 2, y: botPlate.y }, { x: vm.r.x, y: botPlate.y }, vm.r], blk, 2, 2);
+      AP.lcd(ctx, W - 140 * s, sh - 32 * s, 124 * s, 22 * s, "t = " + PL.fmt(t, 2) + " s");
+      AP.valueChip(ctx, 12 * s, 8 * s, charging ? "充電中：電池 → 電阻 → 電容器" : "放電中：電容器 → 電阻（電池斷開）", charging ? "rgba(255,196,110,0.95)" : "rgba(120,190,255,0.95)");
+      /* 下半部：V–t 與 I–t */
+      const gx = 56, gy = sh + 24, gw = W - gx - 20, gh = H - gy - 22;
+      const g = PL.graph(cv, { x: gx, y: gy, w: gw, h: gh }, { x0: 0, x1: 5 * tau, y0: charging ? 0 : -1.05, y1: 1.05 });
+      g.frame({ title: charging ? "充電：電壓上升、電流衰減" : "放電：電壓衰減、電流反向衰減", xlabel: "t (s)" }); g.grid(5, 4);
+      if (!charging) g.hline(0, { color: PL.col("text-faint"), width: 1 });
+      g.fn(tt => charging ? 1 - Math.exp(-tt / tau) : Math.exp(-tt / tau), { color: MC(), width: 2.2 });
+      g.fn(tt => (charging ? 1 : -1) * Math.exp(-tt / tau), { color: PL.col("accent-2"), width: 2, dash: [4, 3] });
+      g.vline(Math.min(t, 5 * tau), { color: PL.col("text-faint"), dash: [3, 3], width: 1 });
       g.dot(Math.min(t, 5 * tau), V, { color: MC(), glow: MC() });
-      D.text(ctx, "V", bx + bw - 20, by + 14, { color: MC(), size: 11 }); D.text(ctx, "I", bx + bw - 20, by + 28, { color: PL.col("accent-2"), size: 11 });
-      rTau.set(tau, 2); rV.set(V, 3);
+      g.dot(Math.min(t, 5 * tau), I, { color: PL.col("accent-2") });
+      D.text(ctx, "V", gx + gw - 20, gy + 14, { color: MC(), size: 11, weight: "700" }); D.text(ctx, "I", gx + gw - 20, gy + 28, { color: PL.col("accent-2"), size: 11, weight: "700" });
+      rTau.set(tau, 2); rV.set(V, 3); rI.set(I, 3);
     }
-    const anim = PL.loop(dt => { if (dt) { t += dt; if (t > 5 * (sR.get() * sC.get() / 1000)) anim.stop(); } draw(); });
+    const anim = PL.loop(dt => {
+      if (dt) {
+        const tau = sR.get() * sC.get() / 1000;
+        t += dt; flow += dt * 70 * Math.exp(-t / tau);
+        if (t > 5 * tau) anim.stop();
+      }
+      draw();
+    });
     cv.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
