@@ -177,8 +177,8 @@
       ctx.restore();
       if (thEnd < TAU) {
         const hp = P(thEnd);
-        D.disc(ctx, hp.x, hp.y, 5, { fill: "rgba(255,255,255,0.95)", glow: "rgb(" + beam + ")", glowSize: 16 });
-        D.text(ctx, "打到玻璃壁", PL.clamp(hp.x, bx - Rb * 0.6, bx + Rb * 0.6), PL.clamp(hp.y + 18, by - Rb * 0.8, by + Rb * 0.8), { color: "#ffe08a", size: 11, align: "center", weight: "700" });
+        D.disc(ctx, hp.x, hp.y, 5, { fill: "#fff0b0", glow: "rgb(" + beam + ")", glowSize: 16 });
+        D.text(ctx, "打到玻璃壁", hp.x + (bx - hp.x) * 0.3, hp.y + (by - hp.y) * 0.3 + 16, { color: "#ffe08a", size: 11, align: "center", weight: "700" });
       } else {
         D.disc(ctx, cx0, cy0, 2.2, { fill: "rgba(230,236,248,0.85)" });
       }
@@ -1172,7 +1172,7 @@
       ctx.stroke(); ctx.restore();
       D.disc(ctx, ip.x, ip.y, 5, { fill: "#9ad6ff", glow: "#5aa2ff", glowSize: 9 });
       if (phase === "arc") { const cx = sx + r, fl = Math.min(22 * s, r * 0.8); D.arrow(ctx, ip.x, ip.y, ip.x + (cx - ip.x) / r * fl, ip.y + (yE - ip.y) / r * fl, { color: "#ffc766", width: 2, label: "F", lsize: 10 }); }
-      if (phase === "hit") { D.disc(ctx, ip.x, ip.y, 6, { fill: "#fff", glow: "#ffd27a", glowSize: 16 }); D.text(ctx, "半徑太大：打到腔壁", PL.clamp(ip.x, x0 + 70 * s, x1 - 70 * s), ip.y - 14, { color: "#ffe08a", size: 11, align: "center", weight: "700" }); }
+      if (phase === "hit") { D.disc(ctx, ip.x, ip.y, 6, { fill: "#fff0b0", glow: "#ffd27a", glowSize: 16 }); D.text(ctx, "半徑太大：打到腔壁", PL.clamp(ip.x, x0 + 70 * s, x1 - 70 * s), ip.y - 14, { color: "#ffe08a", size: 11, align: "center", weight: "700" }); }
       if (phase === "land") D.disc(ctx, sx + 2 * r, plateY, 7, { fill: "rgba(255,236,160,0.9)", glow: "#ffe08a", glowSize: 16 });
       // 右上方兩台電源：選擇器電壓（E）與電磁鐵電流（B）
       const px0 = lx + 150 * s, bw = Math.min(150 * s, (W - 16 - px0 - 12) / 2);
