@@ -944,7 +944,7 @@
       AP.cable(ctx, [{ x: xR + pw / 2, y: topPlate.y }, { x: vm.l.x, y: topPlate.y }, vm.l], red, 2, 2);
       AP.cable(ctx, [{ x: xR + pw / 2, y: botPlate.y }, { x: vm.r.x, y: botPlate.y }, vm.r], blk, 2, 2);
       AP.lcd(ctx, W - 140 * s, sh - 32 * s, 124 * s, 22 * s, "t = " + PL.fmt(t, 2) + " s");
-      AP.valueChip(ctx, 12 * s, 8 * s, charging ? "充電中：電池 → 電阻 → 電容器" : "放電中：電容器 → 電阻（電池斷開）", charging ? "rgba(255,196,110,0.95)" : "rgba(120,190,255,0.95)");
+      AP.valueChip(ctx, 12 * s, 8 * s, W >= 640 ? (charging ? "充電中：電池 → 電阻 → 電容器" : "放電中：電容器 → 電阻（電池斷開）") : (charging ? "充電中" : "放電中"), charging ? "rgba(255,196,110,0.95)" : "rgba(120,190,255,0.95)");
       /* 下半部：V–t 與 I–t */
       const gx = 56, gy = sh + 24, gw = W - gx - 20, gh = H - gy - 22;
       const g = PL.graph(cv, { x: gx, y: gy, w: gw, h: gh }, { x0: 0, x1: 5 * tau, y0: charging ? 0 : -1.05, y1: 1.05 });

@@ -183,7 +183,7 @@
       D.arrow(ctx, cx, cy, cx + (bx - cx) * 0.4, cy + (by - cy) * 0.4, { color: PL.col("danger"), width: 2, label: "拉力" });
       const va = 18 + v * 6; D.arrow(ctx, bx, by, bx - va * Math.sin(ang), by + va * Math.cos(ang), { color: PL.col("accent-2"), width: 2, label: "v" });
       A.poolBall ? A.poolBall(ctx, bx, by, 12, "#2f6fd0", null) : D.disc(ctx, bx, by, 11, { fill: MC() });
-      D.text(ctx, "繩子從洞口往下拉", cx + 12, cy - 14, { color: PL.col("text-dim"), size: 10 });
+      D.text(ctx, "（繩子從中央的洞口往桌下拉）", cx, 30, { color: PL.col("text-dim"), size: 10.5, align: "center" });
       // 右下角側視小圖：桌面下的手把繩子往下拉，拉得越多半徑越小
       if (W >= 640 && A.infoCard) {
         const iw = 150, ih = 118, ix = W - iw - 12, iy = H - ih - 12;

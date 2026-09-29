@@ -315,8 +315,8 @@
       }
       // 螢光屏上的閃光
       flashes.forEach(f => D.disc(ctx, f.x, f.y, 2.5 + 5 * (1 - f.age), { fill: "rgba(150,255,176," + PL.fmt(1 - f.age, 2) + ")", glow: "rgba(150,255,176,0.9)", glowSize: 10 }));
-      // 左上：實驗裝置全貌（鉛盒 α 源 → 金箔 → 硫化鋅螢光屏）
-      {
+      // 左上：實驗裝置全貌（鉛盒 α 源 → 金箔 → 硫化鋅螢光屏）；畫面太窄時省略
+      if (W >= 520) {
         const ix = 12, iy = 12, iw = 196, ih = 104, cyI = iy + ih / 2 + 6;
         AP.infoCard(ctx, ix, iy, iw, ih);
         ctx.fillStyle = "rgb(70,74,82)"; ctx.fillRect(ix + 12, cyI - 12, 30, 24);

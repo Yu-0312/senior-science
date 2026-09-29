@@ -106,7 +106,7 @@
       const v = sV.get(), B = sB.get(), pos = sQ.get() === "pos", dir = pos ? 1 : -1;
       const benchY = Math.round(H * 0.88);
       AP.labRoom(ctx, W, H, benchY, {});
-      const Rb = Math.min(W * 0.19, benchY * 0.29), bx = W * 0.4, by = benchY * 0.47;
+      const Rb = Math.min(W * 0.19, benchY * 0.29, (benchY - 58) / 2.76), bx = W * 0.4, by = 28 + Rb * 1.38;
       const Rc = Rb * 1.3, tw = Rb * 0.16, ro = Rc + tw / 2, ri = Rc - tw / 2;
       const ox = Rb * 0.1, oy = -Rb * 0.07;                 // 後線圈的透視位移
       const coil = (cx, cy, back) => {
@@ -1144,7 +1144,7 @@
       const lx = sx + gx + pw + 16 * s;
       D.text(ctx, "速度選擇器", lx, selBot - 34 * s, { color: PL.col("text"), size: 11, weight: "700" });
       D.text(ctx, "qE = qvB ⇒ v = E/B", lx, selBot - 18 * s, { color: PL.col("text-dim"), size: 10 });
-      D.text(ctx, "太快撞 + 板、太慢撞 − 板", lx, selBot - 3 * s, { color: PL.col("text-faint"), size: 9.5 });
+      if (W >= 600) D.text(ctx, "太快撞 + 板、太慢撞 − 板", lx, selBot - 3 * s, { color: PL.col("text-faint"), size: 9.5 });
       // 底片（偵測板）：水平橫在磁場區頂端，入口處留一道狹縫
       const fy = plateY - 4, fh = 8;
       AP.steel(ctx, x0 - cw, fy - 3, sx - 5 - (x0 - cw), fh + 6, -6);
@@ -1182,7 +1182,7 @@
         const e2 = AP.powerSupply(ctx, px0 + bw + 12, top, bw, h, "B " + PL.fmt(B, 1), { label: "電磁鐵電流", knob: (B - 1) / 5, color: "rgb(130,230,255)" });
         AP.cable(ctx, [e1.red, { x: e1.red.x, y: top + h + 12 * s }, { x: sx + gx + pw / 2, y: selTop }], "rgb(186,54,48)", 2.2, 6);
         AP.cable(ctx, [e1.black, { x: e1.black.x, y: top + h + 18 * s }, { x: sx - gx - pw / 2, y: selTop }], "rgb(40,44,52)", 2.2, 8);
-        if (plateY - (top + h) > 110 * s) {
+        if (W >= 600 && plateY - (top + h) > 110 * s) {
           const ix = px0, iy = top + h + 34 * s, iw = bw * 2 + 12;
           AP.infoCard(ctx, ix, iy, iw, 48 * s);
           D.text(ctx, "底片上的感光痕：落點離入口 2r ∝ m", ix + 10, iy + 19 * s, { color: PL.col("text"), size: 10.5, weight: "700" });
