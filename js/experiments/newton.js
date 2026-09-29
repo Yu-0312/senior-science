@@ -83,16 +83,22 @@
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
 
-  /* 牛頓第二定律 F = ma */
+  /* 牛頓第二定律 F = ma —— 手拉彈簧秤＋打點計時器
+   *
+   * 舊版只有一台小車和一支箭頭。現在照課本的實驗：手透過彈簧秤以固定的力拉小車
+   * （秤的指針就是 F），小車尾巴拖著一條紙帶穿過打點計時器，每隔固定時間打一個點——
+   * 點距越來越大，「等加速度」就留在紙帶上看得見。
+   */
   PL.register("newton2", { build(root) {
     const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.52);
-    let x = 0, v = 0, t = 0;
-    const reset = () => { x = 0; v = 0; t = 0; };
+    let x = 0, v = 0, t = 0, dots = [], nextDot = 0;
+    const DT_DOT = 0.1;                                // 每 0.1 s 打一點
+    const reset = () => { x = 0; v = 0; t = 0; dots = []; nextDot = 0; };
     const sF = PL.ui.slider(L.controls, { label: "施力 F", min: 0, max: 24, step: 1, value: 10, unit: "N", digits: 0, onInput: reset });
     const sM = PL.ui.slider(L.controls, { label: "質量 m", min: 0.5, max: 10, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: reset });
     const row = PL.ui.buttonRow(L.controls);
-    const bP = PL.ui.button(row, "施力", () => { reset(); anim.start(); }, { primary: true });
+    PL.ui.button(row, "施力", () => { reset(); anim.start(); }, { primary: true });
     PL.ui.button(row, "重設", reset);
     const rA = PL.ui.readout(L.readouts, { label: "加速度 a", unit: "m/s²" });
     const rV = PL.ui.readout(L.readouts, { label: "速度 v", unit: "m/s" });
@@ -100,12 +106,16 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const AP = PL.apparatus;
-      const gy = H - 40, a = sF.get() / sM.get();
-      // 軌道：小車跑在導軌上，質量越大車身越寬
+      const gy = H - 40, F = sF.get(), a = F / sM.get();
       AP.benchTop(ctx, W, H, gy + 6);
       AP.steel(ctx, 18, gy, W - 36, 7, -6);
-      const sc = (W - 140) / 24, px = 70 + (x % 24) * sc;
-      const w = 56 + sM.get() * 6, ch = 30 + sM.get() * 1.5;
+      const x0 = 176, sc = (W - 340) / 24;               // 0–24 m 的行程
+      const w = 56 + sM.get() * 6, ch = 30 + sM.get() * 1.5, px = x0 + Math.min(x, 24) * sc;
+      // 打點計時器與紙帶：點是在計時器底下打的，之後跟著紙帶一起被拉走
+      const tx = 70, tapeY = gy - 16;
+      AP.paperTape(ctx, tx - 58, px - w / 2, tapeY, 12);
+      dots.forEach(xk => { const dx = tx + (x - xk) * sc; if (dx < px - w / 2 - 2 && dx > tx - 56) D.disc(ctx, dx, tapeY, 1.8, { fill: "#26262c" }); });
+      AP.tickerTimer(ctx, tx, tapeY, 10, v > 0.01);
       AP.cart(ctx, px, gy, w, ch, {});
       // 車上疊的砝碼越多，車越重：質量是看得見的
       const nW = Math.max(1, Math.min(8, Math.round(sM.get())));
@@ -115,12 +125,23 @@
         AP.weight(ctx, px - 21 + col * 14, bodyTop - 16 - rowI * 17, 12, 16, null);
       }
       D.text(ctx, sM.get() + " kg", px, bodyTop - 20 - Math.ceil(nW / 4) * 17, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
-      if (sF.get() > 0) D.arrow(ctx, px + w / 2 + 4, gy - ch / 2 - 6, px + w / 2 + 4 + sF.get() * 5, gy - ch / 2 - 6, { color: PL.col("accent-2"), width: 2.5, label: "F = " + sF.get() + " N" });
-      // a 長條
+      // 手透過彈簧秤拉車：指針位置就是施力 F
+      const hy = gy - ch / 2 - 8, hx = px + w / 2 + 6;
+      AP.springScale(ctx, hx, hy, 70, F / 24);
+      AP.hand(ctx, hx + 86, hy, -1, 0.85, { pull: true });
+      if (F > 0) D.arrow(ctx, hx + 4, hy - 24, hx + 4 + F * 4, hy - 24, { color: PL.col("accent-2"), width: 2.5, label: "F = " + F + " N" });
       D.text(ctx, "a = F / m = " + PL.fmt(a, 2) + " m/s²", 24, 28, { color: MC(), size: 13 });
+      D.text(ctx, "紙帶每 0.1 s 打一點：點距越來越大 → 等加速度", 24, 48, { color: PL.col("text-dim"), size: 10.5 });
       rA.set(a, 2); rV.set(v, 2); rX.set(x, 1);
     }
-    const anim = PL.loop(dt => { if (dt) { const a = sF.get() / sM.get(); v += a * dt; x += v * dt; t += dt; if (x > 48) reset(); } draw(); });
+    const anim = PL.loop(dt => {
+      if (dt) {
+        const a = sF.get() / sM.get(); v += a * dt; x += v * dt; t += dt;
+        while (t >= nextDot) { dots.push(x); nextDot += DT_DOT; }
+        if (x > 24) reset();
+      }
+      draw();
+    });
     cv.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
@@ -151,14 +172,25 @@
       const AP = PL.apparatus;
       AP.benchTop(ctx, W, H, A.y + 4);
       AP.ramp(ctx, A.x, A.y, Lpx, th);
-      AP.protractorArc = null;   // 保留欄位供日後量角器使用
-      D.text(ctx, sTh.get() + "°", A.x + 34, A.y - 8, { color: PL.col("text-dim"), size: 12, weight: "700" });
       const u = { x: -Math.cos(th), y: Math.sin(th) }; // 下坡方向
       const n = { x: -Math.sin(th), y: -Math.cos(th) }; // 外法線
-      const bs = Math.min(s, Lpx - 30);
-      const bx = apex.x + u.x * (bs + 24), by = apex.y + u.y * (bs + 24);
-      AP.woodBlock(ctx, bx, by - 6, 40, 26, -th);
-      const cx = bx + n.x * 18, cy = by + n.y * 18; const FS = 26;
+      // 斜面上貼的刻度尺（每一格代表斜面長的十分之一）
+      ctx.save(); ctx.strokeStyle = PL.theme.isLight() ? "rgba(60,50,30,0.55)" : "rgba(230,220,200,0.5)"; ctx.lineWidth = 1; ctx.beginPath();
+      for (let k = 1; k < 20; k++) {
+        const d = Lpx * k / 20, px = A.x + Math.cos(th) * d, py = A.y - Math.sin(th) * d, l = k % 2 ? 4 : 8;
+        ctx.moveTo(px + n.x * 2, py + n.y * 2); ctx.lineTo(px + n.x * (2 + l), py + n.y * (2 + l));
+      }
+      ctx.stroke(); ctx.restore();
+      // 底角的量角器弧
+      ctx.save(); ctx.strokeStyle = PL.col("text-dim"); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(A.x, A.y, 52, -th, 0); ctx.stroke();
+      ctx.lineWidth = 1; ctx.beginPath();
+      for (let dg = 0; dg <= sTh.get(); dg += 5) { const r0 = dg % 10 === 0 ? 45 : 48, aa = -dg * Math.PI / 180; ctx.moveTo(A.x + Math.cos(aa) * r0, A.y + Math.sin(aa) * r0); ctx.lineTo(A.x + Math.cos(aa) * 52, A.y + Math.sin(aa) * 52); }
+      ctx.stroke(); ctx.restore();
+      D.text(ctx, "θ = " + sTh.get() + "°", A.x + 60, A.y - 10, { color: PL.col("text"), size: 12, weight: "700" });
+      const s0 = Lpx * 0.24, bs = Math.min(s, Lpx - s0 - 40);      // 木塊從斜面上段放手，力的箭頭才有空間
+      const bx = apex.x + u.x * (bs + s0), by = apex.y + u.y * (bs + s0);
+      AP.woodBlock(ctx, bx, by - 6, 54, 34, -th);
+      const cx = bx + n.x * 23, cy = by + n.y * 23; const FS = 72;
       D.arrow(ctx, cx, cy, cx, cy + FS * 1.4, { color: PL.col("warn"), width: 2, label: "mg" });
       D.arrow(ctx, cx, cy, cx + n.x * FS * Math.cos(th), cy + n.y * FS * Math.cos(th), { color: PL.col("accent-2"), width: 2, label: "N" });
       D.arrow(ctx, cx, cy, cx + u.x * FS * Math.sin(th), cy + u.y * FS * Math.sin(th), { color: "#7ee0c0", width: 2, label: "mg sinθ", dash: [3, 3] });
@@ -175,7 +207,7 @@
       gg.dot(sTh.get(), a, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
     }
     const anim = PL.loop(dt => {
-      if (dt) { const th = sTh.get() * Math.PI / 180, mu = sMu.get(); const a = Math.tan(th) > mu ? 9.8 * (Math.sin(th) - mu * Math.cos(th)) : 0; v += a * dt * 8; s += v * dt; const Lpx = Math.min((cv.W - 120) / Math.cos(th), (cv.H - 90) / Math.sin(th)); if (s > Lpx - 54) { s = 0; v = 0; } }
+      if (dt) { const th = sTh.get() * Math.PI / 180, mu = sMu.get(); const a = Math.tan(th) > mu ? 9.8 * (Math.sin(th) - mu * Math.cos(th)) : 0; v += a * dt * 8; s += v * dt; const Lpx = Math.min((cv.W - 120) / Math.cos(th), (cv.H - 90) / Math.sin(th)); if (s > Lpx * 0.76 - 44) { s = 0; v = 0; } }
       draw();
     });
     cv.onResize(draw); cc.onResize(draw); draw();
