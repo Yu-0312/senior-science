@@ -5,10 +5,16 @@
   const MC = () => PL.col("m-color", "#4db6ac");
   const POS = "#ff6b6b", NEG = "#5aa2ff";
 
-  /* 庫侖定律 */
+  /* 庫侖定律 —— 絕緣架上的兩顆帶電金屬球，中間畫出電力線
+   *
+   * 舊版兩顆球只有 10–20 px，擠在畫面頂端一條窄帶裡，其餘全是圖表。
+   * 現在上方是實驗桌：兩顆金屬球立在壓克力絕緣架上，桌前一支公分尺量 r，
+   * 球面上的 +／− 記號多寡代表電量，兩球之間的電力線隨同性／異性電荷改變形狀
+   * （異性相連、同性互相排開），兩球受力一樣大、方向相反。
+   */
   PL.register("coulomb", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
-    const cv = PL.canvas.create(L.canvasWrap, 0.62);
+    const cv = PL.canvas.create(L.canvasWrap, 0.7);
     const sQ1 = PL.ui.slider(L.controls, { label: "電荷 q₁", min: -5, max: 5, step: 0.5, value: 3, unit: "μC", digits: 1, onInput: draw });
     const sQ2 = PL.ui.slider(L.controls, { label: "電荷 q₂", min: -5, max: 5, step: 0.5, value: -2, unit: "μC", digits: 1, onInput: draw });
     const sR = PL.ui.slider(L.controls, { label: "距離 r", min: 2, max: 10, step: 0.5, value: 5, unit: "cm", digits: 1, onInput: draw });
@@ -17,36 +23,79 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const q1 = sQ1.get(), q2 = sQ2.get(), r = sR.get(), F = 9 * q1 * q2 / (r * r);
-      const attract = q1 * q2 < 0, cy = 88, ox = 70, sc = (W - 140) / 10, x1 = ox, x2 = ox + r * sc;
-      const AP = PL.apparatus;
-      /* 兩顆帶電金屬球，各自架在絕緣支架上 */
-      AP.labStrip(ctx, W, 146, 138, {});
-      const drawQ = (x, q) => {
-        const rr = 10 + Math.abs(q) * 2;
-        ctx.fillStyle = "rgba(230,236,244,0.85)"; ctx.fillRect(x - 2.5, cy + rr, 5, 138 - cy - rr);
-        AP.steel(ctx, x - 14, 134, 28, 5, -6);
-        AP.sportBall(ctx, x, cy, rr, "steel");
-        ctx.save(); ctx.globalAlpha = 0.35; D.disc(ctx, x, cy, rr + 3, { fill: q >= 0 ? POS : NEG, glow: q >= 0 ? POS : NEG, glowSize: 14 }); ctx.restore();
-        D.text(ctx, (q >= 0 ? "+" : "−") + Math.abs(q), x, cy + 4, { color: q >= 0 ? "#b3261e" : "#1d4ed8", size: 12, align: "center", weight: "800" });
+      const attract = q1 * q2 < 0, AP = PL.apparatus;
+      const sh = Math.round(H * 0.46), benchY = sh - 16, cy = Math.round(benchY * 0.46);
+      const ox = 90, sc = (W - 180) / 10, x1 = ox, x2 = ox + r * sc;
+      const r1 = 12 + Math.abs(q1) * 2.4, r2 = 12 + Math.abs(q2) * 2.4;
+      AP.labStrip(ctx, W, sh, benchY, {});
+      // 電力線：從電荷出發沿電場一步一步走，碰到另一顆球或走出桌面上方就停
+      const Ex = (x, y) => { let ex = 0, ey = 0; [[x1, q1], [x2, q2]].forEach(c => { const dx = x - c[0], dy = y - cy, d2 = dx * dx + dy * dy, d = Math.sqrt(d2) || 1; ex += c[1] * dx / (d2 * d); ey += c[1] * dy / (d2 * d); }); return [ex, ey]; };
+      const trace = (sx, sy, sgn) => {
+        const pts = [[sx, sy]]; let x = sx, y = sy;
+        for (let k = 0; k < 420; k++) {
+          const e = Ex(x, y), m = Math.hypot(e[0], e[1]) || 1;
+          x += sgn * e[0] / m * 3; y += sgn * e[1] / m * 3;
+          if (x < 2 || x > W - 2 || y < 4 || y > benchY - 4) break;
+          if (Math.hypot(x - x1, y - cy) < r1 || Math.hypot(x - x2, y - cy) < r2) { pts.push([x, y]); break; }
+          pts.push([x, y]);
+        }
+        return pts;
       };
-      drawQ(x1, q1); drawQ(x2, q2);
-      const fl = PL.clamp(Math.abs(F) * 3, 6, 70), dir = attract ? -1 : 1;
-      D.arrow(ctx, x1, cy - 30, x1 + dir * fl, cy - 30, { color: PL.col("warn"), width: 2.4 });
-      D.arrow(ctx, x2, cy - 30, x2 - dir * fl, cy - 30, { color: PL.col("warn"), width: 2.4 });
-      D.line(ctx, x1, cy + 32, x2, cy + 32, PL.col("text-dim"), 1, [3, 3]); D.text(ctx, "r = " + r + " cm", (x1 + x2) / 2, cy + 46, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
-      const bx = 44, by = 164, bw = W - 80, bh = H - by - 16;
+      const lines = [];
+      const seed = (cx0, q, rr) => {
+        const n = Math.min(14, Math.round(Math.abs(q) * 2.6));
+        for (let i = 0; i < n; i++) { const a = (i + 0.5) / n * TAU; lines.push({ pts: trace(cx0 + Math.cos(a) * (rr + 2), cy + Math.sin(a) * (rr + 2), Math.sign(q)), sgn: Math.sign(q) }); }
+      };
+      if (q1) seed(x1, q1, r1);
+      if (q2 && (!q1 || Math.sign(q2) === Math.sign(q1))) seed(x2, q2, r2);
+      ctx.save(); ctx.strokeStyle = PL.theme.isLight() ? "rgba(214,120,30,0.5)" : "rgba(255,196,110,0.45)"; ctx.lineWidth = 1.2;
+      lines.forEach(l => { if (l.pts.length < 3) return; ctx.beginPath(); l.pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke(); });
+      ctx.restore();
+      lines.forEach(l => {
+        if (l.pts.length < 12) return;
+        const k = Math.floor(l.pts.length * 0.4), a = l.pts[k], b = l.pts[k + 1], dx = (b[0] - a[0]) * l.sgn, dy = (b[1] - a[1]) * l.sgn, m = Math.hypot(dx, dy) || 1;
+        D.arrow(ctx, a[0] - dx / m * 4, a[1] - dy / m * 4, a[0] + dx / m * 4, a[1] + dy / m * 4, { color: PL.theme.isLight() ? "rgba(214,120,30,0.75)" : "rgba(255,196,110,0.7)", width: 1.2, head: 5 });
+      });
+      // 桌前的公分尺：兩球球心分別對準 0 與 r
+      const ry = benchY + 2;
+      ctx.fillStyle = "rgb(246,238,206)"; ctx.fillRect(ox - 16, ry, 10 * sc + 32, 12);
+      ctx.strokeStyle = "rgba(120,104,60,0.7)"; ctx.lineWidth = 1; ctx.strokeRect(ox - 15.5, ry + 0.5, 10 * sc + 31, 11);
+      ctx.beginPath();
+      for (let c = 0; c <= 20; c++) { const x = Math.round(ox + c * sc / 2) + 0.5; ctx.moveTo(x, ry); ctx.lineTo(x, ry + (c % 2 ? 4 : 7)); }
+      ctx.stroke();
+      PL.theme.note(ctx, "rgb(246,238,206)", ox - 16, ry, 10 * sc + 32, 12);
+      for (let c = 0; c <= 10; c += 2) D.text(ctx, String(c), ox + c * sc, ry + 11, { color: "#5a4a20", size: 8, align: "center" });
+      // 絕緣架與帶電金屬球
+      const ball = (x, q, rr) => {
+        ctx.fillStyle = "rgba(214,232,246,0.55)"; ctx.fillRect(x - 3, cy + rr, 6, benchY - 6 - cy - rr);
+        ctx.strokeStyle = "rgba(120,150,180,0.6)"; ctx.lineWidth = 1; ctx.strokeRect(x - 3.5, cy + rr, 7, benchY - 6 - cy - rr);
+        AP.steel(ctx, x - 18, benchY - 6, 36, 6, -6);
+        ctx.save(); ctx.globalAlpha = 0.3; D.disc(ctx, x, cy, rr + 4, { fill: q >= 0 ? POS : NEG, glow: q >= 0 ? POS : NEG, glowSize: 14 }); ctx.restore();
+        AP.sportBall(ctx, x, cy, rr, "steel");
+        const n = Math.min(10, Math.round(Math.abs(q) * 2));
+        for (let i = 0; i < n; i++) { const a = i / n * TAU - Math.PI / 2; D.text(ctx, q >= 0 ? "+" : "−", x + Math.cos(a) * rr * 0.62, cy + Math.sin(a) * rr * 0.62 + 4, { color: q >= 0 ? "#b3261e" : "#1d4ed8", size: 10, align: "center", weight: "800" }); }
+        D.text(ctx, (q >= 0 ? "+" : "−") + Math.abs(q) + " μC", x, cy - rr - 8, { color: q >= 0 ? POS : NEG, size: 11, align: "center", weight: "800" });
+      };
+      ball(x1, q1, r1); ball(x2, q2, r2);
+      // 一對大小相等、方向相反的靜電力
+      if (q1 && q2) {
+        const fl = PL.clamp(12 + Math.abs(F) * 5, 12, 90), dir = attract ? 1 : -1;
+        const s1 = x1 + dir * (r1 + 3), s2 = x2 - dir * (r2 + 3);
+        D.arrow(ctx, s1, cy, s1 + dir * fl, cy, { color: PL.col("warn"), width: 2.8, label: "F" });
+        D.arrow(ctx, s2, cy, s2 - dir * fl, cy, { color: PL.col("warn"), width: 2.8, label: "F" });
+      }
+      D.text(ctx, (attract ? "異性相吸" : q1 * q2 > 0 ? "同性相斥" : "有一顆不帶電：沒有靜電力") + "　r = " + r + " cm", W - 16, 20, { color: PL.col("text"), size: 11.5, align: "right", weight: "700" });
+      // 下方：靜電力大小對距離（平方反比）
+      const bx = 44, by = sh + 22, bw = W - 80, bh = H - by - 18;
       const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 2, x1: 10, y0: 0, y1: 9 * Math.abs(q1 * q2) / 4 * 1.1 + 1 });
-      g.frame({ title: "靜電力大小對距離（平方反比）", xlabel: "r", ylabel: "|F|" }); g.grid(4, 4);
+      g.frame({ title: "靜電力大小對距離（平方反比）", xlabel: "r (cm)", ylabel: "|F|" }); g.grid(4, 4);
       g.fn(rr => 9 * Math.abs(q1 * q2) / (rr * rr), { color: MC(), width: 2.2 });
       g.dot(r, Math.abs(F), { color: PL.col("warn"), glow: PL.col("warn") });
-      rF.set(Math.abs(F), 2); rDir.set(attract ? "相吸" : "相斥");
+      rF.set(Math.abs(F), 2); rDir.set(attract ? "相吸" : q1 * q2 > 0 ? "相斥" : "無");
     }
     cv.onResize(draw); draw();
     return { stop() { cv.destroy(); }, rerender: draw };
   }});
-
-
-
 
   /* 歐姆定律與電路 */
   /* 歐姆定律與電路 —— 旗艦改版

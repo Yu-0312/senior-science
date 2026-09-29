@@ -89,25 +89,38 @@
     const rV = PL.ui.readout(L.readouts, { label: "速度 v", unit: "m/s" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const m = sM.get();
-      const gy = 104, sc = (W - 120) / 16, px = 70 + (x % 16) * sc, K = 0.5 * m * v * v;
-      /*
-       * 方塊尺寸跟著質量走。原本固定 40×26，於是靜止時調整質量畫面完全不動，
-       * 學生看不出自己改的是「哪一個東西的什麼性質」。
-       * 同時也讓「同樣的力推更重的東西，加速度較小」有一個可以先預期的視覺線索。
-       */
+      const A = AP(), m = sM.get(), F = sF.get(), f = sFr.get();
+      /* 實驗桌上的軌道：手拉彈簧秤以固定的力 F 拉小車，桌前的尺量位移 s——淨功就是 (F − f)·s */
+      const gy = Math.round(H * 0.44), sc = (W - 170) / 16, x0 = 70, px = x0 + Math.min(x, 16) * sc, K = 0.5 * m * v * v;
       const bw = 40 + m * 7, bh = 24 + m * 2.4;
-      AP().benchTop && AP().benchTop(ctx, W, H, gy + 4);
-      AP().cart ? AP().cart(ctx, px, gy, bw + 10, bh)
-                : D.rect(ctx, px - bw / 2, gy - bh, bw, bh, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 4 });
-      D.text(ctx, PL.fmt(m, 1) + " kg", px, gy - bh - 14, { color: PL.col("text"), size: 10, align: "center", weight: "700" });
-      D.arrow(ctx, px + bw / 2, gy - bh / 2, px + bw / 2 + sF.get() * 4, gy - bh / 2, { color: KEc, width: 2.2, label: "F" });
-      if (sFr.get() > 0) D.arrow(ctx, px - bw / 2, gy - bh / 2, px - bw / 2 - sFr.get() * 4, gy - bh / 2, { color: THc, width: 2, label: "f" });
-      energyBars(cv, 40, gy + 56, W - 120, [{ label: "淨功", v: Wnet, c: MC() }, { label: "動能 K", v: K, c: KEc }], Math.max(Wnet, K, 10));
+      A.labRoom(ctx, W, H, gy + 10, { window: { x: W * 0.74, y: 14, w: Math.min(150, W * 0.18), h: gy * 0.5 } });
+      A.steel(ctx, 20, gy - 1, W - 40, 7, -6);
+      // 桌前的公尺尺與位移
+      const ry = gy + 12;
+      ctx.fillStyle = "rgb(246,238,206)"; ctx.fillRect(x0 - 10, ry, 16 * sc + 20, 13);
+      ctx.strokeStyle = "rgba(120,104,60,0.7)"; ctx.lineWidth = 1; ctx.strokeRect(x0 - 9.5, ry + 0.5, 16 * sc + 19, 12);
+      ctx.beginPath(); for (let k = 0; k <= 16; k++) { const xx = Math.round(x0 + k * sc) + 0.5; ctx.moveTo(xx, ry); ctx.lineTo(xx, ry + (k % 2 ? 4 : 7)); } ctx.stroke();
+      PL.theme.note(ctx, "rgb(246,238,206)", x0 - 10, ry, 16 * sc + 20, 13);
+      for (let k = 0; k <= 16; k += 4) D.text(ctx, k + " m", x0 + k * sc, ry + 12, { color: "#5a4a20", size: 8, align: "center" });
+      D.line(ctx, x0, gy - bh - 30, x0, gy + 4, PL.col("text-faint"), 1, [4, 4]);
+      if (x > 0.05) {
+        D.line(ctx, x0, gy - bh - 22, px, gy - bh - 22, PL.col("text-dim"), 1.2);
+        D.text(ctx, "s = " + PL.fmt(Math.min(x, 16), 1) + " m", (x0 + px) / 2, gy - bh - 27, { color: PL.col("text-dim"), size: 10, align: "center" });
+      }
+      A.cart(ctx, px, gy, bw + 10, bh);
+      D.text(ctx, PL.fmt(m, 1) + " kg", px, gy - bh - 8, { color: PL.col("text"), size: 10, align: "center", weight: "700" });
+      // 手拉彈簧秤：指針就是 F
+      const hy = gy - bh / 2 - 8, hx = px + (bw + 10) / 2 + 6;
+      A.springScale(ctx, hx, hy, 62, F / 20);
+      A.hand(ctx, hx + 78, hy, -1, 0.85, { pull: true });
+      D.arrow(ctx, hx + 4, hy - 22, hx + 4 + F * 4, hy - 22, { color: KEc, width: 2.2, label: "F" });
+      if (f > 0) D.arrow(ctx, px - bw / 2, gy - 6, px - bw / 2 - f * 4, gy - 6, { color: THc, width: 2, label: "f" });
+      energyBars(cv, 40, gy + 60, W - 120, [{ label: "淨功", v: Wnet, c: MC() }, { label: "動能 K", v: K, c: KEc }], Math.max(Wnet, K, 10));
+      D.text(ctx, "W淨 = (F − f)·s = (" + F + " − " + f + ")·s　　K = ½mv²", 40, gy + 120, { color: PL.col("text-dim"), size: 11 });
       PL.ui.caption(cv, "淨功 = 動能變化：兩條長條始終等長");
       rWn.set(Wnet, 1); rK.set(K, 1); rV.set(v, 2);
     }
-    const anim = PL.loop(dt => { if (dt) { const F = sF.get(), f = sFr.get(), m = sM.get(); const net = F - f; const a = net / m; const dx = Math.max(0, v) * dt + 0.5 * a * dt * dt; v += a * dt; x += Math.max(0, dx); Wnet += net * Math.max(0, dx); if (x > 32) reset(); } draw(); });
+    const anim = PL.loop(dt => { if (dt) { const F = sF.get(), f = sFr.get(), m = sM.get(); const net = F - f; const a = net / m; const dx = Math.max(0, v) * dt + 0.5 * a * dt * dt; v += a * dt; x += Math.max(0, dx); Wnet += net * Math.max(0, dx); if (x > 16) reset(); } draw(); });
     cv.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
