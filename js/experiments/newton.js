@@ -307,13 +307,13 @@
   PL.register("newton3", { build(root) {
     const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.5);
-    let phase = "idle", x1 = 0, x2 = 0, v1 = 0, v2 = 0, pt = 0;
+    let phase = "idle", x1 = 0, x2 = 0, v1 = 0, v2 = 0, pt = 0, tt = -1;
     const sF = PL.ui.slider(L.controls, { label: "互推力 F", min: 4, max: 24, step: 1, value: 12, unit: "N", digits: 0 });
     const sm1 = PL.ui.slider(L.controls, { label: "左車質量 m₁", min: 1, max: 8, step: 0.5, value: 2, unit: "kg", digits: 1 });
     const sm2 = PL.ui.slider(L.controls, { label: "右車質量 m₂", min: 1, max: 8, step: 0.5, value: 4, unit: "kg", digits: 1 });
     const row = PL.ui.buttonRow(L.controls);
-    PL.ui.button(row, "互推", () => { x1 = 0; x2 = 0; v1 = 0; v2 = 0; pt = 0; phase = "push"; anim.start(); }, { primary: true });
-    PL.ui.button(row, "重設", () => { phase = "idle"; x1 = x2 = v1 = v2 = 0; });
+    PL.ui.button(row, "互推", () => { x1 = 0; x2 = 0; v1 = 0; v2 = 0; pt = 0; tt = 0; phase = "push"; anim.start(); }, { primary: true });
+    PL.ui.button(row, "重設", () => { phase = "idle"; x1 = x2 = v1 = v2 = 0; tt = -1; });
     PL.ui.note(L.controls, "兩車受力大小相等、方向相反；質量小的車獲得較大加速度。");
     const rA1 = PL.ui.readout(L.readouts, { label: "左車 a₁", unit: "m/s²" });
     const rA2 = PL.ui.readout(L.readouts, { label: "右車 a₂", unit: "m/s²" });
@@ -358,6 +358,26 @@
       D.arrow(ctx, bx2, gy - 84, bx2 + a2 * aScale, gy - 84,
         { color: PL.col("warn"), width: 2, head: 7, label: "a₂=" + PL.fmt(a2, 1) });
 
+      /* 兩支力感測器接到資料擷取器：互推期間一條 +F、一條 −F，互為鏡像——作用力與反作用力同時出現、同時消失 */
+      if (W >= 520) {
+        const lw = Math.min(260, W * 0.34), lh = lw * 0.62, lx = W - lw - 16, ly = 12;
+        const scr = AP.laptop(ctx, lx, ly, lw, lh);
+        const T0 = -0.08, T1 = 0.72, X = t => scr.x + 8 + (scr.w - 16) * (t - T0) / (T1 - T0), Y = f => scr.y + scr.h / 2 - f / 26 * (scr.h / 2 - 12);
+        ctx.save(); ctx.strokeStyle = "rgba(160,190,220,0.35)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(scr.x + 6, Y(0)); ctx.lineTo(scr.x + scr.w - 6, Y(0)); ctx.stroke(); ctx.restore();
+        const pulse = (t, sg) => (t >= 0 && t < 0.35) ? sg * F : 0;
+        const plot = (sg, col, upto, dash) => {
+          ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 1.8; if (dash) ctx.setLineDash([4, 3]);
+          ctx.beginPath(); for (let t = T0; t <= upto + 1e-9; t += 0.004) { const x = X(t), y = Y(pulse(t, sg)); t === T0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
+        };
+        const rec = tt < 0 ? T0 : Math.min(T1, tt);
+        if (rec < T1) { plot(-1, "rgba(255,120,110,0.4)", T1, true); plot(1, "rgba(110,170,255,0.4)", T1, true); }
+        if (rec > T0) { plot(-1, "#ff7b6e", rec, false); plot(1, "#6fb0ff", rec, false); }
+        ctx.save(); ctx.font = "700 9.5px system-ui,sans-serif"; ctx.textAlign = "left";
+        ctx.fillStyle = "#6fb0ff"; ctx.fillText("右車受力 +" + F + " N", scr.x + 8, scr.y + 13);
+        ctx.fillStyle = "#ff7b6e"; ctx.fillText("左車受力 −" + F + " N", scr.x + 8, scr.y + scr.h - 6);
+        ctx.fillStyle = "rgba(210,222,238,0.8)"; ctx.textAlign = "right"; ctx.fillText("力感測器 F–t", scr.x + scr.w - 6, scr.y + 13);
+        ctx.restore();
+      }
       PL.ui.caption(cv, Math.abs(m1 - m2) < 0.05
         ? "兩車質量相同：受力相等，加速度也相等，畫面完全對稱。"
         : "兩支紅／藍箭頭一樣長——作用力與反作用力大小永遠相等。" +
@@ -366,6 +386,7 @@
     }
     const anim = PL.loop(dt => {
       if (dt) {
+        if (tt >= 0 && tt < 5) tt += dt;
         if (phase === "push") { const F = sF.get(); v1 += F / sm1.get() * dt; v2 += F / sm2.get() * dt; pt += dt; if (pt > 0.35) phase = "glide"; }
         if (phase !== "idle") { x1 += v1 * dt; x2 += v2 * dt; if (cv.W / 2 + 34 + x2 * 30 > cv.W - 30 || cv.W / 2 - 34 - x1 * 30 < 30) phase = "idle"; }
       }

@@ -458,7 +458,7 @@
   PL.register("heat", { build(root) {
     const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.56);
-    let T1, T2, running = false;
+    let T1, T2, running = false, tRun = 0;
     const s1 = PL.ui.slider(L.controls, { label: "物體1 溫度", min: 0, max: 100, step: 1, value: 80, unit: "°C", digits: 0, onInput: reset });
     const sm1 = PL.ui.slider(L.controls, { label: "物體1 質量", min: 0.5, max: 4, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: reset });
     const s2 = PL.ui.slider(L.controls, { label: "物體2 溫度", min: 0, max: 100, step: 1, value: 20, unit: "°C", digits: 0, onInput: reset });
@@ -469,60 +469,55 @@
     const rTf = PL.ui.readout(L.readouts, { label: "熱平衡溫度", unit: "°C" });
     const rT1 = PL.ui.readout(L.readouts, { label: "物體1", unit: "°C" });
     const rT2 = PL.ui.readout(L.readouts, { label: "物體2", unit: "°C" });
-    function reset() { T1 = s1.get(); T2 = s2.get(); running = false; }
+    function reset() { T1 = s1.get(); T2 = s2.get(); running = false; tRun = 0; }
     reset();
     const tcol = T => { const t = PL.clamp(T / 100, 0, 1); return `rgb(${Math.round(60 + 195 * t)},${Math.round(120 - 60 * t)},${Math.round(220 - 200 * t)})`; };
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const Tf = (sm1.get() * T1 + sm2.get() * T2) / (sm1.get() + sm2.get());
+      const m1 = sm1.get(), m2 = sm2.get(), Tf = (m1 * T1 + m2 * T2) / (m1 + m2);
       const AP = PL.apparatus;
-      const cy = H / 2, w1 = 60 + sm1.get() * 14, w2 = 60 + sm2.get() * 14;
-      AP.benchTop(ctx, W, H, cy + 44);
-      /* 兩杯水：杯寬正比於質量，水色仍隨溫度變化。
-         比起兩個色塊，燒杯讓「把兩杯水倒在一起」這個動作有具體對象。 */
-      ctx.save();
-      ctx.fillStyle = tcol(T1);
-      ctx.fillRect(W / 2 - w1 - 6 + 3, cy - 34, w1 - 6, 70);
-      ctx.fillStyle = tcol(T2);
-      ctx.fillRect(W / 2 + 6 + 3, cy - 34, w2 - 6, 70);
-      ctx.restore();
-      AP.beaker(ctx, W / 2 - w1 / 2 - 6, cy + 40, w1, 84, 0.84);
-      AP.beaker(ctx, W / 2 + w2 / 2 + 6, cy + 40, w2, 84, 0.84);
-      D.text(ctx, PL.fmt(T1, 0) + "°C", W / 2 - w1 / 2 - 6, cy + 4, { color: "#fff", size: 14, align: "center", weight: "700" });
-      D.text(ctx, PL.fmt(T2, 0) + "°C", W / 2 + w2 / 2 + 6, cy + 4, { color: "#fff", size: 14, align: "center", weight: "700" });
-
-      /*
-       * 溫度原本只改變方塊的顏色。顏色沒有刻度，學生無法從畫面判讀溫度高低，
-       * 更看不出「兩者往中間靠攏」的過程——量化檢查也證實這兩根滑桿
-       * 對畫面的幾何完全沒有作用。
-       *
-       * 補上兩支溫度計：水銀柱高度正比於溫度，並畫出混合後的終溫虛線。
-       * 終溫偏向質量大的那一邊，是這個實驗真正要教的事，
-       * 現在用兩支柱子與一條虛線就看得出來。
-       */
-      const thX = 46, thW = 22, thTop = cy - 92, thH = 168;
-      const tempY = T => thTop + thH * (1 - PL.clamp(T, 0, 100) / 100);
-      [[thX, T1, "物體1", MC()], [W - thX - thW, T2, "物體2", PL.col("accent-2")]].forEach(([x, T, lab, c]) => {
-        AP.thermometer(ctx, x + thW / 2, thTop, thTop + thH, thW, PL.clamp(T, 0, 100) / 100);
-        D.rect(ctx, x, thTop, 0, 0, { });
-        for (let v = 0; v <= 100; v += 20) {
-          D.line(ctx, x + thW, tempY(v), x + thW + 5, tempY(v), PL.col("text-faint"), 1);
-          D.text(ctx, String(v), x + thW + 8, tempY(v) + 3, { color: PL.col("text-faint"), size: 8 });
-        }
-        D.text(ctx, lab, x + thW / 2, thTop - 8, { color: c, size: 10, align: "center", weight: "700" });
-      });
-      // 終溫：兩支溫度計最後都會停在這條線上
-      D.line(ctx, thX, tempY(Tf), W - thX, tempY(Tf), PL.col("warn"), 1.4, [6, 5]);
-      D.text(ctx, "終溫 " + PL.fmt(Tf, 1) + " °C", W / 2, tempY(Tf) - 7,
-        { color: PL.col("warn"), size: 10.5, align: "center", weight: "700" });
-
-      D.text(ctx, "熱量由高溫流向低溫 →", W / 2, cy - 56, { color: PL.col("text-dim"), size: 11, align: "center" });
+      /* 左半：兩杯水靠在一起（中間夾一片銅板），溫度計插在水裡；右半：溫度–時間曲線 */
+      const benchY = Math.round(H * 0.8), sceneW = W * 0.5, bh = Math.min(120, benchY * 0.42);
+      AP.labRoom(ctx, W, H, benchY, {});
+      const w1 = 56 + m1 * 13, w2 = 56 + m2 * 13, cx = sceneW * 0.54;
+      const b1 = cx - 5 - w1 / 2, b2 = cx + 5 + w2 / 2, wt = benchY - bh * 0.84;
+      ctx.fillStyle = tcol(T1); ctx.fillRect(b1 - w1 / 2 + 3, wt, w1 - 6, benchY - wt - 3);
+      ctx.fillStyle = tcol(T2); ctx.fillRect(b2 - w2 / 2 + 3, wt, w2 - 6, benchY - wt - 3);
+      AP.beaker(ctx, b1, benchY, w1, bh, 0.84);
+      AP.beaker(ctx, b2, benchY, w2, bh, 0.84);
+      AP.steel(ctx, cx - 4, benchY - bh * 0.9, 8, bh * 0.9 - 2, 30);           // 夾在兩杯之間的銅板
+      ctx.fillStyle = "rgba(210,130,60,0.55)"; ctx.fillRect(cx - 4, benchY - bh * 0.9, 8, bh * 0.9 - 2);
+      // 溫度計插在水裡
+      AP.thermometer(ctx, b1 - w1 * 0.22, benchY - bh - 58, benchY - 16, 11, PL.clamp(T1, 0, 100) / 100);
+      AP.thermometer(ctx, b2 + w2 * 0.22, benchY - bh - 58, benchY - 16, 11, PL.clamp(T2, 0, 100) / 100);
+      D.text(ctx, PL.fmt(T1, 0) + "°C", b1 + w1 * 0.08, benchY - bh * 0.4, { color: "#fff", size: 14, align: "center", weight: "700" });
+      D.text(ctx, PL.fmt(T2, 0) + "°C", b2 - w2 * 0.08, benchY - bh * 0.4, { color: "#fff", size: 14, align: "center", weight: "700" });
+      D.text(ctx, "物體1 " + m1 + " kg", b1, benchY + 16, { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
+      D.text(ctx, "物體2 " + m2 + " kg", b2, benchY + 16, { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
+      // 接觸後熱量經銅板由高溫流向低溫（箭頭越粗，溫差越大）
+      const dT = T1 - T2;
+      if (running && Math.abs(dT) > 0.4) {
+        const dir = dT > 0 ? 1 : -1, k = PL.clamp(Math.abs(dT) / 60, 0.2, 1);
+        [0.35, 0.6].forEach(f => D.arrow(ctx, cx - dir * 18, benchY - bh * f, cx + dir * 18, benchY - bh * f, { color: PL.col("danger"), width: 1.5 + 2.5 * k, head: 7 }));
+        D.text(ctx, "熱", cx, benchY - bh * 0.72, { color: PL.col("danger"), size: 11, align: "center", weight: "800" });
+      }
+      D.text(ctx, "熱量由高溫流向低溫", sceneW * 0.54, 24, { color: PL.col("text-dim"), size: 11, align: "center" });
+      // 右半：溫度–時間（兩條線往終溫靠攏）
+      const T10 = s1.get(), T20 = s2.get(), Tf0 = (m1 * T10 + m2 * T20) / (m1 + m2);
+      const gx = W * 0.54, gy = 26, gw = W - gx - 18, gh = benchY - 44;
+      const g = PL.graph(cv, { x: gx, y: gy, w: gw, h: gh }, { x0: 0, x1: 4, y0: 0, y1: 100 });
+      g.frame({ title: "溫度–時間", xlabel: "t（示意）", ylabel: "T (°C)" }); g.grid(4, 5);
+      g.hline(Tf0, { color: PL.col("warn"), dash: [6, 5], width: 1.4 });
+      g.label(0.08, Tf0, "終溫 " + PL.fmt(Tf0, 1) + " °C", { color: PL.col("warn"), size: 10.5, dy: -6 });
+      g.fn(t => Tf0 + (T10 - Tf0) * Math.exp(-1.5 * t), { color: "#e5484d", width: 2.2 });
+      g.fn(t => Tf0 + (T20 - Tf0) * Math.exp(-1.5 * t), { color: "#3b82f6", width: 2.2 });
+      if (tRun > 0) { const tt = Math.min(tRun, 4); g.vline(tt, { color: PL.col("text-faint"), dash: [3, 3], width: 1 }); g.dot(tt, T1, { color: "#e5484d" }); g.dot(tt, T2, { color: "#3b82f6" }); }
       PL.ui.caption(cv, "終溫那條虛線不會落在正中間，而是偏向質量大的那一邊。" +
         "把兩個質量調成一樣，虛線才會剛好落在兩個溫度的中點。");
       rTf.set(Tf, 1); rT1.set(T1, 1); rT2.set(T2, 1);
     }
     const anim = PL.loop(dt => {
-      if (dt && running) { const Tf = (sm1.get() * T1 + sm2.get() * T2) / (sm1.get() + sm2.get()); const r = 1 - Math.exp(-dt * 1.5); T1 += (Tf - T1) * r; T2 += (Tf - T2) * r; if (Math.abs(T1 - T2) < 0.1) running = false; }
+      if (dt && running) { tRun += dt; const Tf = (sm1.get() * T1 + sm2.get() * T2) / (sm1.get() + sm2.get()); const r = 1 - Math.exp(-dt * 1.5); T1 += (Tf - T1) * r; T2 += (Tf - T2) * r; if (Math.abs(T1 - T2) < 0.1 || tRun > 4) running = false; }
       draw();
     });
     cv.onResize(draw); draw();
