@@ -46,58 +46,96 @@
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
 
-  /* 向心力（繩繫小球，可斷繩） */
+  /* 向心力 —— 課本的「向心力實驗器」：手握玻璃管甩橡皮塞，繩子另一端掛墊圈
+   *
+   * 舊版是俯視木桌上一顆球繞著一個圓點轉，半徑 1–4 m、質量 1 kg——手甩不動那種東西。
+   * 現在照高中實驗的器材與數量級：橡皮塞 10–50 g、半徑 0.2–0.8 m、角速度 2–12 rad/s。
+   * 繩子穿過玻璃管，下端掛墊圈（每片 10 g）；墊圈的重量就是繩子的張力，也就是向心力 mω²r。
+   * 從斜上方看：橡皮塞在水平面上畫圓（透視成橢圓），轉到後方時會被玻璃管和手擋住。
+   * 斷繩時橡皮塞沿切線飛出、墊圈往下掉。
+   */
   PL.register("centripetal", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
-    let ang = 0, broken = false, fx = 0, fy = 0, bx = 0, by = 0;
-    const sM = PL.ui.slider(L.controls, { label: "質量 m", min: 0.2, max: 3, step: 0.1, value: 1, unit: "kg", digits: 1 });
-    const sR = PL.ui.slider(L.controls, { label: "半徑 r", min: 1, max: 4, step: 0.5, value: 2.5, unit: "m", digits: 1 });
-    const sW = PL.ui.slider(L.controls, { label: "角速度 ω", min: 0.8, max: 5, step: 0.1, value: 2.2, unit: "rad/s", digits: 1 });
+    let ang = 0, broken = false, fly = null, drop = 0, dropV = 0;
+    const sM = PL.ui.slider(L.controls, { label: "橡皮塞質量 m", min: 0.01, max: 0.05, step: 0.005, value: 0.02, unit: "kg", digits: 3 });
+    const sR = PL.ui.slider(L.controls, { label: "半徑 r", min: 0.2, max: 0.8, step: 0.05, value: 0.5, unit: "m", digits: 2 });
+    const sW = PL.ui.slider(L.controls, { label: "角速度 ω", min: 2, max: 12, step: 0.2, value: 6.2, unit: "rad/s", digits: 1 });
     const row = PL.ui.buttonRow(L.controls);
-    PL.ui.button(row, "斷繩！", () => { if (!broken) { broken = true; } }, { primary: true });
-    PL.ui.button(row, "重新旋轉", () => { broken = false; ang = 0; });
+    PL.ui.button(row, "斷繩！", () => { if (!broken) { broken = true; fly = null; drop = 0; dropV = 0; } }, { primary: true });
+    PL.ui.button(row, "重新旋轉", () => { broken = false; fly = null; ang = 0; drop = 0; dropV = 0; });
+    PL.ui.note(L.controls, "繩子的張力由下方墊圈的重量提供：Mg = mω²r。轉得越快、半徑越大、橡皮塞越重，就得掛越多墊圈。斷繩後橡皮塞沿切線飛出，不是往外甩。");
     const rF = PL.ui.readout(L.readouts, { label: "向心力 F_c", unit: "N" });
     const rV = PL.ui.readout(L.readouts, { label: "線速率 v", unit: "m/s" });
+    const rMg = PL.ui.readout(L.readouts, { label: "需掛墊圈 M = F_c/g", unit: "g" });
+    const rT = PL.ui.readout(L.readouts, { label: "週期 T", unit: "s" });
+    const K = 0.26;                                  // 透視：水平圓看成橢圓的扁率
+    const geo = () => { const W = cv.W, H = cv.H, Rmax = Math.min(W * 0.36, H * 0.56); return { W, H, cx: W * 0.44, ty: H * 0.3, Rmax, R: Rmax * sR.get() / 0.8 }; };
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const A = AP();
-      const cx = W / 2, cy = H / 2, r = sR.get(), w = sW.get(), R = Math.min(W, H) * 0.3 * (r / 4) + 40;
-      /* 向心力實驗器（俯視）：繩子穿過握在手中的玻璃管，另一端綁著橡皮塞 */
-      A.deskTop && A.deskTop(ctx, 0, 0, W, H);
-      D.ring(ctx, cx, cy, R, "rgba(90,60,30,0.35)", 1.5, [4, 4]);
-      ctx.fillStyle = "rgba(210,236,248,0.65)"; ctx.beginPath(); ctx.arc(cx, cy, 13, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = "rgba(120,160,190,0.9)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy, 13, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = "rgba(30,40,50,0.8)"; ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill();
-      if (!broken) {
-        bx = cx + R * Math.cos(ang); by = cy + R * Math.sin(ang);
-        A.cord ? A.cord(ctx, cx, cy, bx, by) : D.line(ctx, cx, cy, bx, by, MC(), 2);
-        /*
-         * 「質量 m」原本只出現在讀數裡：球永遠畫成半徑 10，
-         * 向心力箭頭長度永遠是半徑的 0.4 倍，與 m 無關。
-         * 但 F_c = mω²r，質量本來就是這條式子的一部分。
-         * 改成箭頭長度正比於實際的向心力，質量大就明顯需要更大的力。
-         */
-        const Fc = sM.get() * w * w * r;
-        const fcLen = PL.clamp(Fc * 1.6, 18, R * 0.85);
-        const ux = (cx - bx) / R, uy = (cy - by) / R;
-        D.arrow(ctx, bx, by, bx + ux * fcLen, by + uy * fcLen,
-          { color: PL.col("danger"), width: 2.4, label: "F_c = " + PL.fmt(Fc, 1) + " N" });
-        D.arrow(ctx, bx, by, bx - 40 * Math.sin(ang), by + 40 * Math.cos(ang), { color: PL.col("accent-2"), width: 2, label: "v" });
-      } else {
-        D.arrow(ctx, bx, by, bx + fx * 0.4, by + fy * 0.4, { color: PL.col("accent-2"), width: 2, label: "沿切線飛出" });
+      const A = AP(), G = geo(), { cx, ty, R, Rmax } = G;
+      const m = sM.get(), r = sR.get(), w = sW.get(), Fc = m * w * w * r, Mg = Fc / 9.8 * 1000;
+      A.labRoom(ctx, W, H, Math.round(H * 0.93), { window: { x: W * 0.76, y: H * 0.07, w: Math.min(160, W * 0.19), h: H * 0.36 } });
+      const tb = ty + 150, fl = PL.clamp(12 + Fc * 40, 12, R * 0.8);
+      let sx, sy;
+      if (broken && fly) { sx = fly.x; sy = fly.y; } else { sx = cx + R * Math.cos(ang); sy = ty + K * R * Math.sin(ang); }
+      const behind = !broken && Math.sin(ang) < 0;
+      // 水平圓軌道（透視成橢圓）
+      ctx.save(); ctx.strokeStyle = PL.theme.pale(0.32); ctx.setLineDash([5, 5]); ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.ellipse(cx, ty, R, K * R, 0, 0, TAU); ctx.stroke(); ctx.restore();
+      const rs = (4 + 45 * Math.cbrt(m)) * (1 + (sy - ty) / (K * Rmax + 1) * 0.08);
+      const stopperAndString = () => { if (!broken) A.cord(ctx, cx, ty, sx, sy); A.stopper(ctx, sx, sy, rs); };
+      if (behind) stopperAndString();
+      // 玻璃管
+      ctx.save();
+      const tg = ctx.createLinearGradient(cx - 6, 0, cx + 6, 0);
+      tg.addColorStop(0, "rgba(200,226,240,0.55)"); tg.addColorStop(0.45, "rgba(255,255,255,0.3)"); tg.addColorStop(1, "rgba(170,200,220,0.6)");
+      ctx.fillStyle = tg; ctx.fillRect(cx - 6, ty, 12, tb - ty);
+      ctx.strokeStyle = PL.theme.isLight() ? "rgba(84,124,152,0.85)" : "rgba(206,232,244,0.8)"; ctx.lineWidth = 1.2; ctx.strokeRect(cx - 6, ty, 12, tb - ty);
+      ctx.restore();
+      // 管下的繩、迴紋針記號與墊圈
+      const hy = tb + 24 + (Rmax - R) * 0.5 + drop;
+      if (broken) A.cord(ctx, cx, hy - 50, cx, hy); else A.cord(ctx, cx, ty, cx, hy);
+      if (!broken) { ctx.strokeStyle = "rgb(150,160,176)"; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.ellipse(cx, tb + 12, 3, 6, 0, 0, TAU); ctx.stroke(); }
+      const n = PL.clamp(Math.round(Mg / 10), 1, 30);
+      ctx.strokeStyle = "rgb(150,160,176)"; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(cx, hy + 3, 4, Math.PI * 1.1, Math.PI * 1.9 + Math.PI * 0.2); ctx.stroke();
+      for (let i = 0; i < n; i++) {
+        const yy = hy + 7 + i * 3.4;
+        const g = ctx.createLinearGradient(cx - 14, 0, cx + 14, 0);
+        g.addColorStop(0, "rgb(96,104,118)"); g.addColorStop(0.4, "rgb(196,204,216)"); g.addColorStop(1, "rgb(104,112,126)");
+        ctx.fillStyle = g; A.rrPath(ctx, cx - 14, yy, 28, 3, 1.5); ctx.fill();
+        ctx.strokeStyle = "rgba(30,36,46,0.45)"; ctx.lineWidth = 0.8; ctx.stroke();
       }
-      A.stopper ? A.stopper(ctx, bx, by, 7 + sM.get() * 3.2) : D.disc(ctx, bx, by, 7 + sM.get() * 3.2, { fill: MC() });
-      rF.set(sM.get() * w * w * r, 2); rV.set(w * r, 2);
+      const wb = hy + 7 + n * 3.4;
+      if (!broken) D.arrow(ctx, cx, wb + 4, cx, wb + 4 + fl, { color: PL.col("danger"), width: 2.4, label: "Mg" });
+      D.text(ctx, "墊圈 " + n + " 片 ≈ " + Math.round(Mg) + " g", cx + 24, hy + 16, { color: PL.col("text"), size: 11, weight: "700" });
+      D.text(ctx, "Mg = mω²r（張力提供向心力）", cx + 24, hy + 32, { color: PL.col("text-dim"), size: 10 });
+      // 手握住玻璃管
+      A.hand(ctx, cx + 2, ty + 112, 1, 1, { pull: true, ang: -0.7 });
+      if (!behind) stopperAndString();
+      if (!broken) {
+        const ux = cx - sx, uy = ty - sy, ul = Math.hypot(ux, uy) || 1;
+        D.arrow(ctx, sx, sy, sx + ux / ul * fl, sy + uy / ul * fl, { color: PL.col("danger"), width: 2.4, label: "F_c" });
+        const tx = -Math.sin(ang) * R, tv = K * R * Math.cos(ang), tl = Math.hypot(tx, tv) || 1, vl = PL.clamp(14 + w * r * 9, 14, 90);
+        D.arrow(ctx, sx, sy, sx + tx / tl * vl, sy + tv / tl * vl, { color: PL.col("accent-2"), width: 2, label: "v" });
+        D.text(ctx, "r = " + PL.fmt(r, 2) + " m", (cx + sx) / 2, (ty + sy) / 2 - 10, { color: PL.col("text-dim"), size: 10.5, align: "center", weight: "700" });
+      } else if (fly) {
+        const vl = Math.hypot(fly.vx, fly.vy) || 1;
+        D.arrow(ctx, sx, sy, sx + fly.vx / vl * 50, sy + fly.vy / vl * 50, { color: PL.col("accent-2"), width: 2, label: "沿切線飛出" });
+        D.text(ctx, "慢動作 ×0.35", 16, 22, { color: PL.col("text-dim"), size: 11, weight: "700" });
+      }
+      rF.set(Fc, 3); rV.set(w * r, 2); rMg.set(Mg, 1); rT.set(TAU / w, 2);
     }
     const anim = PL.loop(dt => {
       if (dt) {
-        if (!broken) { ang += sW.get() * dt; }
+        if (!broken) ang += sW.get() * dt;
         else {
-          const R = Math.min(cv.W, cv.H) * 0.3 * (sR.get() / 4) + 40;
-          if (fx === 0 && fy === 0) { fx = -R * sW.get() * Math.sin(ang); fy = R * sW.get() * Math.cos(ang); }
-          bx += fx * dt; by += fy * dt;
-          if (bx < 0 || bx > cv.W || by < 0 || by > cv.H) { fx = 0; fy = 0; broken = false; ang = 0; }
+          const G = geo(), w = sW.get();
+          if (!fly) fly = { x: G.cx + G.R * Math.cos(ang), y: G.ty + K * G.R * Math.sin(ang), vx: -G.R * Math.sin(ang) * w, vy: K * G.R * Math.cos(ang) * w };
+          const sl = dt * 0.35;                         // 斷繩後放慢動作，切線方向才看得清楚
+          fly.x += fly.vx * sl; fly.y += fly.vy * sl;
+          dropV += 900 * sl; drop += dropV * sl;
+          if ((fly.x < -30 || fly.x > cv.W + 30 || fly.y < -30 || fly.y > cv.H + 30) && drop > cv.H) { broken = false; fly = null; ang = 0; drop = 0; dropV = 0; }
         }
       }
       draw();
@@ -106,15 +144,12 @@
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
 
-
-
-
   /* 角動量守恆 */
   PL.register("angular-momentum", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     const m = 1, Lmom = 1 * 3 * 2; // L = m v r（固定）
-    let ang = 0;
+    let ang = 0, trail = [];
     const sR = PL.ui.slider(L.controls, { label: "半徑 r（拉繩調整）", min: 0.8, max: 3.2, step: 0.1, value: 3, unit: "m", digits: 1 });
     PL.ui.note(L.controls, "外力沿繩指向圓心、不產生力矩，故角動量 L 守恆：半徑縮小，轉速就變快。");
     const rL = PL.ui.readout(L.readouts, { label: "角動量 L", unit: "（守恆）" });
@@ -132,14 +167,48 @@
       }
       D.ring(ctx, cx, cy, R, "rgba(90,110,140,0.35)", 1.5, [4, 4]);
       const bx = cx + R * Math.cos(ang), by = cy + R * Math.sin(ang);
+      // 最近兩秒的軌跡：拉繩時畫出向內捲的螺線，轉速變快一眼看得出來
+      if (trail.length > 1) {
+        ctx.save(); ctx.lineCap = "round";
+        for (let i = 1; i < trail.length; i++) {
+          const a = i / trail.length;
+          if (Math.abs(trail[i].r - trail[i - 1].r) > 6) continue;      // 拉繩瞬間半徑跳動，不畫那條弦
+          ctx.strokeStyle = "rgba(47,111,208," + PL.fmt(a * 0.55, 3) + ")"; ctx.lineWidth = 1 + a * 3;
+          ctx.beginPath(); ctx.moveTo(cx + trail[i - 1].r * Math.cos(trail[i - 1].a), cy + trail[i - 1].r * Math.sin(trail[i - 1].a));
+          ctx.lineTo(cx + trail[i].r * Math.cos(trail[i].a), cy + trail[i].r * Math.sin(trail[i].a)); ctx.stroke();
+        }
+        ctx.restore();
+      }
       A.cord ? A.cord(ctx, cx, cy, bx, by) : D.line(ctx, cx, cy, bx, by, MC(), 2);
       D.arrow(ctx, cx, cy, cx + (bx - cx) * 0.4, cy + (by - cy) * 0.4, { color: PL.col("danger"), width: 2, label: "拉力" });
       const va = 18 + v * 6; D.arrow(ctx, bx, by, bx - va * Math.sin(ang), by + va * Math.cos(ang), { color: PL.col("accent-2"), width: 2, label: "v" });
       A.poolBall ? A.poolBall(ctx, bx, by, 12, "#2f6fd0", null) : D.disc(ctx, bx, by, 11, { fill: MC() });
-      D.text(ctx, "繩子從洞口往下拉", cx + 14, cy + 22, { color: PL.col("text-dim"), size: 10 });
+      D.text(ctx, "繩子從洞口往下拉", cx + 12, cy - 14, { color: PL.col("text-dim"), size: 10 });
+      // 右下角側視小圖：桌面下的手把繩子往下拉，拉得越多半徑越小
+      if (W >= 640 && A.infoCard) {
+        const iw = 150, ih = 118, ix = W - iw - 12, iy = H - ih - 12;
+        A.infoCard(ctx, ix, iy, iw, ih);
+        ctx.save(); ctx.beginPath(); ctx.rect(ix, iy, iw, ih); ctx.clip();
+        D.text(ctx, "側視：桌下拉繩", ix + 8, iy + 15, { color: PL.col("text"), size: 10, weight: "700" });
+        const tyy = iy + 38, hx = ix + iw / 2;
+        A.steel(ctx, ix + 12, tyy, iw - 24, 6, -6);
+        ctx.fillStyle = "rgb(20,22,26)"; ctx.fillRect(hx - 2, tyy, 4, 6);
+        const pullY = tyy + 12 + (3.2 - r) / 2.4 * 34;
+        A.cord(ctx, hx + 8 + r * 12, tyy - 5, hx, tyy); A.cord(ctx, hx, tyy + 6, hx, pullY);
+        A.poolBall(ctx, hx + 8 + r * 12, tyy - 6, 5, "#2f6fd0", null);
+        A.hand(ctx, hx - 5, pullY + 3, 1, 0.5, { pull: true, ang: -1.4 });
+        D.arrow(ctx, hx + 20, tyy + 14, hx + 20, pullY + 4, { color: PL.col("danger"), width: 1.6, head: 5 });
+        ctx.restore();
+      }
       rL.set(Lmom, 1); rW.set(w, 2); rV.set(v, 2);
     }
-    const anim = PL.loop(dt => { if (dt) { const r = sR.get(); ang += (Lmom / (m * r * r)) * dt; } draw(); });
+    const anim = PL.loop(dt => {
+      if (dt) {
+        const r = sR.get(); ang += (Lmom / (m * r * r)) * dt;
+        trail.push({ a: ang, r: 30 + r * 42 }); if (trail.length > 110) trail.shift();
+      }
+      draw();
+    });
     cv.onResize(draw); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
