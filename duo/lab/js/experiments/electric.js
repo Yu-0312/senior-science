@@ -760,63 +760,63 @@
 
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const AP = PL.apparatus;
       const R1 = sR1.get(), R2 = sR2.get(), V = sV.get(), series = sCfg.get() === "series";
       const Req = series ? R1 + R2 : R1 * R2 / (R1 + R2), Itot = V / Req;
-      PL.apparatus.circuitBoard(ctx, W, H, false);
-      const x0 = 56, x1 = W - 56, cy = H / 2 + 16, top = cy - 62;
-
-      // 電池組：高度仍正比於電壓，讓「電壓大小」看得見
-      const bh = Math.max(26, 12 + V * 1.6);
-      PL.apparatus.wire(ctx, [{ x: x0, y: cy }, { x: x0, y: top }], "rgb(186,54,48)", 3.2);
-      PL.apparatus.battery(ctx, x0 - 15, cy - bh * 0.5 - 14, 30, bh);
-      D.text(ctx, V + " V", x0 - 21, cy - bh * 0.5, { color: PL.col("text"), size: 12, align: "right", weight: "700" });
-
+      AP.circuitBoard(ctx, W, H, false);
+      /* 接上數位電表：伏特計並聯在電阻兩端、安培計串在主線上——課本量測串並聯的做法 */
+      const x0 = 56, x1 = W - 56, top = Math.round(H * 0.28), cy = Math.round(H * 0.8);
+      const MW = 76, MH = 92, blue = "rgb(52,98,178)";
+      const meterAt = (cx, y, val, unit) => AP.multimeter(ctx, cx - MW / 2, y, MW, MH, PL.fmt(val, val >= 10 ? 1 : 2), { unit });
+      // 電池組：高度正比於電壓
+      const bh = Math.max(26, 12 + V * 1.6), by = (top + cy) / 2 - bh / 2;
+      WIRELINE(ctx, x0, top, x0, cy, WIRECOLOR, 2);
+      AP.battery(ctx, x0 - 15, by, 30, bh);
+      D.text(ctx, V + " V", x0 - 21, by + bh / 2 + 4, { color: PL.col("text"), size: 12, align: "right", weight: "700" });
+      // 主線上的安培計（坐在下方導線上，兩個接孔就是導線的斷點）
+      const amX = Math.round(W * 0.26), amY = cy - MH + 14;
+      WIRELINE(ctx, x1, top, x1, cy, WIRECOLOR, 2);
+      WIRELINE(ctx, x0, cy, amX - MW * 0.18, cy, WIRECOLOR, 2); WIRELINE(ctx, amX + MW * 0.18, cy, x1, cy, WIRECOLOR, 2);
+      currentDots(ctx, x1, cy, amX + MW * 0.18, cy, Itot); currentDots(ctx, amX - MW * 0.18, cy, x0, cy, Itot);
+      meterAt(amX, amY, Itot, "A");
+      D.text(ctx, "安培計（串聯）", amX + MW / 2 + 8, amY + 14, { color: PL.col("text-dim"), size: 10 });
+      const vlead = (ax, ay, bx2, low, jack) => AP.cable(ctx, [{ x: ax, y: ay }, { x: ax, y: low }, { x: bx2, y: low }, jack], blue, 1.8, 0);
       if (series) {
-        // 串聯：兩顆電阻首尾相接，方塊總長就是等效電阻
-        const w1 = 26 + R1 * 3.4, w2 = 26 + R2 * 3.4;
-        const startX = (W - (w1 + w2 + 30)) / 2;
-        currentDots(ctx, x0, top, startX, top, Itot);
-        WIRELINE(ctx, x0, top, startX, top, WIRECOLOR, 2);
+        // 串聯：兩顆電阻首尾相接，電流處處相同；兩顆伏特計各量一顆電阻的電壓
+        const w1 = 26 + R1 * 3.4, w2 = 26 + R2 * 3.4, startX = (W - (w1 + w2 + 30)) / 2;
+        WIRELINE(ctx, x0, top, startX, top, WIRECOLOR, 2); currentDots(ctx, x0, top, startX, top, Itot);
         resBox(ctx, startX, top, R1, "R₁", Itot * R1, Itot);
-        WIRELINE(ctx, startX + w1, top, startX + w1 + 30, top, WIRECOLOR, 2);
-        currentDots(ctx, startX + w1, top, startX + w1 + 30, top, Itot);
+        WIRELINE(ctx, startX + w1, top, startX + w1 + 30, top, WIRECOLOR, 2); currentDots(ctx, startX + w1, top, startX + w1 + 30, top, Itot);
         resBox(ctx, startX + w1 + 30, top, R2, "R₂", Itot * R2, Itot);
-        WIRELINE(ctx, startX + w1 + 30 + w2, top, x1, top, WIRECOLOR, 2);
-        currentDots(ctx, startX + w1 + 30 + w2, top, x1, top, Itot);
-        WIRELINE(ctx, x1, top, x1, cy, WIRECOLOR, 2);
-        WIRELINE(ctx, x0, cy, x1, cy, WIRECOLOR, 2);
-        currentDots(ctx, x1, cy, x0, cy, Itot);
+        WIRELINE(ctx, startX + w1 + 30 + w2, top, x1, top, WIRECOLOR, 2); currentDots(ctx, startX + w1 + 30 + w2, top, x1, top, Itot);
+        const vy = top + 44, low = vy + MH + 8;
+        [[W / 2 - 88, startX, startX + w1, Itot * R1], [W / 2 + 88, startX + w1 + 30, startX + w1 + 30 + w2, Itot * R2]].forEach(m => {
+          const jk = { black: { x: m[0] - MW * 0.18, y: vy + MH - 14 }, red: { x: m[0] + MW * 0.18, y: vy + MH - 14 } };
+          vlead(m[1], top, jk.black.x, low, jk.black); vlead(m[2], top, jk.red.x, low + 5, jk.red);
+          meterAt(m[0], vy, m[3], "V");
+        });
         rBranch.set(Itot, 2);
-        PL.ui.caption(cv, "串聯：兩顆電阻的電流點速度一模一樣——電流處處相同。" +
-          "電壓則按電阻比例分配，方塊下方就是各自分到的電壓。");
+        PL.ui.caption(cv, "串聯：兩顆電阻的電流點速度一模一樣——電流處處相同。電壓按電阻比例分配，兩顆伏特計的讀數加起來就是電池電壓。");
       } else {
-        // 並聯：兩條支路各自標出自己的電流，電阻小的那條點跑得明顯比較快
-        const i1 = V / R1, i2 = V / R2;
-        const w1 = 26 + R1 * 3.4, w2 = 26 + R2 * 3.4;
-        const bx = W / 2 - Math.max(w1, w2) / 2, jx = bx - 34, jx2 = bx + Math.max(w1, w2) + 34;
-        const yA = top - 26, yB = top + 34;
-        WIRELINE(ctx, x0, top, jx, top, WIRECOLOR, 2);
-        currentDots(ctx, x0, top, jx, top, Itot);
+        // 並聯：兩條支路電壓相同；電阻小的那條電流點跑得明顯比較快
+        const i1 = V / R1, i2 = V / R2, w1 = 26 + R1 * 3.4, w2 = 26 + R2 * 3.4;
+        const bx = W / 2 - Math.max(w1, w2) / 2, jx = bx - 34, jx2 = bx + Math.max(w1, w2) + 34, yA = top - 32, yB = top + 42;
+        WIRELINE(ctx, x0, top, jx, top, WIRECOLOR, 2); currentDots(ctx, x0, top, jx, top, Itot);
         [[yA, R1, "R₁", i1, w1], [yB, R2, "R₂", i2, w2]].forEach(([yy, rr, lab, ii, ww]) => {
-          WIRELINE(ctx, jx, top, jx, yy, WIRECOLOR, 2);
-          WIRELINE(ctx, jx, yy, bx, yy, WIRECOLOR, 2);
-          currentDots(ctx, jx, yy, bx, yy, ii);
+          WIRELINE(ctx, jx, top, jx, yy, WIRECOLOR, 2); WIRELINE(ctx, jx, yy, bx, yy, WIRECOLOR, 2); currentDots(ctx, jx, yy, bx, yy, ii);
           resBox(ctx, bx, yy, rr, lab, V, ii);
-          WIRELINE(ctx, bx + ww, yy, jx2, yy, WIRECOLOR, 2);
-          currentDots(ctx, bx + ww, yy, jx2, yy, ii);
+          WIRELINE(ctx, bx + ww, yy, jx2, yy, WIRECOLOR, 2); currentDots(ctx, bx + ww, yy, jx2, yy, ii);
           WIRELINE(ctx, jx2, yy, jx2, top, WIRECOLOR, 2);
         });
-        WIRELINE(ctx, jx2, top, x1, top, WIRECOLOR, 2);
-        currentDots(ctx, jx2, top, x1, top, Itot);
-        WIRELINE(ctx, x1, top, x1, cy, WIRECOLOR, 2);
-        WIRELINE(ctx, x0, cy, x1, cy, WIRECOLOR, 2);
-        currentDots(ctx, x1, cy, x0, cy, Itot);
+        WIRELINE(ctx, jx2, top, x1, top, WIRECOLOR, 2); currentDots(ctx, jx2, top, x1, top, Itot);
+        const vy = yB + 36, low = vy + MH + 8, jk = { black: { x: W / 2 - MW * 0.18, y: vy + MH - 14 }, red: { x: W / 2 + MW * 0.18, y: vy + MH - 14 } };
+        vlead(jx, yB, jk.black.x, low, jk.black); vlead(jx2, yB, jk.red.x, low + 5, jk.red);
+        meterAt(W / 2, vy, V, "V");
+        D.text(ctx, "伏特計（並聯）", W / 2 + MW / 2 + 8, vy + 14, { color: PL.col("text-dim"), size: 10 });
         rBranch.set(i1, 2);
-        PL.ui.caption(cv, "並聯：兩條支路的電壓一樣，但電阻小的那條電流點跑得明顯比較快。" +
-          "把 R₁ 拉到最小、R₂ 拉到最大，速度差距最清楚。");
+        PL.ui.caption(cv, "並聯：兩條支路的電壓一樣，但電阻小的那條電流點跑得明顯比較快。把 R₁ 拉到最小、R₂ 拉到最大，速度差距最清楚。");
       }
-      D.text(ctx, "等效電阻 " + PL.fmt(Req, 2) + " Ω　總電流 " + PL.fmt(Itot, 2) + " A",
-        W / 2, H - 14, { color: PL.col("text-dim"), size: 11, align: "center" });
+      D.text(ctx, "等效電阻 " + PL.fmt(Req, 2) + " Ω　總電流 " + PL.fmt(Itot, 2) + " A", 16, 22, { color: PL.col("text-dim"), size: 11 });
       rReq.set(Req, 2); rItot.set(Itot, 2);
     }
     const anim = PL.loop(dt => { if (dt) flow += dt; draw(); }, 40);
