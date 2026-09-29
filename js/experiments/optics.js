@@ -720,34 +720,72 @@
     };
   }});
 
-  /* 單狹縫繞射 */
+  /* 單狹縫繞射 —— 光具座：雷射 → 單狹縫 → 光屏，光屏正面攤開後對齊強度曲線
+   *
+   * 舊版整個畫面只有一張 sinc² 圖和右邊一條直立的亮帶，看不出實驗是怎麼做的。
+   * 現在上方是光具座：雷射（顏色跟著波長）、寬度可調的單狹縫、光屏，
+   * 狹縫後的光張開的角度跟著 λ/a 變；中間一條是「從正面看光屏」看到的亮紋，
+   * 與下方強度曲線的橫軸一一對齊——中央亮紋的寬度就是兩個第一暗紋之間。
+   */
   PL.register("diffraction", { build(root) {
     const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
-    const cv = PL.canvas.create(L.canvasWrap, 0.6);
+    const cv = PL.canvas.create(L.canvasWrap, 0.66);
     const sA = PL.ui.slider(L.controls, { label: "狹縫寬 a", min: 20, max: 120, step: 5, value: 60, unit: "", digits: 0, onInput: draw });
     const sLam = PL.ui.slider(L.controls, { label: "波長 λ", min: 400, max: 700, step: 10, value: 550, unit: "nm", digits: 0, onInput: draw });
-    PL.ui.note(L.controls, "狹縫越窄，中央亮紋越寬——繞射越明顯。");
+    PL.ui.note(L.controls, "狹縫越窄、波長越長，中央亮紋越寬——繞射越明顯。第一暗紋在 a sinθ = λ 的位置。");
     const rW = PL.ui.readout(L.readouts, { label: "中央亮紋半寬（相對）", unit: "" });
+    const UM = 1.2;                                   // 光屏位置的顯示範圍（相對單位）
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const a = sA.get(), lam = sLam.get() / 40, col = nmColor(sLam.get());
+      const AP = PL.apparatus, a = sA.get(), lam = sLam.get() / 40, col = nmColor(sLam.get()), u1 = lam / a;
       const sinc = b => Math.abs(b) < 1e-4 ? 1 : (Math.sin(b) / b) ** 2;
-      const scr = W - 60, scale = 90;                 // u = (螢幕位置)/scale
-      const beta = u => Math.PI * a * u / lam;          // 相位參數
-      // 實驗室牆上的光屏：屏上亮度帶就是 sinc² 分布
-      const AP = PL.apparatus;
-      AP.labRoom(ctx, W, H, H + 1, { bench: "none" });
-      const paper = AP.paperScreen(ctx, scr + 13, H / 2, 30, H - 26);
-      for (let y = paper.y; y < paper.y + paper.h; y += 2) { const I = sinc(beta((y - H / 2) / scale)); ctx.globalAlpha = I; ctx.fillStyle = col; ctx.fillRect(paper.x + 1, y, paper.w - 2, 2); }
+      const I = u => sinc(Math.PI * a * u / lam);
+      /* 上方：光具座（側視） */
+      const sh = Math.round(H * 0.42), tableY = sh - 6, railY = tableY - 26, cyB = Math.round((16 + railY - 22) / 2);
+      AP.labStrip(ctx, W, sh, tableY, {});
+      AP.bench(ctx, 18, W - 18, railY, { pxPerCm: 5 });
+      const lx = 100, sx = Math.round(W * 0.34), scx = W - 60, hS = (railY - 22 - cyB) * 2, sc = (hS / 2 - 4) / UM;
+      AP.carrier(ctx, lx - 26, railY, cyB + 7);
+      AP.laser(ctx, lx, cyB, 0, { len: 66 });
+      D.text(ctx, sLam.get() + " nm", lx - 34, cyB - 14, { color: col, size: 10.5, align: "center", weight: "800" });
+      ctx.save(); ctx.globalAlpha = 0.9; D.line(ctx, lx + 2, cyB, sx - 5, cyB, col, 2.4); ctx.restore();
+      // 狹縫後張開的光：中央亮紋（到第一暗紋）最亮，兩側次亮紋淡淡的
+      const fan = (u0, uA, alpha) => {
+        ctx.save(); ctx.globalAlpha = alpha; ctx.fillStyle = col; ctx.beginPath();
+        ctx.moveTo(sx + 4, cyB); ctx.lineTo(scx - 11, cyB + PL.clamp(u0, -UM, UM) * sc); ctx.lineTo(scx - 11, cyB + PL.clamp(uA, -UM, UM) * sc); ctx.closePath(); ctx.fill(); ctx.restore();
+      };
+      fan(-u1, u1, 0.28); fan(u1, 2 * u1, 0.08); fan(-2 * u1, -u1, 0.08);
+      const plateH = (railY - 16 - cyB) * 1.4, gapPx = 3 + a / 120 * 12;
+      AP.slitPlate(ctx, sx, cyB, plateH, [0], gapPx, col);
+      AP.carrier(ctx, sx, railY, cyB + plateH / 2 + 14);
+      D.text(ctx, "單狹縫 a", sx, cyB - plateH / 2 - 7, { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
+      // 光屏（側視）：屏面上的亮度就是 sinc² 分布
+      const paper = AP.paperScreen(ctx, scx, cyB, 18, hS);
+      AP.carrier(ctx, scx, railY, cyB + hS / 2 + 20);
+      for (let y = paper.y; y < paper.y + paper.h; y += 2) { ctx.globalAlpha = I((y - cyB) / sc); ctx.fillStyle = col; ctx.fillRect(paper.x + 1, y, paper.w - 2, 2); }
       ctx.globalAlpha = 1;
-      // 強度曲線
-      const bx = 44, by = 26, bw = scr - bx - 16, bh = H - 52, um = (H / 2 - 10) / scale;
-      const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: -um, x1: um, y0: 0, y1: 1.05 });
-      g.frame({ title: "繞射強度分佈 I ∝ sinc²", xlabel: "螢幕位置" }); g.grid(6, 4);
-      g.fn(u => sinc(beta(u)), { color: col, width: 2.2, samples: 240 });
-      g.vline(lam / a, { color: "rgba(255,255,255,0.25)", dash: [3, 3], width: 1 });
-      g.vline(-lam / a, { color: "rgba(255,255,255,0.25)", dash: [3, 3], width: 1 });
-      rW.set(lam / a, 2);
+      D.text(ctx, "光屏", scx - 16, paper.y + 10, { color: PL.col("text-dim"), size: 10, align: "right" });
+      /* 中間：從正面看光屏的亮紋，橫軸與下方的強度曲線對齊 */
+      const gx = 44, gw = W - gx - 20, by = sh + 20, bh = 26;
+      ctx.fillStyle = "rgb(18,20,26)"; ctx.fillRect(gx, by, gw, bh);
+      PL.theme.note(ctx, "rgb(18,20,26)", gx, by, gw, bh);
+      for (let x = 0; x < gw; x += 2) { ctx.globalAlpha = I(-UM + 2 * UM * x / gw); ctx.fillStyle = col; ctx.fillRect(gx + x, by + 1, 2, bh - 2); }
+      ctx.globalAlpha = 1;
+      D.text(ctx, "從正面看光屏", gx + 6, by + bh - 8, { color: "rgba(230,236,248,0.75)", size: 9.5 });
+      const cxB = gx + gw / 2, hw = u1 / UM * gw / 2;
+      if (hw < gw / 2 - 4) {
+        D.line(ctx, cxB - hw, by - 4, cxB + hw, by - 4, PL.col("text-dim"), 1.2);
+        D.line(ctx, cxB - hw, by - 7, cxB - hw, by - 1, PL.col("text-dim"), 1.2); D.line(ctx, cxB + hw, by - 7, cxB + hw, by - 1, PL.col("text-dim"), 1.2);
+        D.text(ctx, "中央亮紋", cxB + hw + 6, by - 2, { color: PL.col("text-dim"), size: 9.5 });
+      }
+      /* 下方：強度曲線 */
+      const gy = by + bh + 26, gh = H - gy - 22;
+      const g = PL.graph(cv, { x: gx, y: gy, w: gw, h: gh }, { x0: -UM, x1: UM, y0: 0, y1: 1.05 });
+      g.frame({ title: "繞射強度分佈 I ∝ sinc²", xlabel: "光屏位置" }); g.grid(6, 4);
+      g.fn(I, { color: col, width: 2.2, samples: 320 });
+      g.vline(u1, { color: PL.col("text-faint"), dash: [3, 3], width: 1 });
+      g.vline(-u1, { color: PL.col("text-faint"), dash: [3, 3], width: 1 });
+      rW.set(u1, 3);
     }
     cv.onResize(draw); draw();
     return { stop() { cv.destroy(); }, rerender: draw };
@@ -824,7 +862,12 @@
     return { stop() { cv.destroy(); }, rerender: draw };
   }});
 
-  /* 繞射光柵 */
+  /* 繞射光柵 —— 光具座上的雷射、光柵片與光屏
+   *
+   * 舊版的各級光線用 10% 白色畫，淺色主題下幾乎看不見，光屏也浮在空中。
+   * 現在三樣器材都立在光具座的滑座上，各級光線用雷射的顏色畫，
+   * 第一級的偏折角 θ₁ 直接標在光柵旁邊：d sinθ = mλ。
+   */
   PL.register("grating", { build(root) {
     const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.6);
@@ -837,17 +880,43 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const lines = sN.get(), d = 1e6 / lines, lam = sLam.get(), col = nmColor(lam);
-      const gx = 120, cy = H / 2, scr = W - 46;
       const AP = PL.apparatus;
-      AP.labRoom(ctx, W, H, H - 16, {});
-      AP.laser(ctx, gx - 30, cy, 0, { len: 60 });
+      const tableY = H - 12, railY = tableY - 26, cy = Math.round((16 + railY - 20) / 2), gx = 150, scr = W - 52;
+      AP.labRoom(ctx, W, H, tableY, {});
+      AP.bench(ctx, 14, W - 14, railY, { pxPerCm: 5 });
+      AP.carrier(ctx, gx - 64, railY, cy + 7);
+      AP.laser(ctx, gx - 38, cy, 0, { len: 66 });
+      D.text(ctx, lam + " nm", gx - 72, cy - 14, { color: col, size: 10.5, align: "center", weight: "800" });
+      const half = railY - 24 - cy;
+      const paper = AP.paperScreen(ctx, scr + 6, cy, 22, half * 2);
+      AP.carrier(ctx, scr + 6, railY, cy + half + 20);
+      D.text(ctx, "光屏", scr + 6, paper.y - 8, { color: PL.col("text-dim"), size: 10, align: "center" });
+      let y1 = null;
+      ctx.save(); ctx.lineCap = "round";
+      for (let mm = -5; mm <= 5; mm++) {
+        const s = mm * lam / d;
+        if (Math.abs(s) > 1) continue;
+        const th = Math.asin(s), yy = cy + Math.tan(th) * (scr - gx);
+        if (yy < paper.y + 4 || yy > paper.y + paper.h - 4) continue;
+        if (mm === 1) y1 = yy;
+        ctx.globalAlpha = mm === 0 ? 0.8 : 0.5; ctx.strokeStyle = col; ctx.lineWidth = mm === 0 ? 2.2 : 1.6;
+        ctx.beginPath(); ctx.moveTo(gx, cy); ctx.lineTo(scr, yy); ctx.stroke();
+        ctx.globalAlpha = 1;
+        D.disc(ctx, scr + 6, yy, mm === 0 ? 6 : 5, { fill: col, glow: col, glowSize: 10 });
+        D.text(ctx, "m=" + mm, scr - 10, yy - 5, { color: PL.col("text-dim"), size: 9.5, align: "right" });
+      }
+      ctx.restore();
+      ctx.save(); ctx.globalAlpha = 0.9; D.line(ctx, gx - 36, cy, gx - 4, cy, col, 2.4); ctx.restore();
+      AP.carrier(ctx, gx, railY, cy + 48);
       AP.gratingSlide(ctx, gx, cy, 84);
-      D.text(ctx, "光柵", gx, cy - 56, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
-      AP.paperScreen(ctx, scr + 6, H / 2, 22, H - 40);
-      for (let mm = -5; mm <= 5; mm++) { const s = mm * lam / d; if (Math.abs(s) <= 1) { const th = Math.asin(s), yy = cy + Math.tan(th) * (scr - gx); if (yy > 14 && yy < H - 14) { D.line(ctx, gx, cy, scr, yy, "rgba(255,255,255,0.1)", 1); D.disc(ctx, scr + 6, yy, mm === 0 ? 6 : 5, { fill: col, glow: col, glowSize: 8 }); D.text(ctx, "m=" + mm, scr - 8, yy + 3, { color: PL.col("text-faint"), size: 9, align: "right" }); } } }
-      D.line(ctx, gx - 30, cy, gx - 4, cy, col, 2.4);
-      const th1 = Math.asin(PL.clamp(lam / d, -1, 1)) * 180 / Math.PI;
-      rD.set(d, 0); rTh.set(th1, 1); rOrders.set("±" + Math.floor(d / lam));
+      D.text(ctx, "光柵 " + lines + " 線/mm", gx, cy - 56, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
+      const th1 = Math.asin(PL.clamp(lam / d, -1, 1));
+      if (y1 != null) {
+        const R = 70;
+        ctx.save(); ctx.strokeStyle = PL.col("text-dim"); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(gx, cy, R, 0, th1); ctx.stroke(); ctx.restore();
+        D.text(ctx, "θ₁ = " + PL.fmt(th1 * 180 / Math.PI, 1) + "°", gx + R * Math.cos(th1 / 2) + 8, cy + R * Math.sin(th1 / 2) + 6, { color: PL.col("text"), size: 10.5, weight: "700" });
+      }
+      rD.set(d, 0); rTh.set(th1 * 180 / Math.PI, 1); rOrders.set("±" + Math.floor(d / lam));
     }
     cv.onResize(draw); draw();
     return { stop() { cv.destroy(); }, rerender: draw };
