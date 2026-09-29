@@ -393,7 +393,14 @@
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
 
-  /* 聲音的共鳴（共鳴管） */
+  /* 聲音的共鳴（共鳴管）
+   *
+   * 舊版只有一根橫放的玻璃管和一條抖動的曲線，而且開管畫成「兩端都是節」——
+   * 那是兩端封閉的管子。開口端的空氣可以自由進出，位移應該最大（腹）。
+   * 聲音是縱波：管內空氣是沿著管子前後擠壓，那條曲線畫的是「位移大小」。
+   * 現在管內加上一排排空氣分子，依駐波的位移前後振動（節附近幾乎不動、腹附近動最多，
+   * 疏密交替看得見），曲線保留成位移圖並標出節與腹；手拿音叉在開口端振動發聲，管子架在夾具上。
+   */
   PL.register("resonance-tube", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.5);
@@ -401,55 +408,94 @@
     const sType = PL.ui.select(L.controls, { label: "管型", value: "closed", options: [{ value: "closed", label: "閉管（一端封閉）" }, { value: "open", label: "開管（兩端開口）" }] });
     const sN = PL.ui.slider(L.controls, { label: "諧波 n", min: 1, max: 5, step: 1, value: 1, unit: "", digits: 0 });
     const sL = PL.ui.slider(L.controls, { label: "管長 L", min: 0.2, max: 1, step: 0.05, value: 0.5, unit: "m", digits: 2 });
+    PL.ui.note(L.controls, "聲音是縱波：管內空氣沿著管子前後振動。閉管的封閉端是位移的節、開口端是腹；開管兩端都是腹。紅點是做了記號的空氣分子。");
     const rLam = PL.ui.readout(L.readouts, { label: "波長 λ", unit: "m" });
     const rF = PL.ui.readout(L.readouts, { label: "共鳴頻率", unit: "Hz" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const AP = PL.apparatus, Lt = PL.theme.isLight();
       const closed = sType.get() === "closed", n = sN.get(), Lm = sL.get();
-      /*
-       * 原本管子永遠畫滿整個畫面寬度，「管長 L」只改讀數。
-       * 共鳴管實驗的核心就是「管子多長決定哪些頻率會共鳴」，
-       * 管長看不出來的話，這個實驗就只剩一條抖動的曲線。
-       * 改成管長以滑桿上限 1 m 對應最大寬度。
-       */
-      const L_MAX = 1.0;
-      const x0 = 50, x1 = 50 + (W - 90) * (0.25 + 0.75 * Lm / L_MAX), span = x1 - x0, midY = H / 2, A = 38;
-      const AP = PL.apparatus;
-      AP.benchTop(ctx, W, H, midY + 92);
-
-      /* 玻璃管本體：橫放的共鳴管，閉管端用金屬塞封住。
-         「管長決定哪些頻率會共鳴」這件事，要看得見管子才成立。 */
-      ctx.save();
-      const gg = ctx.createLinearGradient(0, midY - 46, 0, midY + 46);
-      gg.addColorStop(0.00, "rgba(226,244,252,0.30)");
-      gg.addColorStop(0.16, "rgba(255,255,255,0.14)");
-      gg.addColorStop(0.84, "rgba(200,224,238,0.10)");
-      gg.addColorStop(1.00, "rgba(226,244,252,0.30)");
-      ctx.fillStyle = gg; ctx.fillRect(x0, midY - 46, x1 - x0, 92);
-      ctx.strokeStyle = "rgba(206,232,244,0.75)"; ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.moveTo(x0, midY - 46); ctx.lineTo(x1, midY - 46);
-      ctx.moveTo(x0, midY + 46); ctx.lineTo(x1, midY + 46);
-      ctx.stroke();
+      const lam = closed ? 4 * Lm / (2 * n - 1) : 2 * Lm / n, f = v / lam;
+      const benchY = Math.round(H * 0.86), midY = Math.round(H * 0.42), th = Math.round(Math.min(34, H * 0.085));
+      AP.labRoom(ctx, W, H, benchY, {});
+      /* 管長以滑桿上限 1 m 對應最大寬度——「管子多長決定哪些頻率會共鳴」要看得見 */
+      const x0 = 50, x1 = 50 + (W - 170) * (0.25 + 0.75 * Lm / 1.0), span = x1 - x0;
+      const shape = u => closed ? Math.sin((2 * n - 1) * Math.PI / 2 * u) : Math.cos(n * Math.PI * u);
+      const ph = Math.cos(4 * t);
+      // 夾具的立桿與底座（先畫，玻璃管擱在上面）
+      const clamps = [x0 + span * 0.2, x0 + span * 0.8];
+      clamps.forEach(sx => {
+        AP.contactShadow(ctx, sx, benchY + 2, 34);
+        AP.steel(ctx, sx - 3, midY + th, 6, benchY - 6 - midY - th, 4);
+        AP.steel(ctx, sx - 24, benchY - 7, 48, 7, -8);
+      });
+      // 管內空氣分子：依位移駐波前後振動
+      const A = Math.min(7, span / 40);
+      ctx.save(); ctx.beginPath(); ctx.rect(x0, midY - th, span, th * 2); ctx.clip();
+      const cols = Math.max(8, Math.floor(span / 9));
+      for (let i = 0; i <= cols; i++) {
+        const xe = x0 + 3 + i * (span - 6) / cols, dx = A * shape((xe - x0) / span) * ph;
+        for (let j = 0; j < 5; j++) {
+          const jit = ((i * 73 + j * 151) % 17) / 17 - 0.5, tracer = j === 2 && i % 10 === 5;
+          ctx.fillStyle = tracer ? "#e5484d" : (Lt ? "rgba(46,96,156,0.62)" : "rgba(150,200,255,0.7)");
+          ctx.beginPath(); ctx.arc(xe + dx + jit * 2, midY + (j - 2) * th * 0.37 + jit * 3, tracer ? 3.2 : 2, 0, TAU); ctx.fill();
+        }
+      }
       ctx.restore();
-      if (closed) AP.steel(ctx, x0 - 5, midY - 46, 10, 92, -14);   // 封閉端的塞子
-      // 音叉：在開口端敲響，驅動管內空氣柱
-      AP.tuningFork(ctx, x1 + 32, midY + 46, 74);
-      D.text(ctx, "音叉", x1 + 32, midY + 62, { color: PL.col("text-faint"), size: 10, align: "center" });
-
-      D.line(ctx, x0, midY + 66, x1, midY + 66, PL.col("text-faint"), 1, [4, 4]);
-      D.text(ctx, "L = " + PL.fmt(Lm, 2) + " m", (x0 + x1) / 2, midY + 80,
-        { color: PL.col("text-faint"), size: 10, align: "center" });
-      // 位移駐波：閉管封閉端為節、開口端為腹
-      const shape = xx => { const u = (xx - x0) / span; // 0..1
-        if (closed) return Math.sin((2 * n - 1) * Math.PI / 2 * u);
-        return Math.sin(n * Math.PI * u);
-      };
-      [1, -1].forEach(sgn => { ctx.save(); ctx.strokeStyle = PL.theme.pale(0.14); ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.beginPath(); for (let x = x0; x <= x1; x += 2) ctx.lineTo(x, midY + sgn * A * Math.abs(shape(x))); ctx.stroke(); ctx.restore(); });
-      ctx.save(); ctx.strokeStyle = MC(); ctx.lineWidth = 2.6; ctx.beginPath();
-      for (let x = x0; x <= x1; x += 2) { const y = midY - A * shape(x) * Math.cos(4 * t); x === x0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); ctx.restore();
-      const lam = closed ? 4 * Lm / (2 * n - 1) : 2 * Lm / n;
-      rLam.set(lam, 2); rF.set(v / lam, 0);
+      // 玻璃管本體
+      ctx.save();
+      const gg = ctx.createLinearGradient(0, midY - th, 0, midY + th);
+      gg.addColorStop(0.00, "rgba(226,244,252,0.34)"); gg.addColorStop(0.16, "rgba(255,255,255,0.16)");
+      gg.addColorStop(0.84, "rgba(200,224,238,0.10)"); gg.addColorStop(1.00, "rgba(226,244,252,0.34)");
+      ctx.fillStyle = gg; ctx.fillRect(x0, midY - th, span, th * 2);
+      ctx.strokeStyle = Lt ? "rgba(84,124,152,0.85)" : "rgba(206,232,244,0.8)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x0, midY - th); ctx.lineTo(x1, midY - th); ctx.moveTo(x0, midY + th); ctx.lineTo(x1, midY + th); ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x0 + 6, midY - th + 5); ctx.lineTo(x1 - 6, midY - th + 5); ctx.stroke();
+      ctx.restore();
+      // 開口端的管口（橢圓）；閉管那端塞上橡皮塞
+      [closed ? null : x0, x1].forEach(xe => { if (xe == null) return; ctx.strokeStyle = Lt ? "rgba(84,124,152,0.85)" : "rgba(206,232,244,0.8)"; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.ellipse(xe, midY, 6, th, 0, 0, TAU); ctx.stroke(); });
+      if (closed) {
+        AP.rrPath(ctx, x0 - 12, midY - th - 3, 18, th * 2 + 6, 4);
+        const rg = ctx.createLinearGradient(x0 - 12, 0, x0 + 6, 0); rg.addColorStop(0, "rgb(60,62,68)"); rg.addColorStop(1, "rgb(104,106,114)");
+        ctx.fillStyle = rg; ctx.fill();
+      }
+      // 夾具的夾環
+      clamps.forEach(sx => { AP.steel(ctx, sx - 5, midY - th - 5, 10, th * 2 + 10, -18); AP.brassDisc(ctx, sx + 9, midY + th + 1, 3.5); });
+      // 位移圖：包絡線（虛線）與此刻的位移（縱波的位移畫成上下）
+      const Ac = th * 0.78;
+      ctx.save(); ctx.strokeStyle = PL.theme.pale(0.22); ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+      [1, -1].forEach(sg => { ctx.beginPath(); for (let x = x0; x <= x1; x += 2) { const yy = midY + sg * Ac * Math.abs(shape((x - x0) / span)); x === x0 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy); } ctx.stroke(); });
+      ctx.restore();
+      ctx.save(); ctx.strokeStyle = MC(); ctx.globalAlpha = 0.85; ctx.lineWidth = 2.4; ctx.beginPath();
+      for (let x = x0; x <= x1; x += 2) { const yy = midY - Ac * shape((x - x0) / span) * ph; x === x0 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy); }
+      ctx.stroke(); ctx.restore();
+      // 節與腹
+      const nodes = [], anti = [];
+      if (closed) for (let k = 0; k < n; k++) { nodes.push(2 * k / (2 * n - 1)); anti.push((2 * k + 1) / (2 * n - 1)); }
+      else { for (let k = 0; k <= n; k++) anti.push(k / n); for (let k = 0; k < n; k++) nodes.push((k + 0.5) / n); }
+      nodes.forEach(u => D.text(ctx, "節", x0 + u * span, midY + th + 17, { color: "#e5484d", size: 10.5, align: "center", weight: "800" }));
+      anti.forEach(u => D.text(ctx, "腹", x0 + u * span, midY + th + 17, { color: PL.col("accent-2"), size: 10.5, align: "center", weight: "800" }));
+      // 管長標示
+      const dy = midY + th + 38;
+      D.arrow(ctx, (x0 + x1) / 2 - 36, dy, x0, dy, { color: PL.col("text-faint"), width: 1.2, head: 6 });
+      D.arrow(ctx, (x0 + x1) / 2 + 36, dy, x1, dy, { color: PL.col("text-faint"), width: 1.2, head: 6 });
+      D.text(ctx, "L = " + PL.fmt(Lm, 2) + " m", (x0 + x1) / 2, dy + 4, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
+      D.text(ctx, "位移圖（縱波的位移畫成上下）", x0, midY - th - 12, { color: PL.col("text-faint"), size: 10 });
+      // 手拿音叉在開口端振動發聲
+      const fx = x1 + 34, fBase = midY + 50, sw = 1.6 * ph;
+      ctx.save(); ctx.translate(fx, fBase); ctx.rotate(sw * 0.004); ctx.translate(-fx, -fBase);
+      AP.tuningFork(ctx, fx, fBase, 80);
+      ctx.restore();
+      ctx.save(); ctx.strokeStyle = PL.theme.pale(0.5); ctx.lineWidth = 1.2;
+      for (let k = 0; k < 3; k++) {
+        const r = 14 + ((t * 36 + k * 15) % 45), a = Math.max(0, 1 - r / 60);
+        ctx.globalAlpha = a; ctx.beginPath(); ctx.arc(fx - 6, midY - 6, r, Math.PI - 0.55, Math.PI + 0.55); ctx.stroke();
+      }
+      ctx.restore();
+      AP.hand(ctx, fx - 7, fBase - 10, -1, 0.9, { pull: true });
+      D.text(ctx, "音叉 f = " + Math.round(f) + " Hz", fx, fBase + 20, { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
+      rLam.set(lam, 2); rF.set(f, 0);
     }
     const anim = PL.loop(dt => { if (dt) t += dt; draw(); });
     cv.onResize(draw); anim.start();
