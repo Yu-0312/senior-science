@@ -256,57 +256,97 @@
   }});
 
   /* 鉛直圓周運動 */
+  /* 鉛直圓周運動 —— 甩一桶水：速率夠，水不會灑出來
+   *
+   * 舊版是鐵架上一顆小球繞著轉，畫面大半空著。現在把小球換成一小桶水：
+   * 桶底朝外、桶口朝向圓心，水被壓在桶底；到了最高點若速率不到 √(gr)，
+   * 繩子鬆掉，水桶脫離圓周、水整個灑出來——課本那個「甩水桶」的經典示範。
+   * 物理模型與舊版相同（繩張力 T < 0 即脫離），只是物體換成看得出後果的水桶。
+   */
   PL.register("vertical-circle", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.8);
-    const g = 9.8, m = 1; let beta = 0, dir = 1, mode = "circle", px = 0, py = 0, vx = 0, vy = 0;
-    const sV = PL.ui.slider(L.controls, { label: "最低點速率 v₀", min: 2, max: 10, step: 0.5, value: 7, unit: "m/s", digits: 1, onInput: reset });
-    const sR = PL.ui.slider(L.controls, { label: "半徑 r", min: 1, max: 3, step: 0.5, value: 2, unit: "m", digits: 1, onInput: reset });
-    /* 持續繞行，保留播放/暫停以便暫停觀察；這顆維持單純重置。 */
+    const g = 9.8, m = 1; let beta = 0, dir = 1, mode = "circle", px = 0, py = 0, vx = 0, vy = 0, spin = 0, drops = [];
+    const sV = PL.ui.slider(L.controls, { label: "最低點速率 v₀", min: 2, max: 10, step: 0.5, value: 9, unit: "m/s", digits: 1, onInput: reset });
+    const sR = PL.ui.slider(L.controls, { label: "半徑 r", min: 1, max: 3, step: 0.5, value: 1.5, unit: "m", digits: 1, onInput: reset });
     PL.ui.button(PL.ui.buttonRow(L.controls), "重新開始", reset, { primary: true });
-    PL.ui.note(L.controls, "要能通過最高點，該處速率至少 √(gr)，否則繩鬆脫、物體脫離圓周。");
+    PL.ui.note(L.controls, "要能通過最高點，該處速率至少 √(gr)：這時重力剛好足夠提供向心力，繩子不必拉。速率再小，繩子鬆掉、水桶脫離圓周，水就灑出來了。");
     const rTop = PL.ui.readout(L.readouts, { label: "頂點速率", unit: "m/s" });
     const rT = PL.ui.readout(L.readouts, { label: "底點張力", unit: "N" });
     const rMin = PL.ui.readout(L.readouts, { label: "過頂最小速率", unit: "m/s" });
-    function reset() { beta = 0; dir = 1; mode = "circle"; }
+    function reset() { beta = 0; dir = 1; mode = "circle"; drops = []; spin = 0; }
     reset();
     const speed2 = b => sV.get() * sV.get() - 2 * g * sR.get() * (1 - Math.cos(b));
-    function draw() {
-      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const r = sR.get(), cx = W / 2, cy = H * 0.46, R = Math.min(W, H) * 0.3;
-      const A = AP();
-      /* 鐵架上的轉軸：小球綁在繩子一端，在鉛直面上繞著轉軸甩 */
-      if (A.standRod) {
-        A.benchTop(ctx, W, H, H - 20);
-        A.standRod(ctx, cx - R - 50, H - 18, cy - 30);
-        A.crossArm(ctx, cx - R - 50, cy, cx);
+    const geo = () => { const W = cv.W, H = cv.H; return { W, H, cx: W / 2, cy: H * 0.44, R: Math.min(W, H) * 0.29 }; };
+    // 水桶：原點在提把頂端（繩子綁的地方），局部 +y 朝外（桶底方向）
+    function bucket(ctx, x, y, ang, water) {
+      ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.scale(1.3, 1.3);
+      ctx.strokeStyle = "rgb(120,128,140)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-15, 12); ctx.quadraticCurveTo(0, -8, 15, 12); ctx.stroke();
+      const body = () => { ctx.beginPath(); ctx.moveTo(-16, 12); ctx.lineTo(16, 12); ctx.lineTo(12, 42); ctx.lineTo(-12, 42); ctx.closePath(); };
+      const bg = ctx.createLinearGradient(-16, 0, 16, 0);
+      bg.addColorStop(0, "rgb(110,120,134)"); bg.addColorStop(0.35, "rgb(206,214,224)"); bg.addColorStop(1, "rgb(104,112,126)");
+      body(); ctx.fillStyle = bg; ctx.fill();
+      if (water > 0) {
+        ctx.save(); body(); ctx.clip();
+        const wy = 42 - 22 * water;
+        ctx.fillStyle = "rgba(64,150,230,0.88)"; ctx.fillRect(-18, wy, 36, 44 - wy);
+        ctx.fillStyle = "rgba(190,230,255,0.9)"; ctx.fillRect(-18, wy, 36, 2);
+        ctx.restore();
       }
-      D.ring(ctx, cx, cy, R, "rgba(120,130,150,0.35)", 1.4, [5, 5]);
-      A.brassDisc ? A.brassDisc(ctx, cx, cy, 6) : D.disc(ctx, cx, cy, 4, { fill: PL.col("text-faint") });
-      let ballx, bally;
+      body(); ctx.strokeStyle = "rgba(40,46,56,0.75)"; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.fillStyle = "rgb(150,158,170)"; ctx.fillRect(-17, 10, 34, 3);
+      ctx.restore();
+    }
+    function draw() {
+      const { ctx } = cv; cv.clear(); D.bg(cv);
+      const { W, H, cx, cy, R } = geo(), r = sR.get(), A = AP();
+      /* 鐵架上的轉軸：水桶綁在繩子一端，在鉛直面上繞著轉軸甩 */
+      A.labRoom(ctx, W, H, H - 20, { window: { x: W * 0.78, y: H * 0.06, w: Math.min(140, W * 0.17), h: H * 0.3 } });
+      A.standRod(ctx, cx - R - 70, H - 18, cy - 30);
+      A.crossArm(ctx, cx - R - 70, cy, cx);
+      D.ring(ctx, cx, cy, R, PL.theme.pale(0.35), 1.4, [5, 5]);
+      // 最高點的門檻：頂點速率要 ≥ √(gr)
+      const vmin = Math.sqrt(g * r), vt2 = speed2(Math.PI), ok = vt2 >= g * r;
+      D.line(ctx, cx, cy - R - 8, cx, cy - R + 8, ok ? PL.col("ok", "#3fb950") : PL.col("danger"), 2);
+      D.text(ctx, "頂點需要 v ≥ √(gr) = " + PL.fmt(vmin, 2) + " m/s", cx, cy - R - 16, { color: ok ? PL.col("text-dim") : PL.col("danger"), size: 11, align: "center", weight: "700" });
+      A.brassDisc(ctx, cx, cy, 6);
       if (mode === "circle") {
-        ballx = cx + R * Math.sin(beta); bally = cy + R * Math.cos(beta);
-        A.cord ? A.cord(ctx, cx, cy, ballx, bally) : D.line(ctx, cx, cy, ballx, bally, MC(), 2);
-        const v2 = Math.max(0, speed2(beta)), T = m * v2 / r + m * g * Math.cos(beta);
-        if (T > 0) { const f = PL.clamp(T / 80, 0.12, 0.5); D.arrow(ctx, ballx, bally, ballx + (cx - ballx) * f, bally + (cy - bally) * f, { color: PL.col("danger"), width: 2, label: "T" }); }
-      } else { ballx = px; bally = py; D.text(ctx, "繩鬆脫，物體脫離圓周！", cx, H - 14, { color: PL.col("danger"), size: 12, align: "center" }); }
-      A.sportBall ? A.sportBall(ctx, ballx, bally, 12, "steel") : D.disc(ctx, ballx, bally, 11, { fill: MC() });
-      const vt2 = speed2(Math.PI);
-      rTop.set(vt2 > 0 ? Math.sqrt(vt2) : 0, 2); rT.set(m * sV.get() * sV.get() / r + m * g, 1); rMin.set(Math.sqrt(g * r), 2);
+        const ax = cx + R * Math.sin(beta), ay = cy + R * Math.cos(beta);
+        A.cord(ctx, cx, cy, ax, ay);
+        bucket(ctx, ax, ay, -beta, 1);
+        const v2 = Math.max(0, speed2(beta)), v = Math.sqrt(v2), T = m * v2 / r + m * g * Math.cos(beta);
+        const bxm = ax + 36 * Math.sin(beta), bym = ay + 36 * Math.cos(beta);
+        if (T > 0) { const f = PL.clamp(T / 80, 0.12, 0.5); D.arrow(ctx, ax, ay, ax + (cx - ax) * f, ay + (cy - ay) * f, { color: PL.col("danger"), width: 2, label: "T" }); }
+        D.arrow(ctx, bxm, bym, bxm, bym + 40, { color: PL.col("warn"), width: 2, label: "mg" });
+        const vl = 12 + v * 7;
+        D.arrow(ctx, bxm, bym, bxm + dir * Math.cos(beta) * vl, bym - dir * Math.sin(beta) * vl, { color: PL.col("accent-2"), width: 2, label: "v" });
+      } else {
+        bucket(ctx, px, py, spin, 0.15);
+        drops.forEach(d => D.disc(ctx, d.x, d.y, d.r, { fill: "rgba(70,160,235,0.85)" }));
+        D.text(ctx, "頂點速率不夠：繩子鬆掉，水桶脫離圓周，水灑出來了！", cx, H - 30, { color: PL.col("danger"), size: 12, align: "center", weight: "700" });
+      }
+      rTop.set(vt2 > 0 ? Math.sqrt(vt2) : 0, 2); rT.set(m * sV.get() * sV.get() / r + m * g, 1); rMin.set(vmin, 2);
     }
     const anim = PL.loop(dt => {
       if (dt) {
         dt = Math.min(dt, 0.02);
-        const r = sR.get(), cx = cv.W / 2, cy = cv.H * 0.46, R = Math.min(cv.W, cv.H) * 0.3, scale = R / r;
+        const r = sR.get(), G = geo(), scale = G.R / r;
         if (mode === "circle") {
           const v2 = speed2(beta);
           if (v2 <= 0) { dir = -dir; beta += dir * 0.02; }
           else {
             const T = m * v2 / r + m * g * Math.cos(beta), v = Math.sqrt(v2);
-            if (Math.cos(beta) < 0 && T < 0) { px = cx + R * Math.sin(beta); py = cy + R * Math.cos(beta); vx = dir * v * Math.cos(beta); vy = -dir * v * Math.sin(beta); mode = "projectile"; }
-            else beta += dir * (v / r) * dt;
+            if (Math.cos(beta) < 0 && T < 0) {
+              px = G.cx + G.R * Math.sin(beta); py = G.cy + G.R * Math.cos(beta); vx = dir * v * Math.cos(beta); vy = -dir * v * Math.sin(beta); mode = "projectile"; spin = -beta;
+              let sd = 11;
+              for (let k = 0; k < 26; k++) { sd = (sd * 1103515245 + 12345) & 0x7fffffff; const a = sd / 0x7fffffff; drops.push({ x: px + (a - 0.5) * 20, y: py + 18, vx: vx * scale * (0.7 + a * 0.5), vy: vy * scale * (0.7 + ((k * 7) % 10) / 20), r: 1.5 + (k % 3) }); }
+            } else beta += dir * (v / r) * dt;
           }
-        } else { vy += g * dt; px += vx * scale * dt; py += vy * scale * dt; if (py > cv.H + 20) reset(); }
+        } else {
+          vy += g * dt; px += vx * scale * dt; py += vy * scale * dt; spin += dt * 3 * dir;
+          drops.forEach(d => { d.vy += g * scale * dt; d.x += d.vx * dt; d.y += d.vy * dt; });
+          if (py > cv.H + 40) reset();
+        }
       }
       draw();
     });
