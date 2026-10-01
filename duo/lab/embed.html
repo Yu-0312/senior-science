@@ -97,6 +97,24 @@
       border-radius: 0;
     }
   </style>
+  <style>
+    /* —— 關卡模式（demo）觸控與可讀性微調：維持原視覺語言 —— */
+    html { -webkit-tap-highlight-color: transparent; }
+    :focus-visible { outline: 3px solid rgba(28, 176, 246, .6); outline-offset: 2px; border-radius: 10px; }
+
+    /* 播放／單步／重設：44px 起的可按高度（原本 34px，手機不好按） */
+    .demo-mode .sim-transport-play,
+    .demo-mode .sim-transport-btn,
+    .demo-mode .sim-transport-reset { min-height: 42px; min-width: 46px; border-radius: 12px; }
+    .demo-mode .sim-speed-btn { min-height: 32px; min-width: 42px; border-radius: 10px; }
+
+    /* 滑桿拇指加大到 22px：投影與手機都好抓（原本 16px） */
+    .demo-mode input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; }
+    .demo-mode input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; }
+
+    /* 示範重點是上台要念的句子：放大一點 */
+    .demo-mode .sim-demo-tip { font-size: 14.5px; padding: 10px 14px; }
+  </style>
 </head>
 <body>
   <div id="sim-root"><div class="embed-status" id="boot-status">載入互動模擬…</div></div>

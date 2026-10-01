@@ -15,6 +15,7 @@
     />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#58CC02" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -28,6 +29,51 @@
     class="bg-[#F7F7F7] text-slate-800 antialiased selection:bg-[#58CC02]/20 selection:text-[#1e7e00]"
   >
     <div id="root"></div>
+    <style>
+      /* —— UI/UX 微調：維持多鄰國風格，只加觸感、焦點與導航 —— */
+      html { -webkit-tap-highlight-color: transparent; }
+      button, a, input, select { touch-action: manipulation; }
+      :focus-visible { outline: 3px solid rgba(28, 176, 246, .6); outline-offset: 2px; border-radius: 10px; }
+
+      /* 單元籤貼在頂欄下方：長地圖不用一路回捲就能換單元 */
+      #skill-tree-container > div:first-child {
+        position: sticky; top: 55px; z-index: 30;
+        background: linear-gradient(#f7f7f7 84%, rgba(247, 247, 247, 0));
+        margin-top: -6px; padding-top: 12px;
+        scrollbar-width: none;
+      }
+      #skill-tree-container > div:first-child::-webkit-scrollbar { display: none; }
+
+      /* 選項卡：可按時微微浮起；作答後字母塊上色，對錯一眼可辨 */
+      .z-50 button.border-2.rounded-2xl:not([disabled]):hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 0 rgba(15, 23, 42, .08);
+      }
+      .z-50 button.border-2.rounded-2xl:not([disabled]):active { transform: translateY(1px); box-shadow: none; }
+      .z-50 button[class*="border-[#58CC02]"] { box-shadow: 0 3px 0 rgba(62, 147, 2, .28); }
+      .z-50 button[class*="border-emerald-500"] { box-shadow: 0 3px 0 rgba(5, 150, 105, .25); }
+      .z-50 button[class*="border-amber-400"] { box-shadow: 0 3px 0 rgba(217, 119, 6, .22); }
+      .z-50 button[class*="border-[#58CC02]"] > span:first-child,
+      .z-50 button[class*="border-emerald-500"] > span:first-child { background: #58cc02; color: #fff; }
+      .z-50 button[class*="border-amber-400"] > span:first-child { background: #f59e0b; color: #fff; }
+
+      /* 進度條加一點凹陷感，更像實體關卡進度 */
+      .z-50 div.h-3 > div { box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .10); }
+
+      /* 實驗台變高之後，彈窗是主要捲動區：捲軸收細、不搶戲 */
+      .z-50 .overflow-y-auto { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+      .z-50 .overflow-y-auto::-webkit-scrollbar { width: 10px; }
+      .z-50 .overflow-y-auto::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; border: 3px solid #fff; }
+      .z-50 .overflow-y-auto::-webkit-scrollbar-track { background: transparent; }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: .01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: .01ms !important;
+        }
+      }
+    </style>
     <script>
       /* 實驗台 iframe 依內容自動長高：embed.html 會 postMessage 回報高度 */
       window.addEventListener("message", function (e) {
