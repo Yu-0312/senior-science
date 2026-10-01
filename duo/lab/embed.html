@@ -142,6 +142,18 @@
       var FILES = window.PhysicsLabExperimentFiles || {};
       var simRoot = document.getElementById("sim-root");
 
+      // 回報內容高度，讓外層把 iframe 拉到剛好（避免圖表被切、滑桿看不到）
+      var reportHeight = function () {
+        try {
+          var h = Math.ceil(simRoot.getBoundingClientRect().height);
+          if (h >= 200) parent.postMessage({ type: "lab-height", height: h + 12 }, "*");
+        } catch (e) {}
+      };
+      if (typeof ResizeObserver !== "undefined") new ResizeObserver(reportHeight).observe(simRoot);
+      window.addEventListener("resize", reportHeight);
+      setTimeout(reportHeight, 400);
+      setTimeout(reportHeight, 1500);
+
       if (!id) { fail("缺少實驗 id"); return; }
       if (!PL) { fail("模擬引擎未載入"); return; }
 

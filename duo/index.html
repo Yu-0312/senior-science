@@ -28,6 +28,19 @@
     class="bg-[#F7F7F7] text-slate-800 antialiased selection:bg-[#58CC02]/20 selection:text-[#1e7e00]"
   >
     <div id="root"></div>
+    <script>
+      /* 實驗台 iframe 依內容自動長高：embed.html 會 postMessage 回報高度 */
+      window.addEventListener("message", function (e) {
+        var d = e.data;
+        if (!d || d.type !== "lab-height" || !d.height) return;
+        var frames = document.querySelectorAll('iframe[title*="互動實驗"]');
+        for (var i = 0; i < frames.length; i++) {
+          var h = Math.max(320, Math.min(d.height, 1400));
+          var cur = parseFloat(frames[i].style.height) || 0;
+          if (Math.abs(cur - h) > 2) frames[i].style.height = h + "px";
+        }
+      });
+    </script>
     <script>/* home handled inside app */</script>
   </body>
 </html>
