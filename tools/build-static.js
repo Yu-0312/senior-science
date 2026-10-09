@@ -12,7 +12,7 @@
  *   p/<實驗 id>.html   每個實驗一頁，含標題、概念、公式、學習重點（純 HTML）
  *   experiments.html   245 個實驗的總索引，依模組分組
  *   sitemap.xml        供搜尋引擎抓取
- *   robots.txt         依閘門狀態決定是否開放索引
+ *   robots.txt         開放索引
  *
  * 靜態頁不是模擬本身，而是「這個實驗在講什麼」的可讀說明，
  * 頁面上再導向互動版本。這也順便解決了分享連結時對方看到什麼的問題。
@@ -172,7 +172,6 @@ function plainFormula(latex) {
 }
 
 function layout(o) {
-  const gate = o.gated;
   return `<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -180,7 +179,7 @@ function layout(o) {
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${escapeHtml(o.title)}</title>
 <meta name="description" content="${escapeHtml(o.description)}" />
-${gate ? '<meta name="robots" content="noindex, nofollow" />\n' : ""}<link rel="canonical" href="${escapeHtml(o.canonical)}" />
+<link rel="canonical" href="${escapeHtml(o.canonical)}" />
 <meta property="og:type" content="article" />
 <meta property="og:title" content="${escapeHtml(o.title)}" />
 <meta property="og:description" content="${escapeHtml(o.description)}" />
@@ -270,7 +269,7 @@ ${points}
   return layout({
     title: exp.title + "｜物理實驗室 · " + mod.title,
     description: description,
-    canonical, base: "../", build: site.build, gated: site.accessGate !== false,
+    canonical, base: "../", build: site.build,
     body,
     jsonLd: {
       "@context": "https://schema.org",
@@ -401,7 +400,7 @@ ${rows}
     title: exp.title + " 學習單｜物理實驗室",
     description: "可列印的「" + exp.title + "」實驗學習單，含資料記錄表格、作圖區與由圖求值欄位。",
     canonical: site.siteUrl + "p/worksheet-" + exp.id + ".html",
-    base: "../", build: site.build, gated: site.accessGate !== false,
+    base: "../", build: site.build,
     body
   });
 }
@@ -431,7 +430,7 @@ ${sections}`;
     title: "全部實驗一覽｜物理實驗室 · 台灣中學互動物理",
     description: total + " 個對齊 108 課綱的互動物理模擬，涵蓋運動學、力學、波動、光學、電磁與近代物理，全部免費使用。",
     canonical: site.siteUrl + "experiments.html",
-    base: "", build: site.build, gated: site.accessGate !== false,
+    base: "", build: site.build,
     body
   });
 }
@@ -473,9 +472,8 @@ function main() {
     console.error("找不到課程資料，請確認 js/curriculum.js 是否正常。");
     process.exit(1);
   }
-  const gated = site.accessGate !== false;
   const siteUrl = resolveSiteUrl(site);
-  const conf = { siteUrl, build: site.build || "dev", accessGate: site.accessGate };
+  const conf = { siteUrl, build: site.build || "dev" };
 
   /*
    * 不整個刪掉重建：直接覆寫。
@@ -507,7 +505,7 @@ function main() {
   fs.writeFileSync(path.join(ROOT, "experiments.html"),
     indexPage(curriculum.modules, conf, flat.length), "utf8");
 
-  /* sitemap：閘門開著時仍然產生，但 robots.txt 會擋住，翻牌後立刻生效 */
+  /* sitemap */
   const urls = [
     { loc: siteUrl, priority: "1.0" },
     { loc: siteUrl + "experiments.html", priority: "0.9" },
@@ -536,9 +534,7 @@ function main() {
     "\n</urlset>\n";
   fs.writeFileSync(path.join(ROOT, "sitemap.xml"), sitemap, "utf8");
 
-  const robots = gated
-    ? "# 合作試用期間：暫不開放索引。\n# 把 js/site-config.js 的 accessGate 改成 false 並重新建置即可開放。\nUser-agent: *\nDisallow: /\n"
-    : "User-agent: *\nAllow: /\n\nSitemap: " + siteUrl + "sitemap.xml\n";
+  const robots = "User-agent: *\nAllow: /\n\nSitemap: " + siteUrl + "sitemap.xml\n";
   fs.writeFileSync(path.join(ROOT, "robots.txt"), robots, "utf8");
 
   console.log("已產生靜態頁面：");
@@ -546,7 +542,7 @@ function main() {
   console.log("  可列印學習單    " + flat.length + " 頁  → p/worksheet-<id>.html");
   console.log("  總索引頁        1 頁   → experiments.html");
   console.log("  sitemap.xml     " + urls.length + " 筆網址");
-  console.log("  robots.txt      " + (gated ? "Disallow（閘門開啟中）" : "Allow（已公開）"));
+  console.log("  robots.txt      " + "Allow（已公開）");
   console.log("");
   if (stale.length) {
     console.log("");
@@ -556,9 +552,7 @@ function main() {
     if (stale.length > 10) console.log("        …等共 " + stale.length + " 個");
   }
   console.log("");
-  console.log(gated
-    ? "目前是合作試用模式。合作結束後把 js/site-config.js 的 accessGate 改成 false，\n重新執行本腳本並部署，SEO 就會整套上線。"
-    : "已是公開模式，搜尋引擎可以索引全部內容。");
+  console.log("已是公開模式，搜尋引擎可以索引全部內容。");
 }
 
 main();

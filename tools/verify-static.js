@@ -30,9 +30,7 @@ const C = sandbox.window.PhysicsLabCurriculum;
 const site = sandbox.window.PhysicsLabSite || {};
 const flat = [];
 C.modules.forEach(m => m.experiments.forEach(e => flat.push({ e, m })));
-const gated = site.accessGate !== false;
-
-console.log("=== 靜態層檢查（閘門：" + (gated ? "開啟" : "關閉") + "）===");
+console.log("=== 靜態層檢查 ===");
 
 check("每個實驗都有說明頁", flat.every(x => fs.existsSync(path.join(ROOT, "p", x.e.id + ".html"))),
   flat.length + " 個");
@@ -52,13 +50,10 @@ check("實驗頁含有概念敘述", sample.includes(flat[0].e.concept.slice(0, 
 check("實驗頁含有結構化資料", sample.includes("LearningResource"));
 check("實驗頁指向互動版本", sample.includes("index.html#"));
 
-/* 閘門狀態與索引設定必須一致，否則會收錄到空殼或該公開卻沒公開 */
+/* 站台完全公開：必須開放索引，且不能殘留 noindex */
 const robots = fs.readFileSync(path.join(ROOT, "robots.txt"), "utf8");
-check("robots.txt 與閘門狀態一致",
-  gated ? robots.includes("Disallow: /") : robots.includes("Allow: /"),
-  gated ? "閘門開啟 → 不開放索引" : "已公開 → 開放索引");
-check("頁面的 noindex 與閘門狀態一致",
-  gated ? sample.includes("noindex") : !sample.includes("noindex"));
+check("robots.txt 開放索引", robots.includes("Allow: /"));
+check("頁面沒有 noindex", !sample.includes("noindex"));
 
 const sitemap = fs.readFileSync(path.join(ROOT, "sitemap.xml"), "utf8");
 const urlCount = (sitemap.match(/<url>/g) || []).length;

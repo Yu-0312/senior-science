@@ -5,7 +5,6 @@
 **線上網站：** [https://senior-science.vercel.app/](https://senior-science.vercel.app/)
 **使用授權：** [免費教育使用與推廣授權](https://senior-science.vercel.app/licensing.html)
 
-> 合作試用期間全站有密碼閘門，並自動加上 `noindex`。結束後把 `js/site-config.js` 的 `accessGate` 改成 `false` 重新部署即可全站公開，SEO 會同時上線。
 
 ---
 
@@ -113,7 +112,7 @@
 
 [https://senior-science.vercel.app/](https://senior-science.vercel.app/)
 
-合作試用期間會先顯示存取閘門。這是靜態網站的輕量前端保護，用來區分「有給連結的合作對象」與「隨手點進來的人」，**不是伺服器端身分驗證**——雜湊寫在前端就一定可以被離線暴力破解。若需要真正的帳號權限控管，請改用具備登入與後端驗證的部署方式。
+本站完全公開，不需要密碼；它是純靜態網站，沒有後端，也沒有任何存取控制。
 
 ### 本機使用
 
@@ -166,10 +165,10 @@ senior-science/
 ├─ tools/
 │  ├─ build-manifest.js   產生實驗 → 檔案的對照表
 │  ├─ build-static.js     產生靜態說明頁、學習單、sitemap、robots
-│  ├─ verify-static.js    驗證產出與閘門狀態一致
+│  ├─ verify-static.js    驗證靜態頁產出
 │  └─ tests/              22 支自動化稽核
 └─ js/
-   ├─ site-config.js      閘門開關、密碼雜湊、正式網址、版本號
+   ├─ site-config.js      正式網址、版本號
    ├─ app.js              導覽、搜尋、進度、主題、PWA
    ├─ sim-core.js         模擬引擎：UI、canvas、繪圖、graph、動畫迴圈、墨色層
    ├─ sim-insight.js      模型探測：量出真正的物理關係
@@ -186,7 +185,7 @@ senior-science/
 
 | 檔案 | 說明 |
 | --- | --- |
-| `js/site-config.js` | 存取閘門、正式網址、版本號。**改了 js/css 一定要更新版本號** |
+| `js/site-config.js` | 正式網址、版本號。**改了 js/css 一定要更新版本號** |
 | `js/sim-core.js` | 模擬引擎。UI 元件、canvas、繪圖、graph、動畫迴圈、時間控制列、主題感知的墨色層 |
 | `js/sim-insight.js` | 探測引擎。掃描滑桿與讀數，用對數迴歸求出冪次關係並以中文陳述 |
 | `js/teaching-notes.js` | 各實驗的判讀文案、實體實驗流程與誤差鐵律 |

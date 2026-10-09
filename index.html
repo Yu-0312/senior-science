@@ -42,13 +42,13 @@
 
   <!-- PWA -->
   <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20260929-01" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png?v=20260929-01" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20261009-01" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png?v=20261009-01" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="物理實驗室" />
 
-  <link rel="stylesheet" href="css/style.css?v=20260929-01" />
+  <link rel="stylesheet" href="css/style.css?v=20261009-01" />
 
   <!-- MathJax（LaTeX 公式排版） -->
   <script>
@@ -75,23 +75,6 @@
 
 <body>
   <a class="skip-link" href="#main-content">跳至主要內容</a>
-  <section class="access-gate" id="access-gate" role="dialog" aria-modal="true" aria-labelledby="access-title">
-    <div class="access-gate-panel">
-      <div class="access-mark" aria-hidden="true">PHYS</div>
-      <p class="access-kicker">TAIWAN PHYSICS LAB</p>
-      <h1 id="access-title">進入實驗室</h1>
-      <p>輸入授權密碼後，即可使用完整的互動實驗工作台。</p>
-      <form id="access-form" class="access-form">
-        <label for="access-password">授權密碼</label>
-        <div class="access-input-row">
-          <input id="access-password" type="password" autocomplete="current-password" required />
-          <button type="submit">進入</button>
-        </div>
-        <p class="access-error" id="access-error" aria-live="polite"></p>
-      </form>
-      <div class="access-note">重新整理或另開分頁時，需要再次輸入密碼。<a href="licensing.html">查看免費教育使用授權</a></div>
-    </div>
-  </section>
   <div class="aurora" aria-hidden="true"><i></i></div>
 
   <div class="app">
@@ -117,7 +100,7 @@
           </svg>
         </div>
         <div class="brand-text">
-          <h1>物理實驗室</h1>
+          <div class="brand-name">物理實驗室</div>
           <div class="sub">台灣中學互動物理 · 國中自然到 108 課綱</div>
         </div>
       </div>
@@ -131,7 +114,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l3 3v17H6z"/><path d="M15 2v4h4M9 11h6M9 15h6M9 19h4"/></svg>
         <span>授權</span>
       </a>
-      <button class="icon-btn lock-session" id="lock-session" type="button" aria-label="鎖定實驗室"><span>鎖定</span></button>
       <button class="icon-btn" id="theme-toggle" aria-label="切換主題"></button>
     </header>
 
@@ -181,25 +163,50 @@
             <div class="hero-badge"><span class="dot" aria-hidden="true"></span>依教育部 108 課綱設計 · 全繁體原創</div>
             <h1 class="hero-title">看得見的物理，<br />可以動手玩的實驗室</h1>
             <p class="hero-sub">12 個學習模組、<span id="hero-exp-count">0</span> 個持續擴充的國中到高中物理實驗，並提供大學入門延伸。每一個都附即時互動模擬、可拖曳的碼錶與量角器，以及可列印的學習單。</p>
-            <p class="hero-highlight"><b>模擬會自己說出物理關係。</b>單擺會告訴你 \(T \propto \sqrt{L}\)、而且振幅完全不影響週期；雙狹縫會得出 \(\Delta x \propto \lambda L / d\)。這些不是寫死的答案，是程式實際掃描模型量出來的。</p>
-            <div class="hero-modes" role="group" aria-label="選擇使用模式">
+
+            <h2 class="hero-prompt" id="hero-modes-title">你想怎麼開始？</h2>
+            <div class="hero-modes" role="group" aria-labelledby="hero-modes-title">
               <button class="hero-mode teacher" id="enter-teacher" type="button">
+                <span class="hero-mode-top">
+                  <span class="hero-mode-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+                  </span>
+                  <span class="hero-mode-tag">老師・課堂投影</span>
+                </span>
                 <span class="hero-mode-name">教師演示版</span>
                 <span class="hero-mode-desc">精簡畫面，打開就能拖、直接投影演示</span>
+                <span class="hero-mode-go" aria-hidden="true">開始演示<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
               </button>
-              <button class="hero-mode" id="enter-student" type="button">
+              <button class="hero-mode student" id="enter-student" type="button">
+                <span class="hero-mode-top">
+                  <span class="hero-mode-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z"/></svg>
+                  </span>
+                  <span class="hero-mode-tag">學生・循序自學</span>
+                </span>
                 <span class="hero-mode-name">自學完整版</span>
                 <span class="hero-mode-desc">保留任務導讀、判讀與逐步引導鷹架</span>
+                <span class="hero-mode-go" aria-hidden="true">開始自學<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
               </button>
               <a class="hero-mode duo" id="enter-duo" href="duo/">
+                <span class="hero-mode-top">
+                  <span class="hero-mode-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.2H22l-6 4.8 2.3 7L12 16.8 5.7 21l2.3-7-6-4.8h7.6z"/></svg>
+                  </span>
+                  <span class="hero-mode-tag">闖關・遊戲化</span>
+                </span>
                 <span class="hero-mode-name">關卡挑戰版</span>
                 <span class="hero-mode-desc">多鄰國式地圖：先預測、玩實驗台、再答題通關</span>
+                <span class="hero-mode-go" aria-hidden="true">開始闖關<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
               </a>
             </div>
+            <p class="hero-mode-hint">前兩種模式進入的是同一批實驗，只差畫面繁簡；「關卡挑戰版」把每個實驗做成一關。</p>
             <div class="hero-actions">
-              <button class="btn-hero ghost" id="hero-browse">瀏覽全部模組</button>
+              <button class="btn-hero ghost" id="hero-browse" type="button">瀏覽全部模組<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
             </div>
-            <p class="hero-mode-hint">前兩種模式進入的是同一批實驗，只差畫面繁簡；「關卡挑戰版」把每個實驗做成一關，適合自學闖關。</p>
+
+            <p class="hero-highlight"><b>模擬會自己說出物理關係。</b>單擺會告訴你 \(T \propto \sqrt{L}\)、而且振幅完全不影響週期；雙狹縫會得出 \(\Delta x \propto \lambda L / d\)。這些不是寫死的答案，是程式實際掃描模型量出來的。</p>
+
             <div class="hero-stats">
               <div><div class="hstat-n" id="stat-mod">0</div><div class="hstat-l">學習模組</div></div>
               <div><div class="hstat-n b2" id="stat-exp">0</div><div class="hstat-l">實驗主題</div></div>
@@ -379,25 +386,25 @@
   </section>
 
   <!-- 核心 -->
-  <script src="js/site-config.js?v=20260929-01"></script>
-  <script src="js/curriculum.js?v=20260929-01"></script>
-  <script src="js/advanced-curriculum.js?v=20260929-01"></script>
-  <script src="js/comprehensive-curriculum.js?v=20260929-01"></script>
-  <script src="js/extension-registry.js?v=20260929-01"></script>
-  <script src="js/open-curriculum.js?v=20260929-01"></script>
-  <script src="js/school-curriculum.js?v=20260929-01"></script>
-    <script src="js/sim-core.js?v=20260929-01"></script>
-  <script src="js/sim-tools.js?v=20260929-01"></script>
-  <script src="js/sim-insight.js?v=20260929-01"></script>
-  <script src="js/sim-observe.js?v=20260929-01"></script>
-  <script src="js/teaching-notes.js?v=20260929-01"></script>
-  <script src="js/sim-a11y.js?v=20260929-01"></script>
+  <script src="js/site-config.js?v=20261009-01"></script>
+  <script src="js/curriculum.js?v=20261009-01"></script>
+  <script src="js/advanced-curriculum.js?v=20261009-01"></script>
+  <script src="js/comprehensive-curriculum.js?v=20261009-01"></script>
+  <script src="js/extension-registry.js?v=20261009-01"></script>
+  <script src="js/open-curriculum.js?v=20261009-01"></script>
+  <script src="js/school-curriculum.js?v=20261009-01"></script>
+    <script src="js/sim-core.js?v=20261009-01"></script>
+  <script src="js/sim-tools.js?v=20261009-01"></script>
+  <script src="js/sim-insight.js?v=20261009-01"></script>
+  <script src="js/sim-observe.js?v=20261009-01"></script>
+  <script src="js/teaching-notes.js?v=20261009-01"></script>
+  <script src="js/sim-a11y.js?v=20261009-01"></script>
 
   <!-- 實驗程式改為延遲載入：只掛對應表，開啟實驗時才抓對應的檔案 -->
-  <script src="js/experiment-manifest.js?v=20260929-01"></script>
+  <script src="js/experiment-manifest.js?v=20261009-01"></script>
 
 
   <!-- 應用外殼 -->
-  <script src="js/app.js?v=20260929-01"></script>
+  <script src="js/app.js?v=20261009-01"></script>
 </body>
 </html>
