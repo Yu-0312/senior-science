@@ -56,11 +56,9 @@ repo 首頁側邊欄就出現了 License 與 License-2 兩個分頁。
 2. Settings → Environment Variables → 新增 `SITE_URL`，值填 `https://你的網域/`（**結尾要有斜線**）
 3. 重新部署一次，canonical 與 sitemap 才會換過去
 
-## 開放搜尋引擎收錄
+## 搜尋引擎收錄
 
-合作試用結束後：把 `js/site-config.js` 的 `accessGate` 改成 `false`，
-更新版本號，重新部署。密碼閘門與 `noindex` 會同時解除，
-`robots.txt` 與 `sitemap.xml` 在建置時一併重新產生。
+站台預設完全公開。每次重新建置時，`robots.txt` 與 `sitemap.xml` 會一併重新產生。
 
 ## 發佈前
 

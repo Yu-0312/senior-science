@@ -228,12 +228,8 @@
     const b = new Date((end || todayKey()) + "T00:00:00");
     return Math.floor((b - a) / 86400000);
   }
-  /* 站台設定（js/site-config.js）。合作結束後把 accessGate 改成 false 就全站公開。 */
+  /* 站台設定（js/site-config.js） */
   const SITE = window.PhysicsLabSite || {};
-  const ACCESS_HASHES = Array.isArray(SITE.accessHashes)
-    ? SITE.accessHashes
-    : (SITE.accessHash ? [SITE.accessHash] : []);
-  const ACCESS_GATE_ENABLED = SITE.accessGate !== false;
 
   /* ---------------------------------------------------------------------
      實驗程式的延遲載入
@@ -1809,69 +1805,10 @@
     openExp(id);
   }
 
-  function lockLab() {
-    if (currentSim && currentSim.stop) { try { currentSim.stop(); } catch (e) {} }
-    currentSim = null;
-    // 沒有清掉目前實驗，解鎖後 route() 會誤以為是跨章節切換而彈出檢核。
-    currentId = null;
-    cancelDwell();
-    document.body.classList.remove("has-access");
-    document.body.classList.add("access-locked");
-    $("#access-password").value = "";
-    $("#access-error").textContent = "";
-    setTimeout(() => $("#access-password").focus(), 0);
-  }
-
-  async function sha256(value) {
-    if (!window.crypto || !window.crypto.subtle) return "";
-    const bytes = new TextEncoder().encode(value);
-    const digest = await window.crypto.subtle.digest("SHA-256", bytes);
-    return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, "0")).join("");
-  }
-
-  function unlockLab() {
-    document.body.classList.remove("access-locked");
-    document.body.classList.add("has-access");
-    if (!initialized) { initialized = true; init(); }
-    else route();
-  }
-
-  function initAccessGate() {
-    /*
-     * 閘門關閉時（合作結束後）直接進入實驗室，並把整個密碼面板從
-     * 無障礙樹與版面中移除，避免螢幕報讀器仍然唸到一個不存在的表單。
-     */
-    if (!ACCESS_GATE_ENABLED) {
-      const gate = $("#access-gate");
-      if (gate && gate.parentNode) gate.parentNode.removeChild(gate);
-      const lock = $("#lock-session");
-      if (lock && lock.parentNode) lock.parentNode.removeChild(lock);
-      unlockLab();
-      return;
-    }
-    const form = $("#access-form");
-    const input = $("#access-password");
-    const error = $("#access-error");
-    form.addEventListener("submit", async event => {
-      event.preventDefault();
-      const submit = form.querySelector("button[type=submit]");
-      submit.disabled = true; error.textContent = "驗證中…";
-      try {
-        const digest = await sha256(input.value);
-        if (digest && ACCESS_HASHES.includes(digest)) { unlockLab(); return; }
-        error.textContent = digest ? "密碼不正確，請再試一次。" : "此瀏覽器無法驗證密碼。";
-        input.select();
-      } catch (e) {
-        error.textContent = "驗證暫時無法完成，請重新整理後再試。";
-      } finally {
-        submit.disabled = false;
-      }
-    });
-    // 尚未解鎖時，Tab 必須留在密碼面板內（init() 的監聽器要解鎖後才註冊）
-    document.addEventListener("keydown", e => {
-      if (document.body.classList.contains("access-locked")) trapFocus($("#access-gate"), e);
-    });
-    setTimeout(() => input.focus(), 0);
+  function startApp() {
+    if (initialized) return;
+    initialized = true;
+    init();
   }
 
   /* ---------------------------------------------------------------------
@@ -1992,8 +1929,6 @@
         applySidebarCollapsed(!document.querySelector(".app").matches('[data-sidebar="collapsed"]'));
       });
     }
-    const lockBtn = $("#lock-session");
-    if (lockBtn) lockBtn.addEventListener("click", lockLab);
     $("#menu-toggle").addEventListener("click", toggleSidebar);
     $("#scrim").addEventListener("click", closeSidebarMobile);
     $("#brand-home").addEventListener("click", () => location.hash = "");
@@ -2091,6 +2026,6 @@
     initOfflineCard();
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initAccessGate);
-  else initAccessGate();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startApp);
+  else startApp();
 })();
