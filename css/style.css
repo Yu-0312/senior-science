@@ -2059,7 +2059,8 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
    操作、參數、讀數都和畫布並排在同一屏；任務導讀、預測、挑戰、關係摘要、圖表排到下方整列。
    用 container query 判斷「工作區」夠不夠寬，而不是看視窗——側欄收合、
    超寬螢幕把概念欄放回右側時，工作區寬度都不一樣。
-   參數放在畫布下方的實驗（data-lab-layout="bottom"）需要橫向寬畫面，維持原排法。
+   全部實驗一致：原本把參數放在畫布下方的實驗（data-lab-layout="bottom"）也改成右欄，
+   操作與參數不必捲到畫布下面才找得到。工作區太窄時才退回單欄。
    =========================================================================== */
 
 /* 頁首：麵包屑變成主色小標，標題、學段徽章同列，課綱說明收進徽章的提示 */
@@ -2096,48 +2097,51 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .lab-sim > .sim-readout-panel { margin-bottom: 12px; }
 
 @container lab (min-width: 760px) {
-  .lab-sim:not([data-lab-layout="bottom"]) {
+  .lab-sim {
     display: grid; align-items: start;
     grid-template-columns: minmax(0, 1fr) clamp(272px, 29%, 330px);
     grid-template-rows: auto auto auto auto 1fr;
     column-gap: 14px; row-gap: 10px;
   }
   /* 沒有指定位置的區塊（預測、挑戰、關係、圖表…）一律整列排在實驗台下方 */
-  .lab-sim:not([data-lab-layout="bottom"]) > * { grid-column: 1 / -1; margin-top: 0; margin-bottom: 0; }
-  .lab-sim:not([data-lab-layout="bottom"]) > .sim-command-bar { grid-row: 1; }
-  /* 實驗台外框拆開：畫布進左欄，參數面板進右欄 */
-  .lab-sim:not([data-lab-layout="bottom"]) > .sim-stage { display: contents; }
-  .lab-sim:not([data-lab-layout="bottom"]) .sim-visual-panel { grid-column: 1; grid-row: 2 / 6; align-self: start; }
+  .lab-sim > * { grid-column: 1 / -1; margin-top: 0; margin-bottom: 0; }
+  .lab-sim > .sim-command-bar { grid-row: 1; }
+  /* 實驗台外框拆開：畫布進左欄，參數面板進右欄（原本參數在畫布下方的實驗也一樣） */
+  .lab-sim > .sim-stage { display: contents; }
+  .lab-sim .sim-visual-panel { grid-column: 1; grid-row: 2 / 6; align-self: start; }
   /* 畫布卡頭的實驗台名稱和上方工具列重複，收掉讓畫布再往上 */
-  .lab-sim:not([data-lab-layout="bottom"]) .sim-visual-panel > .sim-panel-head { display: none; }
-  .lab-sim:not([data-lab-layout="bottom"]) > .sim-transport { grid-column: 2; grid-row: 2; }
-  .lab-sim:not([data-lab-layout="bottom"]) .sim-control-deck { grid-column: 2; grid-row: 3; }
-  .lab-sim:not([data-lab-layout="bottom"]) > .sim-readout-panel { grid-column: 2; grid-row: 4; }
+  .lab-sim .sim-visual-panel > .sim-panel-head { display: none; }
+  .lab-sim > .sim-transport { grid-column: 2; grid-row: 2; }
+  .lab-sim .sim-control-deck { grid-column: 2; grid-row: 3; }
+  .lab-sim > .sim-readout-panel { grid-column: 2; grid-row: 4; }
   /* 任務導讀與分步流程是三欄的橫向內容，排在實驗台正下方整列（DOM 順序本來就在最前面） */
   /* 專注模式：參數、讀數收起後，畫布吃滿整列 */
-  .lab-sim.is-focused:not([data-lab-layout="bottom"]) .sim-visual-panel { grid-column: 1 / -1; }
-  .lab-sim.is-focused:not([data-lab-layout="bottom"]) > .sim-transport { display: none; }
-  .lab-sim.is-focused:not([data-lab-layout="bottom"]) > .sim-command-bar { grid-row: 1; }
+  .lab-sim.is-focused .sim-visual-panel { grid-column: 1 / -1; }
+  .lab-sim.is-focused > .sim-transport { display: none; }
+  .lab-sim.is-focused > .sim-command-bar { grid-row: 1; }
 
   /* 檢視欄裡的「實驗操作」卡：播放鍵佔一整行最上面，次要按鈕在旁，速度與時間同一行 */
-  .lab-sim:not([data-lab-layout="bottom"]) > .sim-transport { padding: 11px 12px 12px; gap: 8px; }
-  .lab-sim:not([data-lab-layout="bottom"]) > .sim-transport::before {
+  .lab-sim > .sim-transport { padding: 11px 12px 12px; gap: 8px; }
+  .lab-sim > .sim-transport::before {
     content: "實驗操作"; order: 0; flex-basis: 100%;
     color: var(--text); font-size: 12.5px; font-weight: 800; letter-spacing: 0.4px;
   }
-  .lab-sim:not([data-lab-layout="bottom"]) .sim-transport-play { order: 1; flex: 1 1 auto; min-height: 40px; font-size: 14px; }
-  .lab-sim:not([data-lab-layout="bottom"]) .sim-transport-btn { order: 2; min-height: 40px; }
-  .lab-sim:not([data-lab-layout="bottom"]) .sim-transport-reset { order: 3; min-height: 40px; }
-  .lab-sim:not([data-lab-layout="bottom"]) .sim-transport-hint { order: 4; flex-basis: 100%; }
-  .lab-sim:not([data-lab-layout="bottom"]) .sim-speed { order: 5; flex: 1 1 auto; padding-left: 0; border-left: 0; }
-  .lab-sim:not([data-lab-layout="bottom"]) .sim-transport-spacer { display: none; }
-  .lab-sim:not([data-lab-layout="bottom"]) .sim-transport-time { order: 6; margin-left: auto; }
+  .lab-sim .sim-transport-play { order: 1; flex: 1 1 auto; min-height: 40px; font-size: 14px; }
+  .lab-sim .sim-transport-btn { order: 2; min-height: 40px; }
+  .lab-sim .sim-transport-reset { order: 3; min-height: 40px; }
+  .lab-sim .sim-transport-hint { order: 4; flex-basis: 100%; }
+  .lab-sim .sim-speed { order: 5; flex: 1 1 auto; padding-left: 0; border-left: 0; }
+  .lab-sim .sim-transport-spacer { display: none; }
+  .lab-sim .sim-transport-time { order: 6; margin-left: auto; }
+
+  /* 原本「參數在畫布下方」的實驗是多欄橫排；進了右欄改回單欄直排 */
+  .lab-sim[data-lab-layout="bottom"] .sim-controls { display: flex; flex-direction: column; align-items: stretch; gap: 13px; }
 
   /* 參數、讀數、導讀都變成同一款檢視卡 */
-  .lab-sim:not([data-lab-layout="bottom"]) .sim-control-deck,
-  .lab-sim:not([data-lab-layout="bottom"]) > .sim-readout-panel { border-radius: 8px; }
-  .lab-sim:not([data-lab-layout="bottom"]) > .sim-readout-panel .sim-readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px; gap: 8px; }
-  .lab-sim:not([data-lab-layout="bottom"]) > .sim-readout-panel .readout { padding: 9px 10px; }
+  .lab-sim .sim-control-deck,
+  .lab-sim > .sim-readout-panel { border-radius: 8px; }
+  .lab-sim > .sim-readout-panel .sim-readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px; gap: 8px; }
+  .lab-sim > .sim-readout-panel .readout { padding: 9px 10px; }
 }
 
 /* 檢視卡的卡頭統一：主標用正文色、粗體，副標淡色——取代原本全大寫的儀器字樣 */
