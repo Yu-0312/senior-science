@@ -946,7 +946,16 @@
     show(+input.value);
     input.addEventListener("input", () => { show(+input.value); o.onInput && o.onInput(+input.value); markGuideStep(wrap, 0); });
     // 一鍵歸零時回到初始值，並觸發實驗自己的 onInput（多半會順便清掉歷史資料）
-    registerControl(() => { input.value = o.value; show(+input.value); o.onInput && o.onInput(+input.value); });
+    /*
+     * 「全部重設」走 onReset。多數實驗不必設定，沿用 onInput 即可；
+     * 但「播放中可即時調整」的滑桿，onInput 只會更新畫面、不能把運動狀態清掉，
+     * 這時要另外給 onReset 讓全部重設仍然能把物體放回起點。
+     */
+    registerControl(() => {
+      input.value = o.value; show(+input.value);
+      const fn = o.onReset || o.onInput;
+      fn && fn(+input.value);
+    });
     /*
      * 登記給自動探測引擎
      * 探測引擎會掃描這些滑桿、量出「調整它會讓哪個讀數怎麼變」，

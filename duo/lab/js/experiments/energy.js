@@ -26,9 +26,9 @@
     const cv = PL.canvas.create(L.canvasWrap, 0.52);
     let x = 0, W_ = 0;
     const reset = () => { x = 0; W_ = 0; };
-    const sF = PL.ui.slider(L.controls, { label: "施力 F", min: 2, max: 20, step: 1, value: 10, unit: "N", digits: 0, onInput: reset });
-    const sTh = PL.ui.slider(L.controls, { label: "施力角 θ", min: 0, max: 80, step: 1, value: 30, unit: "°", digits: 0, onInput: reset });
-    const sV = PL.ui.slider(L.controls, { label: "移動速率 v", min: 0.5, max: 4, step: 0.5, value: 2, unit: "m/s", digits: 1, onInput: reset });
+    const sF = PL.ui.slider(L.controls, { label: "施力 F", min: 2, max: 20, step: 1, value: 10, unit: "N", digits: 0, onInput: () => draw(), onReset: reset });
+    const sTh = PL.ui.slider(L.controls, { label: "施力角 θ", min: 0, max: 80, step: 1, value: 30, unit: "°", digits: 0, onInput: () => draw(), onReset: reset });
+    const sV = PL.ui.slider(L.controls, { label: "移動速率 v", min: 0.5, max: 4, step: 0.5, value: 2, unit: "m/s", digits: 1, onInput: () => draw(), onReset: reset });
     const row = PL.ui.buttonRow(L.controls);
     /* 播放／暫停由引擎的傳輸列統一提供（還附單步與速度），實驗不再自備，避免兩個開關互相打架。 */
     PL.ui.button(row, "重設", reset);
@@ -78,8 +78,8 @@
     const cv = PL.canvas.create(L.canvasWrap, 0.56);
     let x = 0, v = 0, Wnet = 0;
     const reset = () => { x = 0; v = 0; Wnet = 0; };
-    const sF = PL.ui.slider(L.controls, { label: "施力 F", min: 2, max: 20, step: 1, value: 12, unit: "N", digits: 0, onInput: reset });
-    const sFr = PL.ui.slider(L.controls, { label: "阻力 f", min: 0, max: 10, step: 0.5, value: 2, unit: "N", digits: 1, onInput: reset });
+    const sF = PL.ui.slider(L.controls, { label: "施力 F", min: 2, max: 20, step: 1, value: 12, unit: "N", digits: 0, onInput: () => draw(), onReset: reset });
+    const sFr = PL.ui.slider(L.controls, { label: "阻力 f", min: 0, max: 10, step: 0.5, value: 2, unit: "N", digits: 1, onInput: () => draw(), onReset: reset });
     const sM = PL.ui.slider(L.controls, { label: "質量 m", min: 1, max: 6, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: reset });
     const row = PL.ui.buttonRow(L.controls);
     PL.ui.button(row, "施力", () => { reset(); anim.start(); }, { primary: true });
@@ -179,7 +179,7 @@
     PL.ui.section(L.controls, "滑板者");
     const sMass = PL.ui.slider(L.controls, { label: "質量 m", min: 20, max: 90, step: 5, value: 50, unit: "kg", digits: 0, onInput: resetRun });
     const sStart = PL.ui.slider(L.controls, { label: "起始位置", min: 1, max: 12, step: 0.5, value: 4, unit: "m", digits: 1, onInput: resetRun });
-    const sFric = PL.ui.slider(L.controls, { label: "摩擦係數 μ", min: 0, max: 0.25, step: 0.01, value: 0, unit: "", digits: 2, onInput: resetRun });
+    const sFric = PL.ui.slider(L.controls, { label: "摩擦係數 μ", min: 0, max: 0.25, step: 0.01, value: 0, unit: "", digits: 2, onInput: () => drawAll(), onReset: resetRun });
 
     PL.ui.section(L.controls, "軌道形狀");
     PL.ui.chipGroup(L.controls, {

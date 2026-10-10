@@ -8,7 +8,8 @@
   PL.register("spring", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet", instrument: false });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
-    let t = 0, hist = [], prevX = null, prevCross = null, crossGaps = [];
+    // ph 是累加的相位（ω 每格積分）：播放中改 m 或 k，振子從當下的相位接著振，不會瞬間跳位置
+    let t = 0, ph = 0, hist = [], prevX = null, prevCross = null, crossGaps = [];
     const resetHist = () => { hist = []; prevX = null; prevCross = null; crossGaps = []; };
     const sM = PL.ui.slider(L.controls, { label: "質量 m", min: 0.5, max: 6, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: resetHist });
     const sK = PL.ui.slider(L.controls, { label: "勁度 k", min: 5, max: 60, step: 1, value: 20, unit: "N/m", digits: 0, onInput: resetHist });
@@ -24,7 +25,7 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const m = sM.get(), k = sK.get(), A = sA.get(), w = Math.sqrt(k / m);
-      const x = A * Math.cos(w * t), v = -A * w * Math.sin(w * t), a = -w * w * x, F = -k * x;
+      const x = A * Math.cos(ph), v = -A * w * Math.sin(ph), a = -w * w * x, F = -k * x;
       const AP = PL.apparatus;
       // 幾何：牆在左，滑軌貫穿全場，平衡點讓最大振幅的滑塊兩端都撞不到牆
       const wallX = 34, cartW = 48, ay = 66, railY = ay + 27;
@@ -87,7 +88,8 @@
       if (dt) {
         t += dt;
         const m = sM.get(), k = sK.get(), A = sA.get(), w = Math.sqrt(k / m);
-        const xn = A * Math.cos(w * t);
+        ph += w * dt;
+        const xn = A * Math.cos(ph);
         // 週期量測：x 由負轉正的瞬間是「同一相位」，相鄰兩次間隔即實測週期
         if (prevX !== null && prevX < 0 && xn >= 0) {
           if (prevCross !== null) {
@@ -97,7 +99,7 @@
           prevCross = t;
         }
         prevX = xn;
-        hist.push([t, xn, -A * w * Math.sin(w * t), -w * w * xn]);
+        hist.push([t, xn, -A * w * Math.sin(ph), -w * w * xn]);
         if (hist.length > 900) hist.shift();
       }
       draw();

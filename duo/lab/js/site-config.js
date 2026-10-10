@@ -20,7 +20,7 @@
     siteUrl: "https://senior-science.vercel.app/",
 
     /* 版本號：同時用於快取破壞與 Service Worker */
-    build: "20261010-02"
+    build: "20261010-03"
   };
 
   /*

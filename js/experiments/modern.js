@@ -130,7 +130,7 @@
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.6);
     const N0 = 144; let t = 0, nuclei = [];
-    const sT = PL.ui.slider(L.controls, { label: "半衰期 T½", min: 1, max: 6, step: 0.5, value: 3, unit: "s", digits: 1, onInput: reset });
+    const sT = PL.ui.slider(L.controls, { label: "半衰期 T½", min: 1, max: 6, step: 0.5, value: 3, unit: "s", digits: 1, onInput: () => draw(), onReset: reset });
     const row = PL.ui.buttonRow(L.controls);
     PL.ui.button(row, "開始衰變", () => { anim.start(); }, { primary: true });
     PL.ui.button(row, "重設", reset);

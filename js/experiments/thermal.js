@@ -600,13 +600,13 @@
 
     PL.ui.section(L.controls, "演示條件");
     const sHeat = PL.ui.slider(L.controls, {
-      label: "酒精燈加熱功率", min: 0, max: 100, step: 5, value: 70, unit: "%", digits: 0, onInput: reset
+      label: "酒精燈加熱功率", min: 0, max: 100, step: 5, value: 70, unit: "%", digits: 0, onInput: () => draw(), onReset: reset
     });
     const sWater = PL.ui.slider(L.controls, {
-      label: "試管內水量", min: 5, max: 40, step: 1, value: 15, unit: "mL", digits: 0, onInput: reset
+      label: "試管內水量", min: 5, max: 40, step: 1, value: 15, unit: "mL", digits: 0, onInput: () => draw(), onReset: reset
     });
     const sFriction = PL.ui.slider(L.controls, {
-      label: "塞子緊度（阻力）", min: 20, max: 90, step: 5, value: 45, unit: "", digits: 0, onInput: reset
+      label: "塞子緊度（阻力）", min: 20, max: 90, step: 5, value: 45, unit: "", digits: 0, onInput: () => draw(), onReset: reset
     });
 
     PL.ui.presets(L.controls, {
