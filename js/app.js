@@ -383,7 +383,7 @@
     document.querySelectorAll('meta[name="theme-color"]').forEach(meta => meta.remove());
     const meta = document.createElement("meta");
     meta.name = "theme-color";
-    meta.content = theme === "light" ? "#eef2f8" : "#0e1013";
+    meta.content = theme === "light" ? "#eef2f8" : "#13171c";
     document.head.appendChild(meta);
     // 主題切換後重繪目前模擬
     if (currentSim && currentSim.rerender) {
@@ -1615,6 +1615,27 @@
     $("#home-view").style.display = name === "home" ? "" : "none";
     $("#exp-view").style.display = name === "exp" ? "" : "none";
     $("#search-results").style.display = name === "search" ? "" : "none";
+    syncStageMode(name);
+  }
+
+  /*
+   * 教師演示的「純實驗台」：只在實驗頁、且是從「教師演示版」進來時生效。
+   * 旗標放 sessionStorage——同一個分頁重新整理還在（上台時不會被打回原形），
+   * 但新開分頁或回首頁就會清掉，不會讓別人點進來看到一個沒有導覽的頁面。
+   */
+  const STAGE_KEY = "pl-teacher-stage";
+  function stageFlag() { try { return sessionStorage.getItem(STAGE_KEY) === "1"; } catch (e) { return false; } }
+  function setStageFlag(on) {
+    try { if (on) sessionStorage.setItem(STAGE_KEY, "1"); else sessionStorage.removeItem(STAGE_KEY); } catch (e) {}
+  }
+  function syncStageMode(view) {
+    const showing = view || ($("#exp-view").style.display !== "none" ? "exp" : "home");
+    document.body.classList.toggle("stage-only", showing === "exp" && stageFlag());
+  }
+  function exitStageMode() {
+    setStageFlag(false);
+    syncStageMode("home");
+    location.hash = "";
   }
 
   function closeSidebarMobile() { $("#sidebar").classList.remove("open"); $("#scrim").classList.remove("show"); }
@@ -1784,6 +1805,7 @@
   function route() {
     const id = decodeURIComponent(location.hash.replace(/^#/, ""));
     if (!id || id === "home") {
+      setStageFlag(false);
       showView("home"); document.title = "物理實驗室｜台灣中學互動物理";
       cancelDwell();
       if (currentSim && currentSim.stop) { try { currentSim.stop(); } catch (e) {} }
@@ -1932,6 +1954,8 @@
     $("#menu-toggle").addEventListener("click", toggleSidebar);
     $("#scrim").addEventListener("click", closeSidebarMobile);
     $("#brand-home").addEventListener("click", () => location.hash = "");
+    const stageExit = $("#stage-exit");
+    if (stageExit) stageExit.addEventListener("click", exitStageMode);
     /*
      * 首頁的兩條入口：教師演示版（精簡）與自學完整版（有鷹架）。
      * 進入的是同一批實驗，差別只在 body.demo-mode——sim-core 會據此收起或顯示鷹架。
@@ -1941,6 +1965,7 @@
       document.body.classList.toggle("demo-mode", demo);
       store.set("pl-demo-mode-flag", demo);   // 給 app 端記錄；sim-core 讀的是原始鍵
       try { localStorage.setItem("pl-demo-mode", demo ? "1" : "0"); } catch (e) {}
+      setStageFlag(demo);   // 教師演示版＝純實驗台；自學完整版維持原本完整介面
       location.hash = "#" + FLAT[0].exp.id;
     }
     const teacherBtn = $("#enter-teacher");
@@ -1978,6 +2003,10 @@
       if (checkpointState) {
         if (e.key === "Escape") leaveCheckpoint();
         trapFocus($("#checkpoint-panel"), e);
+        return;
+      }
+      if (e.key === "Escape" && document.body.classList.contains("stage-only") && !document.fullscreenElement) {
+        exitStageMode();
         return;
       }
       if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;

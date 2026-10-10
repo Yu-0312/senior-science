@@ -5,37 +5,38 @@
 
 :root {
   /* ---------------------------------------------------------------------
-     深色主題：中性石墨底 ＋ 綠只留在強調處
+     深色主題：暖灰石板底 ＋ 綠只留在強調處（版面語彙參考「實驗工作台」式的深色介面：
+     底 #13171c、卡片 #232a33、實驗台 #171c22、邊框 #3a4450、略帶暖意的米白字）
      表面（底色、面板、邊框、實驗台）一律用不帶綠的冷調石墨／深藍灰——
      B 通道略高於 R、G，所以不會有墨綠感。綠只出現在 --accent：
      按鈕、選中項目、連線狀態、進度條。暖橘／紅／琥珀維持不變。
      --------------------------------------------------------------------- */
-  --bg: #0e1013;
-  --bg-2: #131519;
-  --panel: #171a20cc;         /* 玻璃面板（含透明度） */
-  --panel-solid: #171a20;
-  --panel-2: #1d2028;
-  --panel-3: #262a33;
-  --border: #2b303a;
-  --border-soft: #21252d;
-  --text: #eef1f5;
-  --text-dim: #a3acba;
+  --bg: #13171c;
+  --bg-2: #171c22;
+  --panel: #232a33d6;         /* 玻璃面板（含透明度） */
+  --panel-solid: #232a33;
+  --panel-2: #2a323c;
+  --panel-3: #343d48;
+  --border: #3a4450;
+  --border-soft: #2e3640;
+  --text: #eaece8;
+  --text-dim: #a6afa7;
   /* 原本的 #64738a 疊在面板底上只有 3.3:1，所有小字級的說明與軸標都低於 AA。 */
-  --text-faint: #8b94a4;
-  --accent: #46d68a;          /* 主色：綠（只用在按鈕／選中／狀態／進度條） */
+  --text-faint: #939b94;
+  --accent: #5ccf8b;          /* 主色：綠（只用在按鈕／選中／狀態／進度條） */
   --accent-2: #5aa2ff;        /* 次色：藍（圖表曲線用） */
   --accent-3: #b98bff;        /* 輔色：紫（漸層用） */
   --warn: #ffcc66;
   --danger: #ff6b6b;
   --ok: #52e0a4;
-  --sim-bg-1: #0b0d11;
-  --sim-bg-2: #0e1015;
+  --sim-bg-1: #171c22;
+  --sim-bg-2: #1a2027;
   --radius: 14px;
   --radius-sm: 9px;
   --sidebar-w: 306px;
   --shadow: 0 18px 44px -18px rgba(0, 0, 0, 0.75);
   --glow: 0 0 26px -4px var(--accent);
-  --hover: rgba(255, 255, 255, 0.05);
+  --hover: rgba(234, 236, 232, 0.05);
 
   /* ---------------------------------------------------------------------
      表面色階（深／淺色主題都會被覆寫）
@@ -153,7 +154,7 @@ body.checkpoint-active { overflow: hidden; }
 .topbar {
   display: flex; align-items: center; gap: 14px;
   padding: 12px 24px;
-  background: linear-gradient(180deg, rgba(11, 15, 22, 0.92), rgba(11, 15, 22, 0.72));
+  background: linear-gradient(180deg, rgba(19, 23, 28, 0.94), rgba(19, 23, 28, 0.8));
   backdrop-filter: blur(16px) saturate(1.2);
   -webkit-backdrop-filter: blur(16px) saturate(1.2);
   border-bottom: 1px solid var(--border-soft);
@@ -1193,11 +1194,64 @@ body.demo-mode .sim-tool-bar,
 body.demo-mode .sim-instrument-strip,
 /* 指令列只留「演示模式」開關與「全螢幕」，其餘（指南、分步、專注、匯出、截圖）收掉。 */
 body.demo-mode .sim-command-tools .sim-command:not(.sim-command-demo):not(.sim-command-full) { display: none; }
+/* 實驗台以外的學習區塊（動手前先預測、示範重點、文字版讀數、量到的關係、小謎題、挑戰…）
+   教師演示一律不要：只留工具列、播放列、實驗台本體、讀數與圖表。
+   文字版讀數是螢幕報讀器用的，視覺上隱藏但留在無障礙樹裡。 */
+body.demo-mode #sim-root > :not(.sim-command-bar):not(.sim-transport):not(.sim-stage):not(.sim-readout-panel):not(.sim-charts):not(.sim-a11y) { display: none !important; }
+body.demo-mode #sim-root > .sim-a11y {
+  position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
 /* 右側概念卡收起後，模擬工作區就佔滿整列，畫布更大。 */
 body.demo-mode .content-grid { grid-template-columns: minmax(0, 1fr); }
 /* 演示模式的開關本身用主色點一下，讓老師找得到。 */
 .sim-command-demo { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
 body.demo-mode .sim-command-demo { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+/* ---------------------------------------------------------------------------
+   教師演示版：純實驗台（body.stage-only，只在實驗頁、由教師演示版進入時加上）
+   只留「畫布＋參數滑桿＋播放控制」。頂欄、目錄、標題、概念卡、讀數、圖表、
+   上一個／下一個一律收掉，整個視窗都給實驗台。唯一的出口是右上角的小按鈕（或 Esc）。
+   --------------------------------------------------------------------------- */
+.stage-exit { display: none; }
+body.stage-only .topbar,
+body.stage-only .sidebar,
+body.stage-only .sidebar-handle,
+body.stage-only .scrim,
+body.stage-only .aurora,
+body.stage-only .exp-header,
+body.stage-only .exp-nav,
+body.stage-only .learning-output,
+body.stage-only .content-grid > .guide,
+body.stage-only .content-grid > .card > .card-title,
+body.stage-only .sim-command-bar,
+body.stage-only .sim-readout-panel,
+body.stage-only .sim-charts,
+body.stage-only .sim-panel-head,
+body.stage-only .sim-demo-tip,
+body.stage-only .sim-transport-hint,
+/* 實驗台以外的東西（預測題、挑戰、謎題、關係摘要…）一律收掉：只留播放控制列與實驗台本體。 */
+body.stage-only #sim-root > :not(.sim-transport):not(.sim-stage):not(.sim-a11y) { display: none !important; }
+/* 螢幕報讀器用的文字版讀數：視覺上隱藏，但留在無障礙樹裡。 */
+body.stage-only #sim-root > .sim-a11y {
+  position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+/* 上方留一條窄帶給「離開演示」，不蓋到播放控制列。 */
+body.stage-only .main { padding: 54px clamp(12px, 2vw, 28px) 24px; }
+body.stage-only #exp-view { max-width: none; }
+body.stage-only .content-grid { gap: 0; }
+body.stage-only .content-grid > .card { border: 0; background: transparent; box-shadow: none; backdrop-filter: none; }
+body.stage-only .content-grid > .card > .card-body { padding: 0; }
+body.stage-only .stage-exit {
+  display: inline-flex; align-items: center; gap: 4px; position: fixed; top: 8px; right: 14px; z-index: 60;
+  min-height: 40px; padding: 0 14px 0 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: color-mix(in srgb, var(--panel-solid) 88%, transparent);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  color: var(--text-dim); font: inherit; font-size: 13px; font-weight: 600; opacity: 0.6;
+  transition: opacity 0.15s, border-color 0.15s, color 0.15s;
+}
+body.stage-only .stage-exit svg { width: 16px; height: 16px; }
+body.stage-only .stage-exit:hover, body.stage-only .stage-exit:focus-visible { opacity: 1; color: var(--text); border-color: var(--accent); }
+body.stage-only .stage-exit:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 600px) { body.stage-only .main { padding-top: 60px; } body.stage-only .stage-exit { top: 8px; right: 8px; min-height: 44px; } }
 .lab-sim:fullscreen { padding: 18px; overflow: auto; background: var(--bg); }
 .lab-sim:fullscreen .sim-stage { max-width: 1600px; margin: 0 auto; }
 .sim-stage::before {
@@ -1992,6 +2046,135 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 }
 
 /* --------------------------------- 列印 --------------------------------- */
+/* ===========================================================================
+   實驗台 v2：觀察欄 ＋ 檢視欄（inspector）
+   ---------------------------------------------------------------------------
+   舊版的問題：標題、任務導讀、指令列、播放列全部疊在畫布上方，
+   桌機 900px 高的視窗裡畫布要捲到第 750px 才出現，讀數又在畫布下面——
+   一邊拖滑桿一邊看數字得上下捲。
+
+   新版把工作區排成兩欄：
+     左＝觀察欄：畫布（實驗台本體）
+     右＝檢視欄：實驗操作（播放／單步／速度／重設）→ 實驗參數 → 量測讀數
+   操作、參數、讀數都和畫布並排在同一屏；任務導讀、預測、挑戰、關係摘要、圖表排到下方整列。
+   用 container query 判斷「工作區」夠不夠寬，而不是看視窗——側欄收合、
+   超寬螢幕把概念欄放回右側時，工作區寬度都不一樣。
+   參數放在畫布下方的實驗（data-lab-layout="bottom"）需要橫向寬畫面，維持原排法。
+   =========================================================================== */
+
+/* 頁首：麵包屑變成主色小標，標題、學段徽章同列，課綱說明收進徽章的提示 */
+#exp-view .exp-header { display: flex; flex-wrap: wrap; align-items: center; column-gap: 10px; row-gap: 3px; margin-bottom: 14px; }
+#exp-view .exp-crumb { flex-basis: 100%; margin: 0; font-size: 12px; font-weight: 800; letter-spacing: 0.6px; }
+#exp-view .exp-crumb b { font-weight: 800; }
+#exp-view .exp-header h2 { margin: 0; font-size: 25px; line-height: 1.3; }
+#exp-view .exp-level-badge { margin: 0; }
+#exp-view .exp-level-hint:not(.is-university) { display: none; }
+#exp-view .exp-level-hint.is-university { flex-basis: 100%; margin: 4px 0 0; }
+#exp-view .exp-header .lead { flex-basis: 100%; max-width: none; margin: 2px 0 0; font-size: 13.5px; line-height: 1.65; }
+#exp-view .exp-learning-path { flex-basis: 100%; margin-top: 12px; }
+
+/* 工作區卡：「互動模擬工作區」這行標題和下面的指令列重複，收掉 */
+.content-grid > .card:first-child > .card-title { display: none; }
+.content-grid > .card:first-child > .card-body { padding: 12px; container-type: inline-size; container-name: lab; }
+
+/* 指令列：變成工作區的工具列，降低存在感 */
+.sim-command-bar { background: transparent; border-color: var(--border-soft); }
+.sim-command { border-radius: 7px; font-weight: 700; }
+
+/*
+ * 窄工作區（手機、平板）與參數在下方的實驗：單欄由上而下排，
+ * 順序改成「工具列 → 播放 → 實驗台 → 讀數 → 任務導讀 → 其他」——
+ * 實驗台不再被一整塊導讀文字推到第二屏。
+ */
+.lab-sim { display: flex; flex-direction: column; }
+.lab-sim > * { order: 5; }
+.lab-sim > .sim-command-bar { order: 0; }
+.lab-sim > .sim-transport { order: 1; }
+.lab-sim > .sim-stage { order: 2; }
+.lab-sim > .sim-readout-panel { order: 3; }
+.lab-sim > .sim-learning-brief, .lab-sim > .sim-procedure { order: 4; }
+.lab-sim > .sim-readout-panel { margin-bottom: 12px; }
+
+@container lab (min-width: 760px) {
+  .lab-sim:not([data-lab-layout="bottom"]) {
+    display: grid; align-items: start;
+    grid-template-columns: minmax(0, 1fr) clamp(272px, 29%, 330px);
+    grid-template-rows: auto auto auto auto 1fr;
+    column-gap: 14px; row-gap: 10px;
+  }
+  /* 沒有指定位置的區塊（預測、挑戰、關係、圖表…）一律整列排在實驗台下方 */
+  .lab-sim:not([data-lab-layout="bottom"]) > * { grid-column: 1 / -1; margin-top: 0; margin-bottom: 0; }
+  .lab-sim:not([data-lab-layout="bottom"]) > .sim-command-bar { grid-row: 1; }
+  /* 實驗台外框拆開：畫布進左欄，參數面板進右欄 */
+  .lab-sim:not([data-lab-layout="bottom"]) > .sim-stage { display: contents; }
+  .lab-sim:not([data-lab-layout="bottom"]) .sim-visual-panel { grid-column: 1; grid-row: 2 / 6; align-self: start; }
+  /* 畫布卡頭的實驗台名稱和上方工具列重複，收掉讓畫布再往上 */
+  .lab-sim:not([data-lab-layout="bottom"]) .sim-visual-panel > .sim-panel-head { display: none; }
+  .lab-sim:not([data-lab-layout="bottom"]) > .sim-transport { grid-column: 2; grid-row: 2; }
+  .lab-sim:not([data-lab-layout="bottom"]) .sim-control-deck { grid-column: 2; grid-row: 3; }
+  .lab-sim:not([data-lab-layout="bottom"]) > .sim-readout-panel { grid-column: 2; grid-row: 4; }
+  /* 任務導讀與分步流程是三欄的橫向內容，排在實驗台正下方整列（DOM 順序本來就在最前面） */
+  /* 專注模式：參數、讀數收起後，畫布吃滿整列 */
+  .lab-sim.is-focused:not([data-lab-layout="bottom"]) .sim-visual-panel { grid-column: 1 / -1; }
+  .lab-sim.is-focused:not([data-lab-layout="bottom"]) > .sim-transport { display: none; }
+  .lab-sim.is-focused:not([data-lab-layout="bottom"]) > .sim-command-bar { grid-row: 1; }
+
+  /* 檢視欄裡的「實驗操作」卡：播放鍵佔一整行最上面，次要按鈕在旁，速度與時間同一行 */
+  .lab-sim:not([data-lab-layout="bottom"]) > .sim-transport { padding: 11px 12px 12px; gap: 8px; }
+  .lab-sim:not([data-lab-layout="bottom"]) > .sim-transport::before {
+    content: "實驗操作"; order: 0; flex-basis: 100%;
+    color: var(--text); font-size: 12.5px; font-weight: 800; letter-spacing: 0.4px;
+  }
+  .lab-sim:not([data-lab-layout="bottom"]) .sim-transport-play { order: 1; flex: 1 1 auto; min-height: 40px; font-size: 14px; }
+  .lab-sim:not([data-lab-layout="bottom"]) .sim-transport-btn { order: 2; min-height: 40px; }
+  .lab-sim:not([data-lab-layout="bottom"]) .sim-transport-reset { order: 3; min-height: 40px; }
+  .lab-sim:not([data-lab-layout="bottom"]) .sim-transport-hint { order: 4; flex-basis: 100%; }
+  .lab-sim:not([data-lab-layout="bottom"]) .sim-speed { order: 5; flex: 1 1 auto; padding-left: 0; border-left: 0; }
+  .lab-sim:not([data-lab-layout="bottom"]) .sim-transport-spacer { display: none; }
+  .lab-sim:not([data-lab-layout="bottom"]) .sim-transport-time { order: 6; margin-left: auto; }
+
+  /* 參數、讀數、導讀都變成同一款檢視卡 */
+  .lab-sim:not([data-lab-layout="bottom"]) .sim-control-deck,
+  .lab-sim:not([data-lab-layout="bottom"]) > .sim-readout-panel { border-radius: 8px; }
+  .lab-sim:not([data-lab-layout="bottom"]) > .sim-readout-panel .sim-readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px; gap: 8px; }
+  .lab-sim:not([data-lab-layout="bottom"]) > .sim-readout-panel .readout { padding: 9px 10px; }
+}
+
+/* 檢視卡的卡頭統一：主標用正文色、粗體，副標淡色——取代原本全大寫的儀器字樣 */
+.sim-panel-head, .sim-readout-head { background: transparent; }
+.sim-panel-title { color: var(--text); font-size: 12.5px; font-weight: 800; letter-spacing: 0.4px; text-transform: none; }
+.sim-panel-hint { font-size: 10.5px; }
+
+/* ---------------------------------------------------------------------------
+   深色主題的實驗台：石板色卡片 ＋ 更深一階的實驗台底
+   --------------------------------------------------------------------------- */
+[data-theme="dark"] .content-grid > .card:first-child { background: color-mix(in srgb, var(--panel-solid) 72%, transparent); border-color: var(--border); }
+[data-theme="dark"] .sim-stage {
+  background: transparent; border-color: var(--border-soft); box-shadow: none;
+}
+[data-theme="dark"] .sim-stage::before { opacity: 0; }
+[data-theme="dark"] .sim-visual-panel { background: var(--sim-bg-1); border-color: var(--border); border-radius: 8px; }
+[data-theme="dark"] .sim-control-deck,
+[data-theme="dark"] .sim-readout-panel,
+[data-theme="dark"] .sim-transport,
+[data-theme="dark"] .sim-learning-brief,
+[data-theme="dark"] .sim-procedure { background: var(--panel-solid); border-color: var(--border); }
+[data-theme="dark"] .sim-learning-brief { border-left-color: var(--m-color, var(--accent)); }
+[data-theme="dark"] .readout { background: color-mix(in srgb, var(--sim-bg-1) 60%, transparent); border-color: var(--border-soft); }
+[data-theme="dark"] .sim-command-bar { border-color: transparent; padding-left: 2px; padding-right: 0; }
+[data-theme="dark"] .sim-command { background: color-mix(in srgb, var(--panel-solid) 92%, transparent); color: var(--text); }
+
+/* 純實驗台（教師演示）不需要工作區外框 */
+body.stage-only .content-grid > .card:first-child { background: transparent; border-color: transparent; box-shadow: none; }
+
+/* 手機：七顆工具鈕原本會疊成四列、把實驗台推下 150px，改成一列可橫向滑動 */
+@media (max-width: 560px) {
+  .sim-command-bar { flex-wrap: wrap; gap: 8px; }
+  .sim-command-tools { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; margin: 0 -2px; padding: 0 2px 2px; }
+  .sim-command-tools::-webkit-scrollbar { display: none; }
+  .sim-command { flex: 0 0 auto; min-height: 36px; padding: 0 12px; font-size: 12px; }
+}
+
 @media print {
   /* 之前只改了 body 的顏色，但所有子元素都吃 var(--text) 等深色主題變數，
      列印出來會是白紙上的淺灰字。這裡直接把整組變數換成適合紙張的值。 */
