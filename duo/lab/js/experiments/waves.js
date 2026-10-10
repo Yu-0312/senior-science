@@ -177,8 +177,8 @@
     let t = 0, wavefronts = [], emitAcc = 0, sourceX = 0;
 
     PL.ui.section(L.controls, "音源");
-    const sVs = PL.ui.slider(L.controls, { label: "音源速度 vₛ", min: 0, max: 480, step: 10, value: 90, unit: "m/s", digits: 0, onInput: reset });
-    const sF0 = PL.ui.slider(L.controls, { label: "原始頻率 f₀", min: 200, max: 1200, step: 20, value: 600, unit: "Hz", digits: 0, onInput: reset });
+    const sVs = PL.ui.slider(L.controls, { label: "音源速度 vₛ", min: 0, max: 480, step: 10, value: 90, unit: "m/s", digits: 0, onInput: () => drawAll(), onReset: reset });
+    const sF0 = PL.ui.slider(L.controls, { label: "原始頻率 f₀", min: 200, max: 1200, step: 20, value: 600, unit: "Hz", digits: 0, onInput: () => drawAll(), onReset: reset });
 
     PL.ui.section(L.controls, "觀測者");
     const sObsY = PL.ui.slider(L.controls, { label: "觀測者離馬路", min: 0, max: 120, step: 5, value: 40, unit: "m", digits: 0 });

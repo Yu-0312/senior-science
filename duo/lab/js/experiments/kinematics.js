@@ -15,12 +15,16 @@
     const cv = PL.canvas.create(L.canvasWrap, 0.78, 960);
     const TMAX = 8;
     const AP = PL.apparatus;
-    let t = 0, hist = [];
+    // 位置與速度是逐格積分出來的：播放中改加速度 a，車從當下的 x、v 接著加速／減速（v₀ 是起始條件，改它才會重來）
+    let t = 0, hist = [], cur = { x: 0, v: 6 };
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const v0 = sV.get(), a = sA.get(), m = MC();
       let xs = []; for (let i = 0; i <= 40; i++) { const tt = TMAX * i / 40; xs.push(v0 * tt + 0.5 * a * tt * tt); }
-      const s = st(t);
+      // 播放中改過 a 時，實際走過的位置可能超出原本的理論範圍，一併納入才不會跑出畫面
+      hist.forEach(h => xs.push(h[1]));
+      const vHist = hist.map(h => h[2]);
+      const s = cur;
 
       /* 上半實驗台 / 下半兩張圖 */
       const sceneH = Math.max(200, Math.floor(H * 0.46));
@@ -85,7 +89,7 @@
 
       // 下半：x–t / v–t（全程 0–TMAX）
       const gH = Math.max(88, H - graphTop - 16), gap = 14, gW = (W - 40 - gap) / 2, gx1 = 26, gx2 = 26 + gW + gap;
-      const vend = v0 + a * TMAX; let vmin = Math.min(0, v0, vend), vmax = Math.max(0, v0, vend);
+      const vend = v0 + a * TMAX; let vmin = Math.min(0, v0, vend, ...vHist), vmax = Math.max(0, v0, vend, ...vHist);
       if (vmax - vmin < 2) vmax = vmin + 2;
       let gy0 = Math.min(0, ...xs), gy1 = Math.max(0, ...xs); if (gy1 - gy0 < 2) gy1 = gy0 + 2;
       const g1 = PL.graph(cv, { x: gx1, y: graphTop, w: gW, h: gH }, { x0: 0, x1: TMAX, y0: gy0, y1: gy1 });
@@ -101,9 +105,9 @@
 
       rT.set(t, 2); rX.set(s.x, 1); rV.set(s.v, 1);
     }
-    function reset() { t = 0; hist = []; draw(); }
+    function reset() { t = 0; hist = []; cur = { x: 0, v: sV.get() }; draw(); }
     const sV = PL.ui.slider(L.controls, { label: "初速 v₀", min: -8, max: 20, step: 0.5, value: 6, unit: "m/s", digits: 1, onInput: reset });
-    const sA = PL.ui.slider(L.controls, { label: "加速度 a", min: -6, max: 6, step: 0.5, value: 2, unit: "m/s²", digits: 1, onInput: reset });
+    const sA = PL.ui.slider(L.controls, { label: "加速度 a", min: -6, max: 6, step: 0.5, value: 2, unit: "m/s²", digits: 1, onInput: () => draw(), onReset: reset });
     const row = PL.ui.buttonRow(L.controls);
     /* 播放／暫停由引擎的傳輸列統一提供（還附單步與速度），實驗不再自備，避免兩個開關互相打架。 */
     PL.ui.button(row, "重設", reset);
@@ -111,8 +115,17 @@
     const rX = PL.ui.readout(L.readouts, { label: "位置 x", unit: "m" });
     const rV = PL.ui.readout(L.readouts, { label: "速度 v", unit: "m/s" });
 
-    const st = tt => ({ x: sV.get() * tt + 0.5 * sA.get() * tt * tt, v: sV.get() + sA.get() * tt });
-    const anim = PL.loop(dt => { if (dt) { t += dt; if (t > TMAX) { t = 0; hist = []; } const s = st(t); hist.push([t, s.x, s.v]); } draw(); });
+    cur.v = sV.get();
+    const anim = PL.loop(dt => {
+      if (dt) {
+        const a = sA.get();
+        t += dt;
+        if (t > TMAX) { t = 0; hist = []; cur = { x: 0, v: sV.get() }; }
+        else { cur = { x: cur.x + cur.v * dt + 0.5 * a * dt * dt, v: cur.v + a * dt }; }
+        hist.push([t, cur.x, cur.v]);
+      }
+      draw();
+    });
     cv.onResize(draw); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
@@ -122,9 +135,11 @@
     const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     let t = 0, landed = false, strobe = [], landAge = 0;
-    const reset = () => { t = 0; landed = false; strobe = []; landAge = 0; };
+    // 已落下距離 fy 與速度 fv 逐格積分：落下途中改 g，球從當下的位置與速度繼續加速（高度 h 是起始條件，改它才重來）
+    let fy = 0, fv = 0;
+    const reset = () => { t = 0; landed = false; strobe = []; landAge = 0; fy = 0; fv = 0; };
     const sH = PL.ui.slider(L.controls, { label: "初始高度 h", min: 5, max: 80, step: 1, value: 45, unit: "m", digits: 0, onInput: reset });
-    const sG = PL.ui.slider(L.controls, { label: "重力加速度 g", min: 1.6, max: 20, step: 0.1, value: 9.8, unit: "m/s²", digits: 1, onInput: reset });
+    const sG = PL.ui.slider(L.controls, { label: "重力加速度 g", min: 1.6, max: 20, step: 0.1, value: 9.8, unit: "m/s²", digits: 1, onInput: () => draw(), onReset: reset });
     const row = PL.ui.buttonRow(L.controls);
     const bP = PL.ui.button(row, "釋放", () => { if (landed) reset(); anim.start(); }, { primary: true, trigger: true });
     PL.ui.button(row, "重設", reset);
@@ -154,7 +169,7 @@
       ctx.fillStyle = PL.theme.isLight() ? "#e6cf9c" : "#4d4230";
       ctx.beginPath(); ctx.ellipse(px0, groundY + 6, 34, 7, 0, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = "rgba(120,90,50,0.5)"; ctx.lineWidth = 1; ctx.stroke();
-      const fallen = 0.5 * g * t * t; const y = Math.min(h, fallen);
+      const fallen = fy; const y = Math.min(h, fallen);
       const py = y0 + y * scale;
       // 頻閃殘影（等時間間隔）：間距越拉越大
       ctx.save(); ctx.globalAlpha = 0.3;
@@ -166,7 +181,7 @@
       ctx.beginPath(); ctx.ellipse(px0, groundY + 5, 14 + (h - y) / h * 4, 3.4, 0, 0, Math.PI * 2); ctx.fill();
       AP.sportBall(ctx, px0, py, 12, "steel");
       if (landed) AP.dustKick(ctx, px0, groundY + 4, landAge, 1);
-      if (t > 0 && !landed) D.arrow(ctx, px0, py + 18, px0, py + 18 + Math.min(46, g * t * 2.4), { color: PL.col("accent-2"), width: 2, label: "v" });
+      if (t > 0 && !landed) D.arrow(ctx, px0, py + 18, px0, py + 18 + Math.min(46, fv * 2.4), { color: PL.col("accent-2"), width: 2, label: "v" });
       // 高度標尺：立在落點旁的測高桿
       const rx = px0 + 40;
       ctx.fillStyle = PL.theme.isLight() ? "rgba(255,250,235,0.9)" : "rgba(40,44,52,0.9)";
@@ -179,17 +194,25 @@
 
       // v–t 迷你圖
       const bx = W - 118, by = 40, bw = 96, bh = 150;
-      const gg = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: tFall, y0: 0, y1: g * tFall });
+      const gg = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: tFall, y0: 0, y1: Math.max(g * tFall, fv) });
       gg.frame({ title: "v – t", xlabel: "t" });
       gg.fn(tt => g * tt, { color: PL.col("accent-2"), width: 2 });
-      gg.dot(Math.min(t, tFall), Math.min(g * t, g * tFall), { color: m, glow: m });
+      gg.dot(Math.min(t, tFall), fv, { color: m, glow: m });
 
-      rT.set(Math.min(t, tFall), 2); rV.set(Math.min(g * t, g * tFall), 1); rY.set(Math.max(0, h - fallen), 1);
+      rT.set(landed ? t : Math.min(t, tFall), 2); rV.set(fv, 1); rY.set(Math.max(0, h - fallen), 1);
       if (fallen >= h && !landed) { landed = true; landAge = 0; }
     }
     let acc = 0;
     const anim = PL.loop(dt => {
-      if (dt && !landed) { t += dt; acc += dt; if (acc > 0.18) { acc = 0; strobe.push(0.5 * sG.get() * t * t); } }
+      if (dt && !landed) {
+        const g = sG.get();
+        const h = sH.get();
+        let d = dt;
+        // 這一格會穿過地面：只走到剛好碰地的那一刻，著地速度才準（不被影格長短影響）
+        if (fy + fv * d + 0.5 * g * d * d >= h) d = (-fv + Math.sqrt(fv * fv + 2 * g * (h - fy))) / g;
+        t += d; fy = Math.min(h, fy + fv * d + 0.5 * g * d * d); fv += g * d; acc += dt;
+        if (acc > 0.18) { acc = 0; strobe.push(fy); }
+      }
       else if (dt && landed) { landAge += dt; if (landAge > 1) anim.stop(); }
       draw();
     });
@@ -508,26 +531,36 @@
     };
   }});
 
-  /* 相對運動：過河船 */
+  /* 相對運動：過河船
+   * 參數可在播放中即時調整：船的位置是「逐格積分」出來的（位置 += 速度 × dt），
+   * 不是用 t 反推，所以拉滑桿時船從當下位置繼續走，軌跡也會在該處轉彎，
+   * 學生能直接看見「船速、水流、船頭方向一改，合速度與去向跟著變」。 */
   PL.register("relative-motion", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.6);
-    let t = 0;
-    const reset = () => { t = 0; };
-    const sB = PL.ui.slider(L.controls, { label: "船速（對水）", min: 1, max: 8, step: 0.5, value: 4, unit: "m/s", digits: 1, onInput: reset });
-    const sC = PL.ui.slider(L.controls, { label: "水流速度", min: 0, max: 6, step: 0.5, value: 3, unit: "m/s", digits: 1, onInput: reset });
-    const sH = PL.ui.slider(L.controls, { label: "船頭方向（對岸法線）", min: -60, max: 60, step: 1, value: 0, unit: "°", digits: 0, onInput: reset });
+    const RW = 60; // 河寬 m
+    // 船相對碼頭的位置（x 下游、y 對岸，單位 m）、歷史軌跡、水面波紋相位、抵岸後的停留計時
+    let pos = { x: 0, y: 0 }, trail = [[0, 0]], flowPhase = 0, hold = 0, lastLoopT = 0, trailAcc = 0;
+    const restart = () => { pos = { x: 0, y: 0 }; trail = [[0, 0]]; hold = 0; trailAcc = 0; };
+    // 滑桿只更新畫面，不重置：播放中途改參數時船繼續前進
+    const sB = PL.ui.slider(L.controls, { label: "船速（對水）", min: 1, max: 8, step: 0.5, value: 4, unit: "m/s", digits: 1, onInput: () => draw(), onReset: () => { restart(); draw(); } });
+    const sC = PL.ui.slider(L.controls, { label: "水流速度", min: 0, max: 6, step: 0.5, value: 3, unit: "m/s", digits: 1, onInput: () => draw(), onReset: () => { restart(); draw(); } });
+    const sH = PL.ui.slider(L.controls, { label: "船頭方向（對岸法線）", min: -60, max: 60, step: 1, value: 0, unit: "°", digits: 0, onInput: () => draw(), onReset: () => { restart(); draw(); } });
     const row = PL.ui.buttonRow(L.controls);
-    PL.ui.button(row, "重新過河", reset, { primary: true });
+    PL.ui.button(row, "重新過河", () => { restart(); draw(); }, { primary: true });
     const rSpd = PL.ui.readout(L.readouts, { label: "合速率", unit: "m/s" });
     const rT = PL.ui.readout(L.readouts, { label: "渡河時間", unit: "s" });
     const rD = PL.ui.readout(L.readouts, { label: "下游漂移", unit: "m" });
-    const RW = 60; // 河寬 m
+
+    function velocity() {
+      const b = sB.get(), c = sC.get(), th = sH.get() * Math.PI / 180;
+      return { b, c, th, vx: c + b * Math.sin(th), vy: b * Math.cos(th) }; // x下游, y對岸
+    }
 
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const b = sB.get(), c = sC.get(), th = sH.get() * Math.PI / 180, m = MC();
-      const vx = c + b * Math.sin(th), vy = b * Math.cos(th); // x下游, y對岸
+      const { b, c, th, vx, vy } = velocity(), m = MC();
+      // 讀數：「若全程維持目前設定」的渡河時間與漂移（滑桿一動就即時更新）
       const cross = vy > 0 ? RW / vy : Infinity, drift = vy > 0 ? vx * cross : 0;
       const bankTop = 40, bankBot = H - 40, riverH = bankBot - bankTop;
       const AP = PL.apparatus, light = PL.theme.isLight();
@@ -535,7 +568,7 @@
       /* 俯視的河：兩岸草地、沙質河岸，水面波紋以水流速度往下游漂 */
       AP.ground(ctx, 0, W, 0, bankTop, "grass");
       AP.ground(ctx, 0, W, bankBot, H - bankBot, "grass");
-      AP.water(ctx, 0, bankTop, W, riverH, t, { flow: c * sc });
+      AP.water(ctx, 0, bankTop, W, riverH, flowPhase, { flow: 1 });
       ctx.fillStyle = light ? "#e3cf9f" : "#4a3f2c";
       ctx.fillRect(0, bankTop - 5, W, 6); ctx.fillRect(0, bankBot - 1, W, 6);
       for (let i = 0; i < 6; i++) AP.tree(ctx, 40 + i * (W - 60) / 5, bankTop - 6, 30, 3 + i);
@@ -552,10 +585,13 @@
         D.arrow(ctx, W - 96, yy, W - 96 + Math.max(6, c * 9), yy, { color: light ? "rgba(255,255,255,0.9)" : "rgba(190,225,250,0.75)", width: 2 });
       }
       D.text(ctx, "水流 " + PL.fmt(c, 1) + " m/s", W - 96, bankTop + 16, { color: light ? "#ffffff" : "#d6ecff", size: 10.5, weight: "700" });
-      const prog = Math.min(t, isFinite(cross) ? cross : 6);
-      const bx = ox + vx * prog * sc, by = oy - vy * prog * sc;
-      // 實際路徑
-      D.line(ctx, ox, oy, bx, by, light ? "rgba(255,255,255,0.85)" : "rgba(220,235,255,0.6)", 1.6, [5, 4]);
+      const bx = ox + pos.x * sc, by = oy - pos.y * sc;
+      // 實際走過的路徑（改參數時會在轉折處看得出來）
+      ctx.save();
+      ctx.strokeStyle = light ? "rgba(255,255,255,0.85)" : "rgba(220,235,255,0.6)"; ctx.lineWidth = 1.6; ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      trail.forEach((p, i) => (i ? ctx.lineTo(ox + p[0] * sc, oy - p[1] * sc) : ctx.moveTo(ox + p[0] * sc, oy - p[1] * sc)));
+      ctx.lineTo(bx, by); ctx.stroke(); ctx.restore();
       AP.boatTop(ctx, bx, by, 46, -Math.PI / 2 + th, { color: "#e2574c" });
       // 速度向量
       D.arrow(ctx, bx, by, bx + b * Math.sin(th) * 12, by - b * Math.cos(th) * 12, { color: light ? "#4c1d95" : "#ffe08a", width: 2.4, label: "船" });
@@ -563,7 +599,25 @@
       D.arrow(ctx, bx, by, bx + vx * 12, by - vy * 12, { color: light ? "#9f1239" : "#ff8a6a", width: 2.8, label: "合" });
       rSpd.set(Math.hypot(vx, vy), 2); rT.set(cross, 2); rD.set(drift, 1);
     }
-    const anim = PL.loop(dt => { if (dt) { const b = sB.get(), th = sH.get() * Math.PI / 180, vy = b * Math.cos(th); const cross = vy > 0 ? RW / vy : 6; t += dt; if (t > cross) t = 0; } draw(); });
+
+    const anim = PL.loop((dt, loopT) => {
+      // 「全部重設」會把迴圈時間歸零：偵測到倒退就把船放回碼頭
+      if (loopT < lastLoopT - 1e-9) restart();
+      lastLoopT = loopT;
+      if (dt) {
+        const { c, vx, vy } = velocity();
+        flowPhase += c * 8 * dt;                      // 波紋相位用累加的，改水速時才不會跳
+        if (pos.y >= RW) {
+          hold += dt;                                 // 抵岸後停一下讓人看清楚落點，再自動回頭重來
+          if (hold > 1.2) restart();
+        } else {
+          pos.x += vx * dt; pos.y = Math.min(RW, pos.y + vy * dt);
+          trailAcc += dt;
+          if (trailAcc >= 0.1 || pos.y >= RW) { trailAcc = 0; trail.push([pos.x, pos.y]); }
+        }
+      }
+      draw();
+    });
     cv.onResize(draw); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});

@@ -95,8 +95,8 @@
     let x = 0, v = 0, t = 0, dots = [], nextDot = 0;
     const DT_DOT = 0.1;                                // 每 0.1 s 打一點
     const reset = () => { x = 0; v = 0; t = 0; dots = []; nextDot = 0; };
-    const sF = PL.ui.slider(L.controls, { label: "施力 F", min: 0, max: 24, step: 1, value: 10, unit: "N", digits: 0, onInput: reset });
-    const sM = PL.ui.slider(L.controls, { label: "質量 m", min: 0.5, max: 10, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: reset });
+    const sF = PL.ui.slider(L.controls, { label: "施力 F", min: 0, max: 24, step: 1, value: 10, unit: "N", digits: 0, onInput: () => draw(), onReset: reset });
+    const sM = PL.ui.slider(L.controls, { label: "質量 m", min: 0.5, max: 10, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: () => draw(), onReset: reset });
     const row = PL.ui.buttonRow(L.controls);
     PL.ui.button(row, "施力", () => { reset(); anim.start(); }, { primary: true });
     PL.ui.button(row, "重設", reset);
@@ -153,8 +153,8 @@
     let s = 0, v = 0;
     const reset = () => { s = 0; v = 0; };
     PL.ui.section(L.controls, "斜面參數");
-    const sTh = PL.ui.slider(L.controls, { label: "傾角 θ", min: 5, max: 60, step: 1, value: 30, unit: "°", digits: 0, onInput: reset });
-    const sMu = PL.ui.slider(L.controls, { label: "摩擦係數 μ", min: 0, max: 1, step: 0.02, value: 0.2, unit: "", digits: 2, onInput: reset });
+    const sTh = PL.ui.slider(L.controls, { label: "傾角 θ", min: 5, max: 60, step: 1, value: 30, unit: "°", digits: 0, onInput: () => draw(), onReset: reset });
+    const sMu = PL.ui.slider(L.controls, { label: "摩擦係數 μ", min: 0, max: 1, step: 0.02, value: 0.2, unit: "", digits: 2, onInput: () => draw(), onReset: reset });
     const row = PL.ui.buttonRow(L.controls);
     PL.ui.button(row, "釋放", () => { reset(); anim.start(); }, { primary: true, trigger: true });
     PL.ui.button(row, "重設", reset);
@@ -271,8 +271,8 @@
     const cv = PL.canvas.create(L.canvasWrap, 0.72);
     let y = 0, v = 0;
     const reset = () => { y = 0; v = 0; };
-    const s1 = PL.ui.slider(L.controls, { label: "左質量 m₁", min: 0.5, max: 8, step: 0.5, value: 3, unit: "kg", digits: 1, onInput: reset });
-    const s2 = PL.ui.slider(L.controls, { label: "右質量 m₂", min: 0.5, max: 8, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: reset });
+    const s1 = PL.ui.slider(L.controls, { label: "左質量 m₁", min: 0.5, max: 8, step: 0.5, value: 3, unit: "kg", digits: 1, onInput: () => draw(), onReset: reset });
+    const s2 = PL.ui.slider(L.controls, { label: "右質量 m₂", min: 0.5, max: 8, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: () => draw(), onReset: reset });
     const row = PL.ui.buttonRow(L.controls);
     PL.ui.button(row, "釋放", () => { reset(); anim.start(); }, { primary: true, trigger: true });
     PL.ui.button(row, "重設", reset);
@@ -664,10 +664,10 @@
     const cv = PL.canvas.create(L.canvasWrap, 0.58);
     let y = 0, v = 0, released = false;
     PL.ui.section(L.controls, "典型情境");
-    const sM = PL.ui.slider(L.controls, { label: "物體質量 m", min: 0.5, max: 4, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: reset });
-    const sF = PL.ui.slider(L.controls, { label: "水平推力 F", min: 5, max: 200, step: 1, value: 60, unit: "N", digits: 0, onInput: reset });
-    const sMs = PL.ui.slider(L.controls, { label: "靜摩擦係數 μₛ", min: 0.2, max: 0.9, step: 0.02, value: 0.4, unit: "", digits: 2, onInput: reset });
-    const sMk = PL.ui.slider(L.controls, { label: "動摩擦係數 μₖ", min: 0.1, max: 0.7, step: 0.02, value: 0.3, unit: "", digits: 2, onInput: reset });
+    const sM = PL.ui.slider(L.controls, { label: "物體質量 m", min: 0.5, max: 4, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: () => draw(), onReset: reset });
+    const sF = PL.ui.slider(L.controls, { label: "水平推力 F", min: 5, max: 200, step: 1, value: 60, unit: "N", digits: 0, onInput: () => draw(), onReset: reset });
+    const sMs = PL.ui.slider(L.controls, { label: "靜摩擦係數 μₛ", min: 0.2, max: 0.9, step: 0.02, value: 0.4, unit: "", digits: 2, onInput: () => draw(), onReset: reset });
+    const sMk = PL.ui.slider(L.controls, { label: "動摩擦係數 μₖ", min: 0.1, max: 0.7, step: 0.02, value: 0.3, unit: "", digits: 2, onInput: () => draw(), onReset: reset });
     const presets = PL.ui.chipGroup(L.controls, { value: "hold", options: [
       { value: "hold", label: "穩定靜止" }, { value: "critical", label: "剛好不下滑" }, { value: "slip", label: "摩擦不足" }
     ], onChange: value => {
@@ -763,11 +763,11 @@
     const cv = PL.canvas.create(L.canvasWrap, 0.58);
     let xTop = 0, xBottom = 0, vTop = 0, vBottom = 0, released = false;
     PL.ui.section(L.controls, "疊放物體參數");
-    const sTop = PL.ui.slider(L.controls, { label: "上方質量 m₁", min: 0.5, max: 4, step: 0.5, value: 1, unit: "kg", digits: 1, onInput: reset });
-    const sBottom = PL.ui.slider(L.controls, { label: "下方質量 m₂", min: 0.5, max: 6, step: 0.5, value: 3, unit: "kg", digits: 1, onInput: reset });
-    const sF = PL.ui.slider(L.controls, { label: "推動下方的力 F", min: 0, max: 100, step: 1, value: 20, unit: "N", digits: 0, onInput: reset });
-    const sMs = PL.ui.slider(L.controls, { label: "靜摩擦係數 μₛ", min: 0.05, max: 0.9, step: 0.02, value: 0.5, unit: "", digits: 2, onInput: reset });
-    const sMk = PL.ui.slider(L.controls, { label: "動摩擦係數 μₖ", min: 0.05, max: 0.7, step: 0.02, value: 0.35, unit: "", digits: 2, onInput: reset });
+    const sTop = PL.ui.slider(L.controls, { label: "上方質量 m₁", min: 0.5, max: 4, step: 0.5, value: 1, unit: "kg", digits: 1, onInput: () => draw(), onReset: reset });
+    const sBottom = PL.ui.slider(L.controls, { label: "下方質量 m₂", min: 0.5, max: 6, step: 0.5, value: 3, unit: "kg", digits: 1, onInput: () => draw(), onReset: reset });
+    const sF = PL.ui.slider(L.controls, { label: "推動下方的力 F", min: 0, max: 100, step: 1, value: 20, unit: "N", digits: 0, onInput: () => draw(), onReset: reset });
+    const sMs = PL.ui.slider(L.controls, { label: "靜摩擦係數 μₛ", min: 0.05, max: 0.9, step: 0.02, value: 0.5, unit: "", digits: 2, onInput: () => draw(), onReset: reset });
+    const sMk = PL.ui.slider(L.controls, { label: "動摩擦係數 μₖ", min: 0.05, max: 0.7, step: 0.02, value: 0.35, unit: "", digits: 2, onInput: () => draw(), onReset: reset });
     const row = PL.ui.buttonRow(L.controls);
     PL.ui.button(row, "推動", () => { reset(); released = true; anim.start(); }, { primary: true });
     PL.ui.button(row, "重設", reset);
@@ -890,10 +890,10 @@
     const cv = PL.canvas.create(L.canvasWrap, 0.58);
     let v = 0, t = 0, x = 0, running = false;
     PL.ui.section(L.controls, "輸送帶與物體");
-    const sBelt = PL.ui.slider(L.controls, { label: "輸送帶速度 u", min: -6, max: 6, step: 0.5, value: 3, unit: "m/s", digits: 1, onInput: reset });
+    const sBelt = PL.ui.slider(L.controls, { label: "輸送帶速度 u", min: -6, max: 6, step: 0.5, value: 3, unit: "m/s", digits: 1, onInput: () => draw(), onReset: reset });
     const sV0 = PL.ui.slider(L.controls, { label: "物體初速 v₀", min: -8, max: 8, step: 0.5, value: 0, unit: "m/s", digits: 1, onInput: reset });
-    const sM = PL.ui.slider(L.controls, { label: "物體質量 m", min: 0.5, max: 6, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: reset });
-    const sMu = PL.ui.slider(L.controls, { label: "動摩擦係數 μₖ", min: 0.05, max: 0.8, step: 0.05, value: 0.3, unit: "", digits: 2, onInput: reset });
+    const sM = PL.ui.slider(L.controls, { label: "物體質量 m", min: 0.5, max: 6, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: () => draw(), onReset: reset });
+    const sMu = PL.ui.slider(L.controls, { label: "動摩擦係數 μₖ", min: 0.05, max: 0.8, step: 0.05, value: 0.3, unit: "", digits: 2, onInput: () => draw(), onReset: reset });
     const presets = PL.ui.chipGroup(L.controls, { value: "catch", options: [
       { value: "catch", label: "帶子帶動物體" }, { value: "brake", label: "物體跑得較快" }, { value: "opposite", label: "反向相遇" }
     ], onChange: value => {
@@ -1036,10 +1036,10 @@
     const L = PL.ui.layout(root, { chrome: "quiet" }), cv = PL.canvas.create(L.canvasWrap, 0.62);
     let y = 0, v = 0, released = false;
     PL.ui.section(L.controls, "連接體參數");
-    const sTable = PL.ui.slider(L.controls, { label: "桌上物體 mₜ", min: 0.5, max: 6, step: 0.5, value: 3, unit: "kg", digits: 1, onInput: reset });
-    const sHang = PL.ui.slider(L.controls, { label: "懸掛物 mₕ", min: 0.5, max: 5, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: reset });
-    const sMs = PL.ui.slider(L.controls, { label: "靜摩擦係數 μₛ", min: 0.05, max: 0.8, step: 0.02, value: 0.35, unit: "", digits: 2, onInput: reset });
-    const sMk = PL.ui.slider(L.controls, { label: "動摩擦係數 μₖ", min: 0.05, max: 0.7, step: 0.02, value: 0.25, unit: "", digits: 2, onInput: reset });
+    const sTable = PL.ui.slider(L.controls, { label: "桌上物體 mₜ", min: 0.5, max: 6, step: 0.5, value: 3, unit: "kg", digits: 1, onInput: () => draw(), onReset: reset });
+    const sHang = PL.ui.slider(L.controls, { label: "懸掛物 mₕ", min: 0.5, max: 5, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: () => draw(), onReset: reset });
+    const sMs = PL.ui.slider(L.controls, { label: "靜摩擦係數 μₛ", min: 0.05, max: 0.8, step: 0.02, value: 0.35, unit: "", digits: 2, onInput: () => draw(), onReset: reset });
+    const sMk = PL.ui.slider(L.controls, { label: "動摩擦係數 μₖ", min: 0.05, max: 0.7, step: 0.02, value: 0.25, unit: "", digits: 2, onInput: () => draw(), onReset: reset });
     const row = PL.ui.buttonRow(L.controls); PL.ui.button(row, "釋放", () => { reset(); released = true; if (!model().staticHold) anim.start(); else draw(); }, { primary: true, trigger: true }); PL.ui.button(row, "重設", reset);
     PL.ui.note(L.controls, "懸掛物的重力要先克服桌上物體的最大靜摩擦力；運動後再換成動摩擦力計算加速度。 ");
     const rA = PL.ui.readout(L.readouts, { label: "系統加速度 a", unit: "m/s²" });
@@ -1082,7 +1082,7 @@
     let portion = 0.25, v = 0, elapsed = 0, released = false;
     PL.ui.section(L.controls, "均勻繩條件");
     const sPortion = PL.ui.slider(L.controls, { label: "初始垂落比例 x / L", min: 0.05, max: 0.85, step: 0.01, value: 0.25, unit: "", digits: 2, onInput: reset });
-    const sLength = PL.ui.slider(L.controls, { label: "繩總長 L", min: 1, max: 10, step: 0.5, value: 5, unit: "m", digits: 1, onInput: reset });
+    const sLength = PL.ui.slider(L.controls, { label: "繩總長 L", min: 1, max: 10, step: 0.5, value: 5, unit: "m", digits: 1, onInput: () => draw(), onReset: reset });
     const row = PL.ui.buttonRow(L.controls); PL.ui.button(row, "釋放繩子", () => { reset(); released = true; anim.start(); }, { primary: true }); PL.ui.button(row, "重設", reset);
     PL.ui.note(L.controls, "只有垂落部分的重量拉動系統，但整條繩都要一起加速，因此 <b>a = (x/L)g</b>。 ");
     const rA = PL.ui.readout(L.readouts, { label: "瞬時加速度 a", unit: "m/s²" }); const rX = PL.ui.readout(L.readouts, { label: "垂落長度 x", unit: "m" }); const rV = PL.ui.readout(L.readouts, { label: "繩速率 v", unit: "m/s" }); const rState = PL.ui.readout(L.readouts, { label: "受力判讀" });
