@@ -42,13 +42,18 @@
 
   <!-- PWA -->
   <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20261010-03" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png?v=20261010-03" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20261017-01" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png?v=20261017-01" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="物理實驗室" />
 
-  <link rel="stylesheet" href="css/style.css?v=20261010-03" />
+  <!-- 首頁標題用宋體（Noto Serif TC）、數據與標註用等寬字（JetBrains Mono）。
+       載不到時退回系統字型，版面不會壞，只是少了一點個性。 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Serif+TC:wght@700;900&display=swap" />
+  <link rel="stylesheet" href="css/style.css?v=20261017-01" />
 
   <!-- MathJax（LaTeX 公式排版） -->
   <script>
@@ -159,65 +164,133 @@
       <main class="main" id="main-content" tabindex="-1">
         <!-- 首頁 -->
         <section id="home-view">
+          <!--
+            首頁英雄區（2026-10 改版）
+            左：標題與數據；右：一個「真的在動」的單擺標本——擺錘下方的記錄紙把 x(t) 畫成正弦，
+            週期 2.0 s 對應 L = 1.00 m，和標註的公式一致，不是裝飾性的假動畫。
+            整個標本純 SVG＋CSS，不吃 JS，也遵守「減少動態效果」設定。
+          -->
           <div class="hero">
-            <div class="hero-badge"><span class="dot" aria-hidden="true"></span>依教育部 108 課綱設計 · 全繁體原創</div>
-            <h1 class="hero-title">看得見的物理，<br />可以動手玩的實驗室</h1>
-            <p class="hero-sub">12 個學習模組、<span id="hero-exp-count">0</span> 個持續擴充的國中到高中物理實驗，並提供大學入門延伸。每一個都附即時互動模擬、可拖曳的碼錶與量角器，以及可列印的學習單。</p>
+            <div class="hero-copy">
+              <div class="hero-badge"><span class="hero-badge-mark" aria-hidden="true"></span>依教育部 108 課綱設計 · 全繁體原創</div>
+              <h1 class="hero-title"><span class="hero-line">看得見的物理，</span><span class="hero-line">可以<em>動手玩</em>的實驗室</span></h1>
+              <p class="hero-sub">12 個學習模組、<span id="hero-exp-count">0</span> 個持續擴充的國中到高中物理實驗，並提供大學入門延伸。每一個都附即時互動模擬、可拖曳的碼錶與量角器，以及可列印的學習單。</p>
+              <div class="hero-actions">
+                <a class="btn-hero" id="hero-resume" href="#" hidden><span class="btn-hero-k">繼續上次</span><span class="btn-hero-v" id="hero-resume-title">—</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                <button class="btn-hero ghost" id="hero-browse" type="button">瀏覽全部模組<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+              </div>
+              <dl class="hero-stats">
+                <div><dt class="hstat-l">學習模組</dt><dd class="hstat-n" id="stat-mod">0</dd></div>
+                <div><dt class="hstat-l">實驗主題</dt><dd class="hstat-n" id="stat-exp">0</dd></div>
+                <div><dt class="hstat-l">互動模擬</dt><dd class="hstat-n" id="stat-int">0</dd></div>
+              </dl>
+            </div>
 
+            <figure class="hero-specimen">
+              <div class="specimen-head" aria-hidden="true">
+                <span class="specimen-live"><i></i>LIVE</span>
+                <span>FIG. 01 · 單擺</span>
+              </div>
+              <svg class="specimen-svg" viewBox="0 0 400 360" role="img" aria-labelledby="specimen-cap">
+                <defs>
+                  <linearGradient id="trace-fade" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="#fff" stop-opacity="1"/>
+                    <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+                  </linearGradient>
+                  <mask id="trace-mask"><rect x="40" y="236" width="320" height="124" fill="url(#trace-fade)"/></mask>
+                  <clipPath id="trace-clip"><rect x="40" y="236" width="320" height="124"/></clipPath>
+                </defs>
+                <!-- 天花板與懸點 -->
+                <g class="sp-ceiling">
+                  <path d="M128 40h144"/>
+                  <path d="M136 40l-8-10M152 40l-8-10M168 40l-8-10M184 40l-8-10M200 40l-8-10M216 40l-8-10M232 40l-8-10M248 40l-8-10M264 40l-8-10M280 40l-8-10"/>
+                </g>
+                <!-- 鉛垂參考線與擺角 -->
+                <path class="sp-ref" d="M200 40V214"/>
+                <path class="sp-arc" d="M200 120 A80 80 0 0 0 170.03 114.17"/>
+                <text class="sp-label" x="160" y="106" text-anchor="end">θ₀ = 22°</text>
+                <!-- 擺：繞懸點擺動 -->
+                <g class="sp-swing">
+                  <path class="sp-rod" d="M200 40V200"/>
+                  <text class="sp-label sp-label-l" x="208" y="132">L</text>
+                  <circle class="sp-bob" cx="200" cy="200" r="15"/>
+                  <circle class="sp-bob-hi" cx="195" cy="195" r="4"/>
+                </g>
+                <circle class="sp-pivot" cx="200" cy="40" r="4.5"/>
+                <!-- 記錄紙：x(t) 正弦，向下捲動 -->
+                <path class="sp-axis" d="M40 236H360"/>
+                <text class="sp-label sp-label-axis" x="360" y="228" text-anchor="end">x</text>
+                <text class="sp-label sp-label-axis" x="44" y="354">t ↓</text>
+                <g clip-path="url(#trace-clip)" mask="url(#trace-mask)">
+                  <polyline class="sp-trace" points="140.0,156 140.7,158 142.9,160 146.5,162 151.5,164 157.6,166 164.7,168 172.8,170 181.5,172 190.6,174 200.0,176 209.4,178 218.5,180 227.2,182 235.3,184 242.4,186 248.5,188 253.5,190 257.1,192 259.3,194 260.0,196 259.3,198 257.1,200 253.5,202 248.5,204 242.4,206 235.3,208 227.2,210 218.5,212 209.4,214 200.0,216 190.6,218 181.5,220 172.8,222 164.7,224 157.6,226 151.5,228 146.5,230 142.9,232 140.7,234 140.0,236 140.7,238 142.9,240 146.5,242 151.5,244 157.6,246 164.7,248 172.8,250 181.5,252 190.6,254 200.0,256 209.4,258 218.5,260 227.2,262 235.3,264 242.4,266 248.5,268 253.5,270 257.1,272 259.3,274 260.0,276 259.3,278 257.1,280 253.5,282 248.5,284 242.4,286 235.3,288 227.2,290 218.5,292 209.4,294 200.0,296 190.6,298 181.5,300 172.8,302 164.7,304 157.6,306 151.5,308 146.5,310 142.9,312 140.7,314 140.0,316 140.7,318 142.9,320 146.5,322 151.5,324 157.6,326 164.7,328 172.8,330 181.5,332 190.6,334 200.0,336 209.4,338 218.5,340 227.2,342 235.3,344 242.4,346 248.5,348 253.5,350 257.1,352 259.3,354 260.0,356 259.3,358 257.1,360 253.5,362 248.5,364 242.4,366 235.3,368 227.2,370 218.5,372 209.4,374 200.0,376 190.6,378 181.5,380 172.8,382 164.7,384 157.6,386 151.5,388 146.5,390 142.9,392 140.7,394 140.0,396 140.7,398 142.9,400 146.5,402 151.5,404 157.6,406 164.7,408 172.8,410 181.5,412 190.6,414 200.0,416 209.4,418 218.5,420 227.2,422 235.3,424 242.4,426 248.5,428 253.5,430 257.1,432 259.3,434 260.0,436 259.3,438 257.1,440"/>
+                </g>
+                <g class="sp-pen"><circle cx="200" cy="236" r="5"/></g>
+              </svg>
+              <figcaption id="specimen-cap" class="specimen-cap">
+                <span class="specimen-formula">T = 2π√(L/g) ≈ 2.01 s<span class="specimen-dim">L = 1.00 m</span></span>
+                <a class="specimen-link" href="#pendulum">打開這個實驗<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+              </figcaption>
+            </figure>
+          </div>
+
+          <section class="hero-entry" aria-labelledby="hero-modes-title">
             <h2 class="hero-prompt" id="hero-modes-title">你想怎麼開始？</h2>
             <div class="hero-modes" role="group" aria-labelledby="hero-modes-title">
               <button class="hero-mode teacher" id="enter-teacher" type="button">
                 <span class="hero-mode-top">
-                  <span class="hero-mode-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
-                  </span>
+                  <span class="hero-mode-no" aria-hidden="true">01</span>
                   <span class="hero-mode-tag">老師・課堂投影</span>
+                </span>
+                <span class="hero-mode-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
                 </span>
                 <span class="hero-mode-name">教師演示版</span>
                 <span class="hero-mode-desc">精簡畫面，打開就能拖、直接投影演示</span>
-                <span class="hero-mode-go" aria-hidden="true">開始演示<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+                <span class="hero-mode-go" aria-hidden="true"><span>開始演示</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
               </button>
               <button class="hero-mode student" id="enter-student" type="button">
                 <span class="hero-mode-top">
-                  <span class="hero-mode-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z"/></svg>
-                  </span>
+                  <span class="hero-mode-no" aria-hidden="true">02</span>
                   <span class="hero-mode-tag">學生・循序自學</span>
+                </span>
+                <span class="hero-mode-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z"/></svg>
                 </span>
                 <span class="hero-mode-name">自學完整版</span>
                 <span class="hero-mode-desc">保留任務導讀、判讀與逐步引導鷹架</span>
-                <span class="hero-mode-go" aria-hidden="true">開始自學<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+                <span class="hero-mode-go" aria-hidden="true"><span>開始自學</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
               </button>
               <a class="hero-mode duo" id="enter-duo" href="duo/">
                 <span class="hero-mode-top">
-                  <span class="hero-mode-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.2H22l-6 4.8 2.3 7L12 16.8 5.7 21l2.3-7-6-4.8h7.6z"/></svg>
-                  </span>
+                  <span class="hero-mode-no" aria-hidden="true">03</span>
                   <span class="hero-mode-tag">闖關・遊戲化</span>
+                </span>
+                <span class="hero-mode-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.2H22l-6 4.8 2.3 7L12 16.8 5.7 21l2.3-7-6-4.8h7.6z"/></svg>
                 </span>
                 <span class="hero-mode-name">關卡挑戰版</span>
                 <span class="hero-mode-desc">多鄰國式地圖：先預測、玩實驗台、再答題通關</span>
-                <span class="hero-mode-go" aria-hidden="true">開始闖關<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+                <span class="hero-mode-go" aria-hidden="true"><span>開始闖關</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
               </a>
             </div>
             <p class="hero-mode-hint">前兩種模式進入的是同一批實驗，只差畫面繁簡；「關卡挑戰版」把每個實驗做成一關。</p>
-            <div class="hero-actions">
-              <button class="btn-hero ghost" id="hero-browse" type="button">瀏覽全部模組<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
-            </div>
 
-            <p class="hero-highlight"><b>模擬會自己說出物理關係。</b>單擺會告訴你 \(T \propto \sqrt{L}\)、而且振幅完全不影響週期；雙狹縫會得出 \(\Delta x \propto \lambda L / d\)。這些不是寫死的答案，是程式實際掃描模型量出來的。</p>
+            <aside class="hero-highlight" aria-label="設計理念">
+              <span class="hero-highlight-k" aria-hidden="true">NOTE</span>
+              <p><b>模擬會自己說出物理關係。</b>單擺會告訴你 <span class="nowrap">\(T \propto \sqrt{L}\)</span>、而且振幅完全不影響週期；雙狹縫會得出 <span class="nowrap">\(\Delta x \propto \lambda L / d\)</span>。這些不是寫死的答案，是程式實際掃描模型量出來的。</p>
+            </aside>
+          </section>
 
-            <div class="hero-stats">
-              <div><div class="hstat-n" id="stat-mod">0</div><div class="hstat-l">學習模組</div></div>
-              <div><div class="hstat-n b2" id="stat-exp">0</div><div class="hstat-l">實驗主題</div></div>
-              <div><div class="hstat-n b3" id="stat-int">0</div><div class="hstat-l">互動模擬</div></div>
-            </div>
-          </div>
+          <section class="module-section" aria-labelledby="module-section-title">
+            <div class="section-label" id="module-section-title" data-sec="01">課程模組</div>
+            <p class="section-intro">從運動學到近代物理，每個模組都是一組可以直接操作的實驗；點進去就從第一個實驗開始。</p>
+            <div class="module-grid" id="module-grid"></div>
+          </section>
 
           <section class="study-center" aria-labelledby="study-center-title">
             <div class="study-center-head">
               <div>
-                <div class="section-label compact" id="study-center-title">學習中心</div>
+                <div class="section-label compact" id="study-center-title" data-sec="02">學習中心</div>
                 <p class="study-center-intro">建立自己的讀書節奏，保存進度、安排每日實驗，回來時接著上次的位置繼續。</p>
               </div>
               <div class="save-status" id="save-status" aria-live="polite">存檔在這台裝置</div>
@@ -295,17 +368,14 @@
           </section>
 
           <section class="learning-ladder" id="learning-ladder" aria-labelledby="learning-ladder-title">
-            <div class="section-label" id="learning-ladder-title">銜接學習路徑</div>
+            <div class="section-label" id="learning-ladder-title" data-sec="03">銜接學習路徑</div>
             <p class="learning-ladder-intro">選一個主題，從國中現象出發，經過高中模型與量測，再進入大學延伸；每一步都能直接開啟對應實驗。</p>
             <div class="path-tabs" id="path-tabs" role="tablist" aria-label="選擇銜接主題"></div>
             <div class="path-timeline" id="path-timeline"></div>
           </section>
 
-          <div class="section-label">課程模組</div>
-          <div class="module-grid" id="module-grid"></div>
-
           <section class="openness" aria-labelledby="openness-title">
-            <div class="section-label" id="openness-title">關於這個專案</div>
+            <div class="section-label" id="openness-title" data-sec="04">關於這個專案</div>
             <div class="openness-grid">
               <article class="openness-card">
                 <h3>完全免費，而且會一直是</h3>
@@ -392,25 +462,25 @@
   </section>
 
   <!-- 核心 -->
-  <script src="js/site-config.js?v=20261010-03"></script>
-  <script src="js/curriculum.js?v=20261010-03"></script>
-  <script src="js/advanced-curriculum.js?v=20261010-03"></script>
-  <script src="js/comprehensive-curriculum.js?v=20261010-03"></script>
-  <script src="js/extension-registry.js?v=20261010-03"></script>
-  <script src="js/open-curriculum.js?v=20261010-03"></script>
-  <script src="js/school-curriculum.js?v=20261010-03"></script>
-    <script src="js/sim-core.js?v=20261010-03"></script>
-  <script src="js/sim-tools.js?v=20261010-03"></script>
-  <script src="js/sim-insight.js?v=20261010-03"></script>
-  <script src="js/sim-observe.js?v=20261010-03"></script>
-  <script src="js/teaching-notes.js?v=20261010-03"></script>
-  <script src="js/sim-a11y.js?v=20261010-03"></script>
+  <script src="js/site-config.js?v=20261017-01"></script>
+  <script src="js/curriculum.js?v=20261017-01"></script>
+  <script src="js/advanced-curriculum.js?v=20261017-01"></script>
+  <script src="js/comprehensive-curriculum.js?v=20261017-01"></script>
+  <script src="js/extension-registry.js?v=20261017-01"></script>
+  <script src="js/open-curriculum.js?v=20261017-01"></script>
+  <script src="js/school-curriculum.js?v=20261017-01"></script>
+    <script src="js/sim-core.js?v=20261017-01"></script>
+  <script src="js/sim-tools.js?v=20261017-01"></script>
+  <script src="js/sim-insight.js?v=20261017-01"></script>
+  <script src="js/sim-observe.js?v=20261017-01"></script>
+  <script src="js/teaching-notes.js?v=20261017-01"></script>
+  <script src="js/sim-a11y.js?v=20261017-01"></script>
 
   <!-- 實驗程式改為延遲載入：只掛對應表，開啟實驗時才抓對應的檔案 -->
-  <script src="js/experiment-manifest.js?v=20261010-03"></script>
+  <script src="js/experiment-manifest.js?v=20261017-01"></script>
 
 
   <!-- 應用外殼 -->
-  <script src="js/app.js?v=20261010-03"></script>
+  <script src="js/app.js?v=20261017-01"></script>
 </body>
 </html>

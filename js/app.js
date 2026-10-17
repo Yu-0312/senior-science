@@ -574,21 +574,38 @@
     if (heroExperimentCount) heroExperimentCount.textContent = C.totalExperiments;
     const grid = $("#module-grid");
     grid.innerHTML = "";
-    C.modules.forEach(m => {
+    /*
+     * 模組卡（2026-10 改版）：大號序號＋模組色細線＋個人進度條。
+     * 卡片本身就是入口，所以給它按鈕語意與鍵盤操作——原本是純 div，Tab 走不到。
+     */
+    const arrowSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+    C.modules.forEach((m, index) => {
       const card = el("div", "mcard", grid);
       card.style.setProperty("--m-color", m.color);
+      card.dataset.mod = m.id;
+      card.setAttribute("role", "link");
+      card.setAttribute("tabindex", "0");
+      card.setAttribute("aria-label", "模組 " + m.no + "：" + m.title + "，" + m.experiments.length + " 個實驗");
       const top = el("div", "mcard-top", card);
-      const no = el("div", "mcard-no", top); no.textContent = "模組 " + m.no;
+      const no = el("div", "mcard-no", top); no.textContent = String(index + 1).padStart(2, "0");
       const tr = el("div", "mcard-track", top); tr.textContent = m.track;
       const ti = el("div", "mcard-title", card); ti.textContent = m.title;
       const intro = el("div", "mcard-intro", card); intro.textContent = m.intro;
       const meta = el("div", "mcard-meta", card);
-      meta.innerHTML = '<b>' + m.experiments.length + '</b> 個實驗<span class="chip">全互動</span>';
-      card.addEventListener("click", () => {
-        const first = m.experiments[0];
+      meta.innerHTML = '<span class="mcard-count"><b>' + m.experiments.length + '</b> 個實驗</span>' +
+        '<span class="mcard-progress" aria-hidden="true"><i></i></span>' +
+        '<span class="mcard-done">0 / ' + m.experiments.length + '</span>' +
+        '<span class="mcard-go">' + arrowSvg + '</span>';
+      const open = () => {
+        const first = m.experiments.find(exp => !viewed.has(exp.id)) || m.experiments[0];
         location.hash = "#" + first.id;
+      };
+      card.addEventListener("click", open);
+      card.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
       });
     });
+    refreshHomeProgress();
     renderLearningLadder();
     // 統計數字
     $("#stat-mod").textContent = C.totalModules;
@@ -1570,7 +1587,34 @@
     const pct = Math.round(viewed.size / C.totalExperiments * 100);
     const fill = $("#progress-fill"); if (fill) fill.style.width = pct + "%";
     const lab = $("#progress-count"); if (lab) lab.textContent = viewed.size + " / " + C.totalExperiments;
+    refreshHomeProgress();
     renderStudyCenter();
+  }
+  /* 首頁：模組卡的個人進度＋英雄區的「繼續上次」。第一次來的人看不到後者，不會多一顆用不到的按鈕。 */
+  function refreshHomeProgress() {
+    document.querySelectorAll(".mcard[data-mod]").forEach(card => {
+      const mod = C.modules.find(m => m.id === card.dataset.mod);
+      if (!mod) return;
+      const done = mod.experiments.filter(exp => viewed.has(exp.id)).length;
+      const total = mod.experiments.length;
+      const bar = card.querySelector(".mcard-progress i");
+      if (bar) bar.style.width = (total ? done / total * 100 : 0) + "%";
+      const label = card.querySelector(".mcard-done");
+      if (label) label.textContent = done + " / " + total;
+      card.classList.toggle("is-started", done > 0);
+      card.classList.toggle("is-complete", total > 0 && done === total);
+    });
+    const resume = $("#hero-resume");
+    if (resume) {
+      const last = store.get("pl-last-viewed", "");
+      const target = last && byId[last];
+      resume.hidden = !target;
+      if (target) {
+        resume.href = "#" + target.exp.id;
+        const title = $("#hero-resume-title"); if (title) title.textContent = target.exp.title;
+        resume.setAttribute("aria-label", "繼續上次的實驗：" + target.exp.title);
+      }
+    }
   }
   function resetProgress() {
     viewed = new Set(); store.set("pl-progress", []); localStorage.removeItem("pl-last-viewed");
@@ -1972,7 +2016,7 @@
     if (teacherBtn) teacherBtn.addEventListener("click", () => enterWithMode(true));
     const studentBtn = $("#enter-student");
     if (studentBtn) studentBtn.addEventListener("click", () => enterWithMode(false));
-    $("#hero-browse").addEventListener("click", () => $("#module-grid").scrollIntoView({ behavior: "smooth" }));
+    $("#hero-browse").addEventListener("click", () => ($(".module-section") || $("#module-grid")).scrollIntoView({ behavior: "smooth", block: "start" }));
     $("#btn-reset").addEventListener("click", resetProgress);
     $("#btn-export-save").addEventListener("click", exportLearningSave);
     $("#home-export-save").addEventListener("click", exportLearningSave);
