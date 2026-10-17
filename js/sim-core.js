@@ -563,17 +563,20 @@
      * 讀數、播放與圖表——回到 PhET 那種「打開就能拖、拖了就有現象」的直覺。
      * 選擇記在 localStorage，切了就一直維持，不必每個實驗重按。
      */
+    /*
+     * 指令列只留「各自做不同事」的按鈕（2026-10 整理）：
+     *   · 演示模式 → 拿掉按鈕。首頁的「教師演示版」已經是同一件事的唯一入口，
+     *     兩個地方都能切換時，老師常常不知道自己現在在哪一種模式。狀態仍讀 localStorage。
+     *   · 實驗指南＋分步演示 → 合併成「實驗流程」：按一下展開，流程卡裡有「下一步」。
+     *   · 專注模式 → 拿掉。它和全螢幕、收合目錄做的是同一件事（把畫面讓給實驗台）。
+     */
     const demoBtn = el("button", "sim-command sim-command-demo", commandTools); demoBtn.type = "button"; demoBtn.setAttribute("aria-pressed", "false");
-    const guideBtn = el("button", "sim-command", commandTools); guideBtn.type = "button"; guideBtn.textContent = "實驗指南"; guideBtn.setAttribute("aria-expanded", "false");
-    const stepBtn = el("button", "sim-command", commandTools); stepBtn.type = "button"; stepBtn.textContent = "分步演示";
-    const focusBtn = el("button", "sim-command", commandTools); focusBtn.type = "button"; focusBtn.textContent = "專注模式"; focusBtn.setAttribute("aria-pressed", "false");
+    demoBtn.hidden = true;
+    const guideBtn = el("button", "sim-command", commandTools); guideBtn.type = "button"; guideBtn.textContent = "實驗流程"; guideBtn.setAttribute("aria-expanded", "false");
     const exportBtn = el("button", "sim-command", commandTools); exportBtn.type = "button"; exportBtn.textContent = "匯出讀數";
     const screenBtn = el("button", "sim-command", commandTools); screenBtn.type = "button"; screenBtn.textContent = "截取主畫面";
     const fullBtn = el("button", "sim-command sim-command-full", commandTools); fullBtn.type = "button"; fullBtn.textContent = "全螢幕";
-    if (!wantProcedure) {
-      guideBtn.hidden = true;
-      stepBtn.hidden = true;
-    }
+    if (!wantProcedure) guideBtn.hidden = true;
 
     const learningBrief = wantBrief ? el("section", "sim-learning-brief", root) : null;
     if (learningBrief) {
@@ -601,6 +604,8 @@
       const procedureHead = el("div", "sim-procedure-head", procedure);
       const procedureTitle = el("span", "sim-panel-title", procedureHead); procedureTitle.textContent = "實驗流程";
       const procedureState = el("span", "sim-procedure-state", procedureHead); procedureState.textContent = "準備中";
+      const procedureNext = el("button", "sim-procedure-next", procedureHead); procedureNext.type = "button"; procedureNext.textContent = "流程下一步";
+      procedureNext.addEventListener("click", () => setProcedureStep((activeStep + 1) % workflow.length));
       const procedureSteps = el("ol", "sim-procedure-steps", procedure);
       const procedureNote = el("p", "sim-procedure-note", procedure); procedureNote.textContent = "每一步都會對應下方可操作的參數、模擬或量測讀數。";
       paintSteps = () => {
@@ -622,30 +627,24 @@
         guideBtn.setAttribute("aria-expanded", String(visible));
         if (visible && activeStep < 0) setProcedureStep(0);
       });
-      stepBtn.addEventListener("click", () => {
-        root.classList.add("show-procedure"); guideBtn.setAttribute("aria-expanded", "true");
-        setProcedureStep((activeStep + 1) % workflow.length);
-        if (procedure) procedure.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      });
     }
-    focusBtn.addEventListener("click", () => {
-      const focused = root.classList.toggle("is-focused");
-      focusBtn.setAttribute("aria-pressed", String(focused));
-      focusBtn.textContent = focused ? "離開專注" : "專注模式";
-    });
-    function applyDemoMode(on) {
+    function applyDemoMode(on, persist) {
       document.body.classList.toggle("demo-mode", on);
       demoBtn.textContent = on ? "完整模式" : "演示模式";
       demoBtn.title = on
         ? "切回完整教學版：顯示任務導讀、實驗流程、判讀等鷹架"
         : "演示模式：只留畫布、控制項與播放，適合上台展示";
       demoBtn.setAttribute("aria-pressed", String(on));
-      try { localStorage.setItem("pl-demo-mode", on ? "1" : "0"); } catch (e) {}
+      // 只有使用者主動切換才寫回 localStorage；建置時套用狀態不寫，
+      // 否則嵌入頁（關卡挑戰版）會把主站的模式偷偷改掉。
+      if (persist) { try { localStorage.setItem("pl-demo-mode", on ? "1" : "0"); } catch (e) {} }
     }
-    demoBtn.addEventListener("click", () => applyDemoMode(!document.body.classList.contains("demo-mode")));
+    demoBtn.addEventListener("click", () => applyDemoMode(!document.body.classList.contains("demo-mode"), true));
     (function () {
       let on = false;
       try { on = localStorage.getItem("pl-demo-mode") === "1"; } catch (e) {}
+      // 嵌入頁（data-embed-lab）一律是只留實驗台的精簡版
+      if (document.documentElement.hasAttribute("data-embed-lab")) on = true;
       applyDemoMode(on);
     })();
     exportBtn.addEventListener("click", () => {
@@ -784,7 +783,21 @@
        * 在這裡改尺寸，實驗的繪圖程式會依新的 W／H 重新排版。
        */
       const vh = typeof window !== "undefined" && window.innerHeight ? window.innerHeight : 0;
-      const viewportCap = vh ? Math.max(200, vh * (vh < 620 ? 0.68 : 0.9)) : Infinity;
+      let viewportCap = vh ? Math.max(200, vh * (vh < 620 ? 0.68 : 0.9)) : Infinity;
+      /*
+       * 教師演示版是一頁式：畫布高度＝視窗高扣掉演示列（54px）與上下留白。
+       * 只用 0.9 倍視窗高的話，1366×768 投影時畫面會多出一截要捲動。
+       */
+      if (vh && typeof document !== "undefined" && document.body && document.body.classList &&
+          document.body.classList.contains("stage-only")) {
+        viewportCap = Math.max(220, vh - 104);
+      }
+      /*
+       * 嵌入頁（關卡挑戰版）的 iframe 高度跟著內容長，用 iframe 自己的視窗高算上限會
+       * 「畫布變高 → iframe 變高 → 上限再變高」一路長下去。外層會傳入它的可用高度。
+       */
+      const embedCap = typeof window !== "undefined" ? Number(window.PhysicsLabCanvasMaxH) : 0;
+      if (embedCap > 0) viewportCap = Math.min(vh ? Math.max(200, vh * 0.9) : Infinity, embedCap);
       const h = Math.round(Math.min(w * aspect, viewportCap));
       // 2x 已足夠清晰，避免高 DPI 手機以 3x / 4x 重繪每個即時圖表。
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -1030,6 +1043,12 @@
     o = o || {};
     const b = el("button", "btn" + (o.primary ? " btn-primary" : ""), row);
     b.type = "button"; b.textContent = label;
+    /*
+     * 參數區的「重設」和傳輸列的「全部重設」是兩顆做同一件事的按鈕（使用者回報的重複按鍵）。
+     * 登記起來，建置收尾時把它藏掉，並讓「全部重設」順便執行它——
+     * 有些實驗的「重設」還會清掉自己的紀錄，合併後不會少掉這一步。
+     */
+    if (label === "重設" && buildContext && buildContext.resetButtons) buildContext.resetButtons.push(b);
 
     /*
      * trigger 鈕 = 這支實驗自己的「開始這一次」（發射、釋放、開始…）。
@@ -1924,14 +1943,7 @@
     // 沒有畫布（理論上不該發生）就不要提供截圖
     if (!root.querySelector(".sim-visual-panel canvas")) hideCommand("截取主畫面");
     // 沒有鷹架區塊時，分步演示沒有東西可以推進
-    if (!root.querySelector(".sim-procedure")) {
-      hideCommand("實驗指南");
-      hideCommand("分步演示");
-    }
-    // 專注模式會藏掉參數與讀數；沒有參數也沒有讀數時這顆沒有意義
-    if (controlDeck && controlDeck.hidden && readoutPanel && readoutPanel.hidden) {
-      hideCommand("專注模式");
-    }
+    if (!root.querySelector(".sim-procedure")) hideCommand("實驗流程");
 
     const primary = loops[0] || null;
     const anyRunning = () => loops.some(l => l.running);
@@ -1968,7 +1980,15 @@
       loops.forEach(l => l.setSpeed(Number(b.dataset.speed)));
       paint();
     }));
+    const mergedResets = (context.resetButtons || []).filter(b => !ui.resetBtn.hidden);
+    mergedResets.forEach(b => {
+      b.hidden = true;
+      // 整列只剩這顆時，連同空的按鈕列一起收起來
+      const row = b.parentElement;
+      if (row && row.classList.contains("btn-row") && !Array.from(row.children).some(c => !c.hidden)) row.hidden = true;
+    });
     ui.resetBtn.addEventListener("click", () => {
+      mergedResets.forEach(b => { try { b.click(); } catch (e) {} });
       loops.forEach(l => { l.stop(); l.reset(); });
       // 逐一還原控制項；它們各自的 onInput 多半也會清掉實驗內部的歷史資料。
       context.controls.forEach(reset => { try { reset(); } catch (e) { console.warn("控制項重設失敗", e); } });
@@ -2049,7 +2069,7 @@
           root._labProfile = profile;
           if (root.dataset) root.dataset.simId = id;
           const previous = buildContext;
-          const context = { root, id, profile, loops: [], controls: [], canvases: [], sliders: [], readouts: [], tools: null, onTick: null };
+          const context = { root, id, profile, loops: [], controls: [], canvases: [], sliders: [], readouts: [], resetButtons: [], tools: null, onTick: null };
           buildContext = context;
           let api;
           try {

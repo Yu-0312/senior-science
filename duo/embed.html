@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-embed-lab>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>互動實驗台</title>
+  <!--
+    關卡挑戰版的嵌入實驗台。
+
+    直接使用主站的 js/ 與 css/（以前在 duo/lab/ 放了一整份複本，兩邊要同步改，
+    改漏一邊就會出現兩個版本的實驗）。版本號跟主站一致，由 build-consistency 測試把關。
+
+    對外提供 window.DuoLab：外層關卡頁用它讀取滑桿與讀數、取得探測引擎量到的物理關係，
+    才能出「調整實驗題」（把讀數調到目標值）與「數據判讀題」。
+  -->
+  <script>
+    (function () {
+      var params = new URLSearchParams(location.search);
+      document.documentElement.setAttribute("data-theme", params.get("theme") === "dark" ? "dark" : "light");
+      // 外層告訴我們畫布最高可以多高（見 sim-core 的 embedCap）
+      var maxh = Number(params.get("maxh"));
+      if (maxh > 0) window.PhysicsLabCanvasMaxH = maxh;
+    })();
+  </script>
+  <link rel="stylesheet" href="../css/style.css?v=20261017-02" />
+  <style>
+    html, body { margin: 0; padding: 0; background: transparent; }
+    /* 主站的實驗台版面用 container query（名稱 lab）切換左右兩欄；嵌入頁要自己提供這個容器 */
+    body { container-type: inline-size; container-name: lab; }
+    body { padding: 0; }
+    #sim-root { min-height: 320px; }
+    .embed-status { padding: 28px; text-align: center; color: var(--text-dim); font: 700 14px/1.5 system-ui, sans-serif; }
+    .embed-status.err { color: var(--danger); }
+    /* 只留實驗台：畫布、播放列、參數與讀數。預測、挑戰、提示由外層關卡頁負責。 */
+    body.demo-mode #sim-root > :not(.sim-transport):not(.sim-stage):not(.sim-readout-panel):not(.sim-charts):not(.sim-a11y) { display: none !important; }
+    body.demo-mode .sim-command-bar, body.demo-mode .sim-demo-tip, body.demo-mode .sim-transport-hint { display: none !important; }
+    #sim-root > .sim-a11y { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    .lab-sim { gap: 10px; }
+    /* 觸控：播放鍵與滑桿拇指放大，手機與平板好按 */
+    .sim-transport-play, .sim-transport-btn, .sim-transport-reset { min-height: 42px; border-radius: 12px; }
+    input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; }
+    input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; }
+    /* 被外層指定為「這一題要動的滑桿」時加上提示框 */
+    .duo-focus { outline: 3px solid #58cc02; outline-offset: 4px; border-radius: 10px; }
+  </style>
+</head>
+<body>
+  <div id="sim-root"><div class="embed-status" id="boot-status">載入互動模擬…</div></div>
+
+  <script src="../js/site-config.js?v=20261017-02"></script>
+  <script src="../js/curriculum.js?v=20261017-02"></script>
+  <script src="../js/advanced-curriculum.js?v=20261017-02"></script>
+  <script src="../js/comprehensive-curriculum.js?v=20261017-02"></script>
+  <script src="../js/extension-registry.js?v=20261017-02"></script>
+  <script src="../js/open-curriculum.js?v=20261017-02"></script>
+  <script src="../js/school-curriculum.js?v=20261017-02"></script>
+  <script src="../js/sim-core.js?v=20261017-02"></script>
+  <script src="../js/sim-tools.js?v=20261017-02"></script>
+  <script src="../js/sim-insight.js?v=20261017-02"></script>
+  <script src="../js/sim-observe.js?v=20261017-02"></script>
+  <script src="../js/teaching-notes.js?v=20261017-02"></script>
+  <script src="../js/sim-a11y.js?v=20261017-02"></script>
+  <script src="../js/experiment-manifest.js?v=20261017-02"></script>
+  <script>
+    (function () {
+      "use strict";
+      var BUILD = (window.PhysicsLabSite && window.PhysicsLabSite.build) || "";
+      var params = new URLSearchParams(location.search);
+      var id = params.get("id") || "";
+      var PL = window.PhysicsLab;
+      var FILES = window.PhysicsLabExperimentFiles || {};
+      var simRoot = document.getElementById("sim-root");
+      var numeric = (window.PhysicsLabInsight && window.PhysicsLabInsight.numeric) || function (t) {
+        var m = String(t == null ? "" : t).replace(/,/g, "").match(/-?\d+(\.\d+)?(e-?\d+)?/i);
+        return m ? Number(m[0]) : null;
+      };
+
+      function post(msg) { try { parent.postMessage(msg, location.origin); } catch (e) {} }
+      function fail(text) {
+        var el = document.getElementById("boot-status");
+        if (el) { el.className = "embed-status err"; el.textContent = text; }
+        post({ type: "lab-error", id: id, message: text });
+      }
+      function loadScript(src) {
+        return new Promise(function (resolve, reject) {
+          var tag = document.createElement("script");
+          tag.src = src + (BUILD ? "?v=" + BUILD : "");
+          tag.async = false;
+          tag.onload = resolve;
+          tag.onerror = function () { reject(new Error("載入失敗：" + src)); };
+          document.head.appendChild(tag);
+        });
+      }
+
+      // 回報內容高度，外層把 iframe 拉到剛好，不出現雙重捲軸
+      function reportHeight() {
+        var h = Math.ceil(simRoot.getBoundingClientRect().height);
+        if (h >= 160) post({ type: "lab-height", height: h + 8 });
+      }
+      if (typeof ResizeObserver !== "undefined") new ResizeObserver(reportHeight).observe(simRoot);
+
+      if (!id) { fail("缺少實驗 id"); return; }
+      if (!PL || !PL._hooks) { fail("模擬引擎未載入"); return; }
+
+      /*
+       * 在 sim-insight 之後註冊，拿得到它量好的 context.insight。
+       * 把關係整理成純資料交給外層（跨 iframe 傳物件時不要帶 DOM 參照）。
+       */
+      PL._hooks.onBuilt(function (context, api) {
+        var sliders = context.sliders || [];
+        var readouts = context.readouts || [];
+        var insight = context.insight || null;
+        var readNum = function (r) { return r.number != null ? r.number : numeric(r.value); };
+        var summary = {
+          id: id,
+          sliders: sliders.map(function (s) {
+            return { label: s.label, unit: s.unit || "", min: s.min, max: s.max, initial: s.initial, digits: s.digits };
+          }),
+          readouts: readouts.map(function (r) { return { label: r.label, unit: r.unit || "" }; }),
+          relations: [],
+          primary: -1,
+          invariants: []
+        };
+        if (insight && insight.relations) {
+          insight.relations.forEach(function (rel, i) {
+            summary.relations.push({
+              s: sliders.indexOf(rel.slider), r: readouts.indexOf(rel.readout),
+              direction: rel.direction, exponent: rel.exponent, relative: rel.relative,
+              first: rel.first, last: rel.last, min: rel.min, max: rel.max,
+              xs: rel.xs, ys: rel.ys
+            });
+            if (rel === insight.primary) summary.primary = i;
+            if (insight.invariants.indexOf(rel) >= 0) summary.invariants.push(i);
+          });
+        }
+        var listeners = [];
+        function notify() { listeners.forEach(function (fn) { try { fn(); } catch (e) {} }); }
+        sliders.forEach(function (s) { s.el.addEventListener("input", notify); });
+        setInterval(notify, 250);   // 讀數會隨模擬時間變化的實驗也要能即時判定
+
+        window.DuoLab = {
+          summary: summary,
+          read: function (ri) { var r = readouts[ri]; return r ? readNum(r) : null; },
+          slider: function (si) { var s = sliders[si]; return s ? s.read() : null; },
+          onChange: function (fn) { listeners.push(fn); },
+          focus: function (si) {
+            Array.prototype.forEach.call(document.querySelectorAll(".duo-focus"), function (n) { n.classList.remove("duo-focus"); });
+            var s = sliders[si];
+            var box = s && s.el && (s.el.closest(".ctrl-slider") || s.el.parentElement);
+            if (box) { box.classList.add("duo-focus"); box.scrollIntoView({ block: "nearest" }); }
+          },
+          reset: function () {
+            var btn = document.querySelector(".sim-transport-reset");
+            if (btn && !btn.hidden) btn.click();
+          }
+        };
+        setTimeout(function () { post({ type: "lab-ready", id: id }); reportHeight(); }, 0);
+      });
+
+      var file = FILES[id];
+      Promise.resolve()
+        .then(function () {
+          if (PL.has(id)) return true;
+          if (!file) return false;
+          return loadScript("../js/sim-apparatus.js")
+            .catch(function () {})
+            .then(function () { return loadScript("../js/experiments/" + file); })
+            .then(function () { return PL.has(id); });
+        })
+        .then(function (ready) {
+          if (!ready) { fail("找不到這個實驗的模擬程式"); return; }
+          simRoot.innerHTML = "";
+          try {
+            simRoot.dataset.simId = id;
+            PL.get(id).build(simRoot);
+          } catch (err) {
+            console.error("模擬載入失敗：" + id, err);
+            fail("模擬載入時發生問題，請重新整理");
+          }
+        })
+        .catch(function (err) { console.error(err); fail("載入實驗程式失敗"); });
+    })();
+  </script>
+</body>
+</html>

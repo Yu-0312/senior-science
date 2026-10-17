@@ -29,7 +29,7 @@ ok(BUILD === SW_BUILD, "sw.js 的 BUILD 與 site-config 相同",
   "site-config=" + BUILD + " sw=" + SW_BUILD);
 
 console.log("\n=== 所有 HTML 的 ?v= 都等於目前版本 ===");
-const htmls = ["index.html", "experiments.html", "licensing.html"]
+const htmls = ["index.html", "experiments.html", "licensing.html", "duo/index.html", "duo/embed.html"]
   .concat(fs.existsSync("p") ? fs.readdirSync("p").map(f => "p/" + f).filter(f => f.endsWith(".html")) : []);
 const bad = [];
 htmls.forEach(f => {
@@ -67,7 +67,7 @@ console.log("\n=== HTML 引用的資源都有被快取 ===");
 const notCached = [];
 htmls.forEach(f => {
   const src = fs.readFileSync(f, "utf8");
-  const prefix = f.startsWith("p/") ? "../" : "";
+  const prefix = f.startsWith("p/") || f.startsWith("duo/") ? "../" : "";
   Array.from(src.matchAll(/(?:src|href)="([^"?]+\.(?:js|css))/g)).forEach(m => {
     let rel = m[1];
     if (prefix && rel.startsWith("../")) rel = rel.slice(3);

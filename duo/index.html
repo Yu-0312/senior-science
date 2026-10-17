@@ -1,92 +1,118 @@
 <!doctype html>
-<html lang="zh-TW">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>關卡挑戰版 · 物理實驗室</title>
-    <meta
-      name="description"
-      content="物理實驗室的關卡挑戰模式：每個實驗是一關，先預測、玩實驗台、再答題通關。"
-    />
-    <meta property="og:title" content="物理實驗室 Duo · 每個實驗都是關卡" />
-    <meta
-      property="og:description"
-      content="物理實驗室的關卡挑戰模式：每個實驗是一關，先預測、玩實驗台、再答題通關。"
-    />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="theme-color" content="#58CC02" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&family=Noto+Sans+TC:wght@500;600;700;900&display=swap"
-      rel="stylesheet"
-    />
-    <script type="module" crossorigin src="./assets/index-D5P1OdWe.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-KE6uUulI.css">
-  </head>
-  <body
-    class="bg-[#F7F7F7] text-slate-800 antialiased selection:bg-[#58CC02]/20 selection:text-[#1e7e00]"
-  >
-    <div id="root"></div>
-    <style>
-      /* —— UI/UX 微調：維持多鄰國風格，只加觸感、焦點與導航 —— */
-      html { -webkit-tap-highlight-color: transparent; }
-      button, a, input, select { touch-action: manipulation; }
-      :focus-visible { outline: 3px solid rgba(28, 176, 246, .6); outline-offset: 2px; border-radius: 10px; }
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>關卡挑戰版 · 物理實驗室</title>
+  <meta name="description" content="物理實驗室的關卡挑戰模式：每個實驗是一關——先預測、動手把實驗調到目標值、讀數據、解情境題，答錯的題目會再出現直到答對。" />
+  <meta property="og:title" content="物理 Duo · 每個實驗都是一關" />
+  <meta property="og:description" content="先預測、動手調實驗、讀數據、解情境題。台灣國中到高中物理，全部可即時操作。" />
+  <meta name="theme-color" content="#58cc02" />
+  <link rel="icon" type="image/svg+xml" href="../icons/icon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Noto+Sans+TC:wght@500;700;900&display=swap" />
+  <link rel="stylesheet" href="duo.css?v=20261017-02" />
+</head>
+<body>
+  <!--
+    關卡挑戰版（2026-10 重寫）
 
-      /* 單元籤貼在頂欄下方：長地圖不用一路回捲就能換單元 */
-      #skill-tree-container > div:first-child {
-        position: sticky; top: 55px; z-index: 30;
-        background: linear-gradient(#f7f7f7 84%, rgba(247, 247, 247, 0));
-        margin-top: -6px; padding-top: 12px;
-        scrollbar-width: none;
-      }
-      #skill-tree-container > div:first-child::-webkit-scrollbar { display: none; }
+    以前是一份 React 編譯檔，原始碼不在 repo 裡，題目是用課程文字套樣板生成的
+    （「結果會變大／變小／不變」配上一句線索），和實驗台實際量到的東西沒有關係。
 
-      /* 選項卡：可按時微微浮起；作答後字母塊上色，對錯一眼可辨 */
-      .z-50 button.border-2.rounded-2xl:not([disabled]):hover {
-        transform: translateY(-1px);
-        box-shadow: 0 2px 0 rgba(15, 23, 42, .08);
-      }
-      .z-50 button.border-2.rounded-2xl:not([disabled]):active { transform: translateY(1px); box-shadow: none; }
-      .z-50 button[class*="border-[#58CC02]"] { box-shadow: 0 3px 0 rgba(62, 147, 2, .28); }
-      .z-50 button[class*="border-emerald-500"] { box-shadow: 0 3px 0 rgba(5, 150, 105, .25); }
-      .z-50 button[class*="border-amber-400"] { box-shadow: 0 3px 0 rgba(217, 119, 6, .22); }
-      .z-50 button[class*="border-[#58CC02]"] > span:first-child,
-      .z-50 button[class*="border-emerald-500"] > span:first-child { background: #58cc02; color: #fff; }
-      .z-50 button[class*="border-amber-400"] > span:first-child { background: #f59e0b; color: #fff; }
+    重寫後每一關的題目都從「這一關的實驗台」本身長出來：
+      · 情境預測：探測引擎實際掃過滑桿，知道 Y 隨 X 怎麼變
+      · 調整實驗題：在實驗台上把讀數調到目標值，即時判定
+      · 數據判讀：表格數字是模型真的算出來的
+      · 比例推理／控制變因／情境應用：同樣以量到的關係為準
+      · 主站題庫裡逐題撰寫的題目與每次數值不同的計算題
+    答錯的題目會排到後面再出一次，答對才算過關。
+  -->
+  <header class="top">
+    <div class="top-in">
+      <a class="logo" href="../" title="回到物理實驗室">
+        <span class="logo-mark" aria-hidden="true">物理</span><span class="logo-word">Duo</span>
+      </a>
+      <nav class="tabs" aria-label="主選單">
+        <button class="tab active" data-view="map" type="button">學習地圖</button>
+        <button class="tab" data-view="review" type="button">錯題本 <span class="tab-badge" id="review-count" hidden>0</span></button>
+      </nav>
+      <div class="stats" aria-label="學習狀態">
+        <span class="stat streak" id="stat-streak" title="連續學習天數"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1 3.5 5 5.6 5 10.4A5 5 0 0 1 12 22a5 5 0 0 1-5-5c0-2.6 1.5-4.1 2.6-5.3.3 1.6 1 2.6 2 3.1C11 12 10.4 7 12 2z"/></svg><b id="streak-n">0</b><span class="stat-u">天</span></span>
+        <span class="stat xp" id="stat-xp" title="經驗值"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg><b id="xp-n">0</b><span class="stat-u">XP</span></span>
+        <span class="stat crown" id="stat-crown" title="已通過關卡"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 12H5z"/></svg><b id="done-n">0</b></span>
+      </div>
+    </div>
+  </header>
 
-      /* 進度條加一點凹陷感，更像實體關卡進度 */
-      .z-50 div.h-3 > div { box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .10); }
+  <main id="app">
+    <section class="view" id="view-map" aria-label="學習地圖">
+      <div class="units-nav" id="units-nav" role="tablist" aria-label="單元"></div>
+      <div class="continue-card" id="continue-card"></div>
+      <div id="units"></div>
+    </section>
 
-      /* 實驗台變高之後，彈窗是主要捲動區：捲軸收細、不搶戲 */
-      .z-50 .overflow-y-auto { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
-      .z-50 .overflow-y-auto::-webkit-scrollbar { width: 10px; }
-      .z-50 .overflow-y-auto::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; border: 3px solid #fff; }
-      .z-50 .overflow-y-auto::-webkit-scrollbar-track { background: transparent; }
+    <section class="view" id="view-review" aria-label="錯題本" hidden>
+      <div class="review-head">
+        <h1>錯題本</h1>
+        <p>答錯過的題目都收在這裡。重練那一關，答對後就會自動移出。</p>
+      </div>
+      <div id="review-list"></div>
+    </section>
 
-      @media (prefers-reduced-motion: reduce) {
-        *, *::before, *::after {
-          animation-duration: .01ms !important;
-          animation-iteration-count: 1 !important;
-          transition-duration: .01ms !important;
-        }
-      }
-    </style>
-    <script>
-      /* 實驗台 iframe 依內容自動長高：embed.html 會 postMessage 回報高度 */
-      window.addEventListener("message", function (e) {
-        var d = e.data;
-        if (!d || d.type !== "lab-height" || !d.height) return;
-        var frames = document.querySelectorAll('iframe[title*="互動實驗"]');
-        for (var i = 0; i < frames.length; i++) {
-          var h = Math.max(320, Math.min(d.height, 1400));
-          var cur = parseFloat(frames[i].style.height) || 0;
-          if (Math.abs(cur - h) > 2) frames[i].style.height = h + "px";
-        }
-      });
-    </script>
-    <script>/* home handled inside app */</script>
-  </body>
+    <aside class="side" aria-label="關卡說明">
+      <div class="side-card">
+        <h2>每一關怎麼玩</h2>
+        <ol class="howto">
+          <li><b class="k predict">情境預測</b>先猜結果，猜錯不扣分</li>
+          <li><b class="k lab">調整實驗</b>在實驗台上把讀數調到目標值</li>
+          <li><b class="k data">數據判讀</b>看實驗台量到的數據找關係</li>
+          <li><b class="k scenario">情境題</b>把物理關係用在真實情境裡做決定</li>
+          <li><b class="k calc">計算題</b>部分關卡每次數值都不同</li>
+        </ol>
+        <p class="side-note">答錯的題目會在最後再出一次，答對才過關；也會收進「錯題本」。</p>
+      </div>
+      <div class="side-card">
+        <h2>給老師</h2>
+        <p class="side-note">每一關都有自己的網址：打開關卡後把網址列的連結傳給學生，就能直接進到同一關。進度存在學生自己的裝置上。</p>
+        <a class="btn small" href="../">回物理實驗室</a>
+      </div>
+    </aside>
+  </main>
+
+  <!-- 關卡畫面 -->
+  <section class="lesson" id="lesson" role="dialog" aria-modal="true" aria-labelledby="lesson-title" hidden>
+    <div class="lesson-top">
+      <button class="icon-x" id="lesson-close" type="button" aria-label="離開這一關"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <div class="lesson-progress" aria-hidden="true"><i id="lesson-bar"></i></div>
+      <span class="lesson-step" id="lesson-step">準備中</span>
+    </div>
+    <div class="lesson-body" id="lesson-body">
+      <div class="lesson-main" id="lesson-main"></div>
+      <div class="lesson-lab" id="lesson-lab" hidden>
+        <div class="lab-frame-wrap"><iframe id="lab-frame" title="互動實驗台" loading="eager"></iframe></div>
+      </div>
+    </div>
+    <footer class="lesson-foot" id="lesson-foot">
+      <div class="foot-in">
+        <div class="feedback" id="feedback" aria-live="polite"></div>
+        <div class="foot-actions">
+          <button class="btn ghost" id="btn-skip" type="button" hidden>跳過</button>
+          <button class="btn primary" id="btn-check" type="button" disabled>檢查</button>
+        </div>
+      </div>
+    </footer>
+  </section>
+
+  <script src="../js/site-config.js?v=20261017-02"></script>
+  <script src="../js/curriculum.js?v=20261017-02"></script>
+  <script src="../js/advanced-curriculum.js?v=20261017-02"></script>
+  <script src="../js/comprehensive-curriculum.js?v=20261017-02"></script>
+  <script src="../js/extension-registry.js?v=20261017-02"></script>
+  <script src="../js/open-curriculum.js?v=20261017-02"></script>
+  <script src="../js/school-curriculum.js?v=20261017-02"></script>
+  <script src="../js/question-bank.js?v=20261017-02"></script>
+  <script src="duo.js?v=20261017-02"></script>
+</body>
 </html>

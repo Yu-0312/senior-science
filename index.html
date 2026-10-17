@@ -42,8 +42,8 @@
 
   <!-- PWA -->
   <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20261017-01" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png?v=20261017-01" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20261017-02" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png?v=20261017-02" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="物理實驗室" />
@@ -53,7 +53,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Serif+TC:wght@700;900&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=20261017-01" />
+  <link rel="stylesheet" href="css/style.css?v=20261017-02" />
 
   <!-- MathJax（LaTeX 公式排版） -->
   <script>
@@ -141,14 +141,7 @@
           <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
         </div>
         <nav id="module-list" aria-label="全部實驗"></nav>
-        <div class="sidebar-foot">
-          <div class="save-actions" aria-label="學習存檔">
-            <button class="btn-save-action" id="btn-export-save" type="button">匯出學習存檔</button>
-            <button class="btn-save-action" id="btn-import-save" type="button">匯入學習存檔</button>
-            <input id="import-save-file" type="file" accept="application/json,.json" hidden />
-          </div>
-          <button class="btn-reset-progress" id="btn-reset">重設學習進度</button>
-        </div>
+        <input id="import-save-file" type="file" accept="application/json,.json" hidden />
       </aside>
       <!--
         側欄伸縮把手：貼在側欄右緣、垂直置中。
@@ -269,7 +262,7 @@
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.2H22l-6 4.8 2.3 7L12 16.8 5.7 21l2.3-7-6-4.8h7.6z"/></svg>
                 </span>
                 <span class="hero-mode-name">關卡挑戰版</span>
-                <span class="hero-mode-desc">多鄰國式地圖：先預測、玩實驗台、再答題通關</span>
+                <span class="hero-mode-desc">先預測、把實驗台調到目標值，再解數據題與情境題</span>
                 <span class="hero-mode-go" aria-hidden="true"><span>開始闖關</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
               </a>
             </div>
@@ -303,6 +296,7 @@
                 <div class="study-card-actions">
                   <button class="study-btn primary" id="home-export-save" type="button">匯出存檔</button>
                   <button class="study-btn" id="home-import-save" type="button">匯入存檔</button>
+                  <button class="study-btn danger" id="btn-reset" type="button">重設進度</button>
                 </div>
               </article>
               <article class="study-card plan-card">
@@ -355,8 +349,7 @@
                   <div class="today-progress-bar"><div id="today-progress-fill"></div></div>
                 </div>
                 <div class="study-card-actions compact-actions">
-                  <button class="study-btn primary" id="btn-resume-study" type="button">繼續上次學習</button>
-                  <button class="study-btn" id="btn-next-unseen" type="button">下一個未完成</button>
+                  <button class="study-btn primary" id="btn-next-unseen" type="button">下一個未完成</button>
                 </div>
                 <div class="today-task-list" id="today-task-list"></div>
                 <div class="review-focus">
@@ -448,11 +441,27 @@
     </div>
   </div>
 
-  <!-- 教師演示（純實驗台）時唯一留下的控制：回到首頁。平常隱藏。 -->
-  <button class="stage-exit" id="stage-exit" type="button" aria-label="離開演示，回到首頁" title="離開演示（Esc）">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
-    <span>離開演示</span>
-  </button>
+  <!--
+    教師演示版的演示列：一頁式實驗台唯一的導覽。
+    換實驗不必回首頁——選單可搜尋、← → 也能直接切換。平常隱藏。
+  -->
+  <div class="stage-bar" id="stage-bar" role="toolbar" aria-label="演示控制">
+    <button class="stage-picker" id="stage-picker" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="stage-menu" title="選擇實驗（/）">
+      <span class="stage-picker-mod" id="stage-picker-mod">—</span>
+      <span class="stage-picker-title" id="stage-picker-title">選擇實驗</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <button class="stage-nav" id="stage-prev" type="button" aria-label="上一個實驗" title="上一個實驗（←）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+    <button class="stage-nav" id="stage-next" type="button" aria-label="下一個實驗" title="下一個實驗（→）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+    <span class="stage-spacer"></span>
+    <span class="stage-keys" aria-hidden="true"><kbd>空白</kbd> 播放 · <kbd>S</kbd> 單步 · <kbd>R</kbd> 重設 · <kbd>←</kbd><kbd>→</kbd> 換實驗</span>
+    <button class="stage-btn" id="stage-full" type="button" title="全螢幕（F）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>全螢幕</span></button>
+    <button class="stage-btn stage-exit" id="stage-exit" type="button" title="離開演示（Esc）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg><span>離開演示</span></button>
+  </div>
+  <div class="stage-menu" id="stage-menu" role="dialog" aria-label="選擇實驗" hidden>
+    <div class="stage-menu-search"><input id="stage-menu-input" type="search" placeholder="搜尋實驗名稱，例如：單擺、透鏡、電路…" autocomplete="off" /></div>
+    <div class="stage-menu-list" id="stage-menu-list"></div>
+  </div>
 
   <section class="chapter-checkpoint" id="chapter-checkpoint" role="dialog" aria-modal="true" aria-labelledby="checkpoint-title" hidden>
     <div class="checkpoint-backdrop"></div>
@@ -462,25 +471,25 @@
   </section>
 
   <!-- 核心 -->
-  <script src="js/site-config.js?v=20261017-01"></script>
-  <script src="js/curriculum.js?v=20261017-01"></script>
-  <script src="js/advanced-curriculum.js?v=20261017-01"></script>
-  <script src="js/comprehensive-curriculum.js?v=20261017-01"></script>
-  <script src="js/extension-registry.js?v=20261017-01"></script>
-  <script src="js/open-curriculum.js?v=20261017-01"></script>
-  <script src="js/school-curriculum.js?v=20261017-01"></script>
-    <script src="js/sim-core.js?v=20261017-01"></script>
-  <script src="js/sim-tools.js?v=20261017-01"></script>
-  <script src="js/sim-insight.js?v=20261017-01"></script>
-  <script src="js/sim-observe.js?v=20261017-01"></script>
-  <script src="js/teaching-notes.js?v=20261017-01"></script>
-  <script src="js/sim-a11y.js?v=20261017-01"></script>
+  <script src="js/site-config.js?v=20261017-02"></script>
+  <script src="js/curriculum.js?v=20261017-02"></script>
+  <script src="js/advanced-curriculum.js?v=20261017-02"></script>
+  <script src="js/comprehensive-curriculum.js?v=20261017-02"></script>
+  <script src="js/extension-registry.js?v=20261017-02"></script>
+  <script src="js/open-curriculum.js?v=20261017-02"></script>
+  <script src="js/school-curriculum.js?v=20261017-02"></script>
+    <script src="js/sim-core.js?v=20261017-02"></script>
+  <script src="js/sim-tools.js?v=20261017-02"></script>
+  <script src="js/sim-insight.js?v=20261017-02"></script>
+  <script src="js/sim-observe.js?v=20261017-02"></script>
+  <script src="js/teaching-notes.js?v=20261017-02"></script>
+  <script src="js/sim-a11y.js?v=20261017-02"></script>
 
   <!-- 實驗程式改為延遲載入：只掛對應表，開啟實驗時才抓對應的檔案 -->
-  <script src="js/experiment-manifest.js?v=20261017-01"></script>
+  <script src="js/experiment-manifest.js?v=20261017-02"></script>
 
 
   <!-- 應用外殼 -->
-  <script src="js/app.js?v=20261017-01"></script>
+  <script src="js/app.js?v=20261017-02"></script>
 </body>
 </html>

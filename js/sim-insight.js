@@ -836,10 +836,14 @@
     if (predict) host.appendChild(predict);
     const challenge = buildChallenge(context, insight);
     if (challenge) host.appendChild(challenge);
-    const puzzle = buildPuzzle(context, insight);
+    /*
+     * 「誰決定 Y」因果面板會逐一列出每個變因的影響——包含「完全不影響」的那一個，
+     * 等於把下面「找出無關變因」小謎題的答案先講完了。兩個同時出現時只留因果面板。
+     */
+    const causal = buildCausality(context, insight);
+    const puzzle = causal ? null : buildPuzzle(context, insight);
     if (puzzle) host.appendChild(puzzle);
     host.appendChild(buildSummary(context, insight));
-    const causal = buildCausality(context, insight);
     if (causal) host.appendChild(causal);
     const presets = buildPresets(context, insight);
     if (presets) host.appendChild(presets);

@@ -529,24 +529,21 @@
     const title = el("h3", "learning-output-title", heading); title.textContent = "玩完後，你要能帶走什麼？";
     const intro = el("p", "learning-output-intro", heading); intro.textContent = "不是只看到現象，而是把操作、課本概念與解題方法連成一條線。";
 
+    /*
+     * 學習閉環只留「其他地方沒有」的內容（2026-10 整理）：
+     * 原本的「01 操作時先看」和實驗台上方的任務導讀重複；
+     * 「03 玩完能帶走」直接取 exp.points 前三條，和右欄的「學習重點」一字不差。
+     * 留下課本銜接、解題轉換與一句話結論。
+     */
     const grid = el("div", "learning-output-grid", root);
-    const observe = el("article", "learning-output-step observe", grid);
-    const observeNo = el("span", "learning-output-no", observe); observeNo.textContent = "01 · 操作時先看";
-    const observeCopy = el("p", "learning-output-copy", observe); observeCopy.textContent = bridge.observe;
-
     const textbook = el("article", "learning-output-step textbook", grid);
-    const textbookNo = el("span", "learning-output-no", textbook); textbookNo.textContent = "02 · 課本接在哪裡";
+    const textbookNo = el("span", "learning-output-no", textbook); textbookNo.textContent = "課本接在哪裡";
     const textbookList = el("dl", "textbook-bridge", textbook);
     [["國中打底", bridge.junior], ["高中課本", bridge.senior], ["大學延伸", bridge.next]].forEach(([label, text]) => {
       const row = el("div", "textbook-bridge-row", textbookList);
       const term = el("dt", null, row); term.textContent = label;
       const desc = el("dd", null, row); desc.textContent = text;
     });
-
-    const takeaway = el("article", "learning-output-step takeaway", grid);
-    const takeawayNo = el("span", "learning-output-no", takeaway); takeawayNo.textContent = "03 · 玩完能帶走";
-    const points = el("ul", "learning-takeaways", takeaway);
-    exp.points.slice(0, 3).forEach(point => { const item = el("li", null, points); item.textContent = point; });
 
     const transfer = el("div", "learning-transfer", root);
     const transferLabel = el("span", "learning-transfer-label", transfer); transferLabel.textContent = "解題轉換";
@@ -1263,12 +1260,6 @@
     showSaveStatus("已建立 " + days + " 天學習計劃", "ok");
   }
 
-  function goResumeStudy() {
-    const last = store.get("pl-last-viewed", "");
-    if (last && byId[last]) { location.hash = "#" + last; return; }
-    goNextUnseen();
-  }
-
   function goNextUnseen() {
     const target = FLAT.find(f => !viewed.has(f.exp.id)) || FLAT[0];
     if (target) location.hash = "#" + target.exp.id;
@@ -1460,6 +1451,8 @@
       }
       try {
         currentSim = PL.get(exp.id).build(simRoot) || {};
+        arrangeStage();
+        setTimeout(arrangeStage, 0);   // 掛載鉤子（示範重點、課堂提問）有時晚一拍才插進來
       } catch (err) {
         console.error("模擬載入失敗：" + exp.id, err);
         simRoot.innerHTML = "";
@@ -1515,6 +1508,7 @@
     // 進度與側邊高亮
     markVisited(id);
     highlightSidebar(id, mod.id);
+    updateStageBar(id);
     $(".main").scrollTop = 0; window.scrollTo(0, 0);
     document.title = exp.title + "｜物理實驗室";
   }
@@ -1617,6 +1611,8 @@
     }
   }
   function resetProgress() {
+    // 清除後無法復原（除非先匯出存檔），所以先確認一次
+    if (typeof window.confirm === "function" && !window.confirm("確定要清除全部學習進度嗎？建議先「匯出存檔」備份。")) return;
     viewed = new Set(); store.set("pl-progress", []); localStorage.removeItem("pl-last-viewed");
     cancelDwell(); refreshViewedMarks();
   }
@@ -1674,12 +1670,98 @@
   }
   function syncStageMode(view) {
     const showing = view || ($("#exp-view").style.display !== "none" ? "exp" : "home");
-    document.body.classList.toggle("stage-only", showing === "exp" && stageFlag());
+    const on = showing === "exp" && stageFlag();
+    const was = document.body.classList.contains("stage-only");
+    document.body.classList.toggle("stage-only", on);
+    if (!on) closeStageMenu();
+    else arrangeStage();
+    // 畫布高度依「是否一頁式」計算；切換時讓 sim-core 重新量一次
+    if (on !== was) requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
   }
   function exitStageMode() {
     setStageFlag(false);
+    closeStageMenu();
     syncStageMode("home");
     location.hash = "";
+  }
+
+  /*
+   * 一頁式實驗台的右欄：把播放列、情境預設、參數、讀數、示範重點、課堂提問
+   * 收進同一個可捲動的側欄。右欄內容比螢幕高時只捲右欄，整頁永遠不捲。
+   */
+  const STAGE_SIDE_ORDER = [".sim-transport", ".sim-insight-block", ".sim-control-deck", ".sim-readout-panel", ".sim-charts", ".sim-demo-tip", ".sim-predict"];
+  function arrangeStage() {
+    if (!document.body.classList.contains("stage-only")) return;
+    const root = $("#sim-root");
+    if (!root || !root.querySelector(".sim-stage")) return;
+    let side = root.querySelector(":scope > .stage-side");
+    if (!side) { side = el("aside", "stage-side", root); side.setAttribute("aria-label", "實驗操作"); }
+    STAGE_SIDE_ORDER.forEach(sel => {
+      const node = root.querySelector(sel);
+      if (node && node.parentNode !== side) side.appendChild(node);
+    });
+  }
+
+  /* ---------------------------- 教師演示列 ---------------------------- */
+  function updateStageBar(id) {
+    const f = byId[id];
+    if (!f) return;
+    const bar = $("#stage-bar");
+    if (bar) bar.style.setProperty("--m-color", f.mod.color);
+    const mod = $("#stage-picker-mod"); if (mod) mod.textContent = "模組" + f.mod.no;
+    const title = $("#stage-picker-title"); if (title) title.textContent = f.exp.title;
+    const prev = $("#stage-prev"), next = $("#stage-next");
+    if (prev) prev.disabled = !FLAT[f.order - 1];
+    if (next) next.disabled = !FLAT[f.order + 1];
+  }
+  function renderStageMenu(query) {
+    const list = $("#stage-menu-list");
+    if (!list) return;
+    list.innerHTML = "";
+    const q = (query || "").trim().toLowerCase();
+    let count = 0;
+    C.modules.forEach(m => {
+      const items = m.experiments.filter(exp => !q || exp.title.toLowerCase().includes(q) || m.title.toLowerCase().includes(q));
+      if (!items.length) return;
+      const group = el("div", "stage-menu-mod", list);
+      group.style.setProperty("--m-color", m.color);
+      const head = el("p", "stage-menu-mod-title", group);
+      head.innerHTML = "<span>" + String(C.modules.indexOf(m) + 1).padStart(2, "0") + "</span>";
+      head.appendChild(document.createTextNode(m.title));
+      items.forEach(exp => {
+        const item = el("button", "stage-menu-item" + (exp.id === currentId ? " current" : ""), group);
+        item.type = "button"; item.textContent = exp.title;
+        item.addEventListener("click", () => { closeStageMenu(); location.hash = "#" + exp.id; });
+        count++;
+      });
+    });
+    if (!count) { const empty = el("p", "stage-menu-empty", list); empty.textContent = "找不到符合的實驗"; }
+  }
+  function openStageMenu() {
+    const menu = $("#stage-menu"); if (!menu) return;
+    const input = $("#stage-menu-input");
+    if (input) input.value = "";
+    renderStageMenu("");
+    menu.hidden = false;
+    $("#stage-picker").setAttribute("aria-expanded", "true");
+    setTimeout(() => { if (input) input.focus(); }, 0);
+  }
+  function closeStageMenu() {
+    const menu = $("#stage-menu"); if (!menu || menu.hidden) return;
+    menu.hidden = true;
+    const picker = $("#stage-picker"); if (picker) picker.setAttribute("aria-expanded", "false");
+  }
+  function toggleStageMenu() { const menu = $("#stage-menu"); if (menu && menu.hidden) openStageMenu(); else closeStageMenu(); }
+  function stepStage(delta) {
+    const f = currentId && byId[currentId];
+    const target = f && FLAT[f.order + delta];
+    if (target) location.hash = "#" + target.exp.id;
+  }
+  function toggleStageFullscreen() {
+    try {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+    } catch (e) {}
   }
 
   function closeSidebarMobile() { $("#sidebar").classList.remove("open"); $("#scrim").classList.remove("show"); }
@@ -1835,6 +1917,7 @@
 
   function shouldShowCheckpoint(currentMod, targetMod) {
     if (!currentMod || !targetMod || currentMod.id === targetMod.id) return false;
+    if (stageFlag()) return false;   // 老師上台切實驗時不能跳出學生用的章節小考
     if (checkpointDone(currentMod.id)) return false;
     if (!Array.isArray(MODULE_CHECKPOINTS[currentMod.id]) || !MODULE_CHECKPOINTS[currentMod.id].length) return false;
     const total = currentMod.experiments.length;
@@ -2000,6 +2083,22 @@
     $("#brand-home").addEventListener("click", () => location.hash = "");
     const stageExit = $("#stage-exit");
     if (stageExit) stageExit.addEventListener("click", exitStageMode);
+    const stagePicker = $("#stage-picker");
+    if (stagePicker) stagePicker.addEventListener("click", toggleStageMenu);
+    const stagePrev = $("#stage-prev"); if (stagePrev) stagePrev.addEventListener("click", () => stepStage(-1));
+    const stageNext = $("#stage-next"); if (stageNext) stageNext.addEventListener("click", () => stepStage(1));
+    const stageFull = $("#stage-full"); if (stageFull) stageFull.addEventListener("click", toggleStageFullscreen);
+    const stageInput = $("#stage-menu-input");
+    if (stageInput) {
+      stageInput.addEventListener("input", () => renderStageMenu(stageInput.value));
+      stageInput.addEventListener("keydown", e => {
+        if (e.key === "Enter") { const first = $("#stage-menu-list .stage-menu-item"); if (first) first.click(); }
+      });
+    }
+    document.addEventListener("pointerdown", e => {
+      const menu = $("#stage-menu");
+      if (menu && !menu.hidden && !menu.contains(e.target) && !e.target.closest("#stage-picker")) closeStageMenu();
+    });
     /*
      * 首頁的兩條入口：教師演示版（精簡）與自學完整版（有鷹架）。
      * 進入的是同一批實驗，差別只在 body.demo-mode——sim-core 會據此收起或顯示鷹架。
@@ -2010,7 +2109,10 @@
       store.set("pl-demo-mode-flag", demo);   // 給 app 端記錄；sim-core 讀的是原始鍵
       try { localStorage.setItem("pl-demo-mode", demo ? "1" : "0"); } catch (e) {}
       setStageFlag(demo);   // 教師演示版＝純實驗台；自學完整版維持原本完整介面
-      location.hash = "#" + FLAT[0].exp.id;
+      const last = store.get("pl-last-viewed", "");
+      location.hash = "#" + (demo && last && byId[last] ? last : FLAT[0].exp.id);
+      // 老師要先挑今天要演示的實驗：進場直接把選單打開
+      if (demo) setTimeout(openStageMenu, 60);
     }
     const teacherBtn = $("#enter-teacher");
     if (teacherBtn) teacherBtn.addEventListener("click", () => enterWithMode(true));
@@ -2018,9 +2120,7 @@
     if (studentBtn) studentBtn.addEventListener("click", () => enterWithMode(false));
     $("#hero-browse").addEventListener("click", () => ($(".module-section") || $("#module-grid")).scrollIntoView({ behavior: "smooth", block: "start" }));
     $("#btn-reset").addEventListener("click", resetProgress);
-    $("#btn-export-save").addEventListener("click", exportLearningSave);
     $("#home-export-save").addEventListener("click", exportLearningSave);
-    $("#btn-import-save").addEventListener("click", () => $("#import-save-file").click());
     $("#home-import-save").addEventListener("click", () => $("#import-save-file").click());
     $("#import-save-file").addEventListener("change", event => {
       importLearningSave(event.target.files && event.target.files[0]);
@@ -2029,7 +2129,6 @@
     $("#plan-days").addEventListener("change", () => syncPlanControls(store.get(STUDY_PLAN_KEY, null)));
     $("#btn-create-plan").addEventListener("click", createStudyPlan);
     $("#btn-clear-plan").addEventListener("click", clearStudyPlan);
-    $("#btn-resume-study").addEventListener("click", goResumeStudy);
     $("#btn-next-unseen").addEventListener("click", goNextUnseen);
 
     // 每個按鍵都掃 237 筆實驗會讓打字卡頓，改成停手後才搜尋。
@@ -2049,9 +2148,17 @@
         trapFocus($("#checkpoint-panel"), e);
         return;
       }
-      if (e.key === "Escape" && document.body.classList.contains("stage-only") && !document.fullscreenElement) {
-        exitStageMode();
-        return;
+      if (document.body.classList.contains("stage-only")) {
+        const menu = $("#stage-menu");
+        if (menu && !menu.hidden) {
+          if (e.key === "Escape") { closeStageMenu(); $("#stage-picker").focus(); }
+          return;   // 選單開著時，方向鍵與空白鍵留給搜尋框
+        }
+        if (e.key === "Escape" && !document.fullscreenElement) { exitStageMode(); return; }
+        if (e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA" && !e.repeat) {
+          if (e.key === "/") { e.preventDefault(); openStageMenu(); return; }
+          if (e.key === "f" || e.key === "F") { e.preventDefault(); toggleStageFullscreen(); return; }
+        }
       }
       if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
       if (currentId && $("#exp-view").style.display !== "none") {
