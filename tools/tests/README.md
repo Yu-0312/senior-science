@@ -29,9 +29,9 @@ node tools/tests/render-test.js      # 單獨跑某一支
 | `metrology-test.js` | 量具讀數規則（游標不估讀、測微器必估讀、半毫米陷阱） |
 | `a11y-test.js` | 畫布的文字替代、觸控目標尺寸 |
 | `perf-test.js` | 首次載入（壓縮後）與延遲載入沒有被抵銷 |
-| `build-consistency.js` | 全站版本號一致、SW 快取清單與實際檔案相符 |
+| `build-consistency.js` | 全站版本號一致（含 `duo/` 的兩個頁面）、SW 快取清單與實際檔案相符 |
 | `graph-ink-test.js` | 圖表裡的曲線與陰影，在兩種主題下都與底板有足夠對比 |
-| `control-response-test.js` | **暫停狀態下**每一根滑桿都要造成看得見的改變 |
+| `control-response-test.js` | **暫停狀態下**每一根滑桿、每一個步進器（− +）都要造成看得見的改變；選項晶片列出沒有立即反應的 |
 
 `meaning-audit` 與 `control-response-test` 看起來重疊，其實守的是不同狀態：
 前者在動畫跑著的時候量，後者在「剛打開、還沒按播放」的時候量。
@@ -58,6 +58,7 @@ node tools/tests/render-test.js      # 單獨跑某一支
 | 波形實驗被判成靜態插圖 | 只 hook `PL.draw.*`，漏掉原生 `ctx.lineTo()` |
 | 兩支力箭頭互換方向卻判定沒變 | 雜湊用加總，對「對調」是盲的 |
 | 相位 0° 與 360° 被判成沒作用 | 只比 min 與 max，週期性參數兩端是同一個狀態 |
+| 16 個步進器暫停時完全沒反應，測試卻全綠 | 只掃 `input[type=range]`；步進器是按鈕，不在掃描範圍內 |
 | 導線粗細變化偵測不到 | 只錄座標，沒錄 `lineWidth` |
 | 首次載入回報超標 | 量原始位元組，但實際傳輸是 gzip |
 | 532 支滑桿「全部沒反應」 | dispatch 寫在錄影區間外，同步畫的那一格根本沒被錄到 |

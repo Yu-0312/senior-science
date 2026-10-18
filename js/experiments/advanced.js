@@ -44,7 +44,21 @@
     "antenna-resonance": cfg("antenna", ["發射頻率 f", 20, 1000, 280, "MHz"], ["天線長度 L", 0.05, 3, 0.27, "m"], "共振匹配度", "%", (f, l) => Math.max(0, 100 * (1 - Math.min(1, Math.abs(l - 75 / f) / (75 / f + 0.05)))), (f, l, match) => "λ/4 最佳長度約 " + PL.fmt(75 / f, 3) + " m；匹配度 " + PL.fmt(match, 0) + "%", (x, l) => Math.max(0, 100 * (1 - Math.min(1, Math.abs(l - 75 / x) / (75 / x + 0.05))))),
     "radiation-shielding": cfg("radiation", ["屏蔽厚度 x", 0, 20, 6, "cm"], ["吸收係數 μ", 0.03, 0.8, 0.23, "cm⁻¹"], "相對計數 I/I₀", "%", (x, mu) => 100 * Math.exp(-mu * x), (x, mu, value) => value < 10 ? "屏蔽效果明顯，仍須依輻射種類選材" : "仍有顯著穿透計數", (x, mu) => 100 * Math.exp(-mu * x))};
 
+  /*
+   * 讀數小卡的寬度隨文字長度收縮。原本寫死 156～180px：桌機畫布 900px 寬時剛好，
+   * 手機畫布只有 350px，一張卡就佔掉一半寬度，蓋住右上角的公式與標註。
+   */
+  function cardWidth(ctx, title, value, maxW) {
+    if (!ctx || typeof ctx.measureText !== "function") return maxW;
+    ctx.save();
+    ctx.font = "9px system-ui, sans-serif"; const a = ctx.measureText(String(title)).width || 0;
+    ctx.font = "700 11px system-ui, sans-serif"; const b = ctx.measureText(String(value)).width || 0;
+    ctx.restore();
+    const w = Math.ceil(Math.max(a, b) + 22);
+    return isFinite(w) && w > 0 ? Math.max(64, Math.min(maxW, w)) : maxW;
+  }
   function label(ctx, x, y, title, value, width, color) {
+    width = cardWidth(ctx, title, value, width);
     D.rect(ctx, x, y, width, 33, { fill: PL.theme.shade(0.82), stroke: color, width: 1, r: 6 });
     D.text(ctx, title, x + 9, y + 12, { color: PL.col("text-faint"), size: 8.5 });
     D.text(ctx, value, x + 9, y + 25, { color, size: 11, weight: "700" });

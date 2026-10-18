@@ -27,7 +27,9 @@
       const s = cur;
 
       /* 上半實驗台 / 下半兩張圖 */
-      const sceneH = Math.max(200, Math.floor(H * 0.46));
+      // 場景至少 200px 是桌機的設定；手機畫布只有 270px 高時，固定 200 會把下方兩張圖擠出畫布外。
+      // 改成至少替圖留 120px。
+      const sceneH = Math.floor(Math.max(H * 0.46, Math.min(200, H - 120)));
       const graphTop = sceneH + 8;
       const trackY = Math.floor(sceneH * 0.62);
       const tX0 = 40, tX1 = W - 32;

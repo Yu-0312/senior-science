@@ -23,7 +23,7 @@
       if (maxh > 0) window.PhysicsLabCanvasMaxH = maxh;
     })();
   </script>
-  <link rel="stylesheet" href="../css/style.css?v=20261017-02" />
+  <link rel="stylesheet" href="../css/style.css?v=20261018-01" />
   <style>
     html, body { margin: 0; padding: 0; background: transparent; }
     /* 主站的實驗台版面用 container query（名稱 lab）切換左右兩欄；嵌入頁要自己提供這個容器 */
@@ -48,20 +48,20 @@
 <body>
   <div id="sim-root"><div class="embed-status" id="boot-status">載入互動模擬…</div></div>
 
-  <script src="../js/site-config.js?v=20261017-02"></script>
-  <script src="../js/curriculum.js?v=20261017-02"></script>
-  <script src="../js/advanced-curriculum.js?v=20261017-02"></script>
-  <script src="../js/comprehensive-curriculum.js?v=20261017-02"></script>
-  <script src="../js/extension-registry.js?v=20261017-02"></script>
-  <script src="../js/open-curriculum.js?v=20261017-02"></script>
-  <script src="../js/school-curriculum.js?v=20261017-02"></script>
-  <script src="../js/sim-core.js?v=20261017-02"></script>
-  <script src="../js/sim-tools.js?v=20261017-02"></script>
-  <script src="../js/sim-insight.js?v=20261017-02"></script>
-  <script src="../js/sim-observe.js?v=20261017-02"></script>
-  <script src="../js/teaching-notes.js?v=20261017-02"></script>
-  <script src="../js/sim-a11y.js?v=20261017-02"></script>
-  <script src="../js/experiment-manifest.js?v=20261017-02"></script>
+  <script src="../js/site-config.js?v=20261018-01"></script>
+  <script src="../js/curriculum.js?v=20261018-01"></script>
+  <script src="../js/advanced-curriculum.js?v=20261018-01"></script>
+  <script src="../js/comprehensive-curriculum.js?v=20261018-01"></script>
+  <script src="../js/extension-registry.js?v=20261018-01"></script>
+  <script src="../js/open-curriculum.js?v=20261018-01"></script>
+  <script src="../js/school-curriculum.js?v=20261018-01"></script>
+  <script src="../js/sim-core.js?v=20261018-01"></script>
+  <script src="../js/sim-tools.js?v=20261018-01"></script>
+  <script src="../js/sim-insight.js?v=20261018-01"></script>
+  <script src="../js/sim-observe.js?v=20261018-01"></script>
+  <script src="../js/teaching-notes.js?v=20261018-01"></script>
+  <script src="../js/sim-a11y.js?v=20261018-01"></script>
+  <script src="../js/experiment-manifest.js?v=20261018-01"></script>
   <script>
     (function () {
       "use strict";
@@ -118,6 +118,8 @@
             return { label: s.label, unit: s.unit || "", min: s.min, max: s.max, initial: s.initial, digits: s.digits };
           }),
           readouts: readouts.map(function (r) { return { label: r.label, unit: r.unit || "" }; }),
+          // 建置完成（探測已還原）時的讀數：出調整題時用來避開「一開始就已經達標」的目標
+          current: readouts.map(function (r) { return readNum(r); }),
           relations: [],
           primary: -1,
           invariants: []
@@ -136,13 +138,25 @@
         }
         var listeners = [];
         function notify() { listeners.forEach(function (fn) { try { fn(); } catch (e) {} }); }
-        sliders.forEach(function (s) { s.el.addEventListener("input", notify); });
+        // 讀數要等這一次重繪完才會更新；馬上通知會讀到上一格的舊值
+        function notifySoon() { requestAnimationFrame(function () { setTimeout(notify, 0); }); }
+        sliders.forEach(function (s) { s.el.addEventListener("input", notifySoon); });
         setInterval(notify, 250);   // 讀數會隨模擬時間變化的實驗也要能即時判定
 
         window.DuoLab = {
           summary: summary,
           read: function (ri) { var r = readouts[ri]; return r ? readNum(r) : null; },
           slider: function (si) { var s = sliders[si]; return s ? s.read() : null; },
+          // 直接設定滑桿（走 sim-core 的 write，會觸發 onInput 與重繪）；給自動測試用
+          set: function (si, v) {
+            var s = sliders[si]; if (!s || !s.el) return;
+            if (s.el.tagName === "INPUT") {
+              s.el.value = String(v);
+              s.el.dispatchEvent(new Event("input", { bubbles: true }));   // 和使用者拖動走同一條路（onInput＋暫停時重繪）
+            } else {
+              s.write(v);   // 步進器：write 會呼叫回呼並補發 input 事件
+            }
+          },
           onChange: function (fn) { listeners.push(fn); },
           focus: function (si) {
             Array.prototype.forEach.call(document.querySelectorAll(".duo-focus"), function (n) { n.classList.remove("duo-focus"); });

@@ -788,7 +788,8 @@
        * 教師演示版是一頁式：畫布高度＝視窗高扣掉演示列（54px）與上下留白。
        * 只用 0.9 倍視窗高的話，1366×768 投影時畫面會多出一截要捲動。
        */
-      if (vh && typeof document !== "undefined" && document.body && document.body.classList &&
+      const landscape = typeof window === "undefined" || !window.innerWidth || window.innerWidth > 900 && window.innerWidth >= vh;
+      if (vh && landscape && typeof document !== "undefined" && document.body && document.body.classList &&
           document.body.classList.contains("stage-only")) {
         viewportCap = Math.max(220, vh - 104);
       }
@@ -1358,7 +1359,21 @@
     const step = o.step == null ? 1 : o.step, dg = o.digits == null ? 0 : o.digits;
     let v = o.value;
     const show = () => { val.textContent = typeof o.format === "function" ? o.format(v) : (+v).toFixed(dg); };
-    const set = (nv, fire) => { v = clamp(Math.round(nv / step) * step, o.min, o.max); show(); if (fire !== false && o.onInput) o.onInput(v); if (fire !== false) markGuideStep(wrap, 0); };
+    /*
+     * 步進器是按鈕，不會產生 input 事件——引擎的「暫停時重繪」聽不到它，
+     * 於是暫停狀態下按 + / − 只有數字變，畫面與讀數全部不動（16 個步進器如此）。
+     * 數值改變時補發一個會冒泡的 input 事件，走和滑桿完全相同的重繪路徑。
+     * 另外有實驗把回呼寫成 onChange（和 chipGroup 的命名一樣），這裡一併接受。
+     */
+    const callback = o.onInput || o.onChange;
+    const set = (nv, fire) => {
+      const prev = v;
+      v = clamp(Math.round(nv / step) * step, o.min, o.max); show();
+      if (fire === false) return;
+      if (callback) callback(v);
+      markGuideStep(wrap, 0);
+      if (v !== prev) { try { box.dispatchEvent(new Event("input", { bubbles: true })); } catch (e) {} }
+    };
     dec.addEventListener("click", () => set(v - step));
     inc.addEventListener("click", () => set(v + step));
     show();
@@ -1398,6 +1413,8 @@
         chips.forEach(x => x.paint());
         if (o.onChange) o.onChange(multi ? [...value] : value, op.value);
         markGuideStep(row, 0);
+        // 和步進器同理：選項晶片是按鈕，補發 input 讓暫停時也會重繪
+        try { row.dispatchEvent(new Event("input", { bubbles: true })); } catch (e) {}
       });
       chips.push({ paint }); paint();
     });

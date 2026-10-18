@@ -264,19 +264,36 @@
     const target = mono[0] || rels.find(r => r.direction === "peak");
     if (target) {
       const x = X(target), y = Y(target);
-      if (target.direction === "peak") {
+      // 「調到最大」題：若預設就已經在最大值（例如安培力的夾角預設 90°），改出指定值題，免得一進來就過關
+      const startY = S.current ? S.current[target.r] : null;
+      const peakDone = target.direction === "peak" && startY != null && startY >= target.max * 0.97;
+      if (target.direction === "peak" && !peakDone) {
         items.push({ kind: "lab", mode: "peak", rel: target, title: "把「" + y.label + "」調到最大",
           goal: "調整「" + x.label + "」，找出讓「" + y.label + "」最大的設定（最大約 " + withUnit(target.max, y.unit) + "）。",
           test: v => v >= target.max * 0.97, targetValue: target.max, prediction });
       } else {
-        const lo = Math.min(target.first, target.last), hi = Math.max(target.first, target.last);
-        // 目標選在行程 30% 或 70%，離預設值比較遠的那個；取兩位有效數字當「好看的數」
-        const initialY = target.ys[Math.round((x.initial - x.min) / ((x.max - x.min) || 1) * (target.ys.length - 1))];
-        const cands = [0.3, 0.7].map(fr => lo + (hi - lo) * fr);
-        let goal = cands.sort((a, b) => Math.abs(b - initialY) - Math.abs(a - initialY))[0];
-        const nice = Number(goal.toPrecision(2));
-        if (nice > lo && nice < hi) goal = nice;
-        const tol = Number(Math.max(Math.abs(goal) * 0.03, (hi - lo) * 0.01).toPrecision(2));
+        const lo = Math.min.apply(null, target.ys), hi = Math.max.apply(null, target.ys);
+        /*
+         * 目標一定要「只動這一根就調得到」。
+         *
+         * 第一版取行程 30% / 70% 的內插值再四捨五入成好看的數字，自動逐關驗證後發現
+         * 185 個調整題有 52 個調不到：步進器、整數滑桿（諧波 n、匝數）一格一格跳，
+         * 內插出來的值剛好落在兩格之間。改成直接用探測時滑桿真的停過的取樣點——
+         * 那個讀數是模型在可達的設定下實際算出來的，一定調得到。
+         * 取樣點選離預設值最遠的內側點（不選端點，避免「拉到底」就過關）。
+         */
+        const xi = (x.initial - x.min) / ((x.max - x.min) || 1) * (target.ys.length - 1);
+        const i0 = Math.max(0, Math.min(target.ys.length - 2, Math.floor(xi)));
+        const measured = S.current && S.current[target.r];
+        const initialY = measured != null && isFinite(measured) ? measured : target.ys[i0] + (target.ys[i0 + 1] - target.ys[i0]) * (xi - i0);
+        const tolFor = g => Number(Math.max(Math.abs(g) * 0.03, (hi - lo) * 0.01).toPrecision(2));
+        const order = [1, 2, 3].concat([0, target.ys.length - 1])
+          .filter(k => k < target.ys.length)
+          .map(k => ({ k, g: Number(target.ys[k].toPrecision(3)) }))
+          .sort((a, b) => (a.k === 0 || a.k === target.ys.length - 1) - (b.k === 0 || b.k === target.ys.length - 1) || Math.abs(b.g - initialY) - Math.abs(a.g - initialY));
+        const chosen = order.find(o => Math.abs(o.g - initialY) > tolFor(o.g) * 1.5) || order[0];
+        const goal = chosen.g;
+        const tol = tolFor(goal);
         items.push({ kind: "lab", mode: "target", rel: target, title: "把「" + y.label + "」調到 " + withUnit(goal, y.unit),
           goal: "在實驗台上調整參數，讓「" + y.label + "」等於 <b>" + withUnit(goal, y.unit) + "</b>（誤差 ±" + fmt(tol) + (y.unit ? " " + y.unit : "") + " 內）。",
           test: v => Math.abs(v - goal) <= tol, targetValue: goal, tol, prediction });
@@ -436,7 +453,7 @@
   /* =======================================================================
      關卡執行
      ======================================================================= */
-  const L = { f: null, items: [], queue: [], index: 0, total: 0, mistakes: 0, answered: 0, lab: null, ready: false, selected: null, phase: "answer", poll: 0, current: null, predictionPick: null, retried: new Set() };
+  const L = { f: null, items: [], queue: [], index: 0, total: 0, mistakes: 0, answered: 0, lab: null, ready: false, selected: null, phase: "answer", poll: 0, current: null, predictionPick: null, retried: null };
   const lesson = $("#lesson"), main = $("#lesson-main"), labBox = $("#lesson-lab"), frame = $("#lab-frame");
   const foot = $("#lesson-foot"), feedback = $("#feedback"), btnCheck = $("#btn-check"), btnSkip = $("#btn-skip");
 
@@ -447,9 +464,17 @@
     if (e.data.type === "lab-error" && L.f && e.data.id === L.f.exp.id) labReady(true);
   });
 
+  /*
+   * 換 iframe 的網址要用 location.replace：直接改 src 會在瀏覽器歷史多塞一筆，
+   * 學生按「上一頁」時退的是 iframe 而不是關卡，看起來像按了沒反應。
+   */
+  function setFrame(url) {
+    try { frame.contentWindow.location.replace(url); } catch (e) { frame.src = url; }
+  }
+
   function openLesson(id) {
     const f = byId[id]; if (!f) return;
-    Object.assign(L, { f, items: [], queue: [], index: 0, total: 0, mistakes: 0, answered: 0, lab: null, ready: false, selected: null, phase: "answer", current: null, predictionPick: null, retried: new Set() });
+    Object.assign(L, { f, items: [], queue: [], index: 0, total: 0, mistakes: 0, answered: 0, lab: null, ready: false, selected: null, phase: "answer", current: null, predictionPick: null, retried: null });
     clearInterval(L.poll);
     document.body.classList.add("in-lesson");
     lesson.hidden = false;
@@ -463,10 +488,10 @@
     frame.style.height = "520px";
     // 畫布高度上限：視窗高扣掉關卡頂欄與實驗台的播放列，整個實驗台一眼看得完
     const maxh = Math.max(240, Math.min(620, window.innerHeight - (window.innerWidth < 960 ? 330 : 240)));
-    frame.src = "embed.html?id=" + encodeURIComponent(id) + "&theme=light&maxh=" + maxh;
+    setFrame("embed.html?id=" + encodeURIComponent(id) + "&theme=light&maxh=" + maxh);
     clearTimeout(L.timeout);
     L.timeout = setTimeout(() => labReady(true), 9000);   // 載不到也要能出題（退回觀念題）
-    history.replaceState(null, "", "#" + id);
+    if (decodeURIComponent(location.hash.slice(1)) !== id) history.pushState(null, "", "#" + id);
   }
 
   function labReady(failed) {
@@ -485,9 +510,9 @@
   function closeLesson() {
     clearInterval(L.poll); clearTimeout(L.timeout);
     lesson.hidden = true; document.body.classList.remove("in-lesson");
-    frame.src = "about:blank";
+    setFrame("about:blank");
     L.f = null;
-    history.replaceState(null, "", location.pathname);
+    if (location.hash) history.pushState(null, "", location.pathname + location.search);
     renderMap();
   }
   $("#lesson-close").addEventListener("click", () => {
@@ -742,9 +767,8 @@
       const answerText = item.numeric ? withUnit(item.answer, item.unit) : item.options[item.correct];
       setFoot("bad", "正確答案：" + answerText, item.explain || item.hint || "");
       recordMistake(item, answerText);
-      // 答錯的題目排到最後再出一次（每題最多重出一次）
-      if (!L.retried.has(item)) {
-        L.retried.add(item);
+      // 答錯的題目排到最後再出一次，直到答對為止（選項順序每次重排，避免背位置）
+      {
         const again = Object.assign({}, item, { retry: true });
         if (!item.numeric && !item.fixedOrder) {
           const order = shuffle(item.options.map((_, i) => i));
@@ -833,7 +857,13 @@
     if (lesson.hidden) return;
     if (e.target && e.target.tagName === "INPUT" && e.key !== "Enter") return;
     if (e.key === "Escape") { $("#lesson-close").click(); return; }
-    if (e.key === "Enter") { if (!btnCheck.disabled) { e.preventDefault(); btnCheck.click(); } return; }
+    // 焦點在按鈕上時 Enter 會由瀏覽器觸發那顆按鈕；再補一次 click 會把「檢查」和「繼續」連按兩下，
+    // 學生就看不到對錯回饋。只有焦點不在按鈕上時才代按主按鈕。
+    if (e.key === "Enter") {
+      if (e.target && e.target.closest && e.target.closest("button, a")) return;
+      if (!btnCheck.disabled && !btnCheck.hidden) { e.preventDefault(); btnCheck.click(); }
+      return;
+    }
     const n = Number(e.key);
     if (n >= 1 && n <= 6 && L.phase === "answer" && L.current && L.current.options && n <= L.current.options.length) selectChoice(n - 1);
   });
@@ -842,6 +872,18 @@
   renderMap();
   const hash = decodeURIComponent(location.hash.slice(1));
   if (hash && byId[hash]) openLesson(hash);
+  /*
+   * 瀏覽器「上一頁」：開關卡時網址會帶 #實驗 id。以前按上一頁網址變了但關卡畫面還開著，
+   * 再按一次關卡的 ✕ 又會把網址改回去，兩邊對不上。這裡讓網址成為唯一的依據。
+   */
+  // pushState 建立的歷史紀錄來回切換只會觸發 popstate，手動改網址才會觸發 hashchange——兩個都要聽
+  function syncFromUrl() {
+    const id = decodeURIComponent(location.hash.slice(1));
+    if (id && byId[id]) { if (!L.f || L.f.exp.id !== id) openLesson(id); }
+    else if (L.f) closeLesson();
+  }
+  window.addEventListener("hashchange", syncFromUrl);
+  window.addEventListener("popstate", syncFromUrl);
 
   // 給自動測試用：不經過畫面直接檢查出題結果
   window.DuoDebug = { buildItems: (id, S) => buildItems(byId[id], S), state, get current() { return L.current; }, get phase() { return L.phase; } };

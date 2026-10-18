@@ -24,6 +24,7 @@ const rec = makeRecorder();
 const ids = allIds(PL);
 const dead = [];        // 拉了完全沒反應
 const textOnly = [];    // 只有文字變，圖形沒動
+const chipDead = [];    // 選項切換後沒反應（僅列出：有些選項本來就只影響播放時的行為）
 let checkedSliders = 0, checkedExps = 0, movedOk = 0;
 
 ids.forEach(id => {
@@ -39,7 +40,8 @@ ids.forEach(id => {
 
   const inputs = Array.from(root.querySelectorAll ? root.querySelectorAll("input") : [])
     .filter(el => el.type === "range");
-  if (!inputs.length) { cleanup(); return; }
+  const steppers = Array.from(root.querySelectorAll ? root.querySelectorAll(".ctrl-stepper") : []);
+  if (!inputs.length && !steppers.length) { cleanup(); return; }
 
   // 找出這次建置用到的 canvas context 並掛上錄影機
   const canvases = Array.from(root.querySelectorAll("canvas"));
@@ -112,6 +114,50 @@ ids.forEach(id => {
     }
   });
 
+  /*
+   * 步進器（− 數值 +）也是參數輸入，但它是按鈕，不會觸發 input 事件。
+   * 由來：發電機、變壓器、光電效應等 19 個步進器在暫停時按 + / − 只有數字變，
+   * 讀數與畫面都不動——引擎的「暫停時重繪」只聽 input / change，
+   * 而發電機還把回呼寫成 onChange（步進器只認 onInput），連實驗自己的更新都沒被呼叫。
+   */
+  steppers.forEach(wrap => {
+    const btns = Array.from(wrap.querySelectorAll(".stepper-btn"));
+    const val = wrap.querySelector(".stepper-val");
+    if (btns.length < 2 || !val) return;
+    const label = (wrap.querySelector(".ctrl-label") || {}).textContent || "（未命名步進器）";
+    checkedSliders++;
+    const before = rec.capture(() => { flush(); });
+    const domBefore = readoutText(root);
+    const v0 = val.textContent;
+    let moved = false, clicked = null;
+    for (const b of [btns[1], btns[0]]) {      // 先 +，到頂了再試 −
+      const after = rec.capture(() => { dispatch(b, "click"); flush(); });
+      if (val.textContent === v0) continue;     // 已在邊界，數值沒變
+      clicked = b;
+      const gB = before.filter(x => x[0] !== "D"), gA = after.filter(x => x[0] !== "D");
+      if (hashFrame(gB) !== hashFrame(gA) || readoutText(root) !== domBefore) moved = true;
+      break;
+    }
+    if (clicked && !moved) dead.push(`${id} · ${label}（步進器）：暫停時按了數值會變，畫面與讀數都沒有變化`);
+    else if (clicked) movedOk++;
+    if (clicked) { dispatch(clicked === btns[1] ? btns[0] : btns[1], "click"); flush(); }
+  });
+
+  /* 選項晶片（chip）同樣是按鈕：切換後暫停中的畫面或讀數必須跟著變 */
+  Array.from(root.querySelectorAll ? root.querySelectorAll(".chip-row") : []).forEach(row => {
+    const chips = Array.from(row.querySelectorAll(".chip"));
+    if (chips.length < 2) return;
+    const target = chips.find(c => !c.classList.contains("active")) || chips[1];
+    checkedSliders++;
+    const before = rec.capture(() => { flush(); });
+    const domBefore = readoutText(root);
+    const after = rec.capture(() => { dispatch(target, "click"); flush(); });
+    const gB = before.filter(x => x[0] !== "D"), gA = after.filter(x => x[0] !== "D");
+    if (hashFrame(gB) === hashFrame(gA) && readoutText(root) === domBefore) {
+      chipDead.push(`${id} · 「${target.textContent}」（選項）：暫停時切換後畫面與讀數都沒有變化`);
+    } else movedOk++;
+  });
+
   cleanup();
 
   function cleanup() {
@@ -153,6 +199,8 @@ R.ok(dead.length === 0, "沒有滑桿在暫停時毫無反應",
  * 硬要它們動反而會逼出假的視覺效果——那比沒有反應更糟。
  * 列在這裡是為了讓這份清單是「已知且刻意如此」，而不是沒人看過。
  */
+R.ok(true, "（僅供參考）暫停時切換沒有立即反應的選項：" + chipDead.length + " 個",
+  chipDead.length ? "\n    " + chipDead.slice(0, 30).join("\n    ") : "—");
 R.ok(true, "（僅供參考）只改讀數、不改畫面的滑桿：" + textOnly.length + " 支",
   textOnly.length ? "\n    " + textOnly.slice(0, 25).join("\n    ") : "—");
 

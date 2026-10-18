@@ -26,8 +26,21 @@
     "bode-low-pass": cfg("bode", ["訊號頻率 f", 10, 20000, 1000, "Hz", 10, 0], ["截止頻率 f𝚌", 100, 10000, 1800, "Hz", 100, 0], "電壓增益", "dB", (frequency, cutoff) => 20 * Math.log10(1 / Math.sqrt(1 + (frequency / cutoff) ** 2)), (a, b, o) => "f=f𝚌 時增益為 -3 dB；高頻訊號被逐漸濾除"),
     "biot-savart-axis": cfg("biot", ["軸向距離 z", 0, 0.35, 0.08, "m", 0.01, 2], ["線圈半徑 R", 0.03, 0.2, 0.09, "m", 0.01, 2], "軸線磁場 B", "μT", (z, radius) => 4 * Math.PI * 1e-7 * 50 * 0.8 * radius ** 2 / (2 * (radius ** 2 + z ** 2) ** 1.5) * 1e6, (a, b, o) => "線圈中心磁場最大；沿軸向離開後快速衰減")};
 
+  /*
+   * 讀數小卡的寬度隨文字長度收縮。原本寫死 156～180px：桌機畫布 900px 寬時剛好，
+   * 手機畫布只有 350px，一張卡就佔掉一半寬度，蓋住右上角的公式與標註。
+   */
+  function cardWidth(ctx, title, value, maxW) {
+    if (!ctx || typeof ctx.measureText !== "function") return maxW;
+    ctx.save();
+    ctx.font = "9px system-ui, sans-serif"; const a = ctx.measureText(String(title)).width || 0;
+    ctx.font = "700 11px system-ui, sans-serif"; const b = ctx.measureText(String(value)).width || 0;
+    ctx.restore();
+    const w = Math.ceil(Math.max(a, b) + 22);
+    return isFinite(w) && w > 0 ? Math.max(64, Math.min(maxW, w)) : maxW;
+  }
   function label(ctx, x, y, title, value, color) {
-    D.rect(ctx, x, y, 180, 38, { fill: PL.theme.shade(0.82), stroke: color, width: 1, r: 5 });
+    D.rect(ctx, x, y, cardWidth(ctx, title, value, 180), 38, { fill: PL.theme.shade(0.82), stroke: color, width: 1, r: 5 });
     D.text(ctx, title, x + 10, y + 14, { color: PL.col("text-faint"), size: 9 });
     D.text(ctx, value, x + 10, y + 29, { color, size: 11, weight: "700" });
   }

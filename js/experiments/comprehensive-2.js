@@ -33,8 +33,21 @@
     "solar-cell": lab("solar", ["照度", 100, 1200, 780, "W/m²", 10, 0], ["面板面積", 0.05, 20, 1.8, "m²", 0.05, 2], "電力輸出", "W", (irradiance, area) => irradiance * area * 0.21, (irradiance, area, power) => "光伏效率取 21%；輸出 " + PL.fmt(power, 1) + " W", (x, area) => x * area * 0.21)
   };
 
+  /*
+   * 讀數小卡的寬度隨文字長度收縮。原本寫死 156～180px：桌機畫布 900px 寬時剛好，
+   * 手機畫布只有 350px，一張卡就佔掉一半寬度，蓋住右上角的公式與標註。
+   */
+  function cardWidth(ctx, title, value, maxW) {
+    if (!ctx || typeof ctx.measureText !== "function") return maxW;
+    ctx.save();
+    ctx.font = "9px system-ui, sans-serif"; const a = ctx.measureText(String(title)).width || 0;
+    ctx.font = "700 11px system-ui, sans-serif"; const b = ctx.measureText(String(value)).width || 0;
+    ctx.restore();
+    const w = Math.ceil(Math.max(a, b) + 22);
+    return isFinite(w) && w > 0 ? Math.max(64, Math.min(maxW, w)) : maxW;
+  }
   function label(ctx, x, y, title, value, color) {
-    D.rect(ctx, x, y, 156, 36, { fill: PL.theme.shade(0.82), stroke: color, width: 1, r: 6 });
+    D.rect(ctx, x, y, cardWidth(ctx, title, value, 156), 36, { fill: PL.theme.shade(0.82), stroke: color, width: 1, r: 6 });
     D.text(ctx, title, x + 10, y + 13, { color: PL.col("text-faint"), size: 9 });
     D.text(ctx, value, x + 10, y + 27, { color, size: 11, weight: "700" });
   }
