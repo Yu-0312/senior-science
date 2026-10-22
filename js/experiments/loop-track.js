@@ -190,6 +190,16 @@
       rule: "「爬得上去」和「過得去」是兩個不同的條件。只算能量夠不夠爬到 2R，是這一題最常見的失分點。"
     });
 
+    /*
+     * 把手抓斜坡頂端的釋放點，上下拖就是改釋放高度 h。
+     * h 一變，畫面比例尺也跟著變；拖曳期間用按下時的比例尺做相對換算，
+     * 否則指標底下的尺度一直改、把手會亂跳。
+     */
+    let geo = null, hDrag = null;
+    const grip = PL.ui.handle(cv, { slider: sH, label: "釋放點（上下拖改變高度 h）",
+      toValue: (x, y) => { if (!hDrag) hDrag = { y, h: sH.get(), sc: geo ? geo.sc : 100 }; return hDrag.h + (hDrag.y - y) / hDrag.sc; },
+      onRelease: () => { hDrag = null; } });
+
     /* ---------------- 主畫面 ---------------- */
     function draw() {
       const { ctx, W, H } = cv;
@@ -281,11 +291,14 @@
         }
       }
       if (draw._rails) ctx.drawImage(draw._rails, 0, 0, W, H);
+      grip.place(PX(0), PY(sH.get()));
+      geo = { sc };
 
       // 釋放高度線與 h_min 線
       D.line(ctx, PX(0) - 10, PY(sH.get()), PX(RAMP_LEN() * 0.5), PY(sH.get()),
         MC(), 1.4, [6, 5]);
-      D.text(ctx, "釋放高度 h = " + PL.fmt(sH.get(), 2) + " m", PX(0) - 8, PY(sH.get()) - 8,
+      // 文字往右讓出起點，起點上有「釋放點」把手
+      D.text(ctx, "釋放高度 h = " + PL.fmt(sH.get(), 2) + " m", PX(0) + 18, PY(sH.get()) - 10,
         { color: MC(), size: 10.5, weight: "700" });
       const hm = hMin();
       D.line(ctx, PX(RAMP_LEN() + FLAT_LEN - 0.3), PY(hm), PX(RAMP_LEN() + FLAT_LEN + 2 * sR.get() + 0.3), PY(hm),
@@ -457,7 +470,15 @@
             // 速度歸零：能量連爬到這裡都不夠，往回滑
             anim.stop();
           } else {
-            s += v * dt;
+            /*
+             * 只用 v = √(2g(h − y)) 推進，從靜止釋放的那一刻 v = 0，小球永遠起不了步
+             * （按「釋放」畫面完全不動）。補上切線加速度 a = −g·dy/ds 的二階項：
+             * 起點 v = 0 但 a > 0，小球就會開始滑；之後速率仍由能量守恆決定，讀數不變。
+             */
+            const q2 = pointAt(Math.min(total, s + 1e-3));
+            const at = -sG.get() * (q2.y - p.y) / 1e-3;
+            const ds = v * dt + 0.5 * at * dt * dt;
+            if (ds > 0) s += ds;
           }
           const q = pointAt(Math.min(s, total));
           // 脫軌判斷同樣要容差：臨界狀態下 N 理論上恰為零，

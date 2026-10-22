@@ -240,8 +240,15 @@
   };
 
   /* 桁架橋：冰棒棍橋樑架在兩張桌子之間，中央吊重物，受壓紅、受拉藍 */
+  /*
+   * 動態：t = 0 時手托著砝碼，橋還沒受力；按播放放手，橋面先往下沉、上下振動幾次再停在
+   * 撓度 sag 的位置（阻尼彈簧追隨器，木頭結構阻尼小，所以多晃幾下）。
+   * 桿件的受力顏色跟著「此刻」的撓度深淺變化：彈性結構的內力正比於變形量，
+   * 往下沉得最深的那一瞬間桿件受力最大，比靜止時還大——這就是動載重比靜載重危險的原因。
+   * 把手：直接把砝碼往下拉再放手；或拖右邊的桌子改變橋跨。
+   */
   SC["truss-bridge"] = k => {
-    const { ctx, W, H, a: load, b: span, t, s, c, v: fmax, cfg } = k;
+    const { ctx, W, H, a: load, b: span, t, s, c, v: fmax, cfg, st } = k;
     const floorY = H * 0.94;
     AP.labRoom(ctx, W, H, floorY, { bench: "none" });
     AP.woodFloor(ctx, W, H, floorY);
@@ -249,13 +256,22 @@
     const tTop = H * 0.5, n = 6, hT = Math.min(70 * s, Lb / 5);
     AP.table(ctx, bx0 - 120 * s, bx0 + 20 * s, tTop, floorY, { thick: 12 * s });
     AP.table(ctx, bx1 - 20 * s, bx1 + 120 * s, tTop, floorY, { thick: 12 * s });
-    const k1 = clamp(fmax / 6000, 0, 1), sag = k1 * 16 * s;
-    const bot = i => ({ x: bx0 + Lb * i / n, y: tTop - 2 - sag * Math.sin(Math.PI * i / n) });
-    const top = i => ({ x: bx0 + Lb * (i + 0.5) / n, y: tTop - 2 - hT - sag * Math.sin(Math.PI * (i + 0.5) / n) });
+    const k1 = clamp(fmax / 6000, 0, 1), target = k1 * 16 * s;
+    if (!st.sagF) st.sagF = PL.motion.follower(0, { omega: 12, zeta: 0.1 });
+    const F = st.sagF;
+    let sag;
+    if (st.fresh && !st.grabbed) { F.value = 0; F.vel = 0; F.target = target; sag = 0; }
+    else if (st.grabbed) { F.target = target; sag = F.value; }
+    else sag = Math.max(0, F.update(target, st.dt, st.running));
+    // 受力比例：此刻撓度 ÷ 靜止撓度（振動的最低點會超過 1）
+    const ratio = target > 1e-6 ? clamp(sag / target, 0, 1.8) : 0;
+    // 橋面往「下」沉：中央節點的 y 增加
+    const bot = i => ({ x: bx0 + Lb * i / n, y: tTop - 2 + sag * Math.sin(Math.PI * i / n) });
+    const top = i => ({ x: bx0 + Lb * (i + 0.5) / n, y: tTop - 2 - hT + sag * Math.sin(Math.PI * (i + 0.5) / n) });
     const stick = (p, q, col, w) => { ctx.strokeStyle = "rgb(120,84,40)"; ctx.lineWidth = w + 2; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke(); ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke(); };
     const cm = (a, tint) => `rgb(${Math.round(226 + (tint[0] - 226) * a)},${Math.round(196 + (tint[1] - 196) * a)},${Math.round(140 + (tint[2] - 140) * a)})`;
     for (let i = 0; i < n; i++) {
-      const a = k1 * (0.4 + 0.6 * Math.sin(Math.PI * (i + 0.5) / n));
+      const a = Math.min(1, k1 * ratio * (0.4 + 0.6 * Math.sin(Math.PI * (i + 0.5) / n)));
       stick(bot(i), bot(i + 1), cm(a, [60, 110, 220]), 4 * s);
       stick(bot(i), top(i), cm(a * 0.8, i < n / 2 ? [220, 60, 50] : [60, 110, 220]), 3 * s);
       stick(top(i), bot(i + 1), cm(a * 0.8, i < n / 2 ? [60, 110, 220] : [220, 60, 50]), 3 * s);
@@ -265,10 +281,17 @@
     const mid = bot(n / 2), ww = (20 + 30 * Math.sqrt(fr(load, cfg.a))) * s;
     AP.cord(ctx, mid.x, mid.y, mid.x, mid.y + 40 * s);
     AP.weight(ctx, mid.x, mid.y + 46 * s, ww, ww * 0.8, PL.fmt(load, 0) + " N");
+    if (st.fresh && !st.grabbed) {
+      AP.hand(ctx, mid.x, mid.y + 46 * s + ww * 0.8 + 2, 1, 0.9 * s, { ang: -Math.PI / 2 });
+      if (W >= 560) D.text(ctx, "手托住砝碼 · 按播放放手", mid.x + ww / 2 + 12 * s, mid.y + 46 * s + ww * 0.4, { color: PL.col("text-dim"), size: 11 });
+    }
+    st.geo = { base: tTop - 2, off: 46 * s + ww * 0.4, max: target * 2.5 + 14 * s, W, s, rTable: 60 * s };
+    if (st.grips) { st.grips[0].place(mid.x, mid.y + 46 * s + ww * 0.4); st.grips[1].place(bx1 + 60 * s, tTop + 30 * s); }
     D.text(ctx, "紅：受壓　藍：受拉（顏色越深受力越大）", W / 2, 44 * s, { color: PL.col("text"), size: 12, align: "center", weight: "700" });
     D.arrow(ctx, bx0, tTop + 28 * s, bx1, tTop + 28 * s, { color: PL.col("text-dim"), width: 1.4, head: 6 });
     D.arrow(ctx, bx1, tTop + 28 * s, bx0, tTop + 28 * s, { color: PL.col("text-dim"), width: 1.4, head: 6 });
-    D.text(ctx, "橋跨 " + PL.fmt(span, 1) + " m", W / 2, tTop + 44 * s, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
+    // 標示放在吊繩左側：橋面下沉時砝碼和吊繩會經過正中央
+    D.text(ctx, "橋跨 " + PL.fmt(span, 1) + " m", W / 2 - ww / 2 - 10 * s, tTop + 44 * s, { color: PL.col("text"), size: 11, align: "right", weight: "700" });
     label(ctx, 20, 18, "最大桿件力", PL.fmt(fmax, 0) + " N", c);
   };
 
@@ -807,25 +830,55 @@
   };
 
   /* 毛細現象：粗細不同的玻璃管插在水盆裡，越細的管子水爬得越高；水黽靠表面張力站在水面上 */
+  /*
+   * 動態：t = 0 時三根管子剛插進水裡，管內水面和盆面一樣高；按播放後水沿管壁往上爬，
+   * 越爬越慢，最後停在 h = 2γcosθ/(ρgr)。爬升速率用 Lucas–Washburn（含重力）：
+   *     d(h²)/dt = 2A·r²·(h_eq − h)
+   * 管越粗流阻越小、爬得越快但停得越低；最細那根要爬最久才到最高——這也是真實觀察得到的。
+   * 真實的水大約一秒內就爬完，A 取實際值的 1/10（慢動作），畫面上才看得清楚。
+   * 把手：抓住管架往上提，管子離開水面、管內的水流掉；放手管子插回去，水重新爬升。
+   */
+  const WASHBURN_A = 12.25;    // cm/(s·mm²)；實際的水約 122（ρg/8η），這裡放慢 10 倍
   SC["surface-tension"] = k => {
-    const { ctx, W, H, a: r, b: gam, t, s, c, v: hh } = k;
+    const { ctx, W, H, a: r, b: gam, t, s, c, v: hh, st } = k;
     const L = isL(), benchY = H * 0.88;
     AP.labRoom(ctx, W, H, benchY, {});
-    const dx0 = W * 0.12, dx1 = W * 0.6, dTop = benchY - 64 * s, wy = benchY - 40 * s, tubeTop = 74 * s, ppc = (wy - tubeTop - 12 * s) / 30;
+    const dx0 = W * 0.12, dx1 = W * 0.6, dTop = benchY - 64 * s, wy = benchY - 40 * s, tubeTop0 = 74 * s, ppc = (wy - tubeTop0 - 12 * s) / 30;
     ctx.fillStyle = L ? "rgba(110,180,225,0.34)" : "rgba(60,130,180,0.42)"; ctx.fillRect(dx0, wy, dx1 - dx0, benchY - 4 * s - wy);
     const hc = rr => 2 * gam * 0.94 / (9800 * rr * 1e-3) * 100, rs = [r * 2, r, r / 2];
-    AP.standRod(ctx, dx0 - 50 * s, benchY, tubeTop + 4 * s);
+    const heq = rs.map(hc);
+    // 管內水柱高度（cm，相對盆內水面）：剛插入／被提起時為 0；暫停時時間不走，直接是平衡高度
+    const lift = st.lift || 0;
+    if (!st.hs || st.fresh || lift > 0) st.hs = [0, 0, 0];
+    else if (!st.running && !(st.dt > 0)) st.hs = heq.slice();
+    else if (st.dt > 0) st.hs = st.hs.map((h, i) => {
+      const rr = rs[i], A = WASHBURN_A * rr * rr, kk = A / Math.max(heq[i], 0.01);
+      const n = Math.min(400, Math.ceil(Math.min(st.dt, 0.1) * kk / 0.4) + 1), dt = Math.min(st.dt, 0.1) / n;
+      let H2 = h * h;
+      for (let j = 0; j < n; j++) H2 = Math.max(0, H2 + 2 * A * (heq[i] - Math.sqrt(H2)) * dt);
+      return Math.sqrt(H2);
+    });
+    const tubeTop = tubeTop0 - lift, tubeBot = benchY - 14 * s - lift;
+    AP.standRod(ctx, dx0 - 50 * s, benchY, tubeTop0 + 4 * s);
     AP.steel(ctx, dx0 - 54 * s, tubeTop + 16 * s, dx1 - dx0 + 34 * s, 7 * s, 8);
     rs.forEach((rr, i) => {
-      const x = dx0 + (dx1 - dx0) * (0.25 + 0.25 * i), tw = clamp(5 + 9 * rr, 5, 30) * s, h = hc(rr), top = Math.max(tubeTop + 4 * s, wy - h * ppc), sel = i === 1;
-      ctx.fillStyle = L ? "rgba(40,120,200,0.8)" : "rgba(90,170,235,0.8)"; ctx.fillRect(x - tw / 2 + 1, top, tw - 2, benchY - 14 * s - top);
-      ctx.fillStyle = "rgba(230,248,255,0.9)"; ctx.beginPath(); ctx.moveTo(x - tw / 2 + 1, top - 2); ctx.quadraticCurveTo(x, top + tw * 0.4, x + tw / 2 - 1, top - 2); ctx.lineTo(x + tw / 2 - 1, top + 1); ctx.quadraticCurveTo(x, top + tw * 0.4 + 3, x - tw / 2 + 1, top + 1); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "rgba(220,240,250,0.18)"; ctx.fillRect(x - tw / 2, tubeTop, tw, benchY - 14 * s - tubeTop);
-      ctx.strokeStyle = sel ? "#e0843a" : (L ? "rgba(70,110,140,0.85)" : "rgba(200,226,240,0.8)"); ctx.lineWidth = sel ? 2 : 1.2; ctx.strokeRect(x - tw / 2, tubeTop, tw, benchY - 14 * s - tubeTop);
+      const x = dx0 + (dx1 - dx0) * (0.25 + 0.25 * i), tw = clamp(5 + 9 * rr, 5, 30) * s, h = st.hs[i], top = Math.max(tubeTop + 4 * s, wy - h * ppc), sel = i === 1;
+      const eqTop = Math.max(tubeTop0 + 4 * s, wy - heq[i] * ppc);
+      if (tubeBot > top) {
+        ctx.fillStyle = L ? "rgba(40,120,200,0.8)" : "rgba(90,170,235,0.8)"; ctx.fillRect(x - tw / 2 + 1, top, tw - 2, tubeBot - top);
+        ctx.fillStyle = "rgba(230,248,255,0.9)"; ctx.beginPath(); ctx.moveTo(x - tw / 2 + 1, top - 2); ctx.quadraticCurveTo(x, top + tw * 0.4, x + tw / 2 - 1, top - 2); ctx.lineTo(x + tw / 2 - 1, top + 1); ctx.quadraticCurveTo(x, top + tw * 0.4 + 3, x - tw / 2 + 1, top + 1); ctx.closePath(); ctx.fill();
+      }
+      ctx.fillStyle = "rgba(220,240,250,0.18)"; ctx.fillRect(x - tw / 2, tubeTop, tw, tubeBot - tubeTop);
+      ctx.strokeStyle = sel ? "#e0843a" : (L ? "rgba(70,110,140,0.85)" : "rgba(200,226,240,0.8)"); ctx.lineWidth = sel ? 2 : 1.2; ctx.strokeRect(x - tw / 2, tubeTop, tw, tubeBot - tubeTop);
+      // 還在爬升時，用虛線標出最後會停的高度：先預測，再看水爬上去
+      if (Math.abs(h - heq[i]) > 0.02 && lift === 0) D.line(ctx, x - tw / 2 - 5 * s, eqTop, x + tw / 2 + 5 * s, eqTop, sel ? "#e0843a" : PL.col("text-dim"), 1.2, [3, 3]);
       TX(ctx, PL.fmt(h, h < 10 ? 2 : 1) + " cm", x + tw / 2 + 5 * s, top + 4, sel ? 12 : 10, "left", null, sel ? 1 : 0);
       TX(ctx, (sel ? "這根 " : "") + "r = " + PL.fmt(rr, 2) + " mm", x, benchY + 20 * s, 10, "center", sel ? null : PL.col("text-dim"), sel ? 1 : 0);
-      if (h * ppc > wy - tubeTop - 4 * s) TX(ctx, "（超出管長）", x, tubeTop - 4 * s, 9.5, "center", "#e0473c", 0);
+      if (heq[i] * ppc > wy - tubeTop0 - 4 * s) TX(ctx, "（超出管長）", x, tubeTop0 - 4 * s, 9.5, "center", "#e0473c", 0);
     });
+    if (st.grips) st.grips[0].place(dx1 - 34 * s, tubeTop + 19 * s);   // 抓管架右端（左端靠畫布邊，提示文字會被切掉）
+    st.geo = { y0: tubeTop0 + 19 * s, max: 60 * s };
+    if (st.fresh && lift === 0 && W >= 560) TX(ctx, "管子剛插進水裡 · 按播放看水往上爬（慢動作）", dx0, tubeTop0 - 22 * s, 11, "left", PL.col("text-dim"), 0);
     ctx.strokeStyle = "rgba(210,240,255,0.9)"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(dx0, wy); ctx.lineTo(dx1, wy); ctx.stroke();
     ctx.fillStyle = "rgba(220,240,250,0.12)"; ctx.fillRect(dx0, dTop, dx1 - dx0, benchY - 4 * s - dTop);
     ctx.strokeStyle = L ? "rgba(70,110,140,0.85)" : "rgba(200,226,240,0.8)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(dx0, dTop); ctx.lineTo(dx0, benchY - 4 * s); ctx.lineTo(dx1, benchY - 4 * s); ctx.lineTo(dx1, dTop); ctx.stroke();
@@ -877,12 +930,47 @@
   };
 
 
-  function scene(cv, config, a, b, time, out) {
+  function scene(cv, config, a, b, time, out, st) {
     const { ctx, W, H } = cv;
     cv.clear(); D.bg(cv);
     const f = SC[config.id];
-    if (f) f({ cv, ctx, W, H, cfg: config, a, b, t: time, v: out, c: accent(), s: clamp(Math.min(W / 800, H / 472), 0.5, 1.7) });
+    if (f) f({ cv, ctx, W, H, cfg: config, a, b, t: time, v: out, c: accent(), s: clamp(Math.min(W / 800, H / 472), 0.5, 1.7), st: st || {} });
   }
+
+  /*
+   * 需要「狀態」與「把手」的場景另外在這裡掛上：
+   * 場景函式本身每格重畫、沒有記憶，追隨器、水柱高度這類會隨時間演化的量放在每次建置各自的 st 裡；
+   * st.dt（這一格前進的時間，0 表示只重畫）、st.running、st.fresh（t = 0 還沒播放）由模板填好。
+   * 把手建立後放進 st.grips，場景算出物件位置時呼叫 place()。
+   */
+  const GRIPS = {
+    "truss-bridge": (cv, st, a, b, render, play) => {
+      st.grips = [
+        PL.ui.handle(cv, { label: "砝碼（往下拉再放手）",
+          onDrag: (x, y) => {
+            const g = st.geo; if (!g || !st.sagF) return;
+            st.grabbed = true; st.sagF.vel = 0;
+            st.sagF.value = clamp(y - g.off - g.base, 0, g.max);
+            render();
+          },
+          onRelease: () => { st.grabbed = false; play(); } }),
+        // 右邊的桌子往外拖，橋跨就變大（反解場景裡的 Lb = 160 + (W − 280s)·比例）
+        PL.ui.handle(cv, { slider: b, label: "右側桌子（拖曳改變橋跨）",
+          toValue: x => {
+            const g = st.geo, cfg = LABS["truss-bridge"].b; if (!g) return Number(b.el.value);
+            const u = clamp((2 * (x - g.rTable - g.W / 2) - 160) / Math.max(1, g.W - 280 * g.s), 0, 1);
+            return cfg[1] + u * (cfg[2] - cfg[1]);
+          } })
+      ];
+    },
+    "surface-tension": (cv, st, a, b, render, play) => {
+      st.grips = [
+        PL.ui.handle(cv, { label: "管架（往上提出水面，放手插回去）",
+          onDrag: (x, y) => { const g = st.geo; if (!g) return; st.lift = clamp(g.y0 - y, 0, g.max); render(); },
+          onRelease: () => { st.lift = 0; st.hs = [0, 0, 0]; play(); } })
+      ];
+    }
+  };
 
   Object.keys(LABS).forEach(id => { LABS[id].id = id; });
 
@@ -904,17 +992,21 @@
       const conclusion = PL.ui.readout(L.readouts, { label: "模型判讀" });
       const chart = PL.ui.chart(PL.ui.charts(root), { title: config.output + "關係圖", cap: "曲線固定第二項參數；亮點顯示目前操作條件。將圖形趨勢與本頁公式、裝置現象連結。" });
       let elapsed = 0;
-      function render() {
+      const st = { dt: 0, running: false, fresh: true };
+      if (GRIPS[id]) GRIPS[id](cv, st, a, b, () => render(), () => { if (animation && !animation.running) animation.start(); });
+      function render(dt) {
         const av = a.get(), bv = b.get(), result = config.calc(av, bv);
-        scene(cv, config, av, bv, elapsed, result);
+        st.dt = dt > 0 ? dt : 0; st.running = !!(animation && animation.running);
+        st.fresh = !st.running && (!animation || animation.t === 0);
+        scene(cv, config, av, bv, elapsed, result, st);
         reading.set(result, Math.abs(result) >= 100 ? 1 : 3); parameter.set(bv, decimal(config.b)); conclusion.set(config.status(av, bv, result));
         chart.setCap(PL.ui.relationChart(chart, {
           a: config.a, b: config.b, av: av, bv: bv,
           calc: config.calc, output: config.output, sweep: config.sweep
         }));
       }
-      animation = PL.loop(dt => { if (dt) elapsed += dt; render(); });
-      cv.onResize(render); chart.onResize(render); render(); animation.start();
+      animation = PL.loop(dt => { if (dt) elapsed += dt; render(dt); });
+      cv.onResize(() => render()); chart.onResize(() => render()); render(); animation.start();
       return { stop() { animation.stop(); cv.destroy(); chart.destroy(); }, rerender: render };
     }});
   });

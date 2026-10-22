@@ -305,7 +305,7 @@
 
   /* 色光三原色：紅、綠、藍三盞投射燈打在黑幕上，重疊處相加混色 */
   SC["rgb-color-mixing"] = k => {
-    const { ctx, W, H, a: R, b: G, t, s, c, v: Yl } = k;
+    const { ctx, W, H, a: R, b: G, t, s, c, v: Yl, st } = k;
     const B = 42, fy = H * 0.9;
     AP.labRoom(ctx, W, H, fy, { bench: "none" }); AP.woodFloor(ctx, W, H, fy);
     const bx0 = 18 * s, by0 = 80 * s, bw = W * 0.6, bh = fy - by0 - 6 * s;
@@ -324,8 +324,31 @@
       g.addColorStop(0, col(1)); g.addColorStop(0.85, col(0.92)); g.addColorStop(1, col(0));
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p[0], p[1], rr, 0, PL.TAU); ctx.fill();
     });
+    /*
+     * 光子沿光束從燈射向布幕。光速不變，所以三色光點一樣快；
+     * 強度高代表每秒抵達的光子多，表現成光點間距變小（越密越亮）。
+     * 疊在 lighter 合成裡，紅綠光點交會處也會相加成黃。
+     */
+    const PH = ["rgb(255,96,84)", "rgb(96,255,128)", "rgb(120,150,255)"];
+    P.forEach((p, i) => {
+      const k2 = p[3] / 100; if (k2 < 0.02) return;
+      const lx = lamps[i], ly = by0 + 12 * s, gap = 15 * s / Math.max(0.1, k2);
+      [-0.55, 0, 0.55].forEach((q, j) => PL.motion.flow(ctx, [[lx + q * 6 * s, ly], [p[0] + q * rr, p[1] + q * rr * 0.25]],
+        t * 170 * s + j * gap / 3, { gap, r: 2.2 * s, color: PH[i], glow: 6 }));
+    });
     ctx.restore();
     lamps.forEach((lx, i) => { ctx.fillStyle = "rgb(40,42,48)"; AP.rrPath(ctx, lx - 12 * s, by0 - 10 * s, 24 * s, 22 * s, 4 * s); ctx.fill(); ctx.fillStyle = ["rgb(255,70,60)", "rgb(80,255,110)", "rgb(90,120,255)"][i]; ctx.beginPath(); ctx.arc(lx, by0 + 10 * s, 6 * s, 0, Math.PI); ctx.fill(); });
+    // 紅、綠燈旁的調光推桿：把手抓的就是這兩個推桿（藍燈固定，不給推桿）
+    // 手機畫面 s 很小，推桿會頂到左上角的讀數卡，至少從 y = 70 開始
+    const fy0 = Math.max(by0 + 8 * s, 70), fh = 60 * s;
+    [[lamps[0] - 28 * s, R, "rgb(255,70,60)", "紅燈調光"], [lamps[1] + 28 * s, G, "rgb(80,255,110)", "綠燈調光"]].forEach((f, i) => {
+      ctx.fillStyle = "rgba(200,206,218,0.28)"; AP.rrPath(ctx, f[0] - 3 * s, fy0, 6 * s, fh, 3 * s); ctx.fill();
+      const fl = fh * f[1] / 100;
+      if (fl > 1) { ctx.fillStyle = f[2]; AP.rrPath(ctx, f[0] - 3 * s, fy0 + fh - fl, 6 * s, fl, 3 * s); ctx.fill(); }
+      D.text(ctx, f[3], f[0], fy0 + fh + 14 * s, { color: "rgba(220,226,236,0.85)", size: 9, align: "center" });
+      if (st.grips) st.grips[i].place(f[0], fy0 + fh - fl);
+    });
+    st.geo = { fy0, fh };
     TX(ctx, "紅 " + PL.fmt(R, 0) + "%", P[0][0] - rr * 0.55, P[0][1] - rr * 0.45, 11, "center", "#ffb0a8");
     TX(ctx, "綠 " + PL.fmt(G, 0) + "%", P[1][0] + rr * 0.55, P[1][1] - rr * 0.45, 11, "center", "#b0ffb8");
     TX(ctx, "藍 42%（固定）", P[2][0], P[2][1] + rr * 0.78, 11, "center", "#b8c8ff");
@@ -385,7 +408,7 @@
 
   /* 人眼成像：光線經角膜與水晶體折射，要剛好聚在視網膜上才看得清楚 */
   SC["human-eye"] = k => {
-    const { ctx, W, H, a: dO, b: f, t, s, c, v: vi } = k;
+    const { ctx, W, H, a: dO, b: f, t, s, c, v: vi, st } = k;
     const L = isL(), fy = H * 0.9;
     AP.labRoom(ctx, W, H, fy, { bench: "none" }); AP.woodFloor(ctx, W, H, fy);
     const ppc = 118 * s, ex = W * 0.52, ey = H * 0.46, er = 1.2 * ppc, xl = ex - 0.95 * ppc, xr = xl + 2.0 * ppc;
@@ -393,6 +416,9 @@
     ctx.fillStyle = "rgb(250,250,246)"; ctx.fillRect(ox - oh * 0.5, ey - oh, oh, oh); ctx.strokeStyle = "rgba(60,60,60,0.6)"; ctx.lineWidth = 1; ctx.strokeRect(ox - oh * 0.5, ey - oh, oh, oh); noteC(ctx, "rgb(250,250,246)", ox - oh * 0.5, ey - oh, oh, oh);
     D.text(ctx, "E", ox, ey - oh * 0.22, { color: "#1b1f27", size: Math.round(oh * 0.72), align: "center", weight: "700" });
     AP.steel(ctx, ox - 2 * s, ey, 4 * s, fy - ey, 10);
+    // 把手抓視力表的立架：左右拖就是改物距（x 位置是物距的對數刻度，反解見 GRIPS）
+    if (st.grips) st.grips[0].place(ox, (ey + 44 * s + fy) / 2);
+    st.geo = { x0: 60 * s, x1: W * 0.3 };
     TX(ctx, "視力表 " + PL.fmt(dO, 2) + " m", ox, ey + 22 * s, 10.5, "center"); TX(ctx, "（距離未依比例）", ox, ey + 38 * s, 9.5, "center", PL.col("text-dim"), 0);
     ctx.save(); ctx.strokeStyle = "rgb(236,206,120)"; ctx.lineWidth = 14 * s; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(ex + er * 0.8, ey + er * 0.2); ctx.quadraticCurveTo(ex + er * 1.25, ey + er * 0.3, ex + er * 1.45, ey + er * 0.62); ctx.stroke(); ctx.restore();
     const g = ctx.createRadialGradient(ex - er * 0.3, ey - er * 0.3, er * 0.2, ex, ey, er);
@@ -409,11 +435,28 @@
     ctx.save(); ctx.strokeStyle = "rgba(255,190,60,0.85)"; ctx.lineWidth = 1.4;
     hits.forEach(hy => { ctx.beginPath(); ctx.moveTo(ox, yT); ctx.lineTo(xl, hy); const k2 = (xr - xl) / Math.max(1e-6, xi - xl); ctx.lineTo(xr, hy + (yi - hy) * k2); ctx.stroke(); });
     ctx.restore();
+    /*
+     * 光點沿三條光線從視力表出發，經水晶體折射後會聚。
+     * 眼球內（房水、玻璃體 n ≈ 1.34）光變慢，光點間距跟著縮短；
+     * 焦點落在視網膜前（像近視）時，光點先交會再散開，到視網膜上已經分成三點——這就是模糊。
+     * 眼球是淺色的，兩種主題都用飽和的琥珀色，淡黃光點在白眼球上會看不見。
+     */
+    const amb = "#f08c00", vA = 120 * s, gA = 20 * s, nE = 1.34;
+    hits.forEach((hy, j) => {
+      const k2 = (xr - xl) / Math.max(1e-6, xi - xl), ye = hy + (yi - hy) * k2;
+      const len1 = Math.hypot(xl - ox, hy - yT), s0 = t * vA + j * gA / 3;
+      PL.motion.flow(ctx, [[ox, yT], [xl, hy]], s0, { gap: gA, r: 2.2 * s, color: amb, glow: 4 });
+      // 眼內段的起點相位接續眼外段：同一顆光點穿過水晶體後才開始變慢
+      PL.motion.flow(ctx, [[xl, hy], [xr, ye]], (s0 - len1) / nE, { gap: gA / nE, r: 2.2 * s, color: amb, glow: 4 });
+    });
     const blur = Math.abs(xi - xr) / ppc;
     ctx.strokeStyle = "rgb(214,70,70)"; ctx.lineWidth = 3 * s; ctx.beginPath(); ctx.arc(ex, ey, er - 2 * s, -0.9, 0.9); ctx.stroke();
     if (good && xi < W - 10 * s) { ctx.fillStyle = "rgb(255,210,60)"; ctx.beginPath(); ctx.arc(xi, yi, 3.5 * s, 0, PL.TAU); ctx.fill(); }
     TX(ctx, "視網膜", ex + er + 8 * s, ey + 4, 10.5, "left", "#c0453c");
-    TX(ctx, "水晶體", xl + 6 * s, ey - 0.66 * ppc, 10.5, "center");
+    /* 標籤原本壓在眼球邊緣：一半在淺色眼球上、一半在背景上，深色主題時整個糊掉。
+       移到眼球外的左上方、拉一條引線指向水晶體；這一區在任何物距下都沒有光線經過。 */
+    D.line(ctx, xl - 0.3 * ppc + 20 * s, ey - 0.8 * ppc + 3 * s, xl, ey - lh * 0.8, PL.col("text-dim"), 1);
+    TX(ctx, "水晶體", xl - 0.3 * ppc, ey - 0.8 * ppc, 10.5, "center");
     const vx = W - 120 * s, vy = 110 * s, vr = 70 * s;
     ctx.save(); ctx.beginPath(); ctx.arc(vx, vy, vr, 0, PL.TAU); ctx.fillStyle = "rgb(246,246,240)"; ctx.fill(); ctx.clip();
     noteC(ctx, "rgb(246,246,240)", vx - vr * 0.7, vy - vr * 0.7, vr * 1.4, vr * 1.4);
@@ -483,11 +526,24 @@
 
   /* 靜電感應：毛皮摩擦過的塑膠棒靠近驗電器（不接觸），金屬球感應出正電、金箔帶負電互相排斥而張開 */
   SC["electrostatic-induction"] = k => {
-    const { ctx, W, H, a: q, b: d, t, s, c, v: ang } = k;
+    const { ctx, W, H, a: q, b: d, t, s, c, v: ang, st } = k;
     const benchY = H * 0.86;
     AP.labRoom(ctx, W, H, benchY, {});
-    const ex = W * 0.34, sc2 = 1.7 * s, sp = ang / 2 * Math.PI / 180;
-    const es = AP.electroscope(ctx, ex, benchY, sc2, sp), br = 9 * sc2;
+    const ex = W * 0.34, sc2 = 1.7 * s, sp = ang / 2 * Math.PI / 180, pT = ang / 85;
+    /*
+     * 兩個時間尺度：自由電子先被帶電棒推到金箔（很快、不會過衝），
+     * 金箔帶了同號電才互相排斥、張開——金箔很輕，會晃幾下才停在平衡角。
+     * t = 0 時棒子剛靠近、電荷還沒重新分布，按播放才看到這個過程；
+     * 暫停時追隨器直接跳到平衡（時間不走就不該有過渡）。
+     */
+    if (!st.eF) { st.eF = PL.motion.follower(0, { omega: 11, zeta: 1 }); st.leafF = PL.motion.follower(0, { omega: 5, zeta: 0.2 }); }
+    let pe, spr;
+    if (st.fresh) { st.eF.value = 0; st.eF.vel = 0; st.eF.target = pT; st.leafF.value = 0; st.leafF.vel = 0; pe = 0; spr = 0; }
+    else {
+      pe = clamp(st.eF.update(pT, st.dt, st.running), 0, 1);
+      spr = st.leafF.update(sp * clamp(pe / Math.max(1e-6, pT), 0, 1), st.dt, st.running);
+    }
+    const es = AP.electroscope(ctx, ex, benchY, sc2, spr), br = 9 * sc2;
     const ppc = 7 * s, tipX = es.ball.x + br + 6 * s + d * ppc, tipY = es.ball.y, ra = -0.42, rl = 230 * s;
     ctx.save(); ctx.translate(tipX, tipY); ctx.rotate(ra);
     const g = ctx.createLinearGradient(0, -7 * s, 0, 7 * s); g.addColorStop(0, "rgb(120,126,140)"); g.addColorStop(0.4, "rgb(70,76,90)"); g.addColorStop(1, "rgb(36,40,48)");
@@ -496,9 +552,30 @@
     for (let i = 0; i < nq; i++) RT(ctx, "−", 12 * s + (i % 6) * 12 * s, (i < 6 ? 4 : -9) * s, Math.round(15 * s), "#ffffff");
     ctx.restore();
     AP.hand(ctx, tipX + Math.cos(ra) * rl * 0.86, tipY + Math.sin(ra) * rl * 0.86, -1, 0.9 * s, { ang: ra, sleeve: "#3f7fcf" });
-    const nb = clamp(Math.round(ang / 9), 0, 9);
+    if (st.grips) st.grips[0].place(tipX + 4 * s, tipY);
+    st.geo = { x0: es.ball.x + br + 6 * s, ppc, s };
+    // 電子離開後，金屬球上留下的正電（數量跟著已移走的電子一起長出來）
+    const nb = clamp(Math.round(ang / 9 * clamp(pe / Math.max(1e-6, pT), 0, 1)), 0, 9);
     for (let i = 0; i < nb; i++) { const a = -0.3 + (i / Math.max(1, nb - 1)) * 0.6; RT(ctx, "+", es.ball.x + Math.cos(a) * br * 0.75 + 4 * s, es.ball.y + Math.sin(a) * br * 1.2 + 5 * s, Math.round(14 * s), "#e0473c"); }
-    [-1, 1].forEach(sd => { for (let i = 0; i < Math.ceil(nb / 2); i++) { const L2 = (12 + i * 6) * sc2 * 0.5 + 6 * s, a = Math.PI / 2 + sd * sp; RT(ctx, "−", es.pivot.x + Math.cos(a) * L2 + sd * 9 * s, es.pivot.y + Math.sin(a) * L2 + 5 * s, Math.round(15 * s), "#2f7fd8"); } });
+    /*
+     * 自由電子：沿「金屬球 → 金屬桿 → 兩片金箔」這條導體路徑分布。
+     * 參數 u = 0 在球上、u = 1 在箔尖；未感應時均勻散布，
+     * 感應比例 pe 越大，每顆電子越往箔尖擠（被帶負電的棒子推開）。
+     * 小幅的隨機抖動是電子在金屬裡的熱運動，時間不走就不動。
+     */
+    const L2 = 28 * sc2, rodTop = es.ball.y + br * 0.7, NE = 16;
+    for (let i = 0; i < NE; i++) {
+      const u0 = (i + 0.5) / NE, u = u0 + (1 - u0) * pe * 0.9, sg = i % 2 ? 1 : -1;
+      let x, y;
+      if (u < 0.22) { const a = i * 2.4; x = es.ball.x + Math.cos(a) * br * 0.55; y = es.ball.y + Math.sin(a) * br * 0.55; }
+      else if (u < 0.55) { x = es.ball.x; y = rodTop + (es.pivot.y - rodTop) * (u - 0.22) / 0.33; }
+      else { const dd = (u - 0.55) / 0.45 * L2 * 0.92, a = Math.max(0.03, spr); x = es.pivot.x + dd * Math.sin(sg * a); y = es.pivot.y + dd * Math.cos(a); }
+      x += Math.sin(t * 7 + i * 1.7) * 1.4 * s; y += Math.cos(t * 5.3 + i * 2.3) * 1.4 * s;
+      ctx.fillStyle = "#3b8cff"; ctx.beginPath(); ctx.arc(x, y, 3 * s, 0, PL.TAU); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x - 1.6 * s, y); ctx.lineTo(x + 1.6 * s, y); ctx.stroke();
+    }
+    if (st.fresh && W >= 520) TX(ctx, "棒子剛靠近：按播放，看自由電子被推向金箔", W - 18 * s, 44 * s + 20, 10.5, "right", PL.col("text-dim"), 0);
     const yd = es.ball.y - 30 * s;
     D.arrow(ctx, es.ball.x + br, yd, tipX, yd, { color: PL.col("text-dim"), width: 1.3, head: 5 }); D.arrow(ctx, tipX, yd, es.ball.x + br, yd, { color: PL.col("text-dim"), width: 1.3, head: 5 });
     TX(ctx, "距離 " + PL.fmt(d, 1) + " cm", (es.ball.x + tipX) / 2, yd - 8 * s, 10.5, "center");
@@ -629,12 +706,26 @@
 
   /* 指南針偏轉：地磁場（向北）和外加磁場合成，磁針指向合磁場方向 */
   SC["compass-field"] = k => {
-    const { ctx, W, H, a: B, b: th, t, s, c, v: dfl } = k;
+    const { ctx, W, H, a: B, b: th, t, s, c, v: dfl, st } = k;
     AP.deskTop(ctx, 0, 0, W, H);
     const cx = W * 0.34, cy = H * 0.52, r = 84 * s, sc = 1.35 * s, a0 = -Math.PI / 2, ar = th * Math.PI / 180;
     ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.beginPath(); ctx.arc(cx, cy, r * 1.9, 0, PL.TAU); ctx.fill();
-    if (B > 1) { const dist = r + (34 + 90 * (1 - Math.min(B, 120) / 120)) * s, mx = cx - Math.sin(ar) * dist, my = cy + Math.cos(ar) * dist; ctx.save(); ctx.translate(mx, my); ctx.rotate(ar + Math.PI / 2); AP.barMagnet(ctx, 0, 0, 34 * s, 16 * s); ctx.restore(); ctx.save(); ctx.translate(mx, my); ctx.rotate(ar + Math.PI / 2); D.text(ctx, "N", -24 * s, 4, { color: "#fff", size: 11, align: "center", weight: "700" }); D.text(ctx, "S", 24 * s, 4, { color: "#fff", size: 11, align: "center", weight: "700" }); ctx.restore(); }
-    AP.compass(ctx, cx, cy, r, a0 + dfl * Math.PI / 180);
+    // 磁鐵與指南針中心的距離：外加磁場越強代表磁鐵擺得越近（GRIPS 反解同一條式子）
+    const dist = r + (34 + 90 * (1 - Math.min(B, 120) / 120)) * s, mx = cx - Math.sin(ar) * dist, my = cy + Math.cos(ar) * dist;
+    if (B > 1) { ctx.save(); ctx.translate(mx, my); ctx.rotate(ar + Math.PI / 2); AP.barMagnet(ctx, 0, 0, 34 * s, 16 * s); ctx.restore(); ctx.save(); ctx.translate(mx, my); ctx.rotate(ar + Math.PI / 2); D.text(ctx, "N", -24 * s, 4, { color: "#fff", size: 11, align: "center", weight: "700" }); D.text(ctx, "S", 24 * s, 4, { color: "#fff", size: 11, align: "center", weight: "700" }); ctx.restore(); }
+    if (st.grips) st.grips[0].place(mx, my);
+    st.geo = { cx, cy, r, s };
+    /*
+     * 磁針有轉動慣量，水平面上又只有支點與空氣的小阻尼：
+     * 合磁場方向一改變，它會先擺過頭、來回晃幾下才停在新方向（真的指南針就是這樣）。
+     * t = 0 時磁鐵剛放上桌、磁針還指著地磁北；按播放才開始擺。
+     */
+    if (!st.needle) st.needle = PL.motion.follower(0, { omega: 4.2, zeta: 0.15 });
+    let nd;
+    if (st.fresh) { st.needle.value = 0; st.needle.vel = 0; st.needle.target = dfl; nd = 0; }
+    else nd = st.needle.update(dfl, st.dt, st.running);
+    AP.compass(ctx, cx, cy, r, a0 + nd * Math.PI / 180);
+    if (st.fresh && Math.abs(dfl) > 0.5 && W >= 520) TX(ctx, "磁鐵剛放好：按播放，看磁針擺向合磁場", cx, cy - r * 1.9 - 44 * s, 10.5, "center", PL.col("text-dim"), 0);
     for (let dg = 0; dg < 360; dg += 10) { const a = dg * Math.PI / 180; ctx.strokeStyle = "rgba(40,40,40,0.55)"; ctx.lineWidth = dg % 90 ? 1 : 2; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r * 0.8, cy + Math.sin(a) * r * 0.8); ctx.lineTo(cx + Math.cos(a) * r * (dg % 30 ? 0.74 : 0.68), cy + Math.sin(a) * r * (dg % 30 ? 0.74 : 0.68)); ctx.stroke(); }
     const ox = W * 0.76, oy = H * 0.8, eL = 48 * sc, bx = Math.sin(ar) * B * sc, by = -Math.cos(ar) * B * sc;
     AP.infoCard(ctx, ox - 140 * s, oy - 262 * s, 280 * s, 290 * s);
@@ -648,8 +739,10 @@
     TX(ctx, "向量合成（箭頭長度 ∝ 磁場）", ox, oy - 242 * s, 11, "center");
     D.arrow(ctx, 30 * s, 110 * s, 30 * s, 70 * s, { color: "#2f9a5a", width: 3, head: 8 });
     TX(ctx, "北（地磁 N）", 42 * s, 84 * s, 11, "left", "#2f9a5a");
-    TX(ctx, "磁針偏轉 " + PL.fmt(dfl, 1) + "°", cx, cy + r + 30 * s, 12.5, "center");
-    TX(ctx, "外加磁場方向：偏北 " + PL.fmt(th, 0) + "°", cx, cy + r + 50 * s, 10.5, "center", PL.col("text-dim"), 0);
+    // 外場方向限在 ±90°，磁鐵永遠擺在指南針下半圈；文字放上方才不會被磁鐵壓住
+    TX(ctx, "磁針偏轉 " + PL.fmt(dfl, 1) + "°", cx, cy - r * 1.9 - 22 * s, 12.5, "center");
+    // 手機畫面上方太擠，第二行會壓到讀數卡；外場方向在滑桿上本來就看得到
+    if (W >= 520) TX(ctx, "外加磁場方向：偏北 " + PL.fmt(th, 0) + "°", cx, cy - r * 1.9 - 4 * s, 10.5, "center", PL.col("text-dim"), 0);
     label(ctx, 20, 18, "磁針偏角", PL.fmt(dfl, 1) + "°", c);
   };
 
@@ -727,7 +820,7 @@
 
   /* 荷質比 e/m：細束電子管裡的電子被磁場彎成圓圈；圈剛好疊在 7.5 cm 參考環上時，算出的 e/m 才準 */
   SC["cathode-ray-em"] = k => {
-    const { ctx, W, H, a: V, b: Bm, t, s, c, v: em } = k;
+    const { ctx, W, H, a: V, b: Bm, t, s, c, v: em, st, cfg } = k;
     const benchY = H * 0.88;
     AP.labRoom(ctx, W, H, benchY, {});
     const ppc = 11 * s, cx = W * 0.38, cy = H * 0.46, Rs = 8.5 * ppc, rT = 0.337 * Math.sqrt(V) / Bm;
@@ -742,16 +835,36 @@
     const rp = rT * ppc;
     ctx.save(); ctx.strokeStyle = "rgba(90,240,200,0.95)"; ctx.shadowColor = "rgba(90,240,200,0.9)"; ctx.shadowBlur = 10; ctx.lineWidth = 2.6; ctx.beginPath();
     let hit = false;
-    for (let i = 0; i <= 200; i++) { const a = i / 200 * PL.TAU, x = gx + Math.sin(a) * rp, y = gyy - rp + Math.cos(a) * rp; if (Math.hypot(x - cx, y - cy) > Rs - 2) { hit = true; break; } i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
-    ctx.stroke(); ctx.restore();
+    const orbit = [];
+    for (let i = 0; i <= 200; i++) { const a = i / 200 * PL.TAU, x = gx + Math.sin(a) * rp, y = gyy - rp + Math.cos(a) * rp; if (Math.hypot(x - cx, y - cy) > Rs - 2) { hit = true; break; } orbit.push([x, y]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.globalAlpha = 0.55; ctx.stroke(); ctx.restore();
+    /*
+     * 電子一顆顆從電子槍射出、沿圓軌道跑。
+     * 角速度 ω = eB/m 只由磁場決定、與加速電壓無關；光點沿軌道的速率 = ω·r，
+     * 所以加大 V 時圈變大、光點跑得更快，但繞一圈的時間不變——改 B 才會改變週期。
+     * 波前（front）讓剛通電時電子束從槍口一路長出來。
+     */
+    const omega = 1.6 * Bm, sE = t * omega * Math.max(rp, 1);
+    PL.motion.flow(ctx, orbit, sE, { gap: 15 * s, r: 2.4 * s, color: "rgb(200,255,236)", glow: 9, front: true });
+    if (hit && orbit.length > 1) {
+      const pEnd = orbit[orbit.length - 1], arc = rp * PL.TAU * (orbit.length - 1) / 200;
+      // 打到管壁的地方閃一下：電子束到了才開始閃
+      if (sE > arc) { ctx.save(); ctx.fillStyle = "rgba(160,255,220," + (0.45 + 0.4 * Math.abs(Math.sin(t * 13))).toFixed(2) + ")"; ctx.shadowColor = "rgba(160,255,220,0.9)"; ctx.shadowBlur = 12; ctx.beginPath(); ctx.arc(pEnd[0], pEnd[1], 4 * s, 0, PL.TAU); ctx.fill(); ctx.restore(); }
+    }
     ctx.fillStyle = "rgb(120,126,140)"; ctx.fillRect(gx - 12 * s, gyy, 24 * s, 10 * s); ctx.fillStyle = "rgb(255,160,80)"; ctx.fillRect(gx + 8 * s, gyy + 2 * s, 4 * s, 4 * s);
     ring(6 * s, "rgb(196,122,56)", 12 * s);
     AP.steel(ctx, cx - 5 * s, cy + Rs * 1.45, 10 * s, benchY - cy - Rs * 1.45, 10);
     D.text(ctx, "7.5 cm 參考環", gx + rr * 0.72, gyy - rr * 1.72, { color: "rgb(255,220,110)", size: 10.5, align: "left", weight: "700" });
     D.text(ctx, hit ? "半徑太大，電子打到管壁" : "電子束半徑 " + PL.fmt(rT, 1) + " cm", cx, cy - Rs - 16 * s, { color: "rgb(140,250,210)", size: 11.5, align: "center", weight: "700" });
     const px = W * 0.72, pw = W - px - 16 * s;
-    AP.powerSupply(ctx, px, H * 0.16, pw, 64 * s, PL.fmt(V, 0) + " V", { label: "加速電壓" });
-    AP.powerSupply(ctx, px, H * 0.16 + 84 * s, pw, 64 * s, PL.fmt(Bm / 0.78, 2) + " A", { label: "線圈電流（B = " + PL.fmt(Bm, 1) + " mT）", color: "rgb(130,230,255)" });
+    AP.powerSupply(ctx, px, H * 0.16, pw, 64 * s, PL.fmt(V, 0) + " V", { label: "加速電壓", knob: fr(V, cfg.a) });
+    AP.powerSupply(ctx, px, H * 0.16 + 84 * s, pw, 64 * s, PL.fmt(Bm / 0.78, 2) + " A", { label: "線圈電流（B = " + PL.fmt(Bm, 1) + " mT）", color: "rgb(130,230,255)", knob: fr(Bm, cfg.b) });
+    // 把手放在兩台電源的旋鈕上（位置照 powerSupply 內部的旋鈕算法）
+    if (st.grips) {
+      const ph = 64 * s, lh = Math.max(12, Math.min(24, ph * 0.36)), kr = Math.max(5, Math.min(10, ph * 0.15)), kx = px + pw - 11 - kr;
+      st.grips[0].place(kx, H * 0.16 + 10 + lh / 2);
+      st.grips[1].place(kx, H * 0.16 + 84 * s + 10 + lh / 2);
+    }
     const ok = Math.abs(rT - 7.5) < 0.4;
     TX(ctx, ok ? "光圈疊在參考環上 → e/m 算對了！" : "調 V 或 B，讓光圈疊在 7.5 cm 環上", W - 16 * s, H * 0.16 + 176 * s, 11, "right", ok ? "#2f9a5a" : "#e0843a");
     TX(ctx, "真實值 e/m = 1.76 × 10¹¹ C/kg", W - 16 * s, H * 0.16 + 196 * s, 10.5, "right", PL.col("text-dim"), 0);
@@ -864,12 +977,73 @@
   };
 
 
-  function scene(cv, config, a, b, time, out) {
+  function scene(cv, config, a, b, time, out, st) {
     const { ctx, W, H } = cv;
     cv.clear(); D.bg(cv);
     const f = SC[config.id];
-    if (f) f({ cv, ctx, W, H, cfg: config, a, b, t: time, v: out, c: accent(), s: clamp(Math.min(W / 800, H / 472), 0.5, 1.7) });
+    if (f) f({ cv, ctx, W, H, cfg: config, a, b, t: time, v: out, c: accent(), s: clamp(Math.min(W / 800, H / 472), 0.5, 1.7), st: st || {} });
   }
+
+  /*
+   * 旋鈕型把手：電源旋鈕太小，不適合用「指到哪就是哪」的絕對對應，
+   * 改成相對拖曳——按住後往上拖增加、往下拖減少，拖滿約 140 px 走完整個量程。
+   */
+  function knobGrip(cv, sl, cfgP, label) {
+    let start = null;
+    return PL.ui.handle(cv, { slider: sl, label,
+      toValue: (x, y) => { if (!start) start = { y, v: sl.get() }; return start.v + (start.y - y) / 140 * (cfgP[2] - cfgP[1]); },
+      onRelease: () => { start = null; } });
+  }
+  /* 自訂拖曳時要同時改另一支滑桿：直接寫值並派發 input，走和使用者拖滑桿同一條路 */
+  function drive(sl, v) {
+    const el = sl.el, min = Number(el.min), max = Number(el.max), stp = Number(el.step) || 0;
+    let x = clamp(v, min, max);
+    if (stp > 0) x = clamp(Number((Math.round((x - min) / stp) * stp + min).toFixed(10)), min, max);
+    if (Number(el.value) === x) return;
+    el.value = String(x);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  /*
+   * 需要「狀態」與「把手」的場景另外在這裡掛上（做法同 comprehensive.js）：
+   * 場景函式每格重畫、沒有記憶，追隨器這類會隨時間演化的量放在每次建置各自的 st 裡；
+   * st.dt（這一格前進的時間，0 表示只重畫）、st.running、st.fresh（t = 0 還沒播放）由模板填好。
+   * 把手建立後放進 st.grips，場景算出物件位置時呼叫 place()；場景把反解要用的幾何放在 st.geo。
+   */
+  const GRIPS = {
+    "rgb-color-mixing": (cv, st, a, b) => {
+      const fader = sl => (x, y) => { const g = st.geo; if (!g) return sl.get(); return (g.fy0 + g.fh - y) / g.fh * 100; };
+      st.grips = [
+        PL.ui.handle(cv, { slider: a, label: "紅燈調光推桿", toValue: fader(a) }),
+        PL.ui.handle(cv, { slider: b, label: "綠燈調光推桿", toValue: fader(b) })
+      ];
+    },
+    "human-eye": (cv, st, a) => {
+      // 反解 ox = x0 + (x1 − x0)·(1 − log₁₀(d/0.1)/log₁₀80)
+      st.grips = [PL.ui.handle(cv, { slider: a, label: "視力表（左右拖改變物距）",
+        toValue: x => { const g = st.geo; if (!g) return a.get(); const u = 1 - (x - g.x0) / Math.max(1, g.x1 - g.x0); return 0.1 * Math.pow(80, u); } })];
+    },
+    "electrostatic-induction": (cv, st, a, b) => {
+      st.grips = [PL.ui.handle(cv, { slider: b, label: "帶電塑膠棒（左右拖改變距離）",
+        toValue: x => { const g = st.geo; if (!g) return b.get(); return (x - 4 * g.s - g.x0) / g.ppc; } })];
+    },
+    "compass-field": (cv, st, a, b) => {
+      /*
+       * 抓著磁鐵繞指南針拖：方位角就是外場方向（這支把手對應的滑桿，方向鍵也能調），
+       * 離中心的距離同時決定外加磁場強度——磁鐵拿近，磁場就強。
+       */
+      st.grips = [PL.ui.handle(cv, { slider: b, label: "條形磁鐵（繞著拖改方向，拉近拉遠改強弱）",
+        toValue: (x, y) => {
+          const g = st.geo; if (!g) return b.get();
+          const dx = x - g.cx, dy = y - g.cy, dist = Math.hypot(dx, dy);
+          drive(a, 120 * (1 - (dist - g.r - 34 * g.s) / (90 * g.s)));
+          return Math.atan2(-dx, dy) * 180 / Math.PI;
+        } })];
+    },
+    "cathode-ray-em": (cv, st, a, b) => {
+      st.grips = [knobGrip(cv, a, LABS["cathode-ray-em"].a, "加速電壓旋鈕（上下拖）"), knobGrip(cv, b, LABS["cathode-ray-em"].b, "線圈電流旋鈕（上下拖）")];
+    }
+  };
 
   /*
    * sound-properties：聲級 dB 由振幅決定，與頻率無關（頻率決定的是音調）。
@@ -897,17 +1071,21 @@
       const conclusion = PL.ui.readout(L.readouts, { label: "模型判讀" });
       const chart = PL.ui.chart(PL.ui.charts(root), { title: config.output + "關係圖", cap: "曲線固定第二項參數；亮點顯示目前操作條件。將圖形趨勢與本頁公式、裝置現象連結。" });
       let elapsed = 0;
-      function render() {
+      const st = { dt: 0, running: false, fresh: true };
+      if (GRIPS[id]) GRIPS[id](cv, st, a, b);
+      function render(dt) {
         const av = a.get(), bv = b.get(), result = config.calc(av, bv);
-        scene(cv, config, av, bv, elapsed, result);
+        st.dt = dt > 0 ? dt : 0; st.running = !!(animation && animation.running);
+        st.fresh = !st.running && (!animation || animation.t === 0);
+        scene(cv, config, av, bv, elapsed, result, st);
         reading.set(result, Math.abs(result) >= 100 ? 1 : 3); parameter.set(bv, decimal(config.b)); conclusion.set(config.status(av, bv, result));
         chart.setCap(PL.ui.relationChart(chart, {
           a: config.a, b: config.b, av: av, bv: bv,
           calc: config.calc, output: config.output, sweep: config.sweep
         }));
       }
-      animation = PL.loop(dt => { if (dt) elapsed += dt; render(); });
-      cv.onResize(render); chart.onResize(render); render(); animation.start();
+      animation = PL.loop(dt => { if (dt) elapsed += dt; render(dt); });
+      cv.onResize(() => render()); chart.onResize(() => render()); render(); animation.start();
       return { stop() { animation.stop(); cv.destroy(); chart.destroy(); }, rerender: render };
     }});
   });

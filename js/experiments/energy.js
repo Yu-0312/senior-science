@@ -566,8 +566,9 @@
     const sPath = PL.ui.select(L.controls, { label: "選擇路徑", value: "diag", options: [{ value: "diag", label: "路徑一：直線" }, { value: "L", label: "路徑二：先下後平" }, { value: "arc", label: "路徑三：繞遠弧線" }], onChange: () => { s = 0; } });
     const sMu = PL.ui.slider(L.controls, { label: "摩擦係數 μ（非保守）", min: 0, max: 0.4, step: 0.02, value: 0.2, unit: "", digits: 2 });
     const row = PL.ui.buttonRow(L.controls);
-    PL.ui.button(row, "出發", () => { s = 0; anim.start(); }, { primary: true });
-    PL.ui.note(L.controls, "重力做功只看起點與終點高度差（與路徑無關）；摩擦做功則與路徑長度有關。");
+    // 「出發」是單向觸發（回到 A 再走一次），傳輸列的播放鍵因此收起，只留單步與速度
+    PL.ui.button(row, "出發", () => { s = 0; anim.start(); }, { primary: true, trigger: true });
+    PL.ui.note(L.controls, "重力做功只看起點與終點高度差（與路徑無關）；摩擦做功則與路徑長度有關。按「出發」看小球沿路徑走，右上角的長條邊走邊累積；也可以直接把小球拖到路徑上任一點。");
     const rWg = PL.ui.readout(L.readouts, { label: "重力功 W_g", unit: "J" });
     const rWf = PL.ui.readout(L.readouts, { label: "摩擦功 W_f", unit: "J" });
     const rLen = PL.ui.readout(L.readouts, { label: "路徑長", unit: "m" });
@@ -582,6 +583,15 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const sx = (W - 60) / 20, sy = (H - 60) / 12, PX = p => 30 + p.x * sx, PY = p => H - 30 - p.y * sy;
       const pts = pathPts();
+      // 沿路徑的累積長度：小球以弧長定位，直線路徑才不會「停在 A、最後一瞬間跳到 B」
+      const cum = [0];
+      for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+      const at = dist => {
+        let i = 1; while (i < pts.length - 1 && cum[i] < dist) i++;
+        const u = PL.clamp((dist - cum[i - 1]) / Math.max(1e-9, cum[i] - cum[i - 1]), 0, 1);
+        return { x: PL.lerp(pts[i - 1].x, pts[i].x, u), y: PL.lerp(pts[i - 1].y, pts[i].y, u) };
+      };
+      geo = { PX, PY, pts, cum };
       AP().outdoor ? AP().outdoor(ctx, W, H, H - 26, { ground: "grass", hills: false }) : null;
       // 地形填充：路徑以下鋪一層山坡（與路徑同形，落到底部）
       ctx.save();
@@ -611,9 +621,14 @@
       // 長度與功
       let len = 0; for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
       const Wg = m * g * (A.y - B.y), Wf = -sMu.get() * m * g * len;
-      // 移動點
-      const idx = Math.min(pts.length - 1, Math.floor(s * (pts.length - 1)));
-      AP().sportBall ? AP().sportBall(ctx, PX(pts[idx]), PY(pts[idx]) - 9, 9, "steel", s * 12) : D.disc(ctx, PX(pts[idx]), PY(pts[idx]), 8, { fill: MC() });
+      // 移動點：走過的距離 d = s × 路徑長；走過的那一段路徑加亮
+      const dNow = s * len, pNow = at(dNow);
+      ctx.save(); ctx.strokeStyle = PL.col("danger"); ctx.globalAlpha = 0.75; ctx.lineWidth = 3.5; ctx.lineCap = "round"; ctx.beginPath();
+      ctx.moveTo(PX(pts[0]), PY(pts[0]));
+      for (let i = 1; i < pts.length && cum[i] < dNow; i++) ctx.lineTo(PX(pts[i]), PY(pts[i]));
+      ctx.lineTo(PX(pNow), PY(pNow)); ctx.stroke(); ctx.restore();
+      AP().sportBall ? AP().sportBall(ctx, PX(pNow), PY(pNow) - 9, 9, "steel", dNow * 1.2) : D.disc(ctx, PX(pNow), PY(pNow), 8, { fill: MC() });
+      grip.place(PX(pNow), PY(pNow) - 9);
 
       /*
        * 摩擦係數這根滑桿原本只改變讀數上的數字，畫面完全沒反應。
@@ -624,20 +639,28 @@
        * 淨功 = 兩者相加。切換路徑時重力功那一條紋風不動，
        * 摩擦那一條卻明顯變長——這就是「保守力」與「非保守力」的差別。
        */
-      const bx = W - 132, by = 30, bw = 104, rowH = 17;
+      const bx = W - 160, by = 30, bw = 104, rowH = 17;   // 卡片寬 bw + 60，要整張留在畫布內
       const scale = bw / Math.max(1, Math.abs(Wg) * 1.6);
-      AP().infoCard && AP().infoCard(ctx, bx - 10, by - 24, bw + 60, 3 * (rowH + 12) + 26);
+      AP().infoCard && AP().infoCard(ctx, bx - 10, by - 24, bw + 60, 3 * (rowH + 12) + 40);
       D.text(ctx, "做功比較", bx, by - 8, { color: PL.col("text-dim"), size: 10.5, weight: "700" });
-      [["重力功 W_g", Wg, PL.col("ok")],
-       ["摩擦功 W_f", Wf, PL.col("danger")],
-       ["淨功", Wg + Wf, PL.col("accent-2")]].forEach((row, i) => {
+      /*
+       * 淡色長條是走完全程的總功（讀數欄位的值），實色是小球「目前為止」做了多少功：
+       * 重力功只跟已經下降的高度有關——先下後平的路徑一開始就做完，之後完全不長；
+       * 摩擦功則每走一步都在累積。邊走邊看，兩種力的差別比只看終點更清楚。
+       */
+      const WgNow = m * g * (A.y - pNow.y), WfNow = -sMu.get() * m * g * dNow;
+      [["重力功 W_g", Wg, WgNow, PL.col("ok")],
+       ["摩擦功 W_f", Wf, WfNow, PL.col("danger")],
+       ["淨功", Wg + Wf, WgNow + WfNow, PL.col("accent-2")]].forEach((row, i) => {
         const y = by + i * (rowH + 12);
         D.text(ctx, row[0], bx, y + 8, { color: PL.col("text-faint"), size: 9.5 });
         D.rect(ctx, bx, y + 12, bw, rowH, { fill: PL.theme.pale(0.07), r: 3 });
-        const len2 = Math.min(bw, Math.abs(row[1]) * scale);
-        D.rect(ctx, bx, y + 12, len2, rowH, { fill: row[2], r: 3 });
-        D.text(ctx, PL.fmt(row[1], 1) + " J", bx + bw + 4, y + 25, { color: row[2], size: 10 });
+        const len2 = Math.min(bw, Math.abs(row[1]) * scale), lenNow = Math.min(bw, Math.abs(row[2]) * scale);
+        ctx.save(); ctx.globalAlpha = 0.32; D.rect(ctx, bx, y + 12, len2, rowH, { fill: row[3], r: 3 }); ctx.restore();
+        if (lenNow > 0.5) D.rect(ctx, bx, y + 12, lenNow, rowH, { fill: row[3], r: 3 });
+        D.text(ctx, PL.fmt(row[1], 1) + " J", bx + bw + 4, y + 25, { color: row[3], size: 10 });
       });
+      D.text(ctx, "淡色＝全程　實色＝目前為止", bx, by + 3 * (rowH + 12) + 8, { color: PL.col("text-faint"), size: 9 });
 
       PL.ui.caption(cv, sMu.get() <= 0
         ? "摩擦係數為 0：三條路徑的淨功完全相同——只有重力在做功，而重力功只看高度差。"
@@ -645,7 +668,33 @@
           "摩擦功那一條卻隨路徑變長——這就是保守力與非保守力的差別。");
       rWg.set(Wg, 1); rWf.set(Wf, 1); rLen.set(len, 1);
     }
-    const anim = PL.loop(dt => { if (dt) { s += dt * 0.4; if (s >= 1) { s = 1; anim.stop(); } } draw(); });
+    /* 小球以固定速率 7 m/s 沿路徑前進：路徑越長走得越久，摩擦功也累積得越多 */
+    const anim = PL.loop(dt => {
+      if (dt && !grip.dragging) {
+        const pts = pathPts(); let len = 0;
+        for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+        s += dt * 7 / Math.max(1, len);
+        if (s >= 1) { s = 1; anim.stop(); }
+      }
+      draw();
+    });
+    /* 把手抓小球：拖到路徑上哪一點，就看到走到那裡為止重力與摩擦各做了多少功 */
+    let geo = null;
+    const grip = PL.ui.handle(cv, { label: "小球（沿路徑拖曳）",
+      onDrag: (x, y) => {
+        if (!geo) return;
+        if (anim.running) anim.stop();
+        const { PX, PY, pts, cum } = geo; let best = Infinity, bd = 0;
+        for (let i = 1; i < pts.length; i++) {
+          const ax = PX(pts[i - 1]), ay = PY(pts[i - 1]), bx2 = PX(pts[i]), by2 = PY(pts[i]);
+          const vx = bx2 - ax, vy = by2 - ay, L2 = vx * vx + vy * vy || 1;
+          const u = PL.clamp(((x - ax) * vx + (y + 9 - ay) * vy) / L2, 0, 1);
+          const dd = Math.hypot(ax + vx * u - x, ay + vy * u - y - 9);
+          if (dd < best) { best = dd; bd = cum[i - 1] + (cum[i] - cum[i - 1]) * u; }
+        }
+        s = bd / Math.max(1e-9, cum[cum.length - 1]);
+        draw();
+      } });
     cv.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});

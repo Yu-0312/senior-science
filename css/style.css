@@ -2597,3 +2597,55 @@ body.stage-only .content-grid > .card:first-child { background: transparent; bor
   .hero-mode, .hero-mode:hover, .hero-mode:active, .btn-hero:hover, .mcard:hover { transform: none; }
   .hero-mode-go svg, .hero-mode:hover .hero-mode-go svg, .mcard::before { transition: none; }
 }
+
+/* ------------------------------------------------------------------
+   畫布拖曳把手（2026-10）
+   疊在畫布與量測工具層之上；圓環＋微弱脈動提示「這個可以抓」。
+   ------------------------------------------------------------------ */
+.sim-handles { position: absolute; inset: 0; pointer-events: none; z-index: 6; }
+.sim-handle {
+  position: absolute; left: 0; top: 0; width: 34px; height: 34px; margin: -17px 0 0 -17px;
+  border-radius: 50%; pointer-events: auto; touch-action: none; cursor: grab;
+  border: 2px solid color-mix(in srgb, var(--accent) 85%, white);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent);
+  transition: box-shadow .15s, background .15s;
+  outline: none;
+}
+.sim-handle[hidden] { display: none; }
+.sim-handle::after {
+  content: ""; position: absolute; inset: -2px; border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  animation: sim-handle-pulse 2.2s ease-out infinite;
+}
+.sim-handles.was-used .sim-handle::after { animation: none; opacity: 0; }
+.sim-handle:hover, .sim-handle:focus-visible, .sim-handle.is-dragging {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.sim-handle.is-dragging { cursor: grabbing; }
+.sim-handle-tip {
+  position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%);
+  white-space: nowrap; font-weight: 700; font-size: 11.5px; line-height: 1.2;
+  padding: 4px 8px; border-radius: 7px; color: var(--text);
+  background: var(--panel-solid); border: 1px solid var(--border);
+  box-shadow: 0 4px 14px rgba(0,0,0,.18);
+  opacity: 0; pointer-events: none; transition: opacity .15s;
+}
+.sim-handle:hover .sim-handle-tip, .sim-handle:focus-visible .sim-handle-tip, .sim-handle.is-dragging .sim-handle-tip { opacity: 1; }
+.sim-handle-hint {
+  position: absolute; left: 18px; bottom: 14px; pointer-events: none;
+  font-weight: 700; font-size: 11.5px; line-height: 1; color: var(--text-dim);
+  padding: 6px 10px 6px 26px; border-radius: 999px;
+  background: color-mix(in srgb, var(--panel-solid) 86%, transparent);
+  border: 1px solid var(--border);
+  transition: opacity .3s;
+}
+.sim-handle-hint::before {
+  content: ""; position: absolute; left: 9px; top: 50%; width: 10px; height: 10px; margin-top: -7px;
+  border-radius: 50%; border: 2px solid var(--accent);
+}
+.sim-handles.was-used .sim-handle-hint { opacity: 0; }
+@keyframes sim-handle-pulse { 0% { transform: scale(1); opacity: .9; } 70%, 100% { transform: scale(1.7); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .sim-handle::after { animation: none; } }
+@media print { .sim-handles { display: none; } }

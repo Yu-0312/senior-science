@@ -24,6 +24,9 @@
     PL.ui.note(L.controls, "μ = 0 時滑塊永遠等速前進——這就是慣性。");
     const rV = PL.ui.readout(L.readouts, { label: "速度 v", unit: "m/s" });
     const rX = PL.ui.readout(L.readouts, { label: "滑行距離", unit: "m" });
+    // 推之前可以直接拖初速箭頭的尖端（4 px 代表 1 m/s）；滑行中箭頭是實際速度，就把把手收起來
+    let arrowX0 = 0;
+    const grip = PL.ui.handle(cv, { slider: sV, label: "推出初速 v₀（拖曳箭頭）", toValue: px => (px - arrowX0) / 4 });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const gy = H - 40, sc = (W - 120) / 30;
@@ -53,6 +56,8 @@
       const showV = moving ? v : v0;
       D.arrow(ctx, px + 32, gy - 60, px + 32 + showV * 4, gy - 60,
         { color: PL.col("accent-2"), width: 2, label: "v = " + PL.fmt(showV, 1) });
+      arrowX0 = px + 32;
+      if (moving) grip.hide(); else grip.place(px + 32 + v0 * 4, gy - 60);
       if (mu > 0) {
         D.arrow(ctx, px - 32, gy - 6, px - 32 - mu * 160, gy - 6,
           { color: PL.col("danger"), width: 2, label: "f（μ=" + PL.fmt(mu, 2) + "）" });
@@ -214,18 +219,28 @@
     return { stop() { anim.stop(); cv.destroy(); cc.destroy(); }, rerender: draw };
   }});
 
-  /* 靜摩擦與動摩擦 */
+  /* 靜摩擦與動摩擦
+   *
+   * 舊版木塊位置是 (x % 20) 換算的，滑動時每 20 m 就瞬移回原點；預設 F 又小於最大靜摩擦，
+   * 按播放後畫面完全不動。這一版預設 F 略大於最大靜摩擦，讓木塊真的沿桌面滑出去：F 超過 μₛN 才起動，
+   * 起動後摩擦掉到 μₖN，木塊照 a = (F − μₖN)/m 越滑越快，滑到桌面盡頭才放回起點重拉。
+   * F 不夠時木塊不動，但拖曳拉力時靜摩擦箭頭會跟著一起變長——靜摩擦是「被動」的，F 多大它就多大。
+   */
   PL.register("friction", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
-    let x = 0, v = 0;
-    const sF = PL.ui.slider(L.controls, { label: "施力 F", min: 0, max: 30, step: 0.5, value: 6, unit: "N", digits: 1, onInput: draw });
-    const sMs = PL.ui.slider(L.controls, { label: "靜摩擦係數 μₛ", min: 0.1, max: 0.9, step: 0.02, value: 0.5, unit: "", digits: 2, onInput: draw });
-    const sMk = PL.ui.slider(L.controls, { label: "動摩擦係數 μₖ", min: 0.05, max: 0.8, step: 0.02, value: 0.3, unit: "", digits: 2, onInput: draw });
+    let x = 0, v = 0, geo = { x0: 142 };
+    const sF = PL.ui.slider(L.controls, { label: "施力 F", min: 0, max: 30, step: 0.5, value: 12, unit: "N", digits: 1, onInput: () => draw() });
+    const sMs = PL.ui.slider(L.controls, { label: "靜摩擦係數 μₛ", min: 0.1, max: 0.9, step: 0.02, value: 0.5, unit: "", digits: 2, onInput: () => draw() });
+    const sMk = PL.ui.slider(L.controls, { label: "動摩擦係數 μₖ", min: 0.05, max: 0.8, step: 0.02, value: 0.3, unit: "", digits: 2, onInput: () => draw() });
     const mass = 2, N = mass * 9.8;
+    const PX_PER_M = 40;
+    PL.ui.note(L.controls, "把拉力慢慢加大：F 還沒超過最大靜摩擦時木塊不動，靜摩擦 f = F；一超過就突然滑出去，摩擦掉到 μₖN。可直接拖拉力箭頭的尖端。");
     const rF = PL.ui.readout(L.readouts, { label: "摩擦力 f", unit: "N" });
     const rState = PL.ui.readout(L.readouts, { label: "狀態" });
     const rA = PL.ui.readout(L.readouts, { label: "加速度 a", unit: "m/s²" });
+    // 把手抓住拉力箭頭的尖端：往右拉越長，施力越大（箭頭 5 px/N）
+    const grip = PL.ui.handle(cv, { slider: sF, label: "拉力 F（拖曳箭頭）", toValue: px => (px - geo.x0) / 5 });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const F = sF.get(), fsMax = sMs.get() * N, fk = sMk.get() * N, moving = F > fsMax;
@@ -239,7 +254,7 @@
       ctx.restore();
       D.line(ctx, 0, gy + 20, W, gy + 20, PL.col("border"), 1);
 
-      const px = 120 + (moving ? (x % 20) * 6 : 0);
+      const px = 120 + x * PX_PER_M;
       AP.woodBlock(ctx, px, gy, 52, 32, 0);
       D.text(ctx, mass + " kg", px, gy - 12, { color: "#2b1f10", size: 11, align: "center", weight: "700" });
       AP.hand(ctx, px + 28 + 62 + 16, gy - 16, -1, 0.85, { pull: true });
@@ -247,7 +262,13 @@
       AP.springScale(ctx, px + 28, gy - 16, 62, F / 30);
       // 力向量畫在木塊上方，避開彈簧秤
       D.arrow(ctx, px + 22, gy - 46, px + 22 + F * 5, gy - 46, { color: PL.col("accent-2"), width: 2.4, label: "F=" + PL.fmt(F, 1) });
-      D.arrow(ctx, px - 22, gy - 46, px - 22 - f * 5, gy - 46, { color: PL.col("danger"), width: 2.4, label: "f=" + PL.fmt(f, 1), lx: -8, ly: -8 });
+      D.arrow(ctx, px - 22, gy - 46, px - 22 - f * 5, gy - 46, { color: PL.col("danger"), width: 2.4, label: (moving ? "fₖ=" : "fₛ=") + PL.fmt(f, 1), lx: -8, ly: -8 });
+      geo = { x0: px + 22 };
+      grip.place(px + 22 + F * 5, gy - 46);
+      // 窄螢幕只留前半句，免得超出畫布
+      D.text(ctx, (moving ? "F > 最大靜摩擦 " + PL.fmt(fsMax, 1) + " N" + (W < 560 ? "：滑動" : "：木塊滑動，摩擦力變成動摩擦")
+                          : "F ≤ 最大靜摩擦 " + PL.fmt(fsMax, 1) + " N" + (W < 560 ? "：不動" : "：木塊不動，靜摩擦 = F")),
+        16, 22, { color: PL.col(moving ? "danger" : "text"), size: 12, weight: "700" });
       // 摩擦力 vs 施力 圖
       const bx = 40, by = gy + 32, bw = W - 80, bh = H - by - 20;
       const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: 30, y0: 0, y1: Math.max(fsMax, fk) * 1.3 + 1 });
@@ -260,9 +281,19 @@
       g.dot(F, f, { color: MC(), glow: MC() });
       rF.set(f, 1); rState.set(moving ? "滑動" : "靜止"); rA.set(a, 2);
     }
-    const anim = PL.loop(dt => { if (dt) { const F = sF.get(), moving = F > sMs.get() * N; if (moving) { v += (F - sMk.get() * N) / mass * dt; x += v * dt; } else v = 0; } draw(); });
-    cv.onResize(draw); anim.start();
-    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+    const anim = PL.loop(dt => {
+      if (dt) {
+        const F = sF.get(), moving = F > sMs.get() * N;
+        if (moving) {
+          v += (F - sMk.get() * N) / mass * dt; x += v * dt;
+          // 滑到桌面盡頭：把木塊放回起點，從靜止重新拉一次
+          if (120 + x * PX_PER_M > cv.W - 150) { x = 0; v = 0; }
+        } else v = 0;
+      }
+      draw();
+    });
+    cv.onResize(() => draw()); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: () => draw() };
   }});
 
   /* 連接體與張力（阿特午機） */
@@ -318,6 +349,9 @@
     const rA1 = PL.ui.readout(L.readouts, { label: "左車 a₁", unit: "m/s²" });
     const rA2 = PL.ui.readout(L.readouts, { label: "右車 a₂", unit: "m/s²" });
     const rF = PL.ui.readout(L.readouts, { label: "受力大小", unit: "N" });
+    // 互推力把手：抓右車受力箭頭的尖端（4 px/N）。左車的箭頭跟著等長變化——第三定律就在手上
+    let fX0 = 0;
+    const grip = PL.ui.handle(cv, { slider: sF, label: "互推力 F（拖曳箭頭）", toValue: px => (px - fX0) / 4 });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const gy = H - 46, cx = W / 2, F = sF.get();
@@ -350,6 +384,7 @@
         { color: PL.col("danger"), width: 2.4, label: "F = " + F + " N" });
       D.arrow(ctx, bx2 - w2 / 2, gy - 58, bx2 - w2 / 2 + fLen, gy - 58,
         { color: PL.col("accent-2"), width: 2.4, label: "F = " + F + " N" });
+      fX0 = bx2 - w2 / 2; grip.place(fX0 + fLen, gy - 58);
 
       // 加速度箭頭：同樣的力，質量小的箭頭明顯比較長
       const a1 = F / m1, a2 = F / m2, aScale = 90 / Math.max(a1, a2);
@@ -570,65 +605,190 @@
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
 
-  /* 力的合成與分解（力桌） */
+  /* 力的合成與分解（力桌）
+   *
+   * 舊版只畫一張受力圖：第三個砝碼標著「?」，放在算好的平衡方向上，中心環永遠乖乖待在中央。
+   * 可是力桌實驗的重點正是「找」平衡力：學生自己調第三個砝碼的大小與方向，
+   * 看中心環有沒有被拉向一側、靠在中心銷上——環不碰銷、停在正中央，才代表三力平衡。
+   *
+   * 因此這一版讓中心環真的受三條繩的拉力運動：每條繩的拉力大小是砝碼重量，
+   * 方向從環指向各自的滑輪。環移動時三條繩的方向跟著微微改變，
+   * 這正是力桌在平衡點附近有恢復力的原因（環被推開一點會自己回來）。
+   * 合力不為零時環會一路滑到碰到中心銷，並停在合力的方向上。
+   */
   PL.register("force-table", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.72);
-    const sF1 = PL.ui.slider(L.controls, { label: "F₁ 大小", min: 1, max: 8, step: 0.5, value: 5, unit: "N", digits: 1, onInput: draw });
-    const sA1 = PL.ui.slider(L.controls, { label: "F₁ 方向", min: 0, max: 360, step: 5, value: 30, unit: "°", digits: 0, onInput: draw });
-    const sF2 = PL.ui.slider(L.controls, { label: "F₂ 大小", min: 1, max: 8, step: 0.5, value: 4, unit: "N", digits: 1, onInput: draw });
-    const sA2 = PL.ui.slider(L.controls, { label: "F₂ 方向", min: 0, max: 360, step: 5, value: 120, unit: "°", digits: 0, onInput: draw });
+    const sF1 = PL.ui.slider(L.controls, { label: "F₁ 大小", min: 1, max: 8, step: 0.5, value: 5, unit: "N", digits: 1, onInput: () => draw() });
+    const sA1 = PL.ui.slider(L.controls, { label: "F₁ 方向", min: 0, max: 360, step: 5, value: 30, unit: "°", digits: 0, onInput: () => draw() });
+    const sF2 = PL.ui.slider(L.controls, { label: "F₂ 大小", min: 1, max: 8, step: 0.5, value: 4, unit: "N", digits: 1, onInput: () => draw() });
+    const sA2 = PL.ui.slider(L.controls, { label: "F₂ 方向", min: 0, max: 360, step: 5, value: 120, unit: "°", digits: 0, onInput: () => draw() });
+    PL.ui.section(L.controls, "第三個砝碼（由你來找平衡）");
+    const sF3 = PL.ui.slider(L.controls, { label: "F₃ 大小", min: 1, max: 16, step: 0.5, value: 6, unit: "N", digits: 1, onInput: () => draw() });
+    const sA3 = PL.ui.slider(L.controls, { label: "F₃ 方向", min: 0, max: 360, step: 5, value: 240, unit: "°", digits: 0, onInput: () => draw() });
+    PL.ui.note(L.controls, "按播放放開中心環：三力不平衡時，環會被拉向合力方向、靠在中心銷上。調整 F₃（或直接拖盤緣的滑輪）直到環停在正中央、不碰中心銷——此時 F₃ 就是 F₁、F₂ 合力的平衡力。");
     const rMag = PL.ui.readout(L.readouts, { label: "合力大小", unit: "N" });
     const rAng = PL.ui.readout(L.readouts, { label: "合力方向", unit: "°" });
     const rEq = PL.ui.readout(L.readouts, { label: "平衡力方向", unit: "°" });
+    const rNet = PL.ui.readout(L.readouts, { label: "三力合力 ΣF", unit: "N" });
+
+    /*
+     * 中心環的狀態：p 是環心相對盤心的位移（px），vel 為速度（px/s）。
+     * 盤面半徑當作 15 cm，用來把 N/kg 的加速度換成 px/s²。
+     * 中心銷讓環最多只能偏 CLR px——真實力桌上環就是這樣被銷子擋住的。
+     */
+    const RING = 15, PIN = 4, CLR = RING - PIN;
+    let p = { x: 0, y: 0 }, vel = { x: 0, y: 0 }, geo = null;
+    const forces = () => [[sF1.get(), sA1.get()], [sF2.get(), sA2.get()], [sF3.get(), sA3.get()]];
+    /* 環在位置 q 時三條繩的合力（N，畫布座標：y 向下） */
+    function netAt(q) {
+      const R = geo.R + 6;
+      let fx = 0, fy = 0;
+      forces().forEach(([f, deg]) => {
+        const a = deg * Math.PI / 180, dx = Math.cos(a) * R - q.x, dy = -Math.sin(a) * R - q.y, d = Math.hypot(dx, dy) || 1;
+        fx += f * dx / d; fy += f * dy / d;
+      });
+      return { x: fx, y: fy };
+    }
+    /* 中心銷擋住環：超出間隙就推回來，並吃掉往外的速度（輕微反彈） */
+    function pinContact(q, w) {
+      const d = Math.hypot(q.x, q.y);
+      if (d <= CLR) return false;
+      const nx = q.x / d, ny = q.y / d;
+      q.x = nx * CLR; q.y = ny * CLR;
+      if (w) { const vr = w.x * nx + w.y * ny; if (vr > 0) { w.x -= 1.3 * vr * nx; w.y -= 1.3 * vr * ny; } }
+      return true;
+    }
+    function step(dt) {
+      if (!geo || !(dt > 0)) return;
+      const M = forces().reduce((s, f) => s + f[0], 0) / 9.8 + 0.01;   // 環＋三組砝碼一起被拉動
+      const pxPerM = geo.R / 0.15;
+      let left = Math.min(dt, 0.1);
+      while (left > 1e-6) {
+        const h = Math.min(left, 1 / 240), F = netAt(p);
+        vel.x += (F.x / M * pxPerM - 3 * vel.x) * h; vel.y += (F.y / M * pxPerM - 3 * vel.y) * h;
+        p.x += vel.x * h; p.y += vel.y * h;
+        pinContact(p, vel);
+        left -= h;
+      }
+    }
+    /* 暫停時時間不走：直接求出環最後會停的位置（沿合力方向鬆弛，並受中心銷限制） */
+    function settle() {
+      const q = { x: 0, y: 0 };
+      for (let i = 0; i < 400; i++) { const F = netAt(q); q.x += F.x * 1.5; q.y += F.y * 1.5; pinContact(q); }
+      p = q; vel = { x: 0, y: 0 };
+    }
+    const clock = PL.motion.clock(dt => { step(dt); draw(); });
+    const angOf = (x, y) => ((Math.atan2(-(y - geo.cy), x - geo.cx) * 180 / Math.PI) + 360) % 360;
+    const grips = [[sA1, "F₁ 的滑輪（拖曳改方向）"], [sA2, "F₂ 的滑輪（拖曳改方向）"], [sA3, "F₃ 的滑輪（拖曳找平衡方向）"]]
+      .map(([sl, label]) => PL.ui.handle(cv, { slider: sl, label, toValue: (x, y) => angOf(x, y) }));
+
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const cx = W / 2, cy = H / 2, S = 15;
+      const cx = W / 2, cy = H / 2;
       const AP = PL.apparatus;
       /* 真實的力桌（俯視）：盤緣夾滑輪，繩子吊砝碼。砝碼的重量就是那一條繩的拉力 */
       const deskG = ctx.createLinearGradient(0, 0, 0, H);
       deskG.addColorStop(0, PL.theme.isLight() ? "#d9b88a" : "#4f3a26"); deskG.addColorStop(1, PL.theme.isLight() ? "#c9a26d" : "#3f2e1e");
       ctx.fillStyle = deskG; ctx.fillRect(0, 0, W, H);
       PL.theme.note(ctx, PL.theme.isLight() ? "#d2ae7c" : "#473422", 0, 0, W, H);
-      const f1 = sF1.get(), a1 = sA1.get() * Math.PI / 180, f2 = sF2.get(), a2 = sA2.get() * Math.PI / 180;
-      const R = Math.min(W, H) * 0.36;
+      const f1 = sF1.get(), a1 = sA1.get() * Math.PI / 180, f2 = sF2.get(), a2 = sA2.get() * Math.PI / 180, f3 = sF3.get(), a3 = sA3.get() * Math.PI / 180;
+      const R = Math.min(W, H) * 0.36, S = Math.min(15, R / 9);
+      geo = { cx, cy, R };
+      // 還沒開始：手指按住中心環在正中央，按播放才放手；跑過之後暫停，就直接顯示最後停的位置
+      const fresh = clock.t === 0 && !clock.running;
+      if (fresh) { p = { x: 0, y: 0 }; vel = { x: 0, y: 0 }; } else if (!clock.running) settle();
+      const rx = cx + p.x, ry = cy + p.y;
       const pulleyAt = AP.forceTableTop(ctx, cx, cy, R);
-      const resAng0 = (Math.atan2(f1 * Math.sin(a1) + f2 * Math.sin(a2), f1 * Math.cos(a1) + f2 * Math.cos(a2)) * 180 / Math.PI + 540) % 360;
-      pulleyAt(sA1.get(), PL.fmt(f1 / 9.8 * 1000, 0) + "g", "#2f6fd0");
-      pulleyAt(sA2.get(), PL.fmt(f2 / 9.8 * 1000, 0) + "g", "#7a4fd0");
-      pulleyAt(resAng0, "?", "#b0801e");
-      // 中心環
+      // 三條繩從「環」拉到滑輪（環偏離中心時繩的方向跟著變，這就是恢復力的來源）
+      const ropes = [[sA1.get(), f1, "#2f6fd0"], [sA2.get(), f2, "#7a4fd0"], [sA3.get(), f3, "#b0801e"]];
+      ropes.forEach(([deg]) => {
+        const a = -deg * Math.PI / 180, px = cx + Math.cos(a) * (R + 6), py = cy + Math.sin(a) * (R + 6);
+        const d = Math.hypot(px - rx, py - ry) || 1;
+        ctx.strokeStyle = "rgba(90,70,40,0.9)"; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(rx + (px - rx) / d * RING, ry + (py - ry) / d * RING); ctx.lineTo(px, py); ctx.stroke();
+      });
+      // 器材函式會從盤心畫一段繩到滑輪；盤面內那段改由上面從環畫出，所以把它裁掉
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.arc(cx, cy, R - 5, 0, Math.PI * 2, true); ctx.clip("evenodd");
+      ropes.forEach(([deg, f, tint]) => pulleyAt(deg, PL.fmt(f / 9.8 * 1000, 0) + "g", tint));
+      ctx.restore();
+      ropes.forEach(([deg], i) => { const a = -deg * Math.PI / 180; grips[i].place(cx + Math.cos(a) * (R + 6), cy + Math.sin(a) * (R + 6)); });
+      // 中心銷與中心環
+      D.disc(ctx, cx, cy, PIN, { fill: "rgb(60,66,78)" });
       ctx.strokeStyle = "rgb(150,160,176)"; ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(rx, ry, RING, 0, Math.PI * 2); ctx.stroke();
+
       const v1 = { x: f1 * Math.cos(a1), y: -f1 * Math.sin(a1) }, v2 = { x: f2 * Math.cos(a2), y: -f2 * Math.sin(a2) }, rs = { x: v1.x + v2.x, y: v1.y + v2.y };
-      D.line(ctx, cx + v1.x * S, cy + v1.y * S, cx + rs.x * S, cy + rs.y * S, "rgba(255,255,255,0.2)", 1, [4, 4]);
-      D.line(ctx, cx + v2.x * S, cy + v2.y * S, cx + rs.x * S, cy + rs.y * S, "rgba(255,255,255,0.2)", 1, [4, 4]);
-      D.arrow(ctx, cx, cy, cx + v1.x * S, cy + v1.y * S, { color: PL.col("accent-2"), width: 2.4, label: "F₁" });
-      D.arrow(ctx, cx, cy, cx + v2.x * S, cy + v2.y * S, { color: PL.col("accent-3"), width: 2.4, label: "F₂" });
-      D.arrow(ctx, cx, cy, cx + rs.x * S, cy + rs.y * S, { color: MC(), width: 3, label: "合力" });
-      D.arrow(ctx, cx, cy, cx - rs.x * S, cy - rs.y * S, { color: PL.col("warn"), width: 2, label: "平衡力（第三個砝碼）", dash: [5, 4] });
+      const v3 = { x: f3 * Math.cos(a3), y: -f3 * Math.sin(a3) };
+      // 盤面是淺色鋁盤（深色主題也一樣），輔助線一律用深色才看得到
+      const pale = "rgba(40,50,64,0.38)";
+      D.line(ctx, rx + v1.x * S, ry + v1.y * S, rx + rs.x * S, ry + rs.y * S, pale, 1, [4, 4]);
+      D.line(ctx, rx + v2.x * S, ry + v2.y * S, rx + rs.x * S, ry + rs.y * S, pale, 1, [4, 4]);
+      D.arrow(ctx, rx, ry, rx + v1.x * S, ry + v1.y * S, { color: PL.col("accent-2"), width: 2.4, label: "F₁" });
+      D.arrow(ctx, rx, ry, rx + v2.x * S, ry + v2.y * S, { color: PL.col("accent-3"), width: 2.4, label: "F₂" });
+      D.arrow(ctx, rx, ry, rx + rs.x * S, ry + rs.y * S, { color: MC(), width: 3, label: "合力" });
+      D.arrow(ctx, rx, ry, rx - rs.x * S, ry - rs.y * S, { color: PL.col("warn"), width: 2, label: "需要的平衡力", dash: [5, 4] });
+      D.arrow(ctx, rx, ry, rx + v3.x * S, ry + v3.y * S, { color: "#c98a1c", width: 2.6, label: "F₃", lx: -24, ly: 14 });
       const mag = Math.hypot(rs.x, rs.y), ang = (Math.atan2(-rs.y, rs.x) * 180 / Math.PI + 360) % 360;
-      rMag.set(mag, 2); rAng.set(ang, 0); rEq.set((ang + 180) % 360, 0);
+      const net = Math.hypot(rs.x + v3.x, rs.y + v3.y), netAng = (Math.atan2(-(rs.y + v3.y), rs.x + v3.x) * 180 / Math.PI + 360) % 360;
+      // 判讀看的是環本身：碰到中心銷＝三力不平衡（實驗上就是這樣判斷的）
+      const touching = Math.hypot(p.x, p.y) > CLR - 0.6;
+      const msg = fresh ? "手指按住中心環 · 按播放放手"
+        : touching ? (W < 560 ? "三力不平衡：環靠在中心銷上" : "環被拉向 " + PL.fmt(netAng, 0) + "° 方向、靠在中心銷上：三力不平衡（ΣF = " + PL.fmt(net, 2) + " N）")
+        : "環停在中央、不碰中心銷：三力平衡";
+      D.text(ctx, msg, 16, 24, { color: PL.col(touching && !fresh ? "danger" : "text"), size: 12, weight: "700" });
+      rMag.set(mag, 2); rAng.set(ang, 0); rEq.set((ang + 180) % 360, 0); rNet.set(net, 2);
     }
-    cv.onResize(draw); draw();
-    return { stop() { cv.destroy(); }, rerender: draw };
+    cv.onResize(() => draw()); draw();
+    return { stop() { clock.stop(); cv.destroy(); }, rerender: () => draw() };
   }});
 
   /* 虎克定律與彈簧 */
   PL.register("hookes-law", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.72);
-    const sM = PL.ui.slider(L.controls, { label: "懸掛質量 m", min: 0, max: 5, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: draw });
-    const sK = PL.ui.slider(L.controls, { label: "彈簧勁度 k", min: 20, max: 200, step: 10, value: 100, unit: "N/m", digits: 0, onInput: draw });
-    PL.ui.note(L.controls, "伸長量 x = mg/k；F–x 圖為過原點的直線，斜率就是 k。");
+    const sM = PL.ui.slider(L.controls, { label: "懸掛質量 m", min: 0, max: 5, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: () => draw() });
+    const sK = PL.ui.slider(L.controls, { label: "彈簧勁度 k", min: 20, max: 200, step: 10, value: 100, unit: "N/m", digits: 0, onInput: () => draw() });
+    PL.ui.note(L.controls, "伸長量 x = mg/k；F–x 圖為過原點的直線，斜率就是 k。播放時換砝碼，彈簧會先上下振動再停在新的平衡位置；也可以直接把砝碼往下拉再放手。");
     const rX = PL.ui.readout(L.readouts, { label: "伸長量 x", unit: "cm" });
     const rF = PL.ui.readout(L.readouts, { label: "拉力 F=mg", unit: "N" });
     const rK = PL.ui.readout(L.readouts, { label: "勁度 k", unit: "N/m" });
+    /*
+     * 砝碼的實際伸長量 y 照 m·y'' = mg − k·y − b·y' 演化（b 為空氣與彈簧內摩擦）。
+     * 平衡位置 mg/k 是讀數；畫面上的砝碼要先振盪一陣子才停在那裡——
+     * 「平衡」是運動停下來的結果，不是一開始就在那裡。
+     */
+    let y = 2 * 9.8 / 100, vy = 0, grabbed = false, geo = { topY: 44, natural: 66, cx: 0 };
+    const PX_PER_M = 320;
+    const clock = PL.motion.clock(dt => { step(dt); draw(); });
+    function step(dt) {
+      const m = Math.max(sM.get(), 0.05), k = sK.get(), eq = sM.get() * 9.8 / k;
+      if (grabbed || !dt) return;
+      let left = Math.min(dt, 0.1);
+      while (left > 1e-6) {
+        const h = Math.min(left, 1 / 240);
+        const acc = (m * 9.8 - k * y) / m - 0.9 * vy;
+        vy += acc * h; y += vy * h; left -= h;
+      }
+      if (sM.get() === 0 && Math.abs(y) < 1e-4) { y = eq; vy = 0; }
+    }
+    const grip = PL.ui.handle(cv, { label: "砝碼（往下拉再放手）",
+      onDrag: (x, py) => {
+        grabbed = true; vy = 0;
+        y = PL.clamp((py - geo.topY - geo.natural) / PX_PER_M, 0, (cv.H - 170) / PX_PER_M);
+        draw();
+      },
+      onRelease: () => { grabbed = false; if (!clock.running) clock.start(); } });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const A = PL.apparatus;
       const m = sM.get(), k = sK.get(), F = m * 9.8, x = F / k;
-      const topY = 44, cx = W * 0.28, natural = 66, ext = PL.clamp(x * 320, 0, H - 170);
+      // 還沒開始（t = 0）：手托著砝碼停在彈簧原長，按播放才放手。
+      // 跑過之後再暫停：時間不走，換參數直接顯示新的平衡狀態。
+      const fresh = clock.t === 0 && !clock.running;
+      if (!clock.running && !grabbed) { y = fresh ? 0 : x; vy = 0; }
+      const topY = 44, cx = W * 0.28, natural = 66, ext = PL.clamp(y * PX_PER_M, 0, H - 170);
+      geo = { topY, natural, cx };
       const baseY = H - 26;
 
       /* 鐵架 + 橫桿：彈簧是掛在實驗架上的，不是憑空吊著 */
@@ -637,11 +797,18 @@
       A.crossArm(ctx, cx - 78, topY - 14, cx);
 
       // 對照用的刻度尺，讓「伸長量」是量出來的
-      const pxPerCm = 320 / 100;                       // ext = x(m) * 320 → 1 cm = 3.2 px
+      const pxPerCm = PX_PER_M / 100;
       A.ruler(ctx, cx + 52, topY + natural - 4, baseY - 12, pxPerCm);
+
+      // 平衡位置的虛線：砝碼最後會停在這裡
+      const eqY = topY + natural + PL.clamp(x * PX_PER_M, 0, H - 170);
+      D.line(ctx, cx - 40, eqY, cx + 50, eqY, PL.theme.pale(0.45), 1, [4, 4]);
+      D.text(ctx, "平衡", cx - 44, eqY + 4, { color: PL.col("text-faint"), size: 10, align: "right" });
 
       D.spring(ctx, cx, topY, cx, topY + natural + ext, 10, 11, MC());
       A.weight(ctx, cx, topY + natural + ext, 44, 36, m + " kg");
+      grip.place(cx, topY + natural + ext + 18);
+      if (fresh && m > 0) D.text(ctx, "手托住砝碼 · 按播放放手", cx + 30, topY + natural + 20, { color: PL.col("text-dim"), size: 11 });
 
       // 伸長量標註
       D.line(ctx, cx + 34, topY + natural, cx + 34, topY + natural + ext, PL.col("accent-2"), 2);
@@ -652,11 +819,12 @@
       const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: 0.6, y0: 0, y1: 60 });
       g.frame({ title: "F – x（斜率 = k）", xlabel: "x (m)", ylabel: "F (N)" }); g.grid(4, 4);
       g.fn(xx => k * xx, { color: MC(), width: 2.2 });
-      g.dot(Math.min(x, 0.6), F, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+      // 彈力 k·y 隨振盪在直線上來回滑動；停下來時落在 F = mg 那一點
+      g.dot(Math.min(y, 0.6), Math.min(k * y, 60), { color: PL.col("accent-2"), glow: PL.col("accent-2") });
       rX.set(x * 100, 1); rF.set(F, 1); rK.set(k, 0);
     }
     cv.onResize(draw); draw();
-    return { stop() { cv.destroy(); }, rerender: draw };
+    return { stop() { clock.stop(); cv.destroy(); }, rerender: draw };
   }});
   /* 題型：水平推力壓住鉛直牆面的摩擦力 */
   PL.register("wall-friction", { build(root) {
@@ -693,6 +861,8 @@
       return { m, F, mg, fsMax, sliding, f, a: sliding ? (mg - f) / m : 0 };
     }
     function reset() { y = 0; v = 0; released = false; draw(); }
+    let pushX0 = 0;
+    const grip = PL.ui.handle(cv, { slider: sF, label: "水平推力 F（拖曳箭頭尾端）", toValue: px => (pushX0 - px) / 0.47 });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const q = model(), wallX = W * 0.72, bw = Math.min(68, 42 + q.m * 7), bh = 38 + q.m * 4;
@@ -704,7 +874,10 @@
       // 手把物體壓在牆上：推力的來源
       AP.hand(ctx, bx - 2, by + bh / 2, 1, 1.05);
       const cy = by + bh / 2, forceScale = 0.55;
-      D.arrow(ctx, bx - 70 - Math.min(94, q.F * forceScale), cy - 26, bx - 70, cy - 26, { color: PL.col("accent-2"), width: 2.6, label: "推力 F" });
+      // 推力箭頭改成不封頂（0.47 px/N，200 N 時 94 px），尾端就能當把手：往左拉越長、推得越用力
+      const pushLen = q.F * 0.47;
+      D.arrow(ctx, bx - 70 - pushLen, cy - 26, bx - 70, cy - 26, { color: PL.col("accent-2"), width: 2.6, label: "推力 F" });
+      pushX0 = bx - 70; grip.place(bx - 70 - pushLen, cy - 26);
       D.arrow(ctx, bx + bw - 4, cy - 17, bx + bw - 4 - Math.min(84, q.F * forceScale), cy - 17, { color: "#8db7ff", width: 2.3, label: "N" });
       D.arrow(ctx, bx + bw / 2, by + bh / 2, bx + bw / 2, by + bh / 2 + 48, { color: PL.col("warn"), width: 2.3, label: "mg" });
       const fLen = Math.min(60, q.f * 2.1);
@@ -785,6 +958,8 @@
       return { m1, m2, F, fNeed, fMax, grip, f, aTop: f / m1, aBottom: grip ? F / (m1 + m2) : (F - f) / m2 };
     }
     function reset() { xTop = xBottom = vTop = vBottom = 0; released = false; draw(); }
+    let pushX0 = 0;
+    const grip = PL.ui.handle(cv, { slider: sF, label: "推動下方的力 F（拖曳箭頭）", toValue: px => (px - pushX0) / 0.86 });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const q = model(), gy = H * 0.72, cx = W * 0.28, shiftTop = xTop * 8, shiftBottom = xBottom * 8;
@@ -795,7 +970,9 @@
       AP.massBlock(ctx, lowerX, gy, lowerW, lowerH, { color: "#ffab80", label: "m₂" });
       AP.massBlock(ctx, upperX, gy - lowerH, upperW, upperH, { color: MC(), label: "m₁", noShadow: true });
       if (!released || xBottom < 0.3) AP.hand(ctx, lowerX - lowerW / 2 - 1, gy - lowerH / 2, 1, 1.15);
-      D.arrow(ctx, lowerX + lowerW / 2, gy - 18, lowerX + lowerW / 2 + Math.min(86, q.F * 1.1), gy - 18, { color: PL.col("accent-2"), width: 2.6, label: "F" });
+      // 推力箭頭 0.86 px/N（100 N 時 86 px），不再封頂，尖端就是把手
+      D.arrow(ctx, lowerX + lowerW / 2, gy - 18, lowerX + lowerW / 2 + q.F * 0.86, gy - 18, { color: PL.col("accent-2"), width: 2.6, label: "F" });
+      pushX0 = lowerX + lowerW / 2; grip.place(pushX0 + q.F * 0.86, gy - 18);
       const upperY = gy - lowerH - upperH / 2;
       D.arrow(ctx, upperX, upperY, upperX + Math.min(60, q.f * 3), upperY, { color: "#7ee0c0", width: 2.2, label: "上方受 f" });
       D.arrow(ctx, lowerX, gy - lowerH + 6, lowerX - Math.min(60, q.f * 3), gy - lowerH + 6, { color: PL.col("danger"), width: 2.2, label: "下方受 f" });
@@ -821,14 +998,20 @@
     return { stop() { anim.stop(); cv.destroy(); cc.destroy(); }, rerender: draw };
   }});
 
-  /* 題型：兩條繩子共同懸掛重物 */
+  /* 題型：兩條繩子共同懸掛重物
+   *
+   * 舊版是一張定格的受力圖。真實的繩子會微微伸長：手托住重物再放開，重物會往下掉、
+   * 被兩條繩拉住後上下（拉偏的話還會左右）擺盪，最後停在兩繩張力與重力平衡的位置。
+   * 這裡把兩條繩當成很硬的彈性繩，剛好在平衡點時伸長量給出公式算出的 Tₗ、Tᵣ；
+   * 張力箭頭跟著實際伸長量變化，晃動停下後就落在讀數的值上。
+   */
   PL.register("two-rope-equilibrium", { build(root) {
     const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.58);
     PL.ui.section(L.controls, "懸掛條件");
-    const sM = PL.ui.slider(L.controls, { label: "重物質量 m", min: 0.5, max: 12, step: 0.5, value: 4, unit: "kg", digits: 1, onInput: draw });
-    const sL = PL.ui.slider(L.controls, { label: "左繩與水平夾角 θₗ", min: 12, max: 78, step: 1, value: 45, unit: "°", digits: 0, onInput: draw });
-    const sR = PL.ui.slider(L.controls, { label: "右繩與水平夾角 θᵣ", min: 12, max: 78, step: 1, value: 45, unit: "°", digits: 0, onInput: draw });
+    const sM = PL.ui.slider(L.controls, { label: "重物質量 m", min: 0.5, max: 12, step: 0.5, value: 4, unit: "kg", digits: 1, onInput: () => draw() });
+    const sL = PL.ui.slider(L.controls, { label: "左繩與水平夾角 θₗ", min: 12, max: 78, step: 1, value: 45, unit: "°", digits: 0, onInput: () => draw() });
+    const sR = PL.ui.slider(L.controls, { label: "右繩與水平夾角 θᵣ", min: 12, max: 78, step: 1, value: 45, unit: "°", digits: 0, onInput: () => draw() });
     const presets = PL.ui.chipGroup(L.controls, { value: "symmetric", options: [
       { value: "symmetric", label: "對稱懸掛" }, { value: "uneven", label: "角度不等" }, { value: "flat", label: "繩子較平" }
     ], onChange: value => {
@@ -837,7 +1020,7 @@
       if (value === "flat") { sL.set(18); sR.set(18); }
       draw();
     }});
-    PL.ui.note(L.controls, "兩條繩子越接近水平，為了提供同樣的向上分量，張力會迅速變大。 ");
+    PL.ui.note(L.controls, "兩條繩子越接近水平，為了提供同樣的向上分量，張力會迅速變大。按播放放開重物，看它晃動後停在平衡位置；也可以把重物拉開再放手，或拖動兩根立柱頂端的吊環改變繩子角度。 ");
     const rTL = PL.ui.readout(L.readouts, { label: "左繩張力 Tₗ", unit: "N" });
     const rTR = PL.ui.readout(L.readouts, { label: "右繩張力 Tᵣ", unit: "N" });
     const rV = PL.ui.readout(L.readouts, { label: "鉛直分量合計", unit: "N" });
@@ -848,40 +1031,111 @@
       const mg = m * 9.8, denom = Math.sin(l + r);
       return { m, l, r, mg, tl: mg * Math.cos(r) / denom, tr: mg * Math.cos(l) / denom };
     }
+    /*
+     * 繩結（與重物）的位移 p（px，相對平衡點）與速度 vel（px/s）。
+     * 繩子的勁度取「受力較大的那條在平衡時伸長 STRETCH px」，所以不論多重都只晃幾個像素到十幾個像素；
+     * 畫面上 1 m 當作 PX_PER_M px，用來把 N/kg 換成 px/s²。
+     */
+    const STRETCH = 9, PX_PER_M = 100;
+    // 手要把重物托高多少，兩條繩才都鬆掉：繩越平，往上抬造成的縮短越少，要抬得越高
+    const hold = () => Math.min(50, STRETCH / Math.sin(Math.min(sL.get(), sR.get()) * Math.PI / 180) + 3);
+    let p = { x: 0, y: -hold() }, vel = { x: 0, y: 0 }, grabbed = false, geo = null;
+    function ropes(q) {
+      const k = Math.max(q.tl, q.tr) / STRETCH;
+      return [
+        { ax: geo.lx, ay: geo.ly, rest: geo.len - q.tl / k, k },
+        { ax: geo.rx, ay: geo.ry, rest: geo.len - q.tr / k, k }
+      ];
+    }
+    /* 繩結在 (x, y) 時兩條繩的張力（只拉不推：繩子鬆了張力就是 0） */
+    function tensions(q, x, y) {
+      return ropes(q).map(r => {
+        const dx = r.ax - x, dy = r.ay - y, d = Math.hypot(dx, dy) || 1, ext = d - r.rest;
+        return { T: ext > 0 ? r.k * ext : 0, ux: dx / d, uy: dy / d, slack: ext <= 0, d, rest: r.rest };
+      });
+    }
+    function step(dt) {
+      if (!geo || grabbed || !(dt > 0)) return;
+      const q = model();
+      let left = Math.min(dt, 0.1);
+      while (left > 1e-6) {
+        const h = Math.min(left, 1 / 480);
+        const ts = tensions(q, geo.cx + p.x, geo.cy + p.y);
+        const fx = ts[0].T * ts[0].ux + ts[1].T * ts[1].ux, fy = ts[0].T * ts[0].uy + ts[1].T * ts[1].uy + q.mg;
+        vel.x += (fx / q.m * PX_PER_M - 1.6 * vel.x) * h; vel.y += (fy / q.m * PX_PER_M - 1.6 * vel.y) * h;
+        p.x += vel.x * h; p.y += vel.y * h; left -= h;
+      }
+    }
+    const clock = PL.motion.clock(dt => { step(dt); draw(); });
+    const grip = PL.ui.handle(cv, { label: "重物（拉開再放手）",
+      onDrag: (x, y) => {
+        if (!geo) return;
+        grabbed = true; vel = { x: 0, y: 0 };
+        const dx = x - geo.cx, dy = y - geo.blockMid - geo.cy, d = Math.hypot(dx, dy), lim = 46;
+        p = d > lim ? { x: dx / d * lim, y: dy / d * lim } : { x: dx, y: dy };
+        draw();
+      },
+      onRelease: () => { grabbed = false; if (!clock.running) clock.start(); } });
+    // 吊環：沿著以繩結為圓心的圓弧拖，就是改繩子的仰角
+    const ringL = PL.ui.handle(cv, { slider: sL, label: "左側吊環（拖曳改 θₗ）", toValue: (x, y) => Math.atan2(geo.cy - y, geo.cx - x) * 180 / Math.PI });
+    const ringR = PL.ui.handle(cv, { slider: sR, label: "右側吊環（拖曳改 θᵣ）", toValue: (x, y) => Math.atan2(geo.cy - y, x - geo.cx) * 180 / Math.PI });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const q = model(), cx = W * 0.5, cy = H * 0.48, len = Math.min(W * 0.27, H * 0.55);
       const lx = cx - len * Math.cos(q.l), ly = cy - len * Math.sin(q.l), rx = cx + len * Math.cos(q.r), ry = cy - len * Math.sin(q.r);
+      geo = { cx, cy, len, lx, ly, rx, ry, blockMid: 76 };  // 把手放在重物底緣，不蓋住質量標示
+      // t = 0：手托著重物、繩子還鬆著；按播放才放手。跑過之後暫停：時間不走，直接停在平衡點。
+      const fresh = clock.t === 0 && !clock.running;
+      if (!clock.running && !grabbed) { p = fresh ? { x: 0, y: -hold() } : { x: 0, y: 0 }; vel = { x: 0, y: 0 }; }
+      const kx = cx + p.x, ky = cy + p.y;
+      const ts = tensions(q, kx, ky);
       const AP = PL.apparatus;
       AP.labRoom(ctx, W, H, H - 20, { bench: "wood" });
       // 兩條繩各綁在一根立柱頂的吊環上
-      [[lx, ly], [rx, ry]].forEach(p => {
-        AP.steel(ctx, p[0] - 4, p[1], 8, H - 20 - p[1], 8);
-        AP.steel(ctx, p[0] - 16, H - 26, 32, 7, -6);
-        AP.brassDisc(ctx, p[0], p[1], 5);
+      [[lx, ly], [rx, ry]].forEach(pt => {
+        AP.steel(ctx, pt[0] - 4, pt[1], 8, H - 20 - pt[1], 8);
+        AP.steel(ctx, pt[0] - 16, H - 26, 32, 7, -6);
+        AP.brassDisc(ctx, pt[0], pt[1], 5);
       });
-      AP.rope(ctx, lx, ly, cx, cy, 3, "#c8a46a"); AP.rope(ctx, rx, ry, cx, cy, 3, "#c8a46a");
+      // 繩子：拉緊時是直線；鬆的時候往下垂成一條弧
+      [[lx, ly, ts[0]], [rx, ry, ts[1]]].forEach(([ax, ay, t]) => {
+        if (!t.slack) { AP.rope(ctx, ax, ay, kx, ky, 3, "#c8a46a"); return; }
+        const sag = Math.sqrt(Math.max(0, t.rest * t.rest - t.d * t.d)) * 0.5;
+        ctx.save(); ctx.strokeStyle = "#c8a46a"; ctx.lineWidth = 3; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo((ax + kx) / 2, (ay + ky) / 2 + sag, kx, ky); ctx.stroke(); ctx.restore();
+      });
       ctx.strokeStyle = "rgb(150,160,176)"; ctx.lineWidth = 2.6;
-      ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.stroke();
-      AP.rope(ctx, cx, cy + 6, cx, cy + 40, 2.4, "#c8a46a");
-      AP.massBlock(ctx, cx, cy + 78, 56, 34, { color: MC(), label: q.m + " kg", hook: true, noShadow: true });
-      D.arrow(ctx, cx, cy, cx - Math.cos(q.l) * Math.min(72, q.tl * 1.2), cy - Math.sin(q.l) * Math.min(72, q.tl * 1.2), { color: "#8db7ff", width: 2.4, label: "Tₗ" });
-      D.arrow(ctx, cx, cy, cx + Math.cos(q.r) * Math.min(72, q.tr * 1.2), cy - Math.sin(q.r) * Math.min(72, q.tr * 1.2), { color: "#7ee0c0", width: 2.4, label: "Tᵣ" });
-      D.arrow(ctx, cx, cy, cx, cy + 58, { color: PL.col("warn"), width: 2.4, label: "mg" });
-      D.text(ctx, "θₗ = " + sL.get() + "°", lx + 4, ly + 22, { color: "#8db7ff", size: 11 });
-      D.text(ctx, "θᵣ = " + sR.get() + "°", rx - 4, ry + 22, { color: "#7ee0c0", size: 11, align: "right" });
+      ctx.beginPath(); ctx.arc(kx, ky, 6, 0, Math.PI * 2); ctx.stroke();
+      AP.rope(ctx, kx, ky + 6, kx, ky + 40, 2.4, "#c8a46a");
+      AP.massBlock(ctx, kx, ky + 78, 56, 34, { color: MC(), label: q.m + " kg", hook: true, noShadow: true });
+      if (fresh) AP.hand(ctx, kx, ky + 80, 1, 0.9, { ang: -Math.PI / 2 });
+      grip.place(kx, ky + geo.blockMid);
+      ringL.place(lx, ly); ringR.place(rx, ry);
+      // 張力箭頭用「此刻」的張力：晃動時忽長忽短，停下來就是讀數的值
+      const tl = ts[0].T, tr = ts[1].T;
+      if (tl > 0.05) D.arrow(ctx, kx, ky, kx + ts[0].ux * Math.min(72, tl * 1.2), ky + ts[0].uy * Math.min(72, tl * 1.2), { color: "#8db7ff", width: 2.4, label: "Tₗ" });
+      if (tr > 0.05) D.arrow(ctx, kx, ky, kx + ts[1].ux * Math.min(72, tr * 1.2), ky + ts[1].uy * Math.min(72, tr * 1.2), { color: "#7ee0c0", width: 2.4, label: "Tᵣ" });
+      D.arrow(ctx, kx, ky, kx, ky + 58, { color: PL.col("warn"), width: 2.4, label: "mg" });
+      D.text(ctx, "θₗ = " + sL.get() + "°", lx + 8, ly + 34, { color: "#8db7ff", size: 11 });
+      D.text(ctx, "θᵣ = " + sR.get() + "°", rx - 8, ry + 34, { color: "#7ee0c0", size: 11, align: "right" });
+      const swing = Math.hypot(p.x, p.y) > 0.4 || Math.hypot(vel.x, vel.y) > 2;
+      // 窄螢幕上兩個吊環把手就在最上面，狀態文字會被蓋住，乾脆不畫
+      if (W >= 480) D.text(ctx, fresh ? "手托住重物、繩子還沒拉緊 · 按播放放手"
+        : swing ? "此刻 Tₗ = " + PL.fmt(tl, 1) + " N、Tᵣ = " + PL.fmt(tr, 1) + " N" + (W < 560 ? "" : "（晃動中，張力忽大忽小）")
+        : "靜止：Tₗ、Tᵣ 與 mg 三力平衡",
+        16, 24, { color: PL.col("text"), size: 12, weight: "700" });
       rTL.set(q.tl, 1); rTR.set(q.tr, 1); rV.set(q.tl * Math.sin(q.l) + q.tr * Math.sin(q.r), 1); rState.set("ΣFₓ = 0，ΣFᵧ = 0");
       cc.clear();
       let yMax = 0;
-      for (let a = 12; a <= 78; a += 1) { const p = model(a, sR.get()); yMax = Math.max(yMax, p.tl, p.tr); }
+      for (let a = 12; a <= 78; a += 1) { const pp = model(a, sR.get()); yMax = Math.max(yMax, pp.tl, pp.tr); }
       const g = PL.graph(cc, { x: 42, y: 16, w: cc.W - 56, h: cc.H - 40 }, { x0: 12, x1: 78, y0: 0, y1: yMax * 1.1 });
       g.frame({ xlabel: "左繩角度 θₗ (°)", ylabel: "張力 (N)" }); g.grid(6, 4);
       g.fn(a => model(a, sR.get()).tl, { color: "#8db7ff", width: 2.2 });
       g.fn(a => model(a, sR.get()).tr, { color: "#7ee0c0", width: 2.2 });
       g.dot(sL.get(), q.tl, { color: "#8db7ff", glow: "#8db7ff" }); g.dot(sL.get(), q.tr, { color: "#7ee0c0", glow: "#7ee0c0" });
     }
-    cv.onResize(draw); cc.onResize(draw); draw();
-    return { stop() { cv.destroy(); cc.destroy(); }, rerender: draw };
+    cv.onResize(() => draw()); cc.onResize(() => draw()); draw();
+    return { stop() { clock.stop(); cv.destroy(); cc.destroy(); }, rerender: () => draw() };
   }});
 
   /* 題型：輸送帶與物體的相對滑動 */
@@ -918,6 +1172,9 @@
       return { u, current, direction, f, a, tMatch };
     }
     function reset() { v = sV0.get(); t = 0; x = 0; running = false; draw(); }
+    // 放上輸送帶前，直接拖物體上方的速度箭頭決定初速（9 px 代表 1 m/s，可往左拖成負值）
+    let vX0 = 0;
+    const grip = PL.ui.handle(cv, { slider: sV0, label: "物體初速 v₀（拖曳箭頭）", toValue: px => (px - vX0) / 9 });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const q = model(), beltY = H * 0.64, beltX = 32, beltW = W - 64, beltH = 38;
@@ -929,6 +1186,9 @@
       const bx = W * 0.5 + PL.clamp(x * 22, -W * 0.24, W * 0.24), bw = 80, bh = 54, by = beltY - bh;
       AP.crate(ctx, bx, beltY, bw, bh, { label: sM.get() + " kg" });
       if (q.direction) D.arrow(ctx, bx, by - 14, bx + q.direction * Math.min(72, Math.abs(q.f) * 7), by - 14, { color: q.direction > 0 ? "#7ee0c0" : PL.col("danger"), width: 2.5, label: "fₖ" });
+      // 物體速度（相對地面）：和帶速比較，就知道摩擦力往哪邊
+      D.arrow(ctx, bx, by - 44, bx + q.current * 9, by - 44, { color: PL.col("accent-2"), width: 2.2, head: 7, label: "v = " + PL.fmt(q.current, 1) });
+      vX0 = bx; if (running) grip.hide(); else grip.place(bx + q.current * 9, by - 44);
       D.text(ctx, "輸送帶 u = " + PL.fmt(q.u, 1) + " m/s", beltX, beltY - 12, { color: PL.col("text-dim"), size: 12 });
       const state = q.direction === 0 ? "已同速：無相對滑動" : q.direction > 0 ? "物體比帶慢，摩擦力向右" : "物體比帶快，摩擦力向左";
       D.text(ctx, state, 24, 30, { color: q.direction === 0 ? "#7ee0c0" : PL.col("text-dim"), size: 12 });
@@ -952,19 +1212,25 @@
     cv.onResize(draw); cc.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); cc.destroy(); }, rerender: draw };
   }});
-  /* 段考題型：沿斜面外力改變時的摩擦力方向 */
+  /* 段考題型：沿斜面外力改變時的摩擦力方向
+   *
+   * 舊版是一張靜態受力圖。這一版讓木塊真的照受力運動：靜摩擦撐得住就不動；
+   * 撐不住就往「驅動力」的方向滑（可能往上、也可能往下），滑動後摩擦力換成 μₖN、
+   * 方向永遠與速度相反。滑到斜面一端後放回中間重來。讀數仍是起動瞬間的受力分析。
+   * 預設外力 22 N 向上拉，超過最大靜摩擦：物體往上滑，摩擦力朝「下」——最常考錯的那一種。
+   */
   PL.register("incline-applied-force", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" }), cv = PL.canvas.create(L.canvasWrap, 0.61);
     let forceDirection = "up";
     PL.ui.section(L.controls, "斜面與外力");
-    const sM = PL.ui.slider(L.controls, { label: "物體質量 m", min: 0.5, max: 5, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: draw });
-    const sAngle = PL.ui.slider(L.controls, { label: "斜面角度 θ", min: 5, max: 55, step: 1, value: 30, unit: "°", digits: 0, onInput: draw });
-    const sForce = PL.ui.slider(L.controls, { label: "沿斜面外力 F", min: 0, max: 55, step: 1, value: 12, unit: "N", digits: 0, onInput: draw });
-    const sMs = PL.ui.slider(L.controls, { label: "靜摩擦係數 μₛ", min: 0.1, max: 0.9, step: 0.02, value: 0.5, unit: "", digits: 2, onInput: draw });
-    const sMk = PL.ui.slider(L.controls, { label: "動摩擦係數 μₖ", min: 0.05, max: 0.7, step: 0.02, value: 0.35, unit: "", digits: 2, onInput: draw });
+    const sM = PL.ui.slider(L.controls, { label: "物體質量 m", min: 0.5, max: 5, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: () => draw() });
+    const sAngle = PL.ui.slider(L.controls, { label: "斜面角度 θ", min: 5, max: 55, step: 1, value: 30, unit: "°", digits: 0, onInput: () => draw() });
+    const sForce = PL.ui.slider(L.controls, { label: "沿斜面外力 F", min: 0, max: 55, step: 1, value: 22, unit: "N", digits: 0, onInput: () => draw() });
+    const sMs = PL.ui.slider(L.controls, { label: "靜摩擦係數 μₛ", min: 0.1, max: 0.9, step: 0.02, value: 0.5, unit: "", digits: 2, onInput: () => draw() });
+    const sMk = PL.ui.slider(L.controls, { label: "動摩擦係數 μₖ", min: 0.05, max: 0.7, step: 0.02, value: 0.35, unit: "", digits: 2, onInput: () => draw() });
     PL.ui.section(L.controls, "外力方向");
     PL.ui.chipGroup(L.controls, { value: forceDirection, options: [{ value: "up", label: "沿斜面向上拉" }, { value: "down", label: "沿斜面向下推" }], onChange: value => { forceDirection = value; draw(); } });
-    PL.ui.note(L.controls, "先判斷若沒有摩擦時物體想往哪裡滑；靜摩擦力必定朝<b>相反方向</b>。 ");
+    PL.ui.note(L.controls, "先判斷若沒有摩擦時物體想往哪裡滑；靜摩擦力必定朝<b>相反方向</b>。按播放看物體動不動、往哪裡動；也可以直接拖 F 箭頭的尖端改變外力。 ");
     const rN = PL.ui.readout(L.readouts, { label: "正向力 N", unit: "N" });
     const rF = PL.ui.readout(L.readouts, { label: "實際摩擦力", unit: "N" });
     const rMax = PL.ui.readout(L.readouts, { label: "最大靜摩擦", unit: "N" });
@@ -976,8 +1242,39 @@
       const staticHold = Math.abs(drive) <= fsMax + 1e-9, muK = Math.min(sMs.get(), sMk.get());
       const friction = staticHold ? -drive : -Math.sign(drive || 1) * muK * N;
       const acceleration = staticHold ? 0 : (drive + friction) / m;
-      return { m, th, F, N, drive, fsMax, staticHold, friction, acceleration };
+      return { m, th, F, N, drive, fsMax, staticHold, friction, acceleration, muK };
     }
+    /*
+     * 運動狀態：s 是木塊沿斜面離中點的距離（px，正值＝往下坡），v 為速度（m/s，正值＝往下坡）。
+     * 斜面畫面上約 1 m = 60 px。滑動中的摩擦力看「速度」方向，不是看驅動力方向——
+     * 例如往上拉得太猛又突然放鬆，木塊會先減速、停下，再由靜摩擦決定要不要倒滑回來。
+     */
+    const PX_PER_M = 60;
+    let s = 0, v = 0, pause = 0, geo = { c: { x: 0, y: 0 }, dir: { x: 1, y: 0 }, half: 100 };
+    function step(dt) {
+      if (!(dt > 0)) return;
+      const q = model();
+      if (pause > 0) { pause -= dt; if (pause <= 0) { s = 0; v = 0; } return; }
+      let left = Math.min(dt, 0.1);
+      while (left > 1e-6) {
+        const h = Math.min(left, 1 / 240);
+        if (Math.abs(v) < 1e-6) {
+          if (q.staticHold) { v = 0; break; }
+          v += q.acceleration * h;
+        } else {
+          const nv = v + (q.drive - Math.sign(v) * q.muK * q.N) / q.m * h;
+          // 速度過零：先停下來，再交給靜摩擦判斷
+          v = Math.sign(nv) !== Math.sign(v) ? 0 : nv;
+        }
+        s += v * PX_PER_M * h; left -= h;
+      }
+      // 滑到斜面一端：停一下，再把木塊放回中間
+      if (Math.abs(s) > geo.half) { s = Math.sign(s) * geo.half; v = 0; pause = 0.7; }
+    }
+    const clock = PL.motion.clock(dt => { step(dt); draw(); });
+    // 把手抓 F 箭頭的尖端：沿斜面拖離木塊越遠，外力越大（箭頭長 30 + 1.4F px）
+    const grip = PL.ui.handle(cv, { slider: sForce, label: "沿斜面外力 F（拖曳箭頭）",
+      toValue: (x, y) => ((x - geo.c.x) * geo.dir.x + (y - geo.c.y) * geo.dir.y - 30) / 1.4 });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const q = model(), floorY = H - 42, baseX = 42, slopeLength = Math.min(W * 0.63, H * 1.05 / Math.sin(q.th));
@@ -986,15 +1283,30 @@
       AP.benchTop(ctx, W, H, floorY);
       AP.ramp(ctx, baseX, floorY, slopeLength, q.th);
       const down = { x: -Math.cos(q.th), y: Math.sin(q.th) }, normal = { x: -Math.sin(q.th), y: -Math.cos(q.th) };
-      const point = { x: top.x + down.x * slopeLength * 0.48, y: top.y + down.y * slopeLength * 0.48 };
+      const half = slopeLength * 0.36;
+      if (clock.t === 0 && !clock.running) { s = 0; v = 0; }
+      s = PL.clamp(s, -half, half);
+      const d0 = slopeLength * 0.48 + s;
+      const point = { x: top.x + down.x * d0, y: top.y + down.y * d0 };
       AP.massBlock(ctx, point.x + normal.x * 1, point.y + normal.y * 1, 50, 28, { color: MC(), label: q.m + " kg", ang: -q.th, noShadow: true });
       const c = { x: point.x + normal.x * 13, y: point.y + normal.y * 13 }, scale = 3.1;
+      const moving = Math.abs(v) > 1e-6;
       D.arrow(ctx, c.x, c.y, c.x, c.y + 50, { color: PL.col("warn"), width: 2.2, label: "mg" });
       D.arrow(ctx, c.x, c.y, c.x + normal.x * 42, c.y + normal.y * 42, { color: "#8db7ff", width: 2.2, label: "N" });
-      const appSign = forceDirection === "down" ? 1 : -1, appLen = Math.min(62, q.F * scale);
-      D.arrow(ctx, c.x, c.y, c.x + down.x * appSign * appLen, c.y + down.y * appSign * appLen, { color: PL.col("accent-2"), width: 2.5, label: "F" });
-      const fSign = Math.sign(q.friction || 0), fLen = Math.min(58, Math.abs(q.friction) * scale);
-      if (fLen > 0.5) D.arrow(ctx, c.x, c.y, c.x + down.x * fSign * fLen, c.y + down.y * fSign * fLen, { color: q.staticHold ? "#7ee0c0" : PL.col("danger"), width: 2.4, label: q.staticHold ? "fₛ" : "fₖ" });
+      const appSign = forceDirection === "down" ? 1 : -1, appLen = 30 + q.F * 1.4;
+      const fdir = { x: down.x * appSign, y: down.y * appSign };
+      if (q.F > 0) D.arrow(ctx, c.x, c.y, c.x + fdir.x * appLen, c.y + fdir.y * appLen, { color: PL.col("accent-2"), width: 2.5, label: "F" });
+      geo = { c, dir: fdir, half };
+      grip.place(c.x + fdir.x * appLen, c.y + fdir.y * appLen);
+      // 滑動中摩擦力與速度反向；靜止時才是讀數裡那個靜摩擦
+      const fric = moving ? -Math.sign(v) * q.muK * q.N : q.friction, isStatic = !moving && q.staticHold;
+      const fSign = Math.sign(fric || 0), fLen = Math.min(58, Math.abs(fric) * scale);
+      if (fLen > 0.5) D.arrow(ctx, c.x, c.y, c.x + down.x * fSign * fLen, c.y + down.y * fSign * fLen, { color: isStatic ? "#7ee0c0" : PL.col("danger"), width: 2.4, label: isStatic ? "fₛ" : "fₖ" });
+      // 速度箭頭（畫在斜面下側，避開力的箭頭）：長度正比於速率
+      if (moving) {
+        const vb = { x: point.x - normal.x * 26, y: point.y - normal.y * 26 }, vl = Math.min(80, Math.abs(v) * 30) * Math.sign(v);
+        D.arrow(ctx, vb.x, vb.y, vb.x + down.x * vl, vb.y + down.y * vl, { color: PL.col("accent"), width: 2, head: 7, label: "v" });
+      }
       /*
        * μₖ 在物體靜止時同樣無法從畫面判讀。加一組對照棒：
        * 最大靜摩擦 μₛN 與動摩擦 μₖN 並排，並標出目前的驅動力。
@@ -1027,8 +1339,8 @@
       g.hline(q.fsMax, { color: "rgba(126,224,192,0.65)", dash: [4, 3], width: 1.2 }); g.hline(-q.fsMax, { color: "rgba(126,224,192,0.65)", dash: [4, 3], width: 1.2 });
       g.dot(q.F, q.drive, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
     }
-    cv.onResize(draw); cc.onResize(draw); draw();
-    return { stop() { cv.destroy(); cc.destroy(); }, rerender: draw };
+    cv.onResize(() => draw()); cc.onResize(() => draw()); draw();
+    return { stop() { clock.stop(); cv.destroy(); cc.destroy(); }, rerender: () => draw() };
   }});
 
   /* 段考題型：桌面物體與懸掛物的連接體 */
@@ -1054,6 +1366,14 @@
       return { mt, mh, fsMax, pull, staticHold, f, a, T };
     }
     function reset() { y = 0; v = 0; released = false; draw(); }
+    /*
+     * 把手抓懸掛物：手拉著它上下移動（整個系統跟著動），放手就是「釋放」。
+     * 靜摩擦撐得住時放手後系統停在原地——這也是答案的一部分。
+     */
+    let hangTop = 0;
+    const grip = PL.ui.handle(cv, { label: "懸掛物（拉著移動，放手釋放）",
+      onDrag: (px, py) => { released = false; v = 0; y = PL.clamp((py - 20 - hangTop) / 18, 0, 9); draw(); },
+      onRelease: () => { released = true; if (!model().staticHold) anim.start(); else draw(); } });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv); const q = model(), tableY = H * 0.43, edge = W * 0.70, blockX = edge - 105 + y * 12, ropeY = tableY - 15;
       const AP = PL.apparatus;
@@ -1067,6 +1387,7 @@
       AP.massBlock(ctx, blockX, tableY, 64, 30, { color: MC(), label: "mₜ" });
       const hy = ropeY + 64 + y * 18;
       AP.massBlock(ctx, edge + 20, hy + 40, 58, 40, { color: "#ffab80", label: "mₕ", hook: true, noShadow: true });
+      hangTop = ropeY + 64; grip.place(edge + 20, hy + 34);
       D.arrow(ctx, blockX, tableY - 45, blockX + Math.min(60, q.T * 2.2), tableY - 45, { color: PL.col("accent-2"), width: 2.4, label: "T" }); if (q.f) D.arrow(ctx, blockX, tableY - 56, blockX - Math.min(58, q.f * 1.3), tableY - 56, { color: q.staticHold ? "#7ee0c0" : PL.col("danger"), width: 2.2, label: "f" });
       D.arrow(ctx, edge + 52, hy + 14, edge + 52, hy + 58, { color: PL.col("warn"), width: 2.3, label: "mₕg" }); D.text(ctx, q.staticHold ? "最大靜摩擦足夠：系統靜止" : "懸掛物下降，兩物體共同加速", 24, 30, { color: q.staticHold ? "#7ee0c0" : PL.col("danger"), size: 12 });
       rA.set(q.a, 2); rT.set(q.T, 2); rF.set(q.f, 2); rState.set(q.staticHold ? "保持靜止" : "mₕ 向下運動");
@@ -1088,6 +1409,14 @@
     const rA = PL.ui.readout(L.readouts, { label: "瞬時加速度 a", unit: "m/s²" }); const rX = PL.ui.readout(L.readouts, { label: "垂落長度 x", unit: "m" }); const rV = PL.ui.readout(L.readouts, { label: "繩速率 v", unit: "m/s" }); const rState = PL.ui.readout(L.readouts, { label: "受力判讀" });
     const cc = PL.ui.chart(PL.ui.charts(root), { title: "垂落比例與加速度", cap: "在光滑桌面上，繩子的總長與總質量會約掉；加速度只由當下垂落比例決定。" });
     function reset() { portion = sPortion.get(); v = 0; elapsed = 0; released = false; draw(); }
+    /*
+     * 把手抓垂下來的繩端：往下拉就是讓更多繩子垂出桌邊（初始垂落比例），
+     * 放手就是釋放——這正是做這個實驗時手在做的事。
+     */
+    let ropeGeo = { tableY: 0, ropePx: 1 };
+    const grip = PL.ui.handle(cv, { slider: sPortion, label: "垂下的繩端（往下拉，放手釋放）",
+      toValue: (px, py) => (py - ropeGeo.tableY) / ropeGeo.ropePx,
+      onRelease: () => { reset(); released = true; anim.start(); } });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv); const length = sLength.get(), a = portion * 9.8, tableY = H * 0.43, edge = W * 0.70, ropeTopStart = 56;
       /*
@@ -1109,6 +1438,8 @@
       AP.rope(ctx, edge - topLength, tableY - 3.5, edge, tableY - 3.5, 7, "#d09a4a");
       ctx.strokeStyle = "#d09a4a"; ctx.lineWidth = 7; ctx.beginPath(); ctx.arc(edge, tableY + 8, 11.5, -Math.PI / 2, 0); ctx.stroke();
       AP.rope(ctx, edge + 11.5, tableY + 8, edge + 11.5, tableY + hangLength, 7, "#d09a4a");
+      ropeGeo = { tableY, ropePx };
+      if (released) grip.hide(); else grip.place(edge + 11.5, tableY + hangLength);
       D.arrow(ctx, edge + 32, tableY + hangLength * 0.48, edge + 32, tableY + hangLength * 0.48 + Math.min(50, portion * 70), { color: PL.col("danger"), width: 2.3, label: "垂落部分重力" }); D.arrow(ctx, edge - topLength * 0.52, tableY - 32, edge - topLength * 0.52 + Math.min(50, v * 6), tableY - 32, { color: PL.col("accent-2"), width: 2.2, label: "v" });
       D.text(ctx, "垂落比例 x/L = " + PL.fmt(portion, 2), 24, 30, { color: PL.col("text-dim"), size: 12 }); D.text(ctx, released ? "垂落越多，拉力與加速度越大" : "設定初始垂落比例後釋放繩子", 24, 50, { color: PL.col("text-faint"), size: 11 });
       rA.set(a, 2); rX.set(portion * length, 2); rV.set(v, 2); rState.set("整條繩共同加速");

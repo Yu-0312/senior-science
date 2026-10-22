@@ -47,11 +47,11 @@
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
     PL.ui.section(L.controls, "浸入量測");
-    const sRho = PL.ui.slider(L.controls, { label: "物體密度 ρ物", min: 1200, max: 8000, step: 100, value: 2700, unit: "kg/m³", digits: 0, onInput: draw });
-    const sVol = PL.ui.slider(L.controls, { label: "物體體積 V", min: 100, max: 800, step: 25, value: 300, unit: "cm³", digits: 0, onInput: draw });
-    const sSub = PL.ui.slider(L.controls, { label: "浸入比例", min: 0, max: 100, step: 5, value: 0, unit: "%", digits: 0, onInput: draw });
-    const sFluid = PL.ui.select(L.controls, { label: "液體", value: "1000", options: [{ value: "1000", label: "水（1000 kg/m³）" }, { value: "800", label: "酒精（800 kg/m³）" }, { value: "1260", label: "鹽水（1260 kg/m³）" }], onChange: draw });
-    PL.ui.note(L.controls, "先讀取空氣中的示數，再逐漸浸入液體；兩次彈簧秤示數之差就是浮力。");
+    const sRho = PL.ui.slider(L.controls, { label: "物體密度 ρ物", min: 1200, max: 8000, step: 100, value: 2700, unit: "kg/m³", digits: 0, onInput: () => draw() });
+    const sVol = PL.ui.slider(L.controls, { label: "物體體積 V", min: 100, max: 800, step: 25, value: 300, unit: "cm³", digits: 0, onInput: () => draw() });
+    const sSub = PL.ui.slider(L.controls, { label: "浸入比例", min: 0, max: 100, step: 5, value: 0, unit: "%", digits: 0, onInput: () => draw() });
+    const sFluid = PL.ui.select(L.controls, { label: "液體", value: "1000", options: [{ value: "1000", label: "水（1000 kg/m³）" }, { value: "800", label: "酒精（800 kg/m³）" }, { value: "1260", label: "鹽水（1260 kg/m³）" }], onChange: () => draw() });
+    PL.ui.note(L.controls, "先讀取空氣中的示數，再逐漸浸入液體；兩次彈簧秤示數之差就是浮力。按播放放手後，金屬塊在彈簧上晃幾下才停住——浸在液體裡晃得少、停得快；也可以直接抓著金屬塊上下拖，改變浸入比例。");
     const rW = PL.ui.readout(L.readouts, { label: "空氣中重量 W", unit: "N" });
     const rT = PL.ui.readout(L.readouts, { label: "彈簧秤示數 T", unit: "N" });
     const rFb = PL.ui.readout(L.readouts, { label: "示數差／浮力 F_b", unit: "N" });
@@ -62,15 +62,28 @@
       const W = rho * vol * 9.8, Fb = rhoL * vol * frac * 9.8;
       return { rho, volCm, frac, rhoL, W, Fb: Math.min(Fb, W), T: Math.max(0, W - Fb) };
     }
-    function drawScale(x, y, tension) {
-      const { ctx } = cv;
-      PL.apparatus.meter(ctx, x, y - 14, 24, PL.clamp(tension / 20, 0, 1), null);
-      D.text(ctx, "彈簧秤", x, y - 46, { color: PL.col("text-dim"), size: 10, align: "center" });
-      D.text(ctx, PL.fmt(tension, 2) + " N", x, y + 34, { color: MC(), size: 11, align: "center", weight: "700" });
-    }
-    function draw() {
+    /*
+     * 彈簧秤的指針不是瞬間跳到新讀數：金屬塊掛在彈簧上是一個彈簧–質量系統，
+     * 浮力一改變就上下振動，再由阻力慢慢消耗掉，最後指針停在 T = W − F_b（讀數仍以此式為準）。
+     * 阻尼隨浸入比例變大——在空氣中幾乎只靠空氣阻力，泡進液體裡黏滯阻力大得多，晃兩下就停。
+     * t = 0 時手還托著金屬塊、彈簧沒有伸長（示數 0）；按播放才放手。
+     */
+    let xr = 0, vr = 0;                      // 指針目前指的拉力（N）與其變化率
+    const KPX = 1.2;                          // 每 1 N 拉力，彈簧多伸長幾 px（掛鉤下的細繩跟著變長）
+    let geo = null;
+    const clock = PL.motion.clock(dt => draw(dt));
+    const grip = PL.ui.handle(cv, { slider: sSub, label: "金屬塊（上下拖改變浸入比例）",
+      toValue: (x, y) => geo ? 100 * (1 - (geo.surface - (y - geo.boxH + 6 - geo.bob)) / geo.boxH) : sSub.get() });
+    function draw(dt) {
       const { ctx, W, H } = cv, s = data(); cv.clear(); D.bg(cv);
       const AP = PL.apparatus;
+      const fresh = clock.t === 0 && !clock.running;
+      if (fresh) { xr = 0; vr = 0; }
+      else if (dt > 0) {
+        const om = 9, ze = 0.07 + 0.35 * s.frac;
+        let left = Math.min(dt, 0.1);
+        while (left > 1e-6) { const h = Math.min(left, 1 / 240); vr += (-om * om * (xr - s.T) - 2 * ze * om * vr) * h; xr += vr * h; left -= h; }
+      } else if (!clock.running) { xr = s.T; vr = 0; }
       /* 矮畫面時整組縮小、水面往下移，彈簧秤才掛得在鐵架橫桿底下 */
       const k = PL.clamp(H / 400, 0.6, 1), boxW = 72 * k, boxH = 56 * k;
       const tankL = W * 0.45, tankR = W - 36, surface = Math.max(H * 0.5, 113 + boxH), floor = H - 28;
@@ -78,20 +91,26 @@
       AP.beaker(ctx, (tankL + tankR) / 2, floor, tankR - tankL, floor - surface + 26,
         (floor - surface) / (floor - surface + 26));
       D.text(ctx, s.rhoL + " kg/m³", tankL + 12, surface + 19, { color: PL.col("accent-2"), size: 11 });
-      const top = surface - boxH * (1 - s.frac), cx = (tankL + tankR) / 2;
+      const topEq = surface - boxH * (1 - s.frac), cx = (tankL + tankR) / 2;
+      // 拉力超過 20 N 時指針已到底，延伸量也一併封頂，才不會把金屬塊拉出畫面
+      const ext = v => PL.clamp(v, 0, 20) * KPX, bob = ext(xr) - ext(s.T), top = topEq + bob;
       /* 鐵架吊著彈簧秤，彈簧秤下掛金屬塊：浸得越深，整組跟著放低 */
-      const len = PL.clamp(surface - boxH - 83, 30, Math.max(60, H * 0.16)), scaleTop = top - 18 - 21 - len;
+      const len = PL.clamp(surface - boxH - 83 - ext(20), 30, Math.max(60, H * 0.16)), scaleTop = topEq - 18 - ext(s.T) - 21 - len;
       AP.standRod(ctx, tankL - 40, floor, 14);
       AP.crossArm(ctx, tankL - 40, 24, cx);
       AP.cord(ctx, cx, 33, cx, scaleTop - 11);
-      const hook = AP.springScaleV(ctx, cx, scaleTop, len, PL.clamp(s.T / 20, 0, 1), PL.fmt(s.T, 2) + " N");
+      const hook = AP.springScaleV(ctx, cx, scaleTop, len, PL.clamp(xr / 20, 0, 1), PL.fmt(Math.max(0, xr), 2) + " N");
       AP.cord(ctx, cx, hook.y, cx, top);
       AP.massBlock(ctx, cx, top + boxH, boxW, boxH, { color: "#8d97a6", label: "金屬塊", noShadow: true });
+      geo = { surface, boxH, bob };
+      // 把手放在金屬塊底緣中央，不蓋住中間的標籤與兩側的力箭頭
+      grip.place(cx, top + boxH - 6);
       const mid = top + boxH / 2;
       D.arrow(ctx, cx - boxW * 0.44, mid, cx - boxW * 0.44, mid + 42, { color: PL.col("warn"), width: 2.2, label: "W" });
       D.arrow(ctx, cx + boxW * 0.44, mid, cx + boxW * 0.44, mid - 42 * (s.Fb / Math.max(s.W, 0.01)), { color: PL.col("accent-2"), width: 2.2, label: "F_b" });
       D.arrow(ctx, cx, top, cx, top - 34 * (s.T / Math.max(s.W, 0.01)), { color: MC(), width: 2, label: "T" });
       D.text(ctx, "浸入 " + PL.fmt(s.frac * 100, 0) + "%", cx, floor - 9, { color: PL.col("text-dim"), size: 11, align: "center" });
+      if (fresh) { D.text(ctx, "手托住金屬塊，", 12, 30, { color: PL.col("text-dim"), size: 11 }); D.text(ctx, "按播放放手", 12, 46, { color: PL.col("text-dim"), size: 11 }); }
       rW.set(s.W, 2); rT.set(s.T, 2); rFb.set(s.Fb, 2); rVd.set(s.volCm * s.frac, 0);
       chart.clear();
       const g = PL.graph(chart, { x: 42, y: 16, w: chart.W - 58, h: chart.H - 40 }, { x0: 0, x1: 100, y0: 0, y1: Math.max(1, s.W * 1.15) });
@@ -99,8 +118,8 @@
       g.fn(p => Math.max(0, s.W - s.rhoL * s.volCm * 1e-6 * 9.8 * p / 100), { color: MC(), width: 2.1 });
       g.dot(s.frac * 100, s.T, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
     }
-    cv.onResize(draw); chart.onResize(draw); draw();
-    return { stop() { cv.destroy(); chart.destroy(); }, rerender: draw };
+    cv.onResize(() => draw()); chart.onResize(() => draw()); draw();
+    return { stop() { clock.stop(); cv.destroy(); chart.destroy(); }, rerender: () => draw() };
   }});
 
   /* 白努利原理 */
@@ -414,8 +433,9 @@
   PL.register("gas-laws", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
-    const sProc = PL.ui.select(L.controls, { label: "過程", value: "iso", options: [{ value: "iso", label: "等溫（波以耳）" }, { value: "isobar", label: "等壓（查理）" }], onChange: draw });
-    const sDrive = PL.ui.slider(L.controls, { label: "調整", min: 0.4, max: 1.6, step: 0.02, value: 1, unit: "×", digits: 2, onInput: draw });
+    const sProc = PL.ui.select(L.controls, { label: "過程", value: "iso", options: [{ value: "iso", label: "等溫（波以耳）" }, { value: "isobar", label: "等壓（查理）" }], onChange: () => draw() });
+    const sDrive = PL.ui.slider(L.controls, { label: "調整", min: 0.4, max: 1.6, step: 0.02, value: 1, unit: "×", digits: 2, onInput: () => draw() });
+    PL.ui.note(L.controls, "按播放看汽缸裡的分子：等溫時直接抓活塞往下壓，分子速率不變、但撞活塞更頻繁，壓力變大；等壓時拖加熱板升溫，分子變快，活塞被推高、體積變大。");
     const rP = PL.ui.readout(L.readouts, { label: "壓力 P", unit: "kPa" });
     const rV = PL.ui.readout(L.readouts, { label: "體積 V", unit: "L" });
     const rT = PL.ui.readout(L.readouts, { label: "溫度 T", unit: "K" });
@@ -424,23 +444,88 @@
       if (sProc.get() === "iso") { const V = 2 * d, T = 300, P = 300 * 2 / V; return { V, T, P }; }
       const T = 300 * d, V = 2 * d, P = 300; return { V, T, P };
     }
-    function draw() {
+    /*
+     * 汽缸裡的分子：位置用「佔氣柱寬、高的比例」存，活塞一動整群跟著壓扁或拉開。
+     * 速率 ∝ √T（每顆分子有自己的速率倍數，模擬速率分布）；撞到四壁彈性反射。
+     * 撞活塞的次數就是壓力的來源：
+     *   等溫壓縮——速率不變、氣柱變矮，撞得更頻繁 → P ∝ 1/V
+     *   等壓加熱——分子變快、但活塞被推高，撞擊頻率 × 每次的動量剛好不變 → P 固定
+     * 讀數仍由 PV = 常數 × T 計算；分子只負責讓學生看見這件事為什麼成立。
+     */
+    const N = 36, mol = [];
+    let seed = 11;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let i = 0; i < N; i++) {
+      const a = rnd() * TAU, f = 0.55 + rnd() * 0.9;
+      mol.push({ x: rnd(), y: rnd(), vx: Math.cos(a) * f, vy: Math.sin(a) * f, flash: 0 });
+    }
+    const BASE = 95;                           // 300 K 時的典型速率（px/s，慢動作）
+    const piston = PL.motion.follower(2, { omega: 6, zeta: 0.6 });
+    let hits = 0, rate = 0, rateT = 0, flashes = [];
+    const clock = PL.motion.clock(dt => draw(dt));
+    let geo = null;
+    // 等溫：抓活塞壓；等壓：活塞自由浮動，學生能動的是加熱板
+    const gPiston = PL.ui.handle(cv, { slider: sDrive, label: "活塞（上下拖改變體積）",
+      toValue: (x, y) => geo ? (geo.cylBot - (y + 6)) / geo.fullH * 3.2 / 2 : sDrive.get() });
+    let heatStart = null;
+    const gHeat = PL.ui.handle(cv, { slider: sDrive, label: "加熱板（上下拖調整溫度）",
+      toValue: (x, y) => { if (!heatStart) heatStart = { y, v: sDrive.get() }; return heatStart.v + (heatStart.y - y) / 140 * 1.2; },
+      onRelease: () => { heatStart = null; } });
+    function draw(dt) {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const s = state();
       // 汽缸
       const AP = PL.apparatus;
       const cylX = 40, cylW = 80, cylTop = 70, cylBot = H - 56, fullH = cylBot - cylTop;
-      const gasH = fullH * PL.clamp(s.V / 3.2, 0.1, 1);
+      // 活塞追上新體積：有質量的活塞被推動，會稍微晃一下才停（暫停時直接到位）
+      const Vs = piston.update(s.V, dt, clock.running);
+      const gasH = fullH * PL.clamp(Vs / 3.2, 0.1, 1);
       AP.benchTop(ctx, W, H, H - 30);
       /* 等溫：壓力靠活塞上的砝碼決定（砝碼越多壓力越大）；等壓：砝碼不變、底下加熱 */
       const iso = sProc.get() === "iso";
       AP.hotPlate(ctx, cylX + cylW / 2, H - 30, cylW + 30, iso ? 0 : (s.T - 120) / 360);
       const hue = PL.clamp((s.T - 120) / 360, 0, 1);
-      AP.cylinderPiston(ctx, cylX, cylTop, cylW, fullH, cylBot - gasH, {
+      const pistonY = cylBot - gasH;
+      AP.cylinderPiston(ctx, cylX, cylTop, cylW, fullH, pistonY, {
         gas: "rgb(" + Math.round(120 + 110 * hue) + "," + Math.round(150 - 60 * hue) + "," + Math.round(220 - 150 * hue) + ")",
         weights: Math.max(1, Math.round(s.P / 110)), rod: 16
       });
-      D.text(ctx, "氣體", cylX + cylW / 2, cylBot - gasH / 2, { color: PL.col("text"), size: 12, align: "center", weight: "700" });
+      // 分子運動：px/s 換成「每秒走過幾個氣柱寬／高」，氣柱變矮時同樣速率撞頂更頻繁
+      const gw = cylW - 10, gh = Math.max(6, gasH - 6), k = Math.sqrt(s.T / 300);
+      if (dt > 0) {
+        mol.forEach(m => {
+          m.x += m.vx * BASE * k * dt / gw; m.y += m.vy * BASE * k * dt / gh;
+          if (m.x < 0) { m.x = -m.x; m.vx = Math.abs(m.vx); }
+          if (m.x > 1) { m.x = 2 - m.x; m.vx = -Math.abs(m.vx); }
+          if (m.y > 1) { m.y = 2 - m.y; m.vy = -Math.abs(m.vy); }
+          if (m.y < 0) { m.y = -m.y; m.vy = Math.abs(m.vy); hits++; m.flash = 1; flashes.push({ x: m.x, a: 1 }); }
+          m.x = PL.clamp(m.x, 0, 1); m.y = PL.clamp(m.y, 0, 1);
+          if (m.flash > 0) m.flash -= dt * 5;
+        });
+        flashes.forEach(f => { f.a -= dt * 4; }); flashes = flashes.filter(f => f.a > 0);
+        // 撞擊頻率：每 0.5 秒結算一次，再做指數平滑，數字才讀得出來
+        rateT += dt;
+        if (rateT >= 0.5) { rate = rate ? rate * 0.6 + (hits / rateT) * 0.4 : hits / rateT; hits = 0; rateT = 0; }
+      }
+      const Lt = PL.theme.isLight(), dotC = Lt ? "rgba(26,40,90,0.85)" : "rgba(236,242,255,0.92)";
+      const gx0 = cylX + 5, gy0 = pistonY + 3;
+      ctx.save();
+      mol.forEach(m => {
+        const px = gx0 + m.x * gw, py = gy0 + m.y * gh;
+        ctx.fillStyle = m.flash > 0 ? (Lt ? "#d0453a" : "#ffd36b") : dotC;
+        ctx.beginPath(); ctx.arc(px, py, 2.6, 0, TAU); ctx.fill();
+      });
+      // 撞到活塞底面的位置亮一下：每一下都是一次推力
+      ctx.strokeStyle = Lt ? "#d0453a" : "#ffd36b"; ctx.lineWidth = 2;
+      flashes.forEach(f => { ctx.globalAlpha = Math.max(0, f.a); const x = gx0 + f.x * gw; ctx.beginPath(); ctx.moveTo(x - 5, pistonY + 1); ctx.lineTo(x + 5, pistonY + 1); ctx.stroke(); });
+      ctx.restore();
+      D.text(ctx, iso ? "等溫 300 K" : PL.fmt(s.T, 0) + " K", cylX + cylW / 2, 18, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
+      // 撞擊頻率寫在 P–V 圖右上角（那一角兩種過程的曲線都不會經過；畫布左下角留給把手提示）
+      if (clock.running && rate > 0) D.text(ctx, "分子撞活塞 " + PL.fmt(rate, 0) + " 次/秒（慢動作）", W - 30, 62, { color: PL.col("text-dim"), size: 10.5, align: "right", weight: "700" });
+      else if (!clock.running && clock.t === 0) D.text(ctx, "按播放看汽缸裡的分子", W - 30, 62, { color: PL.col("text-dim"), size: 10.5, align: "right" });
+      geo = { cylBot, fullH };
+      if (iso) { gHeat.hide(); gPiston.place(cylX + cylW / 2, pistonY - 6); }
+      else { gPiston.hide(); gHeat.place(cylX + cylW / 2 + 34, H - 40); }
       // P–V 圖
       const bx = cylX + cylW + 40, by = 40, bw = W - bx - 20, bh = H - 70;
       const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: 3.4, y0: 0, y1: 700 });
@@ -450,8 +535,8 @@
       g.dot(s.V, s.P, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
       rP.set(s.P, 0); rV.set(s.V, 2); rT.set(s.T, 0);
     }
-    cv.onResize(draw); draw();
-    return { stop() { cv.destroy(); }, rerender: draw };
+    cv.onResize(() => draw()); draw();
+    return { stop() { clock.stop(); cv.destroy(); }, rerender: () => draw() };
   }});
 
   /* 熱平衡與比熱 */

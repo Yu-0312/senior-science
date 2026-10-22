@@ -88,6 +88,21 @@
   }
 
   const SC = {};
+  /* 拖曳把手的建立函式：GRIPS[id](st) 在建置時呼叫一次，st 與場景共用 */
+  const GRIPS = {};
+
+  /* 光點：深色底圈＋亮芯。光路畫在白紙、量角盤這類不隨主題變色的淺色器材上，單用亮色會消失 */
+  function lightDots(ctx, pts, dist, o) {
+    o = o || {};
+    PL.motion.flow(ctx, pts, dist, Object.assign({}, o, { r: (o.r || 2.4) + 1.3, color: "rgba(120,10,0,0.55)", glow: false }));
+    PL.motion.flow(ctx, pts, dist, Object.assign({}, o, { color: "#fff6c8", glow: 5 }));
+  }
+  /* 菲涅耳反射率（s、p 平均）：分配反射與折射光點的亮度 */
+  function fresnelR(n1, n2, ti, tt) {
+    const ci = Math.cos(ti), ct = Math.cos(tt);
+    const rs = (n1 * ci - n2 * ct) / (n1 * ci + n2 * ct), rp = (n1 * ct - n2 * ci) / (n1 * ct + n2 * ci);
+    return Math.min(1, (rs * rs + rp * rp) / 2);
+  }
 
   /* 電梯裡的體重計：車廂固定在畫面中，大樓樓層相對往下／往上捲動 */
   SC["apparent-weight"] = k => {
@@ -201,15 +216,58 @@
     fillPill(ctx, 18, H - 24 * s - 40, "串聯等效勁度", PL.fmt(kS, 2) + " N/m", 124, c);
   };
 
-  /* 質心：把支點放在質心，木尺就會水平平衡 */
+  /*
+   * 質心：刀口支點可左右拖。支點在質心時力矩相等，放手後木尺保持水平；
+   * 偏離質心則繞刀口轉動，直到一端碰桌。木尺質量忽略（與讀數公式一致）：
+   * I = m₁d₁² + m₂d₂²、τ = g(m₂d₂ − m₁d₁)cosθ。條件一改變就由手扶平，播放才放手。
+   */
+  GRIPS["center-of-mass"] = st => {
+    st.xf = 5;                 // 支點位置（m）：預設在正中央，故意和質心錯開
+    st.th = 0; st.om = 0; st.released = false;
+    st.grip = PL.ui.handle(st.cv, { label: "刀口支點（左右移動）",
+      onDrag: x => {
+        const g = st.geo; if (!g) return;
+        let m = clamp((x - g.x0) / g.Lp * 10, 0.3, 9.7);
+        // 靠近質心就吸附，否則手動永遠對不準、看不到真正的平衡
+        if (Math.abs(m - g.xc) < 0.15) m = g.xc;
+        st.xf = m; st.holding = true; st.redraw();
+      },
+      onRelease: () => { st.holding = false; st.redraw(); } });
+  };
   SC["center-of-mass"] = k => {
-    const { ctx, W, H, a: m1, b: m2, t, s, c, v: xc } = k;
+    const { ctx, W, H, a: m1, b: m2, s, c, v: xc, dt } = k;
+    const S = k.st || {};
     const benchY = H * 0.82;
     AP.labRoom(ctx, W, H, benchY, {});
     const Lp = Math.min(W * 0.72, 600 * s), x0 = W / 2 - Lp / 2;
-    const kh = 54 * s, plankH = 12 * s, plankY = benchY - 6 - kh - plankH;
-    const xf = x0 + xc / 10 * Lp;
-    AP.knifeEdge(ctx, xf, benchY - 6 - kh, kh, 46 * s);
+    const kh = 54 * s, plankH = 12 * s, pivotY = benchY - 6 - kh, plankY = pivotY - plankH;
+    const xfm = S.xf == null ? xc : S.xf, xf = x0 + xfm / 10 * Lp;
+    S.geo = { x0, Lp, xc };
+    const key = [m1, m2, xfm, W, H].join("|");
+    if (S.key !== key || k.clock < (S.lastClock || 0) || S.holding) { S.th = 0; S.om = 0; S.released = false; }
+    S.key = key; S.lastClock = k.clock;
+    const d1 = xfm, d2 = 10 - xfm, net = m2 * d2 - m1 * d1;      // 合力矩 / g，順時針（右側往下）為正
+    const balanced = Math.abs(net) < 1e-3;
+    // 一端碰桌就停：端點距離 × sinθ = 刀口高度
+    const hgt = benchY - pivotY;
+    const thR = Math.asin(clamp(hgt / (x0 + Lp + 10 * s - xf), 0, 1)), thL = -Math.asin(clamp(hgt / (xf - x0 + 10 * s), 0, 1));
+    if (dt > 0 && k.st && !S.holding) {
+      S.released = true;
+      if (!balanced) {
+        const I = m1 * d1 * d1 + m2 * d2 * d2;
+        let left = Math.min(dt, 0.1);
+        while (left > 1e-6) {
+          const h = Math.min(left, 1 / 240);
+          S.om += 9.8 * net * Math.cos(S.th) / I * h; S.th += S.om * h; left -= h;
+          if (S.th > thR || S.th < thL) { S.th = clamp(S.th, thL, thR); S.om = Math.abs(S.om) < 0.3 ? 0 : -0.2 * S.om; }
+        }
+      }
+    }
+    const th = S.th || 0, cth = Math.cos(th), sth = Math.sin(th);
+    const rot = (x, y) => ({ x: xf + (x - xf) * cth - (y - pivotY) * sth, y: pivotY + (x - xf) * sth + (y - pivotY) * cth });
+    AP.knifeEdge(ctx, xf, pivotY, kh, 46 * s);
+    if (S.grip) S.grip.place(xf, pivotY + kh * 0.62);
+    ctx.save(); ctx.translate(xf, pivotY); ctx.rotate(th); ctx.translate(-xf, -pivotY);
     const g = ctx.createLinearGradient(0, plankY, 0, plankY + plankH);
     g.addColorStop(0, "rgb(246,222,150)"); g.addColorStop(1, "rgb(204,168,92)");
     ctx.fillStyle = g; ctx.fillRect(x0 - 10 * s, plankY, Lp + 20 * s, plankH);
@@ -224,20 +282,28 @@
     const side = m => (16 + 30 * Math.sqrt(m / 10)) * s;
     AP.massBlock(ctx, x0, plankY, side(m1), side(m1), { color: "#d0643a", label: PL.fmt(m1, 1) + "kg" });
     AP.massBlock(ctx, x0 + Lp, plankY, side(m2), side(m2), { color: "#3f7fcf", label: PL.fmt(m2, 1) + "kg" });
-    // 質心記號（黑白象限圓）
-    const r = 7 * s, my = plankY + plankH / 2;
-    [0, 1, 2, 3].forEach(q => { ctx.fillStyle = q % 2 ? "#1d232c" : "#f4f4f0"; ctx.beginPath(); ctx.moveTo(xf, my); ctx.arc(xf, my, r, q * Math.PI / 2, (q + 1) * Math.PI / 2); ctx.closePath(); ctx.fill(); });
-    ctx.strokeStyle = "#1d232c"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(xf, my, r, 0, PL.TAU); ctx.stroke();
-    // 重力箭頭與力臂
-    D.arrow(ctx, x0, plankY - side(m1) / 2, x0, plankY - side(m1) / 2 + 40 * s + m1 * 5 * s, { color: PL.col("danger"), width: 2.2 });
-    D.arrow(ctx, x0 + Lp, plankY - side(m2) / 2, x0 + Lp, plankY - side(m2) / 2 + 40 * s + m2 * 5 * s, { color: PL.col("danger"), width: 2.2 });
-    const yb = benchY + 18 * s;
-    D.arrow(ctx, xf, yb, x0, yb, { color: "#d0643a", width: 2 });
-    D.arrow(ctx, xf, yb, x0 + Lp, yb, { color: "#3f7fcf", width: 2 });
-    D.text(ctx, "d₁ = " + PL.fmt(xc, 2) + " m", (x0 + xf) / 2, yb + 16 * s, { color: "#d0643a", size: 11, align: "center", weight: "700" });
-    D.text(ctx, "d₂ = " + PL.fmt(10 - xc, 2) + " m", (xf + x0 + Lp) / 2, yb + 16 * s, { color: "#3f7fcf", size: 11, align: "center", weight: "700" });
-    D.text(ctx, "質心", xf, plankY - 12 * s, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
-    D.text(ctx, "m₁d₁ = m₂d₂ → 平衡", W / 2, 40 * s, { color: c, size: 12.5, align: "center", weight: "700" });
+    // 質心記號（黑白象限圓）：畫在質心，支點不一定在這裡
+    const xcp = x0 + xc / 10 * Lp, r = 7 * s, my = plankY + plankH / 2;
+    [0, 1, 2, 3].forEach(q => { ctx.fillStyle = q % 2 ? "#1d232c" : "#f4f4f0"; ctx.beginPath(); ctx.moveTo(xcp, my); ctx.arc(xcp, my, r, q * Math.PI / 2, (q + 1) * Math.PI / 2); ctx.closePath(); ctx.fill(); });
+    ctx.strokeStyle = "#1d232c"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(xcp, my, r, 0, PL.TAU); ctx.stroke();
+    ctx.restore();
+    // 還沒放手：手托在較重的一側
+    if (!S.released && !balanced) AP.hand(ctx, net > 0 ? x0 + Lp - 34 * s : x0 + 34 * s, pivotY, 1, 0.72 * s, { ang: -Math.PI / 2 });
+    const p1 = rot(x0, plankY - side(m1) / 2), p2 = rot(x0 + Lp, plankY - side(m2) / 2), pc = rot(xcp, plankY - 12 * s);
+    D.arrow(ctx, p1.x, p1.y, p1.x, p1.y + 40 * s + m1 * 5 * s, { color: PL.col("danger"), width: 2.2 });
+    D.arrow(ctx, p2.x, p2.y, p2.x, p2.y + 40 * s + m2 * 5 * s, { color: PL.col("danger"), width: 2.2 });
+    // 淺色台的淺木桌上原本的橘、藍字看不清，改用深一階
+    const yb = benchY + 18 * s, c1 = isL() ? "#8a3412" : "#d0643a", c2 = isL() ? "#1d4f9a" : "#3f7fcf";
+    D.arrow(ctx, xf, yb, x0, yb, { color: c1, width: 2 });
+    D.arrow(ctx, xf, yb, x0 + Lp, yb, { color: c2, width: 2 });
+    D.text(ctx, "d₁ = " + PL.fmt(d1, 2) + " m", (x0 + xf) / 2, yb + 16 * s, { color: c1, size: 11, align: "center", weight: "700" });
+    D.text(ctx, "d₂ = " + PL.fmt(d2, 2) + " m", (xf + x0 + Lp) / 2, yb + 16 * s, { color: c2, size: 11, align: "center", weight: "700" });
+    D.text(ctx, "質心", pc.x, pc.y, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
+    D.text(ctx, "m₁d₁ = " + PL.fmt(m1 * d1, 1) + " kg·m　　m₂d₂ = " + PL.fmt(m2 * d2, 1) + " kg·m", W / 2, 40 * s, { color: PL.col("text"), size: 12, align: "center", weight: "700" });
+    const msg = balanced ? ["支點在質心：兩側力矩相等，放手後木尺保持水平", c]
+      : !S.released ? ["支點不在質心：按播放放手，看木尺倒向哪一側（拖支點到質心試試）", PL.col("warn")]
+      : [(net > 0 ? "右側力矩較大：木尺順時針倒向右側" : "左側力矩較大：木尺逆時針倒向左側"), PL.col("danger")];
+    D.text(ctx, msg[0], W / 2, 40 * s + 20, { color: msg[1], size: 11.5, align: "center", weight: "700" });
     fillPill(ctx, 18, 18, "質心位置（距左端）", PL.fmt(xc, 2) + " m", 132, c);
   };
 
@@ -937,9 +1003,18 @@
     fillPill(ctx, 18, 18, "聲速 v = 4fL", PL.fmt(vs, 0) + " m/s", 120, c);
   };
 
-  /* 臨界角：半圓形玻璃磚放在光學圓盤上，雷射沿半徑射向圓心 */
+  /*
+   * 臨界角：半圓形玻璃磚放在光學圓盤上，雷射沿半徑射向圓心。
+   * 光點在玻璃裡 v = c/n（較慢較密）；反射／折射亮度依菲涅耳分配，
+   * 接近臨界角折射光越來越暗，超過後只剩反射——這才是全反射的樣子。
+   */
+  GRIPS["critical-angle"] = st => {
+    st.grip = PL.ui.handle(st.cv, { slider: st.sb, label: "雷射筆（入射角）",
+      toValue: (x, y) => { const g = st.geo; return g ? Math.atan2(Math.abs(g.cx - x), Math.max(0.0001, y - g.cy)) * 180 / Math.PI : NaN; } });
+  };
   SC["critical-angle"] = k => {
     const { ctx, W, H, a: n1, b: thDeg, t, s, c, v: thC } = k;
+    const S = k.st || {};
     const benchY = H * 0.93;
     AP.labRoom(ctx, W, H, benchY, {});
     const R = Math.min(H * 0.4, W * 0.27), cx = W * 0.42, cy = H * 0.47;
@@ -963,9 +1038,26 @@
     };
     beam(P0.x, P0.y, cx, cy, 0.95);
     const sin2 = n1 * Math.sin(th), tir = sin2 >= 1;
-    if (!tir) { const t2 = Math.asin(sin2); beam(cx, cy, cx + ri * Math.sin(t2), cy - ri * Math.cos(t2), 0.9); D.text(ctx, "折射 " + PL.fmt(t2 * 180 / Math.PI, 0) + "°", cx + ri * 0.55 * Math.sin(t2) + 8 * s, cy - ri * 0.55 * Math.cos(t2), { color: "rgb(200,40,30)", size: 10.5, weight: "700" }); }
-    beam(cx, cy, cx + ri * Math.sin(th), cy + ri * Math.cos(th), tir ? 0.95 : 0.3);
+    const t2 = tir ? 0 : Math.asin(sin2), Rf = tir ? 1 : fresnelR(n1, 1, th, t2);
+    const Pt = { x: cx + ri * Math.sin(t2), y: cy - ri * Math.cos(t2) }, Pr = { x: cx + ri * Math.sin(th), y: cy + ri * Math.cos(th) };
+    if (!tir) { beam(cx, cy, Pt.x, Pt.y, 0.25 + 0.65 * (1 - Rf)); D.text(ctx, "折射 " + PL.fmt(t2 * 180 / Math.PI, 0) + "°", cx + ri * 0.55 * Math.sin(t2) + 8 * s, cy - ri * 0.55 * Math.cos(t2), { color: "rgb(200,40,30)", size: 10.5, weight: "700" }); }
+    beam(cx, cy, Pr.x, Pr.y, tir ? 0.95 : 0.2 + 0.75 * Rf);
+    // 光點：空氣 150 px/s，玻璃 ÷n，頻率固定故間距也 ÷n。雷射筆在玻璃外：先走空氣 ri − gr，沿半徑射入弧面不偏折
+    const cL = 150 * s, fL = 6.5, vG = cL / n1, clk = k.clock || 0;
+    const C0 = { x: cx, y: cy }, onR = (ang, rr, sg) => ({ x: cx - sg * rr * Math.sin(ang), y: cy + rr * Math.cos(ang) });
+    const Ein = onR(th, gr, 1), Eout = onR(th, gr, -1);
+    const tIn = (ri - gr) / cL, tHit = tIn + gr / vG, tOut = tHit + gr / vG;
+    const dg = { gap: vG / fL, front: true }, da = { gap: cL / fL, front: true };
+    lightDots(ctx, [P0, Ein], clk * cL, da);
+    lightDots(ctx, [Ein, C0], (clk - tIn) * vG, dg);
+    const aR = 0.15 + 0.85 * Rf;
+    lightDots(ctx, [C0, Eout], (clk - tHit) * vG, Object.assign({ alpha: aR, r: 2.1 }, dg));
+    lightDots(ctx, [Eout, Pr], (clk - tOut) * cL, Object.assign({ alpha: aR, r: 2.1 }, da));
+    if (!tir) lightDots(ctx, [C0, Pt], (clk - tHit) * cL, Object.assign({ alpha: 0.15 + 0.85 * (1 - Rf) }, da));
     AP.laser(ctx, P0.x, P0.y, Math.atan2(cy - P0.y, cx - P0.x), { len: 42 * s });
+    S.geo = { cx, cy };
+    // 把手抓筆身，不蓋住光束起點
+    if (S.grip) S.grip.place(P0.x - (cx - P0.x) / ri * 22 * s, P0.y - (cy - P0.y) / ri * 22 * s);
     D.text(ctx, "入射 " + PL.fmt(thDeg, 0) + "°", cx - ri * 0.72 * Math.sin(th) - 10 * s, cy + ri * 0.72 * Math.cos(th) - 6 * s, { color: "rgb(200,40,30)", size: 10.5, align: "right", weight: "700" });
     D.text(ctx, "空氣", cx + R * 0.46, cy - R * 0.2, { color: "rgba(40,48,60,0.75)", size: 10 });
     const mats = [["水", 1.33], ["玻璃", 1.5], ["鑽石", 2.42]];
@@ -978,9 +1070,19 @@
     fillPill(ctx, 18, 18, "臨界角 θc", PL.fmt(thC, 1) + "°", 110, c);
   };
 
-  /* 平行玻璃磚：插針法描光路（俯視，桌上一張白紙） */
+  /*
+   * 平行玻璃磚：插針法描光路（俯視，桌上一張白紙）。光點進玻璃後降為 c/1.5、間距變密，
+   * 出來後恢復且與入射光平行——側移 d 是在玻璃裡走斜線累積的。把手：雷射筆、玻璃磚下緣。
+   */
+  GRIPS["refraction-slab"] = st => {
+    st.grip = PL.ui.handle(st.cv, { slider: st.sb, label: "雷射筆（入射角）",
+      toValue: (x, y) => { const g = st.geo; return g ? Math.atan2(Math.abs(g.ex - x), Math.max(0.0001, g.by - y)) * 180 / Math.PI : NaN; } });
+    st.grip2 = PL.ui.handle(st.cv, { slider: st.sa, label: "玻璃磚下緣（厚度）",
+      toValue: (x, y) => { const g = st.geo; return g ? 2 * (y - g.mid) / g.pxmm : NaN; } });
+  };
   SC["refraction-slab"] = k => {
     const { ctx, W, H, a: tmm, b: thDeg, s, c, v: dmm } = k;
+    const S = k.st || {};
     AP.circuitBoard(ctx, W, H, true);
     const n = 1.5, th = rad(thDeg), r2 = Math.asin(Math.sin(th) / n);
     const pxmm = Math.min(5.2 * s, (H * 0.44) / 30), T = tmm * pxmm;
@@ -999,7 +1101,16 @@
     D.line(ctx, ex, by, ex + (T + Lr * 0.8) * Math.tan(th), by + T + Lr * 0.8, "rgba(200,60,50,0.45)", 1.2, [5, 4]);
     const ray = (a, b2) => { ctx.save(); ctx.strokeStyle = "rgba(230,40,32,0.95)"; ctx.lineWidth = 2 * s; ctx.shadowColor = "rgba(255,40,30,0.6)"; ctx.shadowBlur = 5; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b2.x, b2.y); ctx.stroke(); ctx.restore(); };
     ray(inS, { x: ex, y: by }); ray({ x: ex, y: by }, { x: exX, y: by + T }); ray({ x: exX, y: by + T }, outE);
+    const cL = 150 * s, vG = cL / n, fL = 6.5, clk = k.clock || 0;
+    const E1 = { x: ex, y: by }, E2 = { x: exX, y: by + T };
+    const t1 = Lr / cL, t2 = t1 + Math.hypot(exX - ex, T) / vG;
+    lightDots(ctx, [inS, E1], clk * cL, { gap: cL / fL, front: true });
+    lightDots(ctx, [E1, E2], (clk - t1) * vG, { gap: vG / fL, front: true });
+    lightDots(ctx, [E2, outE], (clk - t2) * cL, { gap: cL / fL, front: true });
     AP.laser(ctx, inS.x, inS.y, Math.atan2(Math.cos(th), Math.sin(th)), { len: 38 * s });
+    S.geo = { ex, by, mid: H * 0.52, pxmm };
+    if (S.grip) S.grip.place(inS.x - Math.sin(th) * 20 * s, inS.y - Math.cos(th) * 20 * s);
+    if (S.grip2) S.grip2.place(bx + bw * 0.86, by + T);
     const pin = (x, y, col) => {
       ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(x + 2, y + 2, 4 * s, 2.5 * s, 0, 0, PL.TAU); ctx.fill();
       ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, 3.8 * s, 0, PL.TAU); ctx.fill();
@@ -1335,9 +1446,38 @@
     fillPill(ctx, 18, 18, "相對力矩", PL.fmt(tq, 2), 104, c);
   };
 
-  /* 黑體輻射：望遠鏡拍到的恆星顏色＋筆電上的光譜曲線 */
+  /*
+   * 黑體輻射：望遠鏡拍到的恆星顏色＋筆電上的光譜曲線。
+   * 光子從星體表面飛出，波長從普朗克光子數分布 n(λ) ∝ λ⁻⁴/(e^(hc/λkT) − 1) 抽樣：
+   * 可見光畫實心點、紅外／紫外畫空心圈。恆星的顏色就是這群光子混出來的。
+   * 把手拖光譜峰值線＝改溫度（λmax·T 固定）。
+   */
+  const BB_L0 = 100, BB_L1 = 3000;
+  function bbTable(T) {
+    // 累積分布表（反函數抽樣）；hc/k = 1.4388×10⁷ nm·K
+    const n = 240, cdf = new Float64Array(n + 1);
+    for (let i = 1; i <= n; i++) {
+      const l = BB_L0 + (BB_L1 - BB_L0) * (i - 0.5) / n;
+      cdf[i] = cdf[i - 1] + Math.pow(l, -4) / Math.expm1(1.4388e7 / (l * T));
+    }
+    for (let i = 1; i <= n; i++) cdf[i] /= cdf[n] || 1;
+    return cdf;
+  }
+  function bbSample(cdf, u) {
+    const n = cdf.length - 1;
+    let lo = 0, hi = n;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (cdf[m] < u) lo = m; else hi = m; }
+    const f = (u - cdf[lo]) / Math.max(1e-12, cdf[hi] - cdf[lo]);
+    return BB_L0 + (BB_L1 - BB_L0) * (lo + f) / n;
+  }
+  GRIPS["blackbody"] = st => {
+    st.ph = []; st.acc = 0;
+    st.grip = PL.ui.handle(st.cv, { slider: st.sa, label: "光譜峰值（拖曳改溫度）",
+      toValue: x => { const g = st.geo; if (!g) return NaN; const l = g.l0 + (x - g.gx0) / (g.gx1 - g.gx0) * (g.l1 - g.l0); return l > 1 ? 2898000 / l : NaN; } });
+  };
   SC["blackbody"] = k => {
-    const { ctx, W, H, a: T, b: Rr, t, s, c, v: lam } = k;
+    const { ctx, W, H, a: T, b: Rr, t, s, c, v: lam, dt } = k;
+    const S = k.st || {};
     const benchY = H * 0.86;
     AP.labRoom(ctx, W, H, benchY, {});
     const vr = Math.min(H * 0.3, W * 0.17), vx = W * 0.22, vy = H * 0.46;
@@ -1354,6 +1494,42 @@
     const body = ctx.createRadialGradient(vx - sr * 0.3, vy - sr * 0.3, sr * 0.1, vx, vy, sr);
     body.addColorStop(0, "rgb(255,255,250)"); body.addColorStop(0.5, col); body.addColorStop(1, AP.kColor(T * 0.8));
     ctx.fillStyle = body; ctx.beginPath(); ctx.arc(vx, vy, sr, 0, PL.TAU); ctx.fill();
+    if (S.ph) {
+      if (S.cdfT !== T) { S.cdf = bbTable(T); S.cdfT = T; }
+      if (k.clock < (S.lastClock || 0)) { S.ph.length = 0; S.acc = 0; }      // 重設
+      S.lastClock = k.clock;
+      if (dt > 0) {
+        // 光子數率 ∝ R²T³，跨好幾個數量級；取 0.35 次方壓縮，保留「越熱越大越多」的趨勢
+        const rate = clamp(34 * Math.pow(Math.pow(T / 5800, 3) * Rr * Rr, 0.35), 3, 140);
+        S.acc += rate * dt;
+        while (S.acc >= 1 && S.ph.length < 260) {
+          S.acc -= 1;
+          S.ph.push({ a: Math.random() * PL.TAU, r: 0, l: bbSample(S.cdf, Math.random()) });
+        }
+        if (S.acc >= 1) S.acc = 0;
+        const v = 60 * s;
+        S.ph.forEach(p => { p.r += v * dt; });
+        S.ph = S.ph.filter(p => sr + p.r < vr + 6);
+      }
+      S.ph.forEach(p => {
+        const x = vx + Math.cos(p.a) * (sr + p.r), y = vy + Math.sin(p.a) * (sr + p.r);
+        const vis = AP.nmColor(p.l, 0.95);
+        if (vis) { ctx.fillStyle = vis; ctx.beginPath(); ctx.arc(x, y, 2.2 * s, 0, PL.TAU); ctx.fill(); }
+        else {
+          ctx.strokeStyle = p.l < 380 ? "rgba(190,140,255,0.75)" : "rgba(255,120,90,0.55)"; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(x, y, 2.4 * s, 0, PL.TAU); ctx.stroke();
+        }
+      });
+      // 這兩行字在暗區登記範圍外：補登記，淺色主題才不會改成深色墨
+      const ty1 = vy - vr * 0.72, ty2 = vy + vr * 0.82;
+      noteC(ctx, "rgb(4,8,18)", vx - vr * 0.62, ty1 - 11, vr * 1.24, 15);
+      noteC(ctx, "rgb(4,8,18)", vx - vr * 0.62, ty2 - 10, vr * 1.24, 14);
+      if (S.ph.length) {
+        const nIR = S.ph.filter(p => p.l > 780).length, nUV = S.ph.filter(p => p.l < 380).length;
+        D.text(ctx, "可見 " + (S.ph.length - nIR - nUV) + "　紅外 " + nIR + "　紫外 " + nUV, vx, ty1, { color: "rgb(220,228,240)", size: 9.5, align: "center" });
+      }
+      D.text(ctx, "● 可見光　○ 紅外／紫外（看不見）", vx, ty2, { color: "rgba(220,228,240,0.8)", size: 8.5, align: "center" });
+    }
     ctx.restore();
     ctx.strokeStyle = "rgb(44,48,56)"; ctx.lineWidth = 8 * s; ctx.beginPath(); ctx.arc(vx, vy, vr + 4 * s, 0, PL.TAU); ctx.stroke();
     D.text(ctx, "望遠鏡影像：R = " + PL.fmt(Rr, 1) + " R☉", vx, vy + vr * 0.66, { color: "rgb(220,228,240)", size: 10, align: "center", weight: "700" });
@@ -1376,7 +1552,9 @@
     [500, 1000, 1500, 2000].forEach(l => ctx.fillText(l + "", X(l), gy1 + 20 * s));
     ctx.textAlign = "right"; ctx.fillText("λ (nm)", gx1, gy1 - 5);
     ctx.restore();
-    if (lm > l0 && lm < l1) D.text(ctx, "λmax = " + PL.fmt(lm, 0) + " nm", X(lm) + 6, gy0 + 6, { color: "rgb(140,224,255)", size: 10.5, weight: "700" });
+    if (lm > l0 && lm < l1) D.text(ctx, "λmax = " + PL.fmt(lm, 0) + " nm", X(lm) + 20, gy0 + 6, { color: "rgb(140,224,255)", size: 10.5, weight: "700" });
+    S.geo = { l0, l1, gx0, gx1 };
+    if (S.grip) S.grip.place(X(lm), Y(1));
     D.text(ctx, "光譜（峰高已縮放）", scr.x + 8, scr.y + 14, { color: "rgba(210,220,236,0.85)", size: 10 });
     D.text(ctx, "T = " + PL.fmt(T, 0) + " K", vx, vy - vr - 14 * s, { color: PL.col("text"), size: 13, align: "center", weight: "700" });
     fillPill(ctx, 18, 18, "峰值波長 λmax", PL.fmt(lam, 1) + " nm", 124, c);
@@ -1412,10 +1590,17 @@
     "blackbody": "溫度越高，光譜峰值往短波長移動（λmax·T = 2.898×10⁻³ m·K），顏色由紅轉白再轉藍"
   };
 
-  function drawScene(cv, cfg, a, b, t, value) {
+  /*
+   * x 是動態場景需要的額外資訊（其他場景不讀，照舊只用 t）：
+   *   dt       這一格前進的模擬時間；滑桿重畫、暫停重畫時為 0
+   *   running  是否正在播放（暫停時阻尼追隨器直接跳到目標）
+   *   clock    傳輸列的模擬時間：按「重設」會歸零，光點的波前從頭再走一次
+   *   st       每次建置一份的狀態（滑桿、拖曳把手、追隨器、上一格的幾何）
+   */
+  function drawScene(cv, cfg, a, b, t, value, x) {
     const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
     const f = SC[cfg.id];
-    if (f) f({ cv, ctx, W, H, cfg, a, b, t, v: value, c: color(), s: clamp(Math.min(W / 800, H / 464), 0.5, 1.7) });
+    if (f) f(Object.assign({ cv, ctx, W, H, cfg, a, b, t, v: value, c: color(), s: clamp(Math.min(W / 800, H / 464), 0.5, 1.7) }, x));
   }
 
   /*
@@ -1447,17 +1632,21 @@
       const r2 = PL.ui.readout(L.readouts, { label: cfg.b[0], unit: cfg.b[4] });
       const chart = PL.ui.chart(PL.ui.charts(root), { title: cfg.output + "關係圖", cap: "曲線以目前第二個條件為固定值；滑動任一參數可比較趨勢與當前量測點。" });
       let time = 0;
-      function render() {
+      const st = { cv, sa, sb, redraw: () => render() };
+      function render(dt) {
         const a = sa.get(), b = sb.get(), result = cfg.calc(a, b);
-        drawScene(cv, cfg, a, b, time, result);
+        drawScene(cv, cfg, a, b, time, result, { dt: dt > 0 ? dt : 0, running: !!(anim && anim.running), clock: anim ? anim.t : 0, st });
         r.set(result, Math.abs(result) < 1 ? 3 : 2); r2.set(b, cfg.b[4] === "" ? 2 : 1);
         chart.setCap(PL.ui.relationChart(chart, {
           a: cfg.a, b: cfg.b, av: a, bv: b,
           calc: cfg.calc, output: cfg.output, sweep: cfg.sweep
         }));
       }
-      anim = PL.loop(dt => { if (dt) time += dt; render(); });
-      cv.onResize(render); chart.onResize(render); render(); anim.start();
+      // 畫面上可以直接抓的器材（雷射筆、支點…）：建立一次，位置由場景每格更新
+      if (GRIPS[id]) GRIPS[id](st);
+      anim = PL.loop(dt => { if (dt) time += dt; render(dt); });
+      // 縮放回呼可能帶參數進來，包一層確保 render 收到的 dt 只來自迴圈
+      cv.onResize(() => render()); chart.onResize(() => render()); render(); anim.start();
       return { stop() { anim.stop(); cv.destroy(); chart.destroy(); }, rerender: render };
     }});
   });

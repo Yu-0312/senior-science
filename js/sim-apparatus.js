@@ -4306,4 +4306,212 @@
     lcd, balance, powerSupply, horseshoe, ringCoil, laptop, electroscope, flowDots, heatWaves, bubbles, dial, nmColor, kColor,
     poly, oblique, obBox, woodFloor, concreteFloor
   };
+
+  /* ======================================================================
+     動態與直接操作（2026-10）
+
+     盤點時有 62 個實驗按下播放後畫面一動也不動：光學只有一張光路圖、
+     電路只有指針、靜力平衡只有一張受力圖。它們都能拉滑桿，但學生看到的是
+     「換一張圖」，不是「一個會動的系統」。這裡提供三個共用零件：
+
+       motion.flow      沿光路／導線流動的光點或電荷：看得到傳播方向與快慢
+       motion.follower  阻尼彈簧追隨器：參數改變後，系統「晃一晃再停在」新平衡
+       ui.handle        畫布上的拖曳把手：直接抓著雷射筆、砝碼、透鏡去調，
+                        背後仍是同一根滑桿（讀數、探測引擎、重設全部照舊）
+
+     時間凍結原則：暫停時追隨器直接跳到目標（時間不走，就不該有過渡），
+     播放時才看得到過渡。這樣暫停狀態下拉滑桿畫面仍會立即改變。
+     ====================================================================== */
+  PL.motion = {
+    /*
+     * 沿折線畫一串等距光點，s 是已經走過的距離（px）。
+     * 呼叫端用 s = t × 速率 讓光點前進；介質裡光變慢，就給較小的速率，
+     * 光點自然擠在一起——這正是波長變短的樣子。
+     * o: gap 間距、r 半徑、color、alpha、glow（false 關閉）、
+     *    fade（越遠越淡，0–1）、front（只畫到波前 s 為止）
+     */
+    flow(ctx, pts, s, o) {
+      o = o || {};
+      if (!pts || pts.length < 2) return;
+      const P = pts.map(p => Array.isArray(p) ? { x: p[0], y: p[1] } : p);
+      const gap = o.gap || 22, r = o.r || 2.4;
+      // 預設光點色隨主題：深色台用亮白黃，淺色台用飽和的琥珀色（淡黃在米白底上幾乎看不見）
+      const color = o.color || (PL.theme.isLight() ? "#e39400" : "#fff4c2");
+      const seg = [];
+      let total = 0;
+      for (let i = 1; i < P.length; i++) {
+        const len = Math.hypot(P[i].x - P[i - 1].x, P[i].y - P[i - 1].y);
+        seg.push(len); total += len;
+      }
+      if (total < 1) return;
+      // front：光／電流剛打開時只畫到波前為止（s 就是波前走過的距離）
+      if (o.front) { if (s <= 0) return; total = Math.min(total, s); }
+      const start = ((s % gap) + gap) % gap;
+      ctx.save();
+      ctx.fillStyle = color;
+      if (o.glow !== false) { ctx.shadowColor = color; ctx.shadowBlur = o.glow || 6; }
+      let k = 0, acc = 0;
+      for (let d = start; d < total; d += gap) {
+        while (k < seg.length - 1 && d > acc + seg[k]) { acc += seg[k]; k++; }
+        const u = seg[k] ? (d - acc) / seg[k] : 0;
+        const x = P[k].x + (P[k + 1].x - P[k].x) * u, y = P[k].y + (P[k + 1].y - P[k].y) * u;
+        const a = o.fade ? Math.max(0.08, 1 - d / total * o.fade) : 1;
+        ctx.globalAlpha = (o.alpha == null ? 1 : o.alpha) * a;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+      }
+      ctx.restore();
+    },
+    /*
+     * 阻尼彈簧追隨器：value 以 ω、ζ 追上 target。
+     * update(target, dt, running)：
+     *   dt > 0          → 照物理步進（播放中）
+     *   dt 為 0／未給   → 暫停中就直接跳到目標；播放中則維持現狀等下一格
+     */
+    follower(v0, o) {
+      o = o || {};
+      const omega = o.omega || 7, zeta = o.zeta == null ? 0.32 : o.zeta;
+      const f = {
+        value: v0, vel: 0, target: v0,
+        step(dt) {
+          let left = Math.min(dt, 0.1);
+          while (left > 1e-6) {
+            const h = Math.min(left, 1 / 120);
+            const acc = -omega * omega * (f.value - f.target) - 2 * zeta * omega * f.vel;
+            f.vel += acc * h; f.value += f.vel * h; left -= h;
+          }
+          return f.value;
+        },
+        snap() { f.value = f.target; f.vel = 0; return f.value; },
+        update(target, dt, running) {
+          if (target != null && isFinite(target)) f.target = target;
+          if (dt > 0) return f.step(dt);
+          if (!running) return f.snap();
+          return f.value;
+        },
+        get settled() { return Math.abs(f.value - f.target) < 1e-3 * (Math.abs(f.target) + 1) && Math.abs(f.vel) < 1e-3; }
+      };
+      return f;
+    },
+    /*
+     * 給原本沒有時間軸的實驗一個時鐘：draw(dt, t) 每格被呼叫一次。
+     * 建置時只畫一格（全站不自動播放），按播放才開始走。
+     */
+    clock(draw, fps) {
+      // start() 在建置期會同步畫一格；那時呼叫端的 const clock 還沒賦值，
+      // draw 裡讀 clock.t 會丟 TDZ 錯誤。建置期這一格交給呼叫端自己的 draw()。
+      let ready = false;
+      const c = PL.loop((dt, t) => { if (ready) draw(dt, t); }, fps);
+      c.start();
+      ready = true;
+      return c;
+    }
+  };
+
+  /*
+   * 畫布上的拖曳把手
+   *
+   * 用 DOM 元素疊在畫布上，而不是畫在畫布裡再自己做命中測試：
+   *  · 實驗的繪圖程式不必知道把手存在，只要在算出位置後呼叫 h.place(x, y)
+   *  · 鍵盤可以聚焦、用方向鍵調整，螢幕閱讀器讀得到 role="slider"
+   *  · 永遠疊在量測工具層之上，打開碼錶時把手仍抓得到
+   *
+   * o.slider    要驅動的滑桿（PL.ui.slider 的回傳值）
+   * o.toValue   (x, y) → 滑桿值；x、y 是畫布座標（與繪圖相同的 CSS px）
+   * o.label     把手名稱，例如「雷射筆（入射角）」
+   * o.onDrag    (x, y) → 自訂拖曳（不經過滑桿，例如把物體拉離平衡位置）
+   * o.onRelease 放手時呼叫（例如放開後開始振盪）
+   */
+  PL.ui.handle = function handle(cv, o) {
+    const host = cv.canvas.parentElement || cv.canvas.parentNode;
+    let layer = host._simHandles;
+    if (!layer) {
+      layer = host._simHandles = PL.el("div", "sim-handles", host);
+      // 第一次出現把手時，在畫面角落提示「可以直接拖」；開始拖之後就收起來
+      const hint = PL.el("div", "sim-handle-hint", layer);
+      hint.textContent = "可直接拖曳畫面上的圓形把手";
+      layer._hint = hint;
+    }
+    const h = PL.el("div", "sim-handle", layer);
+    h.tabIndex = 0;
+    h.setAttribute("role", "slider");
+    const name = o.label || (o.slider && o.slider.label && o.slider.label.textContent) || "拖曳調整";
+    h.setAttribute("aria-label", name);
+    h.title = "拖曳：" + name;
+    h.hidden = true;
+    const tip = PL.el("span", "sim-handle-tip", h); tip.textContent = name;
+    const input = o.slider && o.slider.el;
+    let px = 0, py = 0, dragging = false;
+
+    function syncAria() {
+      if (!input) return;
+      h.setAttribute("aria-valuemin", input.min);
+      h.setAttribute("aria-valuemax", input.max);
+      h.setAttribute("aria-valuenow", input.value);
+    }
+    function apply(v) {
+      if (!input || !isFinite(v)) return;
+      const min = Number(input.min), max = Number(input.max), st = Number(input.step) || 0;
+      let x = PL.clamp(v, min, max);
+      if (st > 0) x = Math.round((x - min) / st) * st + min;
+      x = PL.clamp(Number(x.toFixed(10)), min, max);
+      if (String(x) === input.value || Number(input.value) === x) return;
+      input.value = String(x);
+      // 和使用者拖滑桿走同一條路：顯示值、onInput、暫停時重畫、探測引擎
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      syncAria();
+    }
+    function local(e) {
+      const r = cv.canvas.getBoundingClientRect();
+      return { x: (e.clientX - r.left) * (cv.W / (r.width || cv.W)), y: (e.clientY - r.top) * (cv.H / (r.height || cv.H)) };
+    }
+    h.addEventListener("pointerdown", e => {
+      dragging = true; h.classList.add("is-dragging"); layer.classList.add("is-active", "was-used");
+      try { h.setPointerCapture(e.pointerId); } catch (err) {}
+      e.preventDefault(); e.stopPropagation();
+      try { h.focus({ preventScroll: true }); } catch (err) {}
+    });
+    h.addEventListener("pointermove", e => {
+      if (!dragging) return;
+      const p = local(e);
+      // 自訂拖曳（例如把砝碼往下拉再放手）：交給呼叫端，自己負責重畫
+      if (o.onDrag) { o.onDrag(p.x, p.y); return; }
+      apply(o.toValue(p.x, p.y));
+    });
+    const end = () => {
+      if (!dragging) return;
+      dragging = false; h.classList.remove("is-dragging"); layer.classList.remove("is-active");
+      if (o.onRelease) o.onRelease();
+    };
+    h.addEventListener("pointerup", end);
+    h.addEventListener("pointercancel", end);
+    h.addEventListener("keydown", e => {
+      if (!input) return;
+      const st = Number(input.step) || (Number(input.max) - Number(input.min)) / 100;
+      const dir = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[e.key];
+      if (!dir) return;
+      e.preventDefault();
+      apply(Number(input.value) + dir * st * (e.shiftKey ? 10 : 1));
+    });
+    if (input) input.addEventListener("input", syncAria);
+    syncAria();
+
+    const api = {
+      el: h,
+      /* 在繪圖程式算出物件位置後呼叫；x、y 用畫布座標 */
+      place(x, y) {
+        if (!isFinite(x) || !isFinite(y)) { h.hidden = true; return api; }
+        px = x; py = y;
+        const r = cv.canvas.getBoundingClientRect ? cv.canvas.getBoundingClientRect() : {}, hr = host.getBoundingClientRect ? host.getBoundingClientRect() : {};
+        const sx = (r.width || cv.W) / cv.W, sy = (r.height || cv.H) / cv.H;
+        const ox = r.width ? r.left - hr.left : cv.canvas.offsetLeft, oy = r.height ? r.top - hr.top : cv.canvas.offsetTop;
+        h.style.transform = "translate(" + (ox + px * sx) + "px," + (oy + py * sy) + "px)";
+        h.hidden = false;
+        return api;
+      },
+      hide() { h.hidden = true; return api; },
+      get dragging() { return dragging; }
+    };
+    return api;
+  };
+
 })();

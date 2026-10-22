@@ -25,7 +25,7 @@
  */
 (function () {
   "use strict";
-  const PL = window.PhysicsLab, D = PL.draw;
+  const PL = window.PhysicsLab, D = PL.draw, TAU = PL.TAU;
   const MC = () => PL.col("m-color", "#4dd0e1");
 
   /*
@@ -68,6 +68,8 @@
     let value = 81.32;           // 目前的真實長度（mm）
     let seed = 20260802;
     let answered = null;         // 練習模式：學生按下的選項
+    let shown = value;           // 畫面上量爪／螺桿實際停的位置（mm），播放時會移動
+    let geo = {};
 
     /* ---------------- 量具規格 ---------------- */
     const VERNIER_MAX = 150;     // mm
@@ -80,17 +82,17 @@
      *   L = M + k × (1/n)，因此 k = (L − M) / 精度，且 k 必為整數 0..n−1。
      *   為了讓畫面與讀數永遠自洽，這裡先把 value 對齊到精度的整數倍。
      */
-    function decompose() {
+    function decompose(v) {
       const p = precision();
-      const snapped = Math.round(value / p) * p;
+      const snapped = Math.round((v == null ? value : v) / p) * p;
       const M = Math.floor(snapped + 1e-9);
       const k = Math.round((snapped - M) / p);
       return { snapped, M, k, p };
     }
 
     /* 螺旋測微器：套管讀數以 0.5 mm 為階，微分筒 50 格對應 0.5 mm */
-    function microParts() {
-      const snapped = Math.round(value * 1000) / 1000;
+    function microParts(v) {
+      const snapped = Math.round((v == null ? value : v) * 1000) / 1000;
       const halves = Math.floor(snapped / 0.5 + 1e-9);       // 露出的半毫米格數
       const sleeve = halves * 0.5;
       const thimble = (snapped - sleeve) / 0.01;             // 0..49.9…（含估讀）
@@ -112,6 +114,8 @@
         syncDivisionVisibility();
         sValue.setRange(0, tool === "vernier" ? VERNIER_MAX : MICRO_MAX);
         sValue.set(value);
+        // 換了一支量具：量爪位置直接跳到新讀數，不要從卡尺的 81 mm 一路滑到測微器的 6 mm
+        act = null; follow.snap(); follow.value = shown = value; follow.target = value;
         draw();
       }
     });
@@ -317,10 +321,13 @@
 
     /* ---------------- 繪圖：游標卡尺 ---------------- */
     function drawVernier(ctx, W, H) {
-      const d = decompose();
+      // 畫面上的游標停在 shown（播放時會滑動）；視窗位置跟著真實讀數 value，
+      // 拖曳把手時凍結視窗，否則指標底下的尺一直捲動、手感會失控
+      const d = decompose(shown), dv0 = decompose();
       const pad = 40;
       const mmPx = (W - pad * 2) / 96;                 // 畫面顯示約 96 mm 的區段
-      const view0 = Math.max(0, Math.min(VERNIER_MAX - 96, d.M - 74));
+      const view0 = gripV.dragging && geo.view0 != null ? geo.view0 : Math.max(0, Math.min(VERNIER_MAX - 96, dv0.M - 74));
+      geo = { view0, pad, mmPx };
       const X = mm => pad + (mm - view0) * mmPx;
       const barY = H * 0.40;
 
@@ -365,9 +372,11 @@
       D.text(ctx, PL.fmt(precision(), 2) + " mm", vx + vLen * mmPx * 0.5, barY + 26,
         { color: METAL.label(), size: 9, align: "center" });
 
-      // 測量物：夾在兩爪之間，長度就是讀數
-      D.rect(ctx, X(view0 + 2) + 2, barY + 46, Math.max(2, vx - 12 - (X(view0 + 2) + 2)), 26,
+      // 測量物：長度就是讀數 value；量爪張開時（shown > value）兩者之間看得到空隙
+      D.rect(ctx, X(view0 + 2) + 2, barY + 46, Math.max(2, X(dv0.snapped) - 12 - (X(view0 + 2) + 2)), 26,
         { fill: "rgba(120,140,165,0.35)", stroke: PL.theme.pale(0.3), r: 2 });
+      // 把手抓活動爪：學生真的是用拇指推這一片
+      gripV.place(vx - 3, barY + 88); gripM.hide();
 
       return d;
     }
@@ -376,7 +385,7 @@
     function magVernier(c) {
       const { ctx, W, H } = c;
       c.clear(); D.bg(c);
-      const d = decompose();
+      const d = decompose(shown);
       const span = divisions === 10 ? 6 : divisions === 20 ? 8 : 10;   // 放大顯示幾格游標
       const k0 = Math.max(0, Math.min(divisions - span, d.k - Math.floor(span / 2)));
       const vLenMm = divisions === 10 ? 9 : divisions === 20 ? 19 : 49;
@@ -418,50 +427,73 @@
       }
     }
 
-    /* ---------------- 繪圖：螺旋測微器 ---------------- */
+    /* ---------------- 繪圖：螺旋測微器 ----------------
+     * 幾何照真的量具：砧座固定，測微螺桿與微分筒一起轉、一起前進。
+     * 讀數 L 增加時，螺桿退出（砧座與螺桿之間的空隙 = L），
+     * 微分筒的左緣同時沿套管往右移、多露出 L 那麼長的套管刻度——
+     * 所以「套管露出多少」和「夾住的東西多厚」是同一個長度，學生看得到兩者一起變。
+     * 微分筒上畫出 50 格中正對前方的那一半，基準線對到的那一格就是讀數。
+     */
     function drawMicrometer(ctx, W, H) {
-      const m = microParts();
-      const cx = W * 0.5, cy = H * 0.52;
-      // U 形框架
+      const m = microParts(shown), mv = microParts();
+      const cy = H * 0.5;
+      const k = PL.clamp((Math.min(W, 900) - 230) / 50, 3, 12);     // 每 mm 幾 px
+      const total = 160 + 50 * k, x0 = (W - total) / 2;
+      const xa = x0 + 34;                         // 砧座端面
+      const xsl = xa + 25 * k + 12;               // 套管起點（框架在這裡夾住套管）
+      const xs0 = xsl + 8;                        // 套管上的 0 刻線
+      const xT = xs0 + shown * k;                 // 微分筒左緣
+      const xSp = xa + shown * k;                 // 螺桿端面
+      // C 形框架
       ctx.save();
-      ctx.strokeStyle = METAL.frame(); ctx.lineWidth = 20; ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(cx - 170, cy - 46);
-      ctx.arc(cx - 150, cy + 26, 74, Math.PI * 1.15, Math.PI * 0.6, false);
-      ctx.stroke();
+      ctx.strokeStyle = METAL.frame(); ctx.lineWidth = 18; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.beginPath(); ctx.moveTo(xa - 14, cy - 8); ctx.lineTo(xa - 14, cy + 52); ctx.lineTo(xsl + 2, cy + 52); ctx.lineTo(xsl + 2, cy + 10); ctx.stroke();
       ctx.restore();
-      // 砧座與測微螺桿
-      D.rect(ctx, cx - 120, cy - 12, 24, 26, { fill: METAL.anvil(), r: 2 });
-      D.rect(ctx, cx - 60, cy - 11, 130, 24, { fill: METAL.anvil(), stroke: PL.theme.pale(0.3), r: 3 });
-      // 待測物：厚度就是讀數
-      const thick = Math.max(3, m.snapped * 3.4);
-      D.rect(ctx, cx - 96, cy - 26 - thick * 0.2, thick, 52 + thick * 0.4,
-        { fill: "#c9a227", stroke: PL.theme.pale(0.3), r: 2 });
-      // 固定套管的刻度：上排整毫米、下排半毫米
-      for (let i = 0; i <= 10; i += 1) {
-        const x = cx - 54 + i * 11;
-        D.line(ctx, x, cy - 11, x, cy - 3, METAL.tick(), 1.2);
+      D.text(ctx, "量程 0 – 25 mm · 一格 0.01 mm", (xa + xsl) / 2, cy + 80, { color: PL.col("text-dim"), size: 10, align: "center" });
+      // 砧座
+      D.rect(ctx, xa - 24, cy - 12, 24, 24, { fill: METAL.anvil(), r: 2 });
+      // 待測物：厚度就是讀數 value，夾在砧座與螺桿之間
+      D.rect(ctx, xa, cy - 25, Math.max(2, mv.snapped * k), 50, { fill: "#c9a227", stroke: PL.theme.pale(0.3), r: 2 });
+      // 測微螺桿（從套管伸出來）
+      D.rect(ctx, xSp, cy - 9, Math.max(0, xsl - xSp), 18, { fill: METAL.anvil(), stroke: PL.theme.pale(0.3), r: 2 });
+      // 固定套管與刻度：上排整毫米、下排半毫米（只看得到微分筒左緣以左的部分）
+      // 套管右段收在微分筒裡面，只畫到微分筒左緣
+      D.rect(ctx, xsl, cy - 13, Math.max(8, xT + 6 - xsl), 26, { fill: METAL.anvil(), stroke: PL.theme.pale(0.3), r: 3 });
+      ctx.save(); ctx.beginPath(); ctx.rect(xsl, cy - 40, Math.max(0, xT - xsl), 80); ctx.clip();
+      for (let i = 0; i <= 25; i += 1) {
+        const x = xs0 + i * k;
+        D.line(ctx, x, cy - (i % 5 === 0 ? 11 : 8), x, cy, METAL.tick(), 1.2);
         if (i % 5 === 0) D.text(ctx, String(i), x, cy - 15, { color: METAL.label(), size: 8.5, align: "center" });
         // 下排的半毫米線：錯開半格，這排就是最常被漏看的那一排
-        D.line(ctx, x + 5.5, cy + 3, x + 5.5, cy + 11, METAL.tick(), 1.2);
+        if (i < 25) D.line(ctx, x + k / 2, cy, x + k / 2, cy + 8, METAL.tick(), 1.2);
       }
-      // 微分筒
-      const drum = cx + 70;
-      D.rect(ctx, drum, cy - 30, 92, 60, { fill: METAL.drum(), stroke: PL.theme.pale(0.35), r: 5 });
-      for (let i = 0; i < 12; i += 1) {
-        const frac = ((m.thimble / 50) + i / 12) % 1;
-        const y = cy - 26 + frac * 52;
-        D.line(ctx, drum + 4, y, drum + 30, y, METAL.tick(), 1);
+      ctx.restore();
+      D.line(ctx, xsl, cy, xT + 2, cy, PL.col("danger"), 1.4);   // 基準線
+      // 微分筒：圓周 50 格，轉一圈前進 0.5 mm
+      const dw = 88, R = 27;
+      D.rect(ctx, xT, cy - 31, dw, 62, { fill: METAL.drum(), stroke: PL.theme.pale(0.35), r: 5 });
+      D.rect(ctx, xT, cy - 31, 5, 62, { fill: METAL.slide(), r: 2 });
+      for (let i = 0; i < 50; i += 1) {
+        const ph = (i - m.thimble) / 50 * TAU, cz = Math.cos(ph);
+        if (cz < 0.12) continue;                   // 轉到背面的格線看不到
+        const y = cy - R * Math.sin(ph), big = i % 5 === 0;
+        ctx.globalAlpha = Math.min(1, cz * 1.6);
+        D.line(ctx, xT + 5, y, xT + 5 + (big ? 13 : 8), y, METAL.tick(), 1);
+        if (big && cz > 0.55) D.text(ctx, String(i), xT + 21, y + 3, { color: METAL.label(), size: 8.5 });
+        ctx.globalAlpha = 1;
       }
-      D.line(ctx, drum - 6, cy, drum + 92, cy, PL.col("danger"), 1.4);   // 基準線
-      D.text(ctx, "0 – 25 mm · 0.01", cx - 118, cy + 74, { color: METAL.label(), size: 10 });
+      // 棘輪旋柄：學生真的是轉這裡
+      D.rect(ctx, xT + dw, cy - 15, 24, 30, { fill: METAL.slide(), stroke: PL.theme.pale(0.35), r: 4 });
+      for (let i = 1; i < 6; i += 1) D.line(ctx, xT + dw + i * 4, cy - 13, xT + dw + i * 4, cy + 13, PL.theme.pale(0.25), 1);
+      geo = { xs0, k };
+      gripM.place(xT + dw + 12, cy); gripV.hide();
       return m;
     }
 
     function magMicrometer(c) {
       const { ctx, W, H } = c;
       c.clear(); D.bg(c);
-      const m = microParts();
+      const m = microParts(shown);
       const baseY = H * 0.52;
       // 固定套管：把整毫米與半毫米兩排分開畫，並標出半毫米是否露出
       const mm0 = Math.max(0, Math.floor(m.sleeve) - 1);
@@ -494,10 +526,53 @@
         W - 34, baseY + 46, { color: PL.col("text-dim"), size: 10, align: "right" });
     }
 
+    /* ---------------- 量測動作（播放時） ----------------
+     * 按下播放就做一次「量一次」的手部動作：
+     *   游標卡尺——推開活動爪、再慢慢合上夾住待測物。合上的過程中，放大窗裡
+     *     「對齊的那一格」會沿著游標一路跑過去：爪子只動 0.02 mm，共線就跳一格，
+     *     這正是游標能把 1 mm 細分成 n 份的原因。
+     *   螺旋測微器——先退三圈（1.5 mm），再轉棘輪把螺桿旋進去，碰到待測物時棘輪打滑「喀喀」響。
+     *     微分筒每轉一圈套管就多露出（或蓋住）半毫米，轉動與前進的關係直接看得到。
+     * 動作結束後量具停在讀數上；播放中再拖滑桿或把手，量爪會平順地追過去（不會穿過待測物而過衝）。
+     * 讀數欄位一律顯示夾緊後的結果 value；暫停時沒有過渡，畫面直接停在讀數上。
+     */
+    let act = null;
+    const follow = PL.motion.follower(value, { omega: 12, zeta: 1 });
+    const ease = u => u * u * (3 - 2 * u);
+    function actionPos(dt) {
+      const vern = tool === "vernier", max = vern ? VERNIER_MAX : MICRO_MAX;
+      const open = Math.max(0, Math.min(vern ? 8 : 1.5, max - value));
+      const tOpen = 0.5, tHold = 0.25, tClose = vern ? 1.4 : 2.0, tClick = vern ? 0.6 : 0.8;
+      act.t += dt;
+      const t = act.t;
+      act.phase = t < tOpen + tHold ? "open" : t < tOpen + tHold + tClose ? "close" : "clamp";
+      if (t < tOpen) return value + open * ease(t / tOpen);
+      if (t < tOpen + tHold) return value + open;
+      if (t < tOpen + tHold + tClose) { const u = (t - tOpen - tHold) / tClose; return value + open * (1 - (1 - Math.pow(1 - u, 2.2))); }
+      if (t > tOpen + tHold + tClose + tClick) act = null;
+      return value;
+    }
+    function advance(dt, tick) {
+      if (!clock.running) { act = null; shown = follow.update(value, 0, false); return; }
+      // 迴圈剛啟動（按下播放）的第一格 dt = 0：開始一次量測動作
+      if (tick && dt === 0 && !gripV.dragging && !gripM.dragging) act = { t: 0, phase: "open" };
+      if (act && dt > 0) { shown = actionPos(dt); follow.value = shown; follow.vel = 0; follow.target = value; }
+      else if (!act) shown = follow.update(value, dt, true);
+    }
+    const clock = PL.motion.clock(dt => draw(dt, true));
+
+    /* 把手：游標卡尺抓活動爪、螺旋測微器抓棘輪旋柄，左右拖就是改讀數 */
+    const gripV = PL.ui.handle(cv, { slider: sValue, label: "活動爪（左右推動）",
+      toValue: x => geo.mmPx ? geo.view0 + (x + 3 - geo.pad) / geo.mmPx : sValue.get(),
+      onRelease: () => draw() });
+    const gripM = PL.ui.handle(cv, { slider: sValue, label: "棘輪旋柄（左右拖動螺桿）",
+      toValue: x => geo.k ? (x - 88 - 12 - geo.xs0) / geo.k : sValue.get() });
+
     /* ---------------- 主繪圖 ---------------- */
-    function draw() {
+    function draw(dt, tick) {
       const { ctx, W, H } = cv;
       cv.clear(); D.bg(cv);
+      advance(dt > 0 ? dt : 0, tick);
       // 量具平放在實驗桌上（俯視）：鋼尺的金屬色在木桌上最像真的
       if (PL.apparatus && PL.apparatus.deskTop) PL.apparatus.deskTop(ctx, 0, 0, W, H);
 
@@ -543,6 +618,15 @@
         mag.setMode("講解模式 · 已標出對齊");
       }
 
+      if (act) {
+        const msg = tool === "vernier"
+          ? (act.phase === "open" ? "推開活動爪，放入待測物…" : act.phase === "close" ? "合上量爪：看放大窗裡對齊的那一格一路跑動" : "夾緊了，現在才讀數")
+          : (act.phase === "open" ? "先退開螺桿…" : act.phase === "close" ? "轉棘輪旋進：每轉一圈前進 0.5 mm" : "喀、喀——棘輪打滑，接觸力剛好，讀數");
+        D.text(ctx, msg, 16, 24, { color: PL.col("text"), size: 12, weight: "700" });
+      } else if (!clock.running && clock.t === 0) {
+        D.text(ctx, "按播放，看一次完整的量測動作", 16, 24, { color: PL.col("text-dim"), size: 11 });
+      }
+
       PL.ui.caption(cv, tool === "vernier"
         ? "游標的 " + divisions + " 格恰好等於主尺的 " + (divisions - 1) + " mm，所以每格差 " +
           PL.fmt(precision(), 2) + " mm；只有一格會與主尺共線，那一格的格號就是答案的小數部分。"
@@ -553,8 +637,8 @@
     syncDivisionVisibility();
     renderProcedure();
     const origToolChange = draw;
-    cv.onResize(draw);
-    mag.canvas.onResize(draw);
+    cv.onResize(() => draw());
+    mag.canvas.onResize(() => draw());
     draw();
 
     // 切換量具時步驟卡要跟著換
@@ -564,8 +648,8 @@
     }, 400);
 
     return {
-      stop() { clearInterval(obs); cv.destroy(); mag.canvas.destroy(); },
-      rerender: draw
+      stop() { clearInterval(obs); clock.stop(); cv.destroy(); mag.canvas.destroy(); },
+      rerender: () => draw()
     };
   }});
 })();
@@ -578,6 +662,7 @@
   const PL = window.PhysicsLab, D = PL.draw, TAU = PL.TAU;
   const AP = PL.apparatus;
   const color = () => PL.col("m-color", "#35e0cf");
+  const ease = u => { u = Math.max(0, Math.min(1, u)); return u * u * (3 - 2 * u); };
   /*
    * 不確定度是抽象概念：滑桿一拉就「算出 N 筆」學生不會有量測感。
    * 改成任務式：一按一筆，自己決定要不要再量，看平均值與離散如何收斂。
@@ -640,17 +725,38 @@
         : 0;
       return { mean, spread: Math.sqrt(variance) };
     }
+    /*
+     * 播放時，視線（讀到棒子末端的那條線）會在真實位置附近飄移：
+     * 這是隨機誤差的來源——眼睛角度、棒端對不齊、手抖。飄移用 Ornstein–Uhlenbeck 過程，
+     * 任一瞬間的偏差都服從同一個常態分布 N(0, (0.72 r)²)，和原本每次抽一個常態亂數的模型一致；
+     * 按下「量測一次」就是把「這一瞬間」的視線位置記下來，再對齊到最近的刻度（解析度量化）。
+     * 記下的那一筆會從尺上落進下方的散布圖，學生看得到「一筆資料是怎麼來的」。
+     * 暫停時時間不走，量測沿用一次抽一個常態亂數、點直接出現。
+     */
+    const TAU_EYE = 0.35;
+    let eye = normal() * sigma(), eyeR = sigma(), drops = [];
+    function sigma() { return sResolution.get() * 0.72; }
+    function stepEye(dt) {
+      const sg = sigma();
+      if (eyeR !== sg) { eye *= sg / Math.max(1e-9, eyeR); eyeR = sg; }   // 換了尺：飄移幅度跟著換
+      let left = Math.min(dt, 0.1);
+      while (left > 1e-6) { const h = Math.min(left, 1 / 60); eye += -eye / TAU_EYE * h + sg * Math.sqrt(2 * h / TAU_EYE) * normal(); left -= h; }
+      drops.forEach(d => { d.age += dt; }); drops = drops.filter(d => d.age < 1.1);
+    }
     function measureOnce(silent) {
       const resolution = sResolution.get(), bias = sBias.get();
+      const live = clock && clock.running && !silent;
       // 均勻量化到尺的刻度：讀數只能是解析度的整數倍
-      const raw = trueLength + bias + normal() * resolution * 0.72;
+      const raw = trueLength + bias + (live ? eye : normal() * sigma());
       const snapped = Math.round(raw / resolution) * resolution;
       readings.push(snapped);
+      if (live) drops.push({ idx: readings.length - 1, raw, snapped, age: 0 });
       if (!silent) draw();
     }
     function clearRecords() {
       readings = [];
       revealed = false;
+      drops = [];
       draw();
     }
     function taskState() {
@@ -661,6 +767,14 @@
       if (Math.abs(sBias.get()) > 0.05) return "筆數足夠，但零點未校正——平均值會整體偏移";
       return "筆數足夠：可寫成 x̄ ± u 交作業";
     }
+
+    let rodDrag = null;
+    // 把手抓待測棒：左右推動它，棒的起點就不再對準尺的零點——這就是「零點偏移」
+    const grip = PL.ui.handle(cv, { slider: sBias, label: "待測金屬棒（左右推動改變零點偏移）",
+      toValue: x => { if (!rodDrag) rodDrag = { x, b: sBias.get() }; return rodDrag.b + (x - rodDrag.x) / 8; },
+      onRelease: () => { rodDrag = null; } });
+    const clock = PL.motion.clock(dt => { stepEye(dt); draw(); });
+    const EYE_C = () => PL.theme.isLight() ? "#d0453a" : "#ff7a6b";
 
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
@@ -706,6 +820,13 @@
         const shift = bias * 8;
         steelRod(x0 + (x1 - x0) * 0.2 + shift, x0 + (x1 - x0) * 0.8 + shift, y - 16, 18);
         D.text(ctx, "待測金屬棒", x0 + (x1 - x0) * 0.5 + shift, y - 22, { color: PL.col("text"), size: 10, align: "center", weight: "700" });
+        grip.place(x0 + (x1 - x0) * 0.35 + shift, y - 7);
+        if (clock.running) {
+          // 視線：在棒子末端附近飄（同樣放大 8 倍）
+          const ex = x0 + (x1 - x0) * 0.8 + shift + eye * 8;
+          D.line(ctx, ex, y - 20, ex, y + 38, EYE_C(), 1.6, [3, 2]);
+          D.text(ctx, "你的視線", ex, y + 50, { color: EYE_C(), size: 9.5, align: "center", weight: "700" });
+        }
         // 建議次數進度格
         const gx = x0, gy = y + 66, cell = Math.min(22, (x1 - x0) / Math.max(8, target));
         D.text(ctx, "建議量測進度", gx, gy - 6, { color: PL.col("text-faint"), size: 9 });
@@ -735,9 +856,17 @@
         ctx.beginPath(); ctx.moveTo(x, 52); ctx.lineTo(x, 52 + (major ? 16 : 9)); ctx.stroke();
         if (major) D.text(ctx, String(value), x, 82, { color: PL.col("text-dim"), size: 8.5, align: "center" });
       }
-      // 棒子由左邊伸進來，右端停在真實長度的位置（放大檢視棒子末端附近）
-      steelRod(x0 - 12, mapX(trueLength), 36, 16);
-      D.text(ctx, "棒子末端（放大檢視）", Math.max(x0 + 60, mapX(trueLength) - 70), 32, { color: PL.col("text"), size: 9.5, align: "center", weight: "700" });
+      // 棒子由左邊伸進來（放大檢視棒子末端附近）。零點沒對準時整支棒相對尺錯開 b，
+      // 所以末端落在尺上 L + b 的位置——讀值整群偏移的原因就在這裡看得到
+      const rodEnd = mapX(trueLength + bias);
+      steelRod(x0 - 12, rodEnd, 36, 16);
+      D.text(ctx, "棒子末端（放大檢視）", Math.max(x0 + 60, rodEnd - 70), 32, { color: PL.col("text"), size: 9.5, align: "center", weight: "700" });
+      grip.place(x0 + 140, 46);
+      if (clock.running) {
+        const ex = mapX(trueLength + bias + eye);
+        D.line(ctx, ex, 30, ex, 92, EYE_C(), 1.6, [3, 2]);
+        D.text(ctx, "視線", ex + 4, 100, { color: EYE_C(), size: 9, weight: "700" });
+      }
 
       // 散布：每一筆是一顆綠點，按記錄順序排開
       const scatterTop = H * 0.28, scatterBottom = H * 0.51;
@@ -745,10 +874,30 @@
       D.text(ctx, "每次讀值（你自己按出來的）", x0 + 10, scatterTop + 17, { color: PL.col("text-faint"), size: 9 });
       if (revealed) D.line(ctx, mapX(trueLength), scatterTop + 25, mapX(trueLength), scatterBottom - 12, PL.col("warn"), 1.8, [4, 4]);
       D.line(ctx, mapX(result.mean), scatterTop + 25, mapX(result.mean), scatterBottom - 12, PL.col("accent-2"), 2);
+      const rowY = index => scatterTop + 48 + (index % 4) * ((scatterBottom - scatterTop - 68) / 3);
+      const flying = new Set(drops.filter(d => d.age < 0.9).map(d => d.idx));
       readings.forEach((value, index) => {
-        const rowIndex = index % 4, y = scatterTop + 48 + rowIndex * ((scatterBottom - scatterTop - 68) / 3);
+        if (flying.has(index)) return;
+        const y = rowY(index);
         D.disc(ctx, mapX(value), y, 5, { fill: color(), glow: color(), glowSize: 7 });
         D.text(ctx, String(index + 1), mapX(value), y - 9, { color: PL.col("text-faint"), size: 8, align: "center" });
+      });
+      /*
+       * 剛記下的那一筆：先在尺上停在當下的視線位置（還沒量化），
+       * 再吸到最近的一條刻度（讀數只能是解析度的整數倍），最後落進散布圖。
+       */
+      drops.forEach(d => {
+        if (d.age >= 0.9) return;
+        const a = d.age, xr0 = mapX(d.raw), xs = mapX(d.snapped);
+        const x = a < 0.25 ? xr0 : a < 0.45 ? xr0 + (xs - xr0) * ease((a - 0.25) / 0.2) : xs;
+        if (a < 0.45) {
+          D.line(ctx, x, 30, x, 92, color(), 2.2);
+          D.text(ctx, a < 0.25 ? "記下這一刻" : "對齊刻度", x + 5, 104, { color: color(), size: 9.5, weight: "700" });
+        } else {
+          const u = ease((a - 0.45) / 0.45), y = 70 + (rowY(d.idx) - 70) * u;
+          D.line(ctx, xs, 52, xs, 86, color(), 2.2);
+          D.disc(ctx, xs, y, 5, { fill: color(), glow: color(), glowSize: 9 });
+        }
       });
       D.text(ctx, "平均值", mapX(result.mean), scatterTop + 19, { color: PL.col("accent-2"), size: 9, align: "center" });
       if (revealed) D.text(ctx, "真值", mapX(trueLength), scatterBottom - 2, { color: PL.col("warn"), size: 9, align: "center" });
@@ -784,8 +933,8 @@
       draw();
     });
 
-    cv.onResize(draw); draw();
-    return { stop() { cv.destroy(); }, rerender: draw };
+    cv.onResize(() => draw()); draw();
+    return { stop() { clock.stop(); cv.destroy(); }, rerender: () => draw() };
   }});
 
 

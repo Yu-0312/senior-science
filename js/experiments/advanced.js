@@ -70,6 +70,22 @@
   const isL = () => PL.theme.isLight();
   const noteC = (ctx, col, x, y, w, h) => PL.theme.note(ctx, col, x, y, w, h);
   const SC = {};
+  /* 拖曳把手的建立函式：GRIPS[id](st) 在建置時呼叫一次，st 與場景共用 */
+  const GRIPS = {};
+  /*
+   * 旋鈕把手：抓住後左右拖，相對於按下時的值調整（旋鈕很小，用絕對位置換算會一抓就跳）。
+   * perPx 是每 px 的變化量；log 為真時改成每 px 乘上固定倍率（頻率這類跨好幾個數量級的量）。
+   */
+  function knobGrip(st, slider, label, perPx, log) {
+    let from = null;
+    return PL.ui.handle(st.cv, { slider, label,
+      toValue: x => {
+        if (!from) from = { x, v: slider.get() };
+        const dx = x - from.x;
+        return log ? from.v * Math.pow(2, dx * perPx) : from.v + dx * perPx;
+      },
+      onRelease: () => { from = null; } });
+  }
 
   /* 火箭（側視）：底部中心 (x, by)、寬 w、高 h；fuel 0..1 為剖面窗燃料量；nose 是否有鼻錐 */
   function rocketBody(ctx, x, by, w, h, fuel, nose, fins, col) {
@@ -434,9 +450,37 @@
     label(ctx, 20, 18, "舉升力 F₂", PL.fmt(F2, 0) + " N", 110, c);
   };
 
-  /* 馬呂斯定律：光源 → 起偏器 → 檢偏器（轉 θ）→ 光屏 */
+  /*
+   * 馬呂斯定律：光源 → 起偏器 → 檢偏器（轉 θ）→ 光屏
+   *
+   * 播放時沿光束畫電場向量的振動（一排隨波前進的向量，尖端連成正弦）：
+   *   · 光源到起偏器：非偏振光，每一段波列的振動方向都不同
+   *   · 起偏器後：只剩鉛直振動，振幅 E₁ ∝ √I₀
+   *   · 檢偏器後：振動方向轉到 θ，振幅只剩投影 E₁cosθ，強度 ∝ 振幅² → I = I₀cos²θ
+   * 把手抓檢偏器邊緣的旋鈕，繞圓心轉動就是改 θ。
+   */
+  GRIPS["malus-law"] = st => {
+    st.grip = PL.ui.handle(st.cv, { slider: st.sa, label: "檢偏器（旋轉 θ）",
+      toValue: (x, y) => { const g = st.geo; return g ? Math.atan2(Math.abs(x - g.x2), Math.max(0.0001, g.cy - y)) * 180 / Math.PI : NaN; } });
+  };
+  /* 沿 xa→xb 畫電場向量：dirAt(x) 回傳該處振動方向（0 = 鉛直），amp 振幅 px，ph 相位 */
+  function eField(ctx, xa, xb, cy, amp, dirAt, kw, ph, col) {
+    if (amp < 0.6) return;
+    ctx.save(); ctx.strokeStyle = col; ctx.lineCap = "round";
+    let prev = null;
+    for (let x = xa; x <= xb; x += 6) {
+      const q = dirAt(x), e = amp * Math.cos(kw * x - ph);
+      const tx = x + Math.sin(q) * e, ty = cy - Math.cos(q) * e;
+      ctx.globalAlpha = 0.5; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, cy); ctx.lineTo(tx, ty); ctx.stroke();
+      if (prev && prev.q === q) { ctx.globalAlpha = 0.95; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(prev.x, prev.y); ctx.lineTo(tx, ty); ctx.stroke(); }
+      prev = { x: tx, y: ty, q };
+    }
+    ctx.restore();
+  }
   SC["malus-law"] = k => {
     const { ctx, W, H, a: th, b: I0, t, s, c, v: I } = k;
+    const S = k.st || {};
     const benchY = H * 0.92;
     AP.labRoom(ctx, W, H, benchY, {});
     const railY = benchY - 30 * s, cy = H * 0.44, r = Math.min(40 * s, H * 0.1);
@@ -444,10 +488,19 @@
     const xL = 96 * s, x1 = W * 0.36, x2 = W * 0.6, xS = W * 0.85, thr = th * Math.PI / 180;
     const band = (xa, xb, a) => { const g = ctx.createLinearGradient(0, cy - 10 * s, 0, cy + 10 * s); g.addColorStop(0, `rgba(255,240,170,0)`); g.addColorStop(0.5, `rgba(255,236,150,${a.toFixed(3)})`); g.addColorStop(1, `rgba(255,240,170,0)`); ctx.fillStyle = g; ctx.fillRect(xa, cy - 10 * s, xb - xa, 20 * s); };
     band(xL, x1, 0.5 + 0.35 * I0 / 100); band(x1, x2, 0.1 + 0.8 * I0 / 100); band(x2, xS, 0.05 + 0.85 * I / 100);
-    const sym = (x, y, angs, a) => { ctx.save(); ctx.strokeStyle = `rgba(220,120,20,${a})`; ctx.lineWidth = 1.6; angs.forEach(q => { const dx = Math.sin(q) * 11 * s, dy = -Math.cos(q) * 11 * s; D.arrow(ctx, x - dx, y - dy, x + dx, y + dy, { color: `rgba(220,120,20,${a})`, width: 1.6, head: 5 }); D.arrow(ctx, x + dx, y + dy, x - dx, y - dy, { color: `rgba(220,120,20,${a})`, width: 1.6, head: 5 }); }); ctx.restore(); };
-    sym((xL + x1) / 2, cy - 34 * s, [0, Math.PI / 3, -Math.PI / 3], 0.9);
-    sym((x1 + x2) / 2, cy - 34 * s, [0], 0.9);
-    if (I > 0.5) sym((x2 + xS) / 2, cy - 34 * s, [thr], 0.3 + 0.6 * I / 100);
+    /*
+     * 電場向量：波以 90 px/s 前進、波長 44 px。非偏振段每 40 px 一段波列，
+     * 方向由波列編號決定並跟著波一起往右移（不是原地亂轉）。
+     */
+    const vW = 90 * s, lamW = 44 * s, kw = TAU / lamW, ph = kw * vW * t;
+    const E1 = r * 0.62 * Math.sqrt(I0 / 100), E2 = E1 * Math.cos(thr);
+    const eCol = isL() ? "rgb(196,84,0)" : "rgb(255,176,80)";
+    const train = 40 * s;
+    // 振動方向畫在畫面平面（與偏振片圓盤的刻線同一套約定）；避開接近水平的方向，免得向量躺在光束上看不出來
+    const QS = [0, Math.PI / 3, -Math.PI / 6, -Math.PI / 3, Math.PI / 6, Math.PI / 2.4, -Math.PI / 2.4];
+    eField(ctx, xL + 18 * s, x1 - r * 0.2, cy, E1 * Math.SQRT2 * 0.8, x => { const n = Math.floor((x - vW * t) / train); return QS[((n * 5) % 7 + 7) % 7]; }, kw, ph, eCol);
+    eField(ctx, x1 + r * 0.2, x2 - r * 0.2, cy, E1, () => 0, kw, ph, eCol);
+    eField(ctx, x2 + r * 0.2, xS - 30 * s, cy, E2, () => thr, kw, ph, eCol);
     AP.carrier(ctx, xL - 26 * s, railY, cy + 34 * s);
     AP.lampHouse(ctx, xL, cy, s, "rgba(255,244,210," + (0.5 + 0.5 * I0 / 100).toFixed(2) + ")");
     AP.carrier(ctx, x1, railY, cy + r + 24 * s); AP.polarizer(ctx, x1, cy, r, 0);
@@ -460,7 +513,11 @@
     D.text(ctx, "非偏振光", (xL + x1) / 2, cy - 54 * s, { color: PL.col("text-dim"), size: 10, align: "center" });
     D.text(ctx, "起偏器", x1, cy + r + 18 * s + 30, { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
     D.text(ctx, "檢偏器 θ = " + PL.fmt(th, 0) + "°", x2, cy + r + 18 * s + 30, { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
-    D.text(ctx, "I₀ = " + PL.fmt(I0, 0), (x1 + x2) / 2, cy + 26 * s, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
+    // 標註移到光束上方：下方留給電場向量的振動範圍
+    D.text(ctx, "I₀ = " + PL.fmt(I0, 0) + "（只剩鉛直振動）", (x1 + x2) / 2, cy - r - 10 * s, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
+    D.text(ctx, "E = E₁cos θ", (x2 + xS) / 2 - 8 * s, cy - r - 10 * s, { color: PL.col("text-dim"), size: 10.5, align: "center", weight: "700" });
+    S.geo = { x2, cy };
+    if (S.grip) S.grip.place(x2 + Math.sin(thr) * (r + 6), cy - Math.cos(thr) * (r + 6));
     AP.lcd(ctx, xS - 44 * s, cy - 96 * s, 88 * s, 22 * s, "I = " + PL.fmt(I, 1), { color: "rgb(255,210,110)" });
     D.text(ctx, "I = I₀ cos²θ", W - 18 * s, 44 * s, { color: PL.col("text"), size: 13, align: "right", weight: "700" });
     label(ctx, 20, 18, "透射強度 I", PL.fmt(I, 1), 104, c);
@@ -697,9 +754,22 @@
     label(ctx, 20, 18, "發光波長 λ", PL.fmt(lam, 0) + " nm", 110, c);
   };
 
-  /* 示波器：訊號產生器送出正弦波，螢幕上讀週期與峰對峰值 */
+  /*
+   * 示波器：訊號產生器送出正弦波，螢幕上讀週期與峰對峰值
+   *
+   * 波形是電子束亮點畫出來的：水平偏轉以固定速率（TIME/DIV）把亮點由左掃到右，
+   * 垂直偏轉跟著當下的電壓上下走；掃到右邊後回到左邊，等訊號再次「由負轉正過零」
+   * 才開始下一次掃描（觸發），所以每一次掃描都疊在同一個位置，波形看起來是靜止的。
+   * 真實一次掃描只有幾毫秒，這裡以慢動作播放（每次掃描約 2.4 秒），
+   * 亮點後面留下逐漸變暗的螢光餘暉；上一次掃描留下的整條波形以淡色顯示。
+   */
+  GRIPS["oscilloscope"] = st => {
+    // 訊號產生器的頻率旋鈕：左右拖，每 40 px 頻率加倍／減半
+    st.grip = knobGrip(st, st.sa, "頻率旋鈕（左右拖）", 1 / 40, true);
+  };
   SC["oscilloscope"] = k => {
     const { ctx, W, H, a: f, b: V0, t, s, c, v: Tms } = k;
+    const S = k.st || {};
     const benchY = H * 0.9;
     AP.labRoom(ctx, W, H, benchY, {});
     const gw = Math.min(W * 0.26, 190 * s), gh = 86 * s;
@@ -710,9 +780,29 @@
     const tdiv = f < 12 ? 0.05 : f < 120 ? 0.005 : 0.0005, vdiv = V0 > 6 ? 5 : V0 > 2.5 ? 2 : V0 > 1 ? 1 : 0.5;
     const pxDiv = scr.w / 10, pyDiv = scr.h / 8, midY = scr.y + scr.h / 2;
     ctx.save(); ctx.beginPath(); ctx.rect(scr.x, scr.y, scr.w, scr.h); ctx.clip();
-    ctx.strokeStyle = "rgb(120,255,170)"; ctx.lineWidth = 2; ctx.shadowColor = "rgba(120,255,170,0.8)"; ctx.shadowBlur = 6; ctx.beginPath();
-    for (let x = 0; x <= scr.w; x += 1.5) { const tt = x / pxDiv * tdiv, y = midY - Math.sin(2 * Math.PI * f * tt) * V0 / vdiv * pyDiv; x ? ctx.lineTo(scr.x + x, y) : ctx.moveTo(scr.x, y); }
-    ctx.stroke(); ctx.restore();
+    const Yat = x => midY - Math.sin(2 * Math.PI * f * (x / pxDiv * tdiv)) * V0 / vdiv * pyDiv;
+    const trace = (xa, xb, a, w) => {
+      ctx.globalAlpha = a; ctx.lineWidth = w; ctx.beginPath();
+      for (let x = xa; x <= xb + 0.01; x += 1.5) { const xx = Math.min(x, xb); x > xa ? ctx.lineTo(scr.x + xx, Yat(xx)) : ctx.moveTo(scr.x + xx, Yat(xx)); }
+      ctx.stroke();
+    };
+    ctx.strokeStyle = "rgb(120,255,170)"; ctx.shadowColor = "rgba(120,255,170,0.8)"; ctx.shadowBlur = 6;
+    // 掃描相位：時鐘 0 時亮點停在左端（剛觸發），整條淡色波形是上一次掃描的餘暉
+    const SWEEP = 2.4, u = ((k.clock || 0) % SWEEP) / SWEEP, dotX = u * scr.w;
+    trace(0, scr.w, 0.32, 1.6);
+    // 亮點後方的餘暉：越久以前畫的越暗（分段畫出遞減亮度）
+    const tail = scr.w * 0.45, seg = 10;
+    for (let x = Math.max(0, dotX - tail); x < dotX; x += seg) trace(x, Math.min(dotX, x + seg + 1.5), 0.32 + 0.68 * (1 - (dotX - x) / tail), 2.2);
+    ctx.globalAlpha = 1;
+    const dy = Yat(dotX);
+    ctx.fillStyle = "rgb(225,255,235)"; ctx.shadowBlur = 14; ctx.beginPath(); ctx.arc(scr.x + dotX, dy, 3.4, 0, TAU); ctx.fill();
+    ctx.restore();
+    // 觸發點記號：每次掃描都從「電壓由負轉正過零」開始
+    ctx.fillStyle = "rgba(255,220,90,0.9)"; ctx.beginPath(); ctx.moveTo(scr.x + 1, midY - 5); ctx.lineTo(scr.x + 8, midY); ctx.lineTo(scr.x + 1, midY + 5); ctx.closePath(); ctx.fill();
+    D.text(ctx, "慢動作：真實一次掃描 " + (tdiv * 10 >= 0.001 ? PL.fmt(tdiv * 10000, 0) + " ms" : PL.fmt(tdiv * 1e7, 0) + " μs"), scr.x + 6, scr.y + scr.h - 22, { color: "rgba(160,240,190,0.85)", size: 9.5 });
+    // 旋鈕位置：與 AP.powerSupply 內部的擺放公式相同（它只回傳端子座標）
+    const kr = Math.max(5, Math.min(10, gh * 0.15)), lh = Math.max(12, Math.min(24, gh * 0.36));
+    if (S.grip) S.grip.place(20 * s + gw - 11 - kr, benchY - gh - 2 + 10 + lh / 2);
     const Tpx = (1 / f) / tdiv * pxDiv;
     if (Tpx > 12 && Tpx < scr.w * 0.9) {
       const x1 = scr.x + Tpx * 0.25, x2 = x1 + Tpx;
@@ -760,12 +850,26 @@
     label(ctx, 20, 18, "霍爾電壓 V_H", PL.fmt(VH, 2) + " mV", 118, c);
   };
 
-  /* 電流天平：U 形磁鐵放在電子秤上，通電導線受力，反作用力讓讀數改變 */
+  /*
+   * 電流天平：U 形磁鐵放在電子秤上，通電導線受力，反作用力讓讀數改變
+   *
+   * 播放時電荷沿電源線流動，流速 ∝ 電流 I。改變 I 或 B 時，磁力瞬間改變，
+   * 但秤盤（彈性元件 + 磁鐵質量）要晃幾下才停：讀數以阻尼振盪追到新值，
+   * 暫停時直接顯示穩定讀數。
+   * 把手抓電源供應器的電流旋鈕。
+   */
+  GRIPS["current-balance"] = st => {
+    st.pan = PL.motion.follower(0, { omega: 9, zeta: 0.18 });
+    st.grip = knobGrip(st, st.sa, "電流旋鈕（左右拖）", 0.05, false);
+  };
   SC["current-balance"] = k => {
     const { ctx, W, H, a: I, b: B, t, s, c, v: F, cfg } = k;
+    const S = k.st || {};
     const benchY = H * 0.9;
     AP.labRoom(ctx, W, H, benchY, {});
-    const cx = W * 0.42, base = 250, reading = base + F / 9.8 * 1000;
+    // 秤的讀數 = 彈性元件的形變力，跟著追隨器振盪；磁力 F 本身沒有延遲
+    const Fs = S.pan ? S.pan.update(F, k.dt, k.running) : F;
+    const cx = W * 0.42, base = 250, reading = base + Fs / 9.8 * 1000;
     const panY = AP.balance(ctx, cx, benchY, 240 * s, PL.fmt(reading, 2) + " g");
     const gap = 58 * s, t0 = 30 * s, len = 124 * s;
     const poles = AP.horseshoe(ctx, cx, panY - len, gap, len, t0, "up");
@@ -783,7 +887,13 @@
     D.arrow(ctx, cx - 28 * s, wy, cx - 28 * s, wy - fl, { color: "#e0473c", width: 2.8, label: "F（導線）", lsize: 10.5 });
     D.arrow(ctx, cx + 40 * s, panY - len * 0.4, cx + 40 * s, panY - len * 0.4 + fl, { color: "#2f7fd8", width: 2.8, label: "−F（磁鐵）", lsize: 10.5 });
     const ps = AP.powerSupply(ctx, W - 176 * s, benchY - 72 * s, 156 * s, 64 * s, PL.fmt(I, 1) + " A", { label: "DC 電源", knob: fr(I, cfg.a) });
-    AP.cable(ctx, [ps.red, { x: ps.red.x, y: H * 0.14 + 40 * s }, { x: cx + 30 * s, y: H * 0.14 + 40 * s }], "rgb(186,54,48)", 2.2 * s, 5);
+    const wire = [ps.red, { x: ps.red.x, y: H * 0.14 + 40 * s }, { x: cx + 30 * s, y: H * 0.14 + 40 * s }];
+    AP.cable(ctx, wire, "rgb(186,54,48)", 2.2 * s, 5);
+    // 電荷沿電源線流向導線，流速 ∝ I（時鐘歸零時從頭流起）
+    PL.motion.flow(ctx, wire, (k.clock || 0) * 14 * I * s, { gap: 16 * s, r: 2.3 * s });
+    // 旋鈕位置：與 AP.powerSupply 內部的擺放公式相同
+    const pw = 156 * s, phh = 64 * s, lh = Math.max(12, Math.min(24, phh * 0.36)), kr = Math.max(5, Math.min(10, phh * 0.15));
+    if (S.grip) S.grip.place(W - 176 * s + pw - 11 - kr, benchY - 72 * s + 10 + lh / 2);
     D.text(ctx, "磁鐵本身 250 g，多出來的讀數就是 F/g", cx, benchY + 22 * s, { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
     D.text(ctx, "F = BIL（L = 0.18 m）", W - 18 * s, 44 * s, { color: PL.col("text"), size: 12.5, align: "right", weight: "700" });
     label(ctx, 20, 18, "天平受力 F", PL.fmt(F, 3) + " N", 110, c);
@@ -962,11 +1072,18 @@
     "radiation-shielding": "屏蔽越厚、材料吸收係數越大，穿透的輻射越少：I = I₀ e^(−μx)"
   };
 
-  function scene(cv, config, a, b, time, out) {
+  /*
+   * x 是動態場景需要的額外資訊（其他場景不讀，照舊只用 t）：
+   *   dt       這一格前進的模擬時間；滑桿重畫、暫停重畫時為 0
+   *   running  是否正在播放（暫停時阻尼追隨器直接跳到目標）
+   *   clock    傳輸列的模擬時間：按「重設」會歸零
+   *   st       每次建置一份的狀態（滑桿、拖曳把手、追隨器）
+   */
+  function scene(cv, config, a, b, time, out, x) {
     const { ctx, W, H } = cv;
     cv.clear(); D.bg(cv);
     const f = SC[config.id];
-    if (f) f({ cv, ctx, W, H, cfg: config, a, b, t: time, v: out, c: accent(), s: clamp(Math.min(W / 800, H / 472), 0.5, 1.7) });
+    if (f) f(Object.assign({ cv, ctx, W, H, cfg: config, a, b, t: time, v: out, c: accent(), s: clamp(Math.min(W / 800, H / 472), 0.5, 1.7) }, x));
   }
 
   /*
@@ -1003,17 +1120,21 @@
       const conclusion = PL.ui.readout(L.readouts, { label: "模型判讀" });
       const chart = PL.ui.chart(PL.ui.charts(root), { title: config.output + "關係圖", cap: "曲線固定目前第二個參數；亮點表示正在操作的條件。讀取曲線趨勢，再用本頁公式說明原因。" });
       let time = 0;
-      function render() {
+      const st = { cv, sa: a, sb: b, redraw: () => render() };
+      function render(dt) {
         const av = a.get(), bv = b.get(), result = config.calc(av, bv);
-        scene(cv, config, av, bv, time, result);
+        scene(cv, config, av, bv, time, result, { dt: dt > 0 ? dt : 0, running: !!(anim && anim.running), clock: anim ? anim.t : 0, st });
         reading.set(result, Math.abs(result) >= 100 ? 1 : 3); parameter.set(bv, config.b[4] === "" ? 2 : 2); conclusion.set(config.status(av, bv, result));
         chart.setCap(PL.ui.relationChart(chart, {
           a: config.a, b: config.b, av: av, bv: bv,
           calc: config.calc, output: config.output, sweep: config.sweep
         }));
       }
-      anim = PL.loop(dt => { if (dt) time += dt; render(); });
-      cv.onResize(render); chart.onResize(render); render(); anim.start();
+      // 畫面上可以直接抓的器材（檢偏器、旋鈕…）：建立一次，位置由場景每格更新
+      if (GRIPS[id]) GRIPS[id](st);
+      anim = PL.loop(dt => { if (dt) time += dt; render(dt); });
+      // 縮放回呼可能帶參數進來，包一層確保 render 收到的 dt 只來自迴圈
+      cv.onResize(() => render()); chart.onResize(() => render()); render(); anim.start();
       return { stop() { anim.stop(); cv.destroy(); chart.destroy(); }, rerender: render };
     }});
   });

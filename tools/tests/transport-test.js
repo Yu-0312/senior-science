@@ -160,10 +160,23 @@ R.section("靜態實驗：沒有播放／單步／速度，提示改成調整參
     "有播放鍵時不顯示提示");
   if (satApi && satApi.stop) satApi.stop();
 
-  // 靜態場景：拉滑桿就重畫，沒有動畫迴圈
+  /*
+   * 靜態場景：拉滑桿就重畫，沒有動畫迴圈。
+   * 以前拿 coulomb 當例子；2026-10 全站改成「每個實驗播放時都會動」之後，
+   * 已經沒有真實的靜態實驗可用，改註冊一個測試專用的最小靜態實驗，
+   * 繼續守住引擎對「沒有迴圈」的處理（日後若再出現靜態實驗，提示仍然正確）。
+   */
+  PL.register("__static-probe", { build(r) {
+    const L = PL.ui.layout(r, { chrome: "quiet" });
+    const cv = PL.canvas.create(L.canvasWrap, 0.6);
+    const s1 = PL.ui.slider(L.controls, { label: "x", min: 0, max: 1, step: 0.1, value: 0.5, onInput: () => draw() });
+    function draw() { cv.clear(); PL.draw.text(cv.ctx, String(s1.get()), 10, 10, {}); }
+    draw();
+    return { stop() { cv.destroy(); }, rerender: draw };
+  }});
   const root = document.createElement("div");
-  root.dataset = { simId: "coulomb" };
-  const api = PL.get("coulomb").build(root);
+  root.dataset = { simId: "__static-probe" };
+  const api = PL.get("__static-probe").build(root);
   const trans = root._labTransport;
   const ctx = null;
   R.ok(!!trans && trans.playBtn.hidden === true, "靜態實驗隱藏播放鍵");
@@ -176,6 +189,27 @@ R.section("靜態實驗：沒有播放／單步／速度，提示改成調整參
   R.ok(!!trans && /調整參數/.test(trans.playHint.textContent),
     "提示文案：" + (trans.playHint ? trans.playHint.textContent : ""));
   if (api && api.stop) api.stop();
+}
+
+R.section("全站動態：每個實驗都有時間軸（播放時畫面會動）");
+{
+  /*
+   * 使用者要求「儘量把實驗都做成動態或可互動，做不到就拿掉」。
+   * 盤點時有 62 個實驗按播放後畫面完全不動，已逐一補上有物理意義的動態。
+   * 這裡守住結果：新增的實驗若沒有任何動畫迴圈，直接失敗。
+   */
+  const still = [];
+  allIds(PL).filter(id => id !== "__static-probe").forEach(id => {
+    const r = document.createElement("div");
+    r.dataset = { simId: id };
+    let a = null;
+    try { a = PL.get(id).build(r); } catch (e) { still.push(id + "（建置失敗）"); return; }
+    const t = r._labTransport;
+    const animated = !!t && t.stepBtnT.hidden !== true;
+    if (!animated) still.push(id);
+    try { if (a && a.stop) a.stop(); } catch (e) {}
+  });
+  R.ok(still.length === 0, "沒有靜態實驗（" + (still.length ? still.join("、") : "全部都有時間軸") + "）");
 }
 
 R.done();

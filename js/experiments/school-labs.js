@@ -459,7 +459,7 @@
     PL.ui.select(L.controls, {
       label: "材質", value: key,
       options: Object.entries(MATERIALS).map(([value, m]) => ({ value, label: m.label })),
-      onChange: v => { key = v; panel.clear(); refresh(); }
+      onChange: v => { key = v; panel.clear(); draw(); refresh(); }
     });
     const sLen = PL.ui.slider(L.controls, { label: "導線長度 ℓ", min: 0.2, max: 2.0, step: 0.1, value: 1.0, unit: "m", digits: 1 });
     const sD = PL.ui.slider(L.controls, { label: "導線直徑 d", min: 0.2, max: 1.2, step: 0.1, value: 0.5, unit: "mm", digits: 1 });
@@ -497,11 +497,27 @@
       } else { rRho.set("至少 2 筆"); rErr.set("—"); }
     }
 
+    /*
+     * 動態：歐姆檔量電阻時，電表送出一個固定的小測試電流 I 穿過導線。
+     * 電荷的漂移速率 v = I / (n·e·A)：同一種材質、同樣的電流，截面積越大走得越慢——
+     * 把直徑加倍，導線裡的亮點就慢成四分之一；探棒導線粗細不變，亮點速率始終一樣。
+     * 這也是 R ∝ 1/A 的直觀圖像：同樣的電流分散在更寬的通道裡，電荷不必「擠著跑」。
+     * 長度只改變電荷要走的路有多長（R ∝ ℓ），漂移速率不變。
+     */
+    const DRIFT_K = 60 * 0.5 * 0.5;               // d = 0.5 mm 時漂移 60 px/s（v ∝ 1/d²）
+    const LEAD_V = 60;                            // 探棒導線上的速率（截面固定）
+    let sWire = 0, sLead = 0;
+    const driftV = () => Math.min(400, DRIFT_K / (sD.get() * sD.get()));
+    let geo = { x0: 70, span: 1 };
+    // 把手抓右端的鱷魚夾：夾在導線上的位置決定接入電路的長度 ℓ
+    const grip = PL.ui.handle(cv, { slider: sLen, label: "右端夾子（導線長度 ℓ）", toValue: x => (x - geo.x0) / geo.span * 2.0 });
+
     function draw() {
       const { ctx, W, H } = cv;
       cv.clear(); D.bg(cv);
       const mat = MATERIALS[key];
       const x0 = 70, x1 = x0 + (W - 210) * (sLen.get() / 2.0);      // 長度直接對應畫面長度
+      geo = { x0, span: W - 210 };
       cv.calibrate((W - 210) / 2.0, "m");   // 尺可直接量導線長度
       const y = H * 0.46;
       const thick = 3 + sD.get() * 7;                                // 直徑直接對應線粗
@@ -526,16 +542,29 @@
       // 三用電表（歐姆檔）：紅黑探棒夾在導線兩端
       const mW = 104, mH = 128, mX = W - mW - 16, mY = 12;
       const jacks = AP.multimeter(ctx, mX, mY, mW, mH, PL.fmt(resistance(), 2), { unit: "Ω" });
-      AP.cable(ctx, [jacks.red, { x: jacks.red.x, y: mY + mH + 30 }, { x: x1 + 7, y: y + 9 }], "rgb(200,44,40)", 2.6, 8);
-      AP.cable(ctx, [jacks.black, { x: jacks.black.x, y: mY + mH + 44 }, { x: x0 - 7, y: y + 9 }], "rgb(30,32,36)", 2.6, 10);
+      AP.cable(ctx, [jacks.red, { x: jacks.red.x, y: mY + mH + 30 }, { x: x1 + 7, y: y + 9 }], "rgb(200,44,40)", 2.6, 0);
+      // 黑探棒繞到導線下方再接左端，不和待測導線疊在一起（否則分不清哪條線上的電荷在走）
+      const low = y + 96;
+      const blackPath = [jacks.black, { x: jacks.black.x, y: low }, { x: x0 - 7, y: low }, { x: x0 - 7, y: y + 9 }];
+      AP.cable(ctx, blackPath, "rgb(30,32,36)", 2.6, 0);
+      // 測試電流：紅探棒 → 右端 → 沿導線往左 → 左端 → 黑探棒
+      const dot = PL.theme.isLight() ? "#fff06a" : "#fff4c2";
+      PL.motion.flow(ctx, [[jacks.red.x, jacks.red.y], [jacks.red.x, mY + mH + 30], [x1 + 7, y + 9]], sLead, { gap: 22, r: 2.2, color: dot, glow: 5 });
+      PL.motion.flow(ctx, blackPath.slice().reverse(), sLead, { gap: 22, r: 2.2, color: dot, glow: 5 });
+      PL.motion.flow(ctx, [[x1, y], [x0, y]], sWire, { gap: 16, r: Math.min(2.6, 1.2 + thick * 0.18), color: dot, glow: 5 });
+      D.text(ctx, "導線中電荷漂移速率 ∝ 1/A（同一測試電流）", x0, y + 74, { color: PL.col("text-dim"), size: 10.5 });
+      // 右端鱷魚夾：夾在導線上，拖曳即改變接入長度
+      grip.place(x1 + 7, y);
 
+      // 放左上角：左下角會被「可直接拖曳」提示蓋住
       D.text(ctx, mat.label + "：ρ = " + mat.rho.toExponential(2) + " Ω·m",
-        16, H - 16, { color: PL.col("text-faint"), size: 11 });
+        16, 22, { color: PL.col("text-faint"), size: 11 });
     }
 
-    const anim = PL.loop(() => draw(), 30);
-    [sLen, sD].forEach(s => s.el.addEventListener("input", refresh));
-    cv.onResize(draw); panel.chart.onResize(refresh);
+    const anim = PL.loop(dt => { if (dt) { sWire += driftV() * dt; sLead += LEAD_V * dt; } draw(); }, 30);
+    // 暫停時拉滑桿也要立即重畫主畫面（迴圈停著時 draw 不會被呼叫）
+    [sLen, sD].forEach(s => s.el.addEventListener("input", () => { draw(); refresh(); }));
+    cv.onResize(() => draw()); panel.chart.onResize(refresh);
     refresh(); anim.start();
     return { stop() { anim.stop(); cv.destroy(); panel.chart.destroy(); }, rerender() { draw(); refresh(); } };
   }});
@@ -854,7 +883,8 @@
       return cErr.get() ? v + jitter(u * 1000, 0.002) : v;
     }
 
-    function record() { const u = sU.get(); panel.add(1 / u, 1 / imageDistance(u)); refresh(); }
+    // 「對焦並記錄」：先把光屏推回最清晰的位置，再記下這一筆
+    function record() { const u = sU.get(); screenM = null; panel.add(1 / u, 1 / imageDistance(u)); draw(); refresh(); }
 
     function refresh() {
       const u = sU.get(), v = imageDistance(u);
@@ -866,6 +896,21 @@
       } else { rSlope.set("—"); rF.set("至少 2 筆"); }
     }
 
+    /*
+     * 動態與操作：
+     *  · 光點從燭焰頂端出發，沿三條特徵光線前進（平行光→過 F′、過光心不偏折、過 F→平行射出），
+     *    經透鏡後會聚到同一點——像就是光真的匯聚的地方，不是畫上去的。
+     *  · 可以抓蠟燭改物距，也可以抓光屏前後移動自己對焦：光屏不在會聚點時，
+     *    光點在屏前就交叉（或還沒交會）打在屏上散成一片，像就糊了。
+     *    「對焦並記錄」會先把光屏推到最清晰的位置，讀數仍以清晰成像的像距 v 為準。
+     */
+    const C_PX = 150;                  // 光點速率（px/s），只是讓傳播方向看得見
+    let screenM = null;                // 光屏離透鏡的距離（m）；null＝自動對焦在像距上
+    let geo = { lensX: 0, scale: 1, W: 0 };
+    const gripObj = PL.ui.handle(cv, { slider: sU, label: "蠟燭（物距 u）", toValue: x => (geo.lensX - x) / geo.scale });
+    const gripScr = PL.ui.handle(cv, { label: "光屏（前後移動對焦）",
+      onDrag: x => { screenM = PL.clamp((x - geo.lensX) / geo.scale, 30 / geo.scale, (geo.W - 34 - geo.lensX) / geo.scale); draw(); } });
+
     function draw() {
       const { ctx, W, H } = cv;
       cv.clear(); D.bg(cv);
@@ -874,6 +919,7 @@
       const lensX = W * 0.42;
       const scale = Math.min((lensX - 60) / 0.85, (W - lensX - 60) / Math.max(0.35, v));
       cv.calibrate(scale, "m");   // 可自己量物距與像距，不必只信讀數
+      geo = { lensX, scale, W };
 
       // 光具座：導軌 + 滑座
       const AP = PL.apparatus;
@@ -884,7 +930,7 @@
       // 透鏡
       AP.carrier(ctx, lensX, axisY + 62, axisY + 62);
       AP.lens(ctx, lensX, axisY, 56, true);
-      D.text(ctx, "凸透鏡", lensX, axisY + 84, { color: MC(), size: 11, align: "center" });
+      D.text(ctx, "凸透鏡", lensX, axisY - 70, { color: MC(), size: 11, align: "center" });
 
       // 焦點
       [-1, 1].forEach(s => {
@@ -893,28 +939,56 @@
         D.text(ctx, s < 0 ? "F" : "F′", fx, axisY - 8, { color: PL.col("warn"), size: 11, align: "center" });
       });
 
-      // 物體（向上的箭頭）
-      const objX = lensX - u * scale, objH = 42;
       // 物體：蠟燭（燭焰頂端就是物高）
+      const objX = lensX - u * scale, objH = 42;
       AP.carrier(ctx, objX, axisY + 62, axisY + 9);
       AP.candle(ctx, objX, axisY + 9, { h: 30 });
-      D.text(ctx, "物體", objX, axisY + 20, { color: PL.col("accent-2"), size: 11, align: "center" });
+      D.text(ctx, "物體", objX, axisY - 58, { color: PL.col("accent-2"), size: 11, align: "center" });
+      gripObj.place(objX, axisY + 55);
 
       // 像（倒立實像），高度依放大率縮放
       const imgX = lensX + v * scale, imgH = objH * (v / u);
       const onScreen = imgX < W - 26;
-      if (onScreen) {
-        // 白色紙屏上的倒立燭焰
-        AP.carrier(ctx, imgX, axisY + 62, axisY + 62);
-        AP.screen(ctx, imgX, axisY, 24, 124, c2 => AP.projectedFlame(c2, imgX, axisY, Math.min(56, Math.abs(imgH)), true, 1));
-        D.text(ctx, "倒立實像", imgX, axisY - 70, { color: PL.col("ok"), size: 11, align: "center", weight: "700" });
-        // 三條特徵光線：平行→過焦點、過中心→不偏折
-        D.line(ctx, objX, axisY - objH, lensX, axisY - objH, PL.col("warn"), 1.4);
-        D.line(ctx, lensX, axisY - objH, imgX, axisY + imgH, PL.col("warn"), 1.4);
-        D.line(ctx, objX, axisY - objH, imgX, axisY + imgH, PL.theme.pale(0.35), 1.2, [4, 3]);
-      } else {
-        D.text(ctx, "像距太遠，紙屏已經超出光具座", lensX + 40, axisY - 40, { color: PL.col("danger"), size: 12 });
-      }
+      // 光屏位置：自動對焦時就在像上；像跑出導軌時停在導軌盡頭
+      const scrX = screenM != null ? lensX + screenM * scale : onScreen ? imgX : W - 34;
+      // 屏上光斑（模糊圈）直徑 ≈ 透鏡有效口徑 × |屏到像| / 像距
+      const blurPx = 84 * Math.abs(scrX - imgX) / Math.max(1, imgX - lensX);
+      const sharp = 1 / (1 + blurPx / 5);
+
+      // 三條特徵光線：在透鏡上的入射點，之後都朝像點前進，畫到光屏為止
+      const tip = [objX, axisY - objH], img = [imgX, axisY + imgH];
+      // 光線畫到光屏為止；從屏下緣漏過去的光打到導軌就停（不畫進桌子裡）
+      const toScreen = p => {
+        const k = (scrX - p[0]) / (img[0] - p[0]), y = p[1] + (img[1] - p[1]) * k, floor = axisY + 60;
+        if (y <= floor) return [scrX, y];
+        const k2 = (floor - p[1]) / (img[1] - p[1]);
+        return [p[0] + (img[0] - p[0]) * k2, floor];
+      };
+      const yF = axisY + objH * F_TRUE / (u - F_TRUE);        // 過 F 的光線打在透鏡上的高度
+      const rays = [[tip, [lensX, axisY - objH]], [tip, [lensX, axisY]]];
+      if (Math.abs(yF - axisY) < 52) rays.push([tip, [lensX, yF]]);
+      const lightCol = PL.theme.isLight() ? "#e39400" : "#fff4c2";
+      rays.forEach((r, i) => {
+        const end = toScreen(r[1]), pts = [r[0], r[1], end];
+        ctx.save(); ctx.globalAlpha = i === 0 ? 0.85 : 0.5;
+        D.line(ctx, r[0][0], r[0][1], r[1][0], r[1][1], i === 0 ? PL.col("warn") : lightCol, 1.2, i === 1 ? [4, 3] : null);
+        D.line(ctx, r[1][0], r[1][1], end[0], end[1], i === 0 ? PL.col("warn") : lightCol, 1.2, i === 1 ? [4, 3] : null);
+        ctx.restore();
+        PL.motion.flow(ctx, pts, anim.t * C_PX, { gap: 20, r: 2.3, color: lightCol, glow: 6 });
+      });
+
+      // 白色紙屏上的倒立燭焰：對焦越準越清晰
+      AP.carrier(ctx, scrX, axisY + 62, axisY + 62);
+      // 像的大小與位置跟著光線走：燭焰（約 23 px 高）放大 m 倍，焰尖落在光線會聚點上；
+      // 光屏不在像上時，取主光線（過光心）打在屏上的位置
+      const kS = (scrX - lensX) / Math.max(1, imgX - lensX), fh = PL.clamp(32 * (v / u) * kS, 8, 160);
+      const tipY = axisY + imgH * kS, anchor = tipY - (0.58 * fh + 2);
+      AP.screen(ctx, scrX, axisY, 24, 124, c2 => AP.projectedFlame(c2, scrX, anchor, fh + blurPx * 0.4, true, sharp));
+      // 光屏把手放在屏框頂端：放在底座會蓋住屏面下半部的倒立像
+      gripScr.place(scrX, axisY - 66);
+      if (sharp > 0.8) D.text(ctx, "倒立實像", scrX, axisY - 90, { color: PL.col("ok"), size: 11, align: "center", weight: "700" });
+      else D.text(ctx, "像模糊：前後移動光屏對焦", Math.min(scrX, W - 90), axisY - 90, { color: PL.col("warn"), size: 11, align: "center", weight: "700" });
+      if (!onScreen) D.text(ctx, "像距太遠，紙屏推到導軌盡頭也接不到清晰的像", lensX + 40, axisY - 110, { color: PL.col("danger"), size: 12 });
 
       // 距離標示
       D.arrow(ctx, objX, axisY + 44, lensX, axisY + 44, { color: PL.col("text-faint"), width: 1.2, head: 6 });
@@ -925,10 +999,11 @@
       }
     }
 
+    // 光點用迴圈自己的時間前進；暫停時拉滑桿或勾選誤差也要立即重畫主畫面
     const anim = PL.loop(() => draw(), 30);
-    sU.el.addEventListener("input", refresh);
-    cErr.el.addEventListener("change", refresh);
-    cv.onResize(draw); panel.chart.onResize(refresh);
+    sU.el.addEventListener("input", () => { screenM = null; draw(); refresh(); });
+    cErr.el.addEventListener("change", () => { draw(); refresh(); });
+    cv.onResize(() => draw()); panel.chart.onResize(refresh);
     refresh(); anim.start();
     return { stop() { anim.stop(); cv.destroy(); panel.chart.destroy(); }, rerender() { draw(); refresh(); } };
   }});

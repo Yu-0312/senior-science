@@ -56,6 +56,51 @@
   const niceCeil = x => { if (!(x > 0)) return 1; const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; };
   const SC = {};
 
+  /* ---------- 動態與拖曳把手（2026-10） ----------
+   * 模板實驗共用同一個 PL.loop（下方 build），場景函式另外拿到：
+   *   k.dt       這一格前進的模擬時間；暫停中拉滑桿重畫時為 0
+   *   k.running  是否正在播放。追隨器在暫停時直接跳到目標，滑桿一拉畫面立即改變
+   *   k.st       這次建置專屬的狀態（追隨器、把手換算用的幾何量）
+   *   k.grips    GRIPS[id] 建立的拖曳把手；場景算出器材位置後呼叫 place()
+   * TICK[id] 則讓「時間本身就是參數」的實驗（RC 充電）在播放時自己把滑桿往前推。
+   */
+  const GRIPS = {}, TICK = {};
+  const NOGRIP = { place() {}, hide() {} };
+  const gripOf = (k, i) => (k.grips && k.grips[i]) || NOGRIP;
+  const stOf = k => k.st || {};
+  function follow(k, key, target, o) {
+    const st = stOf(k);
+    const f = st[key] || (st[key] = PL.motion.follower(target, o));
+    return f.update(target, k.dt, k.running);
+  }
+  // 電源供應器旋鈕的位置：與 AP.powerSupply 內部同一套算法，把手才會剛好疊在旋鈕上
+  function knobAt(x, y, w, h) { const lh = clamp(h * 0.36, 12, 24), kr = clamp(h * 0.15, 5, 10); return { x: x + w - 11 - kr, y: y + 10 + lh / 2, r: kr }; }
+  // 旋鈕指針角從 −225° 轉到 +45°（對應 0～1）；把手拖到哪個方向，旋鈕就轉到哪
+  function knobFrac(kn, px, py) { let ang = Math.atan2(py - kn.y, px - kn.x); if (ang > Math.PI / 2) ang -= TAU; return clamp((ang + Math.PI * 1.25) / (Math.PI * 1.5), 0, 1); }
+  function knobTip(kn, f) { const ang = -Math.PI * 1.25 + clamp(f, 0, 1) * Math.PI * 1.5, rr = kn.r + 9; return { x: kn.x + Math.cos(ang) * rr, y: kn.y + Math.sin(ang) * rr }; }
+  // 把數值寫回滑桿並走同一條 input 路徑（讀數、暫停重畫、探測引擎照舊）
+  function pushSlider(sl, v) {
+    const el = sl.el, min = +el.min, max = +el.max, step = +el.step || 0;
+    let x = clamp(v, min, max);
+    if (step > 0) x = clamp(Math.round((x - min) / step) * step + min, min, max);
+    x = +x.toFixed(6);
+    if (+el.value === x) return;
+    el.value = String(x); el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  /*
+   * 相對拖曳把手：有些器材本身的可動幅度很小（橡皮球只能捏扁三成、放射源只有幾十 px 可挪），
+   * 用絕對位置換算會一碰就到底。改成「從按下處拖了多少」換算：拖 span px 走完整個量程。
+   * toF／fromF 是數值與 0–1 比例的互換；sign = −1 表示往左拖數值變大。
+   */
+  function relGrip(cv, sl, label, span, sign, toF, fromF) {
+    let x0 = null, f0 = 0;
+    return PL.ui.handle(cv, { slider: sl, label,
+      onDrag: x => { if (x0 == null) { x0 = x; f0 = toF(sl.get()); } pushSlider(sl, fromF(clamp(f0 + sign * (x - x0) / span, 0, 1))); },
+      onRelease: () => { x0 = null; } });
+  }
+  // 線圈前半圈（ringCoil 的亮色那半）上的折線，讓電流光點沿線圈繞
+  function coilFront(cx, cy, rx, ry, up) { const P = []; for (let i = 0; i <= 24; i++) { const ang = (up ? 1 : -1) * (Math.PI / 2 - Math.PI * i / 24); P.push([cx + Math.cos(ang) * rx, cy + Math.sin(ang) * ry]); } return P; }
+
 
   /* U 形管壓力計：捏橡皮球加壓，左管液面被壓低、右管升高；高度差 h = ΔP / ρg */
   SC["u-tube-manometer"] = k => {
@@ -64,7 +109,18 @@
     AP.labRoom(ctx, W, H, benchY, {});
     const lx = W * 0.42, rx = W * 0.58, tTop = 46 * s, tBot = benchY - 46 * s, tw = 22 * s;
     const liq = rho > 10000 ? ["水銀", "rgba(186,192,204,0.97)"] : rho > 1100 ? ["濃鹽水", "rgba(70,140,215,0.72)"] : rho >= 950 ? ["水", "rgba(80,160,230,0.62)"] : ["酒精", "rgba(236,196,90,0.72)"];
-    const R = Math.max(2, niceCeil(h * 1.3)), span = (tBot - tTop) * 0.74, mid = (tTop + tBot) / 2 + 10 * s, half = h / R * span / 2, yL = mid + half, yR = mid - half;
+    /*
+     * 液柱有慣性：壓力差一變，液面會衝過頭、來回振盪幾次才停在 h = ΔP/ρg。
+     * U 形管液柱的固有角頻率 ω = √(2g/L)，L 是液柱總長（這裡約 0.6 m）——與密度無關，
+     * 所以換成水銀時晃動的快慢不變，只是停下來的高度差小很多。
+     */
+    // 按下播放＝重新示範一次：兩管液面先齊平，手在 0.5 s 內把球捏到 ΔP，液面跟著衝上去再晃停
+    const stM = stOf(k);
+    if (k.dt > 0 && k.t - k.dt <= 1e-9 && stM.level) { stM.level.value = 0; stM.level.vel = 0; }
+    const ramp = k.running && k.t < 0.5 ? k.t / 0.5 : 1;
+    const hd = follow(k, "level", h * ramp, { omega: 5.7, zeta: 0.12 });
+    const R = Math.max(2, niceCeil(h * 1.3)), span = (tBot - tTop) * 0.74, mid = (tTop + tBot) / 2 + 10 * s, lim = (tBot - tTop) / 2 - 12 * s;
+    const half = clamp(hd / R * span / 2, -lim, lim), yL = mid + half, yR = mid - half;
     AP.standRod(ctx, W * 0.72, benchY, tTop - 6 * s);
     AP.crossArm(ctx, W * 0.72, tTop + 30 * s, rx + tw / 2);
     ctx.fillStyle = liq[1]; ctx.fillRect(lx - tw / 2 + 2, yL, tw - 4, tBot - yL); ctx.fillRect(rx - tw / 2 + 2, yR, tw - 4, tBot - yR);
@@ -79,13 +135,15 @@
     for (let i = -5; i <= 5; i++) { const y = mid - i * step * pxc; ctx.fillStyle = "rgba(60,52,32,0.85)"; ctx.fillRect(sx - 12 * s, y - 0.5, i % 5 ? 6 * s : 11 * s, 1); if (i % 5 === 0) RT(ctx, PL.fmt(i * step, step < 1 ? 1 : 0), sx + 6 * s, y + 3 * s, 8 * s, "rgba(60,52,32,0.95)", "center", 0); }
     D.line(ctx, lx, yL, rx + tw, yL, "rgba(224,71,60,0.7)", 1, [3, 3]); D.line(ctx, rx - tw, yR, rx + tw + 16 * s, yR, "rgba(224,71,60,0.7)", 1, [3, 3]);
     if (yL - yR > 8 * s) { D.arrow(ctx, rx + tw + 10 * s, yL, rx + tw + 10 * s, yR, { color: "#e0473c", width: 2, head: 6 }); D.arrow(ctx, rx + tw + 10 * s, yR, rx + tw + 10 * s, yL, { color: "#e0473c", width: 2, head: 6 }); }
-    TX(ctx, "h = " + PL.fmt(h, h < 10 ? 2 : 1) + " cm", rx + tw + 18 * s, (yL + yR) / 2 + 4, 12, "left", "#e0473c");
+    TX(ctx, "h = " + PL.fmt(hd, h < 10 ? 2 : 1) + " cm", rx + tw + 18 * s, (yL + yR) / 2 + 4, 12, "left", "#e0473c");
     TX(ctx, "尺上單位 cm", sx, mid + span / 2 + 22 * s, 9.5, "center", PL.col("text-dim"), 0);
-    const bxl = W * 0.14, byl = H * 0.46, sq = 1 - 0.32 * fr(dP, cfg.a);
+    const bxl = W * 0.14, byl = H * 0.46, sq = 1 - 0.32 * fr(dP * ramp, cfg.a);
     ctx.save(); ctx.strokeStyle = "rgb(60,40,34)"; ctx.lineWidth = 6 * s; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(bxl + 30 * s, byl); ctx.quadraticCurveTo(lx - 40 * s, byl - 10 * s, lx - 20 * s, tTop - 20 * s); ctx.quadraticCurveTo(lx, tTop - 34 * s, lx, tTop); ctx.stroke(); ctx.restore();
     const bg = ctx.createRadialGradient(bxl - 8 * s, byl - 10 * s, 4 * s, bxl, byl, 40 * s); bg.addColorStop(0, "rgb(214,80,70)"); bg.addColorStop(1, "rgb(120,28,24)");
     ctx.fillStyle = bg; ctx.beginPath(); ctx.ellipse(bxl, byl, 34 * s * sq, 26 * s / Math.sqrt(sq), 0, 0, PL.TAU); ctx.fill();
     AP.hand(ctx, bxl - 6 * s, byl + 4 * s, 1, 0.8 * s, { pull: true, sleeve: "#3f7fcf" });
+    // 把手抓在橡皮球右緣：往左推＝捏扁＝加壓（相對拖曳，見 relGrip）
+    gripOf(k, 0).place(bxl + 34 * s * sq, byl + 8 * s);
     TX(ctx, "捏橡皮球加壓 ΔP = " + PL.fmt(dP, 0) + " Pa", bxl, byl + 60 * s, 11, "center");
     TX(ctx, "右管通大氣", rx, tTop - 10 * s, 10, "center", PL.col("text-dim"), 0);
     TX(ctx, "管內液體：" + liq[0] + "（ρ = " + PL.fmt(rho, 0) + " kg/m³）", W - 16 * s, 42 * s, 11, "right");
@@ -268,6 +326,17 @@
       ctx.strokeStyle = "rgba(255,190,60,0.95)"; ctx.beginPath(); ctx.moveTo(xl + 8 * s, ay + h); ctx.lineTo(ex, ey); ctx.stroke();
     });
     ctx.restore();
+    /*
+     * 光點沿每條光線前進：平行光同時抵達透鏡，經透鏡組偏折後在組合焦點 F 會合再散開。
+     * 各條光線的光點同步出發，所以會看到它們在 F 處「擠成一點」——焦點就是光真的匯聚的地方。
+     */
+    hs.forEach(h => {
+      const ex = W - 20 * s, ey = ay + h + (ay - (ay + h)) * (ex - xl) / (xfe - xl);
+      PL.motion.flow(ctx, [[lbx + 4 * s, ay + h], [xl, ay + h], [xl + 8 * s, ay + h], [ex, ey]], t * 150 * s, { gap: 30 * s, r: 2.6 * s, front: true });
+    });
+    // 只用凸透鏡時的焦點 F₁：拖它就是換一片焦距不同的凸透鏡
+    stOf(k).lens = { xl, ppc };
+    gripOf(k, 0).place(xf1, ay + 22 * s);
     AP.lens(ctx, xl, ay, 64 * s, true); AP.lens(ctx, xl + 12 * s, ay, 64 * s, false);
     [xl, xl + 12 * s].forEach(x => AP.steel(ctx, x - 2 * s, ay + 66 * s, 4 * s, benchY - 30 * s - ay - 66 * s, 10));
     ctx.fillStyle = "rgb(255,240,160)"; ctx.shadowColor = "rgba(255,220,100,0.9)"; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(xfe, ay, 4 * s, 0, PL.TAU); ctx.fill(); ctx.shadowBlur = 0;
@@ -290,6 +359,8 @@
     AP.steel(ctx, bx - 3 * s, by + 14 * s, 6 * s, benchY - by - 14 * s, 10);
     AP.bulb(ctx, bx, by, 14 * s, 0.3 + 0.7 * br);
     const u = 40 * s, frame = m => { const x = bx + m * ppm, hh = u * m, ww = hh * 0.22, sk = hh * 0.16; return (qi, qj) => ({ x: x + ww * qj / m, y: by - hh / 2 + hh * qi / m + sk * (qj / m - 0.5) }); };
+    // 與 frame() 同一個斜投影：距離 d（m）處、框內比例位置 (p, q) 的點；對 d 是線性的，所以光子走直線
+    const cone = (d, p, q) => ({ x: bx + d * ppm + 0.22 * u * d * q, y: by + u * d * (p - 0.5) + 0.16 * u * d * (q - 0.5) });
     [1, 2, 3].forEach(m => {
       const P = frame(m), a = (0.12 + 0.55 * br) / (m * m);
       for (let i = 0; i < m; i++) for (let j = 0; j < m; j++) AP.poly(ctx, [P(i, j), P(i, j + 1), P(i + 1, j + 1), P(i + 1, j)], `rgba(255,236,150,${a.toFixed(3)})`, "rgba(190,150,60,0.6)");
@@ -297,7 +368,26 @@
     });
     const P3 = frame(3);
     ctx.save(); ctx.strokeStyle = "rgba(230,190,80,0.55)"; ctx.lineWidth = 1; [P3(0, 0), P3(0, 3), P3(3, 0), P3(3, 3)].forEach(q => { ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(q.x, q.y); ctx.stroke(); }); ctx.restore();
+    /*
+     * 光子：燈泡每秒射出的光子數 ∝ 光源強度 I，方向在照向三個框的角錐內均勻分布。
+     * 同一批光子先穿過 1 m 處的 1 格，到 2 m 攤在 4 格、3 m 攤在 9 格上——
+     * 每一格分到的光點數 ∝ 1/r²，這就是照度反平方的來源（光沒有變少，只是攤開了）。
+     */
+    const rate = 160 * Iv / 2400, vph = 1.3, dmax = 3.5, life = dmax / vph;
+    const hash = (n, kk) => { const q = Math.sin(n * 12.9898 + kk * 78.233) * 43758.5453; return q - Math.floor(q); };
+    ctx.save(); ctx.fillStyle = isL() ? "#d98a00" : "#fff4c2";
+    for (let n = Math.max(0, Math.ceil((t - life) * rate)); n <= Math.floor(t * rate); n++) {
+      const d = vph * (t - n / rate);
+      if (d <= 0.05 || d > dmax) continue;
+      const p = cone(d, hash(n, 1), hash(n, 2));
+      ctx.globalAlpha = d > 3.1 ? clamp((dmax - d) / 0.4, 0, 1) : 1;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 1.9 * s, 0, PL.TAU); ctx.fill();
+    }
+    ctx.restore();
     const mx = X(clamp(r, 0.5, 16));
+    // 把手抓照度計本體：沿光具座前後推，看讀數跟距離平方成反比
+    stOf(k).photo = { bx, W, X4: X(4) };
+    gripOf(k, 0).place(mx, by);
     ctx.fillStyle = "rgb(40,44,52)"; AP.rrPath(ctx, mx - 8 * s, by - 20 * s, 16 * s, 40 * s, 3 * s); ctx.fill();
     ctx.fillStyle = "rgb(236,240,246)"; ctx.beginPath(); ctx.arc(mx - 8 * s, by, 7 * s, Math.PI / 2, Math.PI * 1.5); ctx.fill();
     AP.steel(ctx, mx - 2 * s, by + 20 * s, 4 * s, benchY - by - 20 * s, 10);
@@ -328,9 +418,20 @@
     ctx.beginPath(); ctx.moveTo(src.x, src.y); ctx.lineTo(pin.x, pin.y); ctx.lineTo(pout.x, pout.y); ctx.stroke(); ctx.restore();
     ["#ff4a3a", "#ffa030", "#ffe040", "#40d060", "#4080ff", "#9050ff"].forEach((col, i) => { const da = (i - 2.5) * 0.012, ang = rd / 2 + da; ctx.strokeStyle = col; ctx.lineWidth = 2 * s; ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.moveTo(pout.x, pout.y); ctx.lineTo(pout.x + Math.cos(ang) * Lr, pout.y + Math.sin(ang) * Lr); ctx.stroke(); ctx.globalAlpha = 1; });
     AP.prismGlass(ctx, P0, B1, B2);
+    /*
+     * 光點沿光路前進：玻璃中光速 v = c/n，光點變慢、擠得更密（波長變短）；
+     * 出射後各色光的偏向角略有不同（色散），分成六道彩色光點各走各的方向。
+     */
+    const cpx = 150 * s, gp = 24 * s, l1 = Lr, l2 = Math.hypot(pout.x - pin.x, pout.y - pin.y), t1 = t - l1 / cpx, t2 = t1 - l2 * n / cpx;
+    PL.motion.flow(ctx, [[src.x, src.y], [pin.x, pin.y]], t * cpx, { gap: gp, r: 2.6 * s, color: "#fffbe6", front: true });
+    PL.motion.flow(ctx, [[pin.x, pin.y], [pout.x, pout.y]], t1 * cpx / n, { gap: gp / n, r: 2.4 * s, color: "#fffbe6", front: true });
+    ["#ff4a3a", "#ffa030", "#ffe040", "#40d060", "#4080ff", "#9050ff"].forEach((col, i) => { const ang = rd / 2 + (i - 2.5) * 0.012; PL.motion.flow(ctx, [[pout.x, pout.y], [pout.x + Math.cos(ang) * Lr, pout.y + Math.sin(ang) * Lr]], t2 * cpx, { gap: gp, r: 2.2 * s, color: col, glow: 4, front: true }); });
     const tube = (p, d, len, lab) => { const ang = Math.atan2(d.y, d.x); ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(ang); AP.steel(ctx, 0, -9 * s, len, 18 * s, 8); AP.brass(ctx, len - 8 * s, -11 * s, 10 * s, 22 * s); ctx.restore(); TX(ctx, lab, p.x + d.x * len * 0.5, p.y + d.y * len * 0.5 - 18 * s, 10.5, "center"); };
     tube({ x: pin.x - din.x * Rt * 1.28, y: pin.y - din.y * Rt * 1.28 }, din, Rt * 0.55, "平行光管");
     tube({ x: pout.x + dout.x * Rt * 0.75, y: pout.y + dout.y * Rt * 0.75 }, dout, Rt * 0.6, "望遠鏡");
+    // 把手抓望遠鏡的目鏡端：繞稜鏡轉動望遠鏡，對準出射光的位置就是量到的最小偏向角
+    stOf(k).prism = { x: pout.x, y: pout.y };
+    gripOf(k, 0).place(pout.x + dout.x * Rt * 1.27, pout.y + dout.y * Rt * 1.27);
     ctx.save(); ctx.setLineDash([5, 5]); ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(pin.x, pin.y); ctx.lineTo(pin.x + din.x * Lr * 0.8, pin.y + din.y * Lr * 0.8); ctx.stroke(); ctx.restore();
     const X0 = (pin.x + pout.x) / 2, vy = yi - (X0 - pin.x) * Math.tan(rd / 2), rr = Rt * 0.75;
     ctx.strokeStyle = "#ffcf5a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X0, vy, rr * 0.5, -rd / 2, rd / 2); ctx.stroke();
@@ -359,6 +460,22 @@
     AP.cable(ctx, [dl.red, { x: dl.red.x, y: byl + 16 * s }, { x: bxl + 8 * s, y: byl + 16 * s }], "rgb(186,54,48)", 2 * s, 2); AP.cable(ctx, [{ x: dl.black.x, y: benchY - 92 * s }, { x: bxl - 8 * s, y: byl + 16 * s }], "rgb(40,44,52)", 2 * s, 2);
     AP.bulb(ctx, bxl, byl, 14 * s, clamp(Vo / 12, 0, 1));
     TX(ctx, "小燈泡接在輸出", bxl, byl + 36 * s, 10, "center", PL.col("text-dim"), 0);
+    /*
+     * 電荷流動（傳統電流方向），光點速率 ∝ 電流：
+     *  · 主迴路：電源 + → 電阻線右端 → 整段電阻線 → 左端 → 電源 −，電流 ∝ Vᵢₙ（總電阻固定）
+     *  · 輸出支路：滑片 → 金屬桿 → 小燈泡 → 回到電阻線左端，電流 ∝ Vₒᵤₜ（燈泡電阻固定）
+     * 伏特計內阻極大，幾乎沒有電流流過，所以光點走燈泡那條路。
+     * 滑片往左推，輸出支路的光點就慢下來、燈泡變暗。
+     */
+    const tubeY = benchY - 16, rodY = benchY - 34, jy = benchY - 92 * s, vI = 7 * s;
+    const fo = { gap: 20 * s, r: 2.3 * s, glow: 4 };
+    PL.motion.flow(ctx, [ps.red, { x: ps.red.x, y: benchY + 16 * s }, { x: p.tubeR.x, y: benchY + 16 * s }, p.tubeR, { x: p.tubeR.x, y: tubeY }, { x: p.tubeL.x, y: tubeY }, p.tubeL, { x: p.tubeL.x - 20 * s, y: benchY + 28 * s }, { x: ps.black.x, y: benchY + 28 * s }, ps.black], t * vI * Vin, fo);
+    if (Vo > 0.05) PL.motion.flow(ctx, [{ x: rh.slider.x, y: tubeY }, { x: rh.slider.x, y: rodY }, p.rodR, { x: dl.red.x, y: p.rodR.y - 30 * s }, dl.red, { x: dl.red.x, y: byl + 16 * s }, { x: bxl + 8 * s, y: byl + 16 * s }, { x: bxl - 8 * s, y: byl + 16 * s }, { x: dl.black.x, y: jy }, { x: p.tubeL.x - 14 * s, y: jy }, p.tubeL], t * vI * Vo, fo);
+    // 把手：滑動變阻器的滑片（R₂ 佔的比例），以及電源旋鈕（Vᵢₙ）
+    const kn = knobAt(20 * s, benchY - 74 * s, 140 * s, 72 * s);
+    stOf(k).div = { x0: rx - rw / 2 + 6, w: rw - 12, kn };
+    gripOf(k, 0).place(rh.slider.x, rodY - 18);
+    const kt = knobTip(kn, fr(Vin, cfg.a)); gripOf(k, 1).place(kt.x, kt.y);
     const ya = benchY - 64 * s, xs = rh.slider.x, xl = rx - rw / 2 + 8 * s, xr = rx + rw / 2 - 8 * s;
     [[xl, xs, "R₂（輸出這段）", "#2f7fd8"], [xs, xr, "R₁", "#d0553a"]].forEach(r => { if (r[1] - r[0] > 16 * s) { D.line(ctx, r[0], ya, r[1], ya, r[3], 2); D.line(ctx, r[0], ya - 5 * s, r[0], ya + 5 * s, r[3], 2); D.line(ctx, r[1], ya - 5 * s, r[1], ya + 5 * s, r[3], 2); } TX(ctx, r[2], (r[0] + r[1]) / 2, ya - 8 * s, 10.5, "center", r[3]); });
     TX(ctx, "Vₒᵤₜ = Vᵢₙ × R₂/(R₁+R₂) = " + PL.fmt(Vo, 2) + " V", W - 16 * s, 42 * s, 12, "right");
@@ -380,6 +497,14 @@
     AP.resistorBox(ctx, x2, T, 50 * s, null, false);
     ctx.fillStyle = "rgb(40,60,120)"; AP.rrPath(ctx, x3 - 12 * s, (T + B) / 2 - 22 * s, 24 * s, 44 * s, 6 * s); ctx.fill(); ctx.fillStyle = "rgb(200,206,214)"; ctx.fillRect(x3 - 12 * s, (T + B) / 2 - 22 * s, 24 * s, 5 * s);
     ctx.save(); if (on) { ctx.shadowColor = "rgba(255,70,50,0.95)"; ctx.shadowBlur = 16; } ctx.fillStyle = on ? "rgb(255,80,60)" : "rgb(120,40,36)"; ctx.beginPath(); ctx.arc(x2, B, 8 * s, Math.PI, 0); ctx.lineTo(x2 + 8 * s, B + 6 * s); ctx.lineTo(x2 - 8 * s, B + 6 * s); ctx.closePath(); ctx.fill(); ctx.restore();
+    /*
+     * 充電電流：光點走過的距離 ∝ 已經流過的電荷 Q = C·Vc，所以光點速率 ∝ 電流 I = (9 − Vc)/R。
+     * 一接通時電流最大、光點衝得最快；電容越滿，光點越慢，最後幾乎停住（I → 0）。
+     * 上面的光點流進電容上板，下面同樣多的電荷離開下板——兩板帶等量異號電荷。
+     */
+    const my = (T + B) / 2, sQ = Vc * 40 * s, fo = { gap: 18 * s, r: 2.3 * s, glow: 4 };
+    PL.motion.flow(ctx, [[x1, my - 26 * s], [x1, T], [x3, T], [x3, my - 22 * s]], sQ, fo);
+    PL.motion.flow(ctx, [[x3, my + 22 * s], [x3, B], [x1, B], [x1, my + 26 * s]], sQ, fo);
     TX(ctx, "9 V", x1 - 22 * s, (T + B) / 2 + 4, 10, "right"); TX(ctx, "R", x2, T - 14 * s, 10.5, "center"); TX(ctx, "C", x3 + 18 * s, (T + B) / 2 + 4, 10.5, "left"); TX(ctx, on ? "LED 亮！" : "LED（6 V 才亮）", x2, B + 22 * s, 10, "center", on ? "#e0473c" : null);
     const dl = AP.dial(ctx, bx + bw * 0.5, by - 56 * s, 36 * s, Vc / 9, { max: 9, unit: "V", majors: 3 });
     TX(ctx, "電容電壓", bx + bw * 0.5, by - 100 * s, 10.5, "center"); void dl;
@@ -390,6 +515,9 @@
     ctx.strokeStyle = "rgba(190,205,225,0.3)"; for (let n = 1; n * tau <= 10; n++) { ctx.beginPath(); ctx.moveTo(X(n * tau), gy0); ctx.lineTo(X(n * tau), gy1); ctx.stroke(); } ctx.setLineDash([]);
     ctx.strokeStyle = "rgb(110,226,255)"; ctx.lineWidth = 2.2; ctx.beginPath(); for (let i = 0; i <= 100; i++) { const u = i / 10; i ? ctx.lineTo(X(u), Y(9 * (1 - Math.exp(-u / tau)))) : ctx.moveTo(X(u), Y(0)); } ctx.stroke();
     ctx.fillStyle = "rgb(255,220,110)"; ctx.beginPath(); ctx.arc(X(tm), Y(Vc), 5, 0, PL.TAU); ctx.fill(); ctx.restore();
+    // 把手：資料擷取畫面上的時間游標，拖到哪一刻就看那一刻的電路狀態
+    stOf(k).rc = { gx0, gx1 };
+    gripOf(k, 0).place(X(tm), Y(Vc));
     D.text(ctx, "Vc（V）", scr.x + 8 * s, scr.y + 16 * s, { color: "rgba(210,220,236,0.9)", size: 10 });
     D.text(ctx, "LED 亮起門檻 6 V", gx1, Y(6) - 5, { color: "rgba(255,150,130,0.9)", size: 9.5, align: "right" });
     D.text(ctx, "t = " + PL.fmt(tm, 1) + " s（虛線間隔 τ）", gx1, gy1 + 16 * s, { color: "rgba(210,220,236,0.9)", size: 9.5, align: "right" });
@@ -431,19 +559,35 @@
     const benchY = H * 0.88;
     AP.labRoom(ctx, W, H, benchY, {});
     const cx = W * 0.34, Rc = (56 + 100 * fr(r, cfg.b)) * s, cy = benchY - 30 * s - Rc, ra = th * Math.PI / 180;
+    /*
+     * 磁針有轉動慣量：電流一改變，合磁場方向立刻變，但磁針會擺過頭、來回晃幾下才停在 θ。
+     * 磁針只畫顯示角 rd；讀數與向量圖仍用 tan θ = B線圈/B地磁 的平衡值。
+     */
+    const rdN = follow(k, "needle", ra, { omega: 4.2, zeta: 0.16 });
     AP.steel(ctx, cx - 50 * s, benchY - 10 * s, 100 * s, 10 * s, -8); AP.steel(ctx, cx - 5 * s, cy + Rc, 10 * s, benchY - cy - Rc - 10 * s, 10);
     AP.ringCoil(ctx, cx, cy, Rc * 0.32, Rc, { part: "back", turns: 5, depth: 10 * s, w: 3 * s });
     ctx.fillStyle = "rgb(190,160,110)"; ctx.fillRect(cx - 34 * s, cy - 3 * s, 68 * s, 6 * s);
     ctx.fillStyle = "rgb(248,248,244)"; ctx.beginPath(); ctx.ellipse(cx, cy - 4 * s, 26 * s, 10 * s, 0, 0, PL.TAU); ctx.fill(); ctx.strokeStyle = "rgb(190,150,70)"; ctx.lineWidth = 2; ctx.stroke();
-    const nx = Math.sin(ra) * 22 * s, ny = -Math.cos(ra) * 8 * s;
+    const nx = Math.sin(rdN) * 22 * s, ny = -Math.cos(rdN) * 8 * s;
     ctx.lineWidth = 3 * s; ctx.strokeStyle = "rgb(214,52,44)"; ctx.beginPath(); ctx.moveTo(cx, cy - 4 * s); ctx.lineTo(cx + nx, cy - 4 * s + ny); ctx.stroke();
     ctx.strokeStyle = "rgb(52,98,178)"; ctx.beginPath(); ctx.moveTo(cx, cy - 4 * s); ctx.lineTo(cx - nx, cy - 4 * s - ny); ctx.stroke();
     AP.ringCoil(ctx, cx, cy, Rc * 0.32, Rc, { part: "front", turns: 5, depth: 10 * s, w: 3 * s });
     const ps = AP.powerSupply(ctx, W * 0.56, benchY - 70 * s, 140 * s, 68 * s, PL.fmt(I, 1) + " A", { label: "電流", knob: fr(I, cfg.a) });
     AP.cable(ctx, [{ x: cx - 12 * s, y: benchY - 12 * s }, { x: cx + 40 * s, y: benchY - 3 * s }, { x: ps.red.x, y: benchY - 3 * s }, ps.red], "rgb(186,54,48)", 2.4 * s, 2);
     AP.cable(ctx, [{ x: cx + 12 * s, y: benchY - 12 * s }, { x: cx + 50 * s, y: benchY - 6 * s }, { x: ps.black.x, y: benchY - 6 * s }, ps.black], "rgb(40,44,52)", 2.4 * s, 2);
+    // 電流光點：速率 ∝ I，從電源 + 極沿導線進線圈、繞線圈前半圈，再回到 − 極；I = 0 時沒有電流就不畫
+    if (I > 0.02) {
+      const sI = t * 16 * s * I, fo = { gap: 18 * s, r: 2.2 * s, glow: 4 };
+      PL.motion.flow(ctx, [ps.red, { x: ps.red.x, y: benchY - 3 * s }, { x: cx + 40 * s, y: benchY - 3 * s }, { x: cx - 12 * s, y: benchY - 12 * s }], sI, fo);
+      PL.motion.flow(ctx, coilFront(cx + 5 * s, cy, Rc * 0.32, Rc, false), sI, fo);
+      PL.motion.flow(ctx, [{ x: cx + 12 * s, y: benchY - 12 * s }, { x: cx + 50 * s, y: benchY - 6 * s }, { x: ps.black.x, y: benchY - 6 * s }, ps.black], sI, fo);
+    }
+    // 把手：電源旋鈕（線圈電流）
+    const kn = knobAt(W * 0.56, benchY - 70 * s, 140 * s, 68 * s);
+    stOf(k).galv = { kn };
+    const kt = knobTip(kn, fr(I, cfg.a)); gripOf(k, 0).place(kt.x, kt.y);
     const ix = W * 0.8, iy = H * 0.3, ir = 62 * s;
-    AP.compass(ctx, ix, iy, ir, -Math.PI / 2 + ra);
+    AP.compass(ctx, ix, iy, ir, -Math.PI / 2 + rdN);
     const bE = 46, bC = Math.tan(ra) * bE, sc = 1.2 * s;
     D.arrow(ctx, ix, iy + ir + 80 * s, ix, iy + ir + 80 * s - bE * sc, { color: "#2f9a5a", width: 2.6, head: 7 });
     D.arrow(ctx, ix, iy + ir + 80 * s, ix + Math.min(bC, 120) * sc, iy + ir + 80 * s, { color: "#e0843a", width: 2.6, head: 7 });
@@ -523,6 +667,26 @@
     AP.laser(ctx, lx, ay, 0, { len: 60 * s });
     ctx.save(); ctx.strokeStyle = "rgba(60,255,110,0.85)"; ctx.shadowColor = "rgba(60,255,110,0.8)"; ctx.shadowBlur = 6; ctx.lineWidth = 3 * s; ctx.beginPath(); ctx.moveTo(lx, ay); ctx.lineTo(px, ay); ctx.stroke(); ctx.restore();
     ctx.fillStyle = "rgba(60,255,110,0.14)"; ctx.beginPath(); ctx.moveTo(px, ay - 2 * s); ctx.lineTo(sx, ay - 40 * s); ctx.lineTo(sx, ay + 40 * s); ctx.lineTo(px, ay + 2 * s); ctx.closePath(); ctx.fill();
+    /*
+     * 光的傳播：雷射光點沿光束前進到圓孔；穿過圓孔後，孔上每一點都當新的波源（惠更斯原理），
+     * 波前變成以圓孔為中心的弧往光屏擴散——光屏上的亮暗環就是這些子波疊加的結果。
+     * 波前越走越淡：能量攤在越來越大的弧面上。
+     */
+    const gL = isL(), vw = 140 * s, lamPx = 16 * s, tA = t - (px - lx) / vw;
+    PL.motion.flow(ctx, [[lx + 4 * s, ay], [px, ay]], t * vw, { gap: lamPx, r: 2.2 * s, color: gL ? "#0f9a3e" : "#c8ffd8", glow: 5, front: true });
+    if (tA > 0) {
+      ctx.save(); ctx.beginPath(); ctx.moveTo(px, ay - 2 * s); ctx.lineTo(sx, ay - 40 * s); ctx.lineTo(sx, ay + 40 * s); ctx.lineTo(px, ay + 2 * s); ctx.closePath(); ctx.clip();
+      ctx.lineWidth = 1.6 * s; const span = sx - px, reach = Math.min(span, tA * vw);
+      for (let rr = (tA * vw) % lamPx; rr <= reach; rr += lamPx) {
+        const al = 0.75 * (1 - 0.7 * rr / Math.max(span, 1));
+        ctx.strokeStyle = gL ? `rgba(14,140,60,${al.toFixed(3)})` : `rgba(170,255,195,${al.toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(px, ay, rr, -0.9, 0.9); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    // 把手抓光屏：前後移動改變傳播距離 z
+    stOf(k).fres = { px, s, W };
+    gripOf(k, 0).place(sx, ay - 50 * s);
     AP.steel(ctx, px - 4 * s, ay - 50 * s, 8 * s, 100 * s, -14); ctx.fillStyle = "rgb(60,255,110)"; ctx.fillRect(px - 4 * s, ay - (1 + ar) * s, 8 * s, (2 + 2 * ar) * s);
     AP.steel(ctx, px - 3 * s, ay + 50 * s, 6 * s, benchY - ay - 50 * s, 10);
     AP.steel(ctx, sx - 3 * s, ay - 56 * s, 6 * s, 112 * s, 8); AP.steel(ctx, sx - 2 * s, ay + 56 * s, 4 * s, benchY - ay - 56 * s, 10);
@@ -594,6 +758,8 @@
     ctx.restore();
     AP.ringCoil(ctx, cx, cy, Rc * 0.3, Rc, { part: "back", turns: 5, depth: 10 * s, w: 3 * s });
     AP.ringCoil(ctx, cx, cy, Rc * 0.3, Rc, { part: "front", turns: 5, depth: 10 * s, w: 3 * s });
+    // 線圈裡的電流（固定 0.8 A）：光點沿線圈繞行，磁場就是這圈電流產生的
+    PL.motion.flow(ctx, coilFront(cx + 5 * s, cy, Rc * 0.3, Rc, false), t * 14 * s, { gap: 18 * s, r: 2.2 * s, glow: 4 });
     const px = cx + z * ppm;
     AP.steel(ctx, px, cy - 3 * s, W * 0.82 - px, 6 * s, 8); ctx.fillStyle = "rgb(60,64,72)"; ctx.fillRect(px - 4 * s, cy - 5 * s, 8 * s, 10 * s);
     AP.steel(ctx, W * 0.82 - 4 * s, cy, 8 * s, benchY - cy, 10);
@@ -603,7 +769,20 @@
     D.line(ctx, px, cy + 6 * s, px, yd, "rgba(224,132,58,0.6)", 1, [3, 3]);
     if (z > 0.005) { D.arrow(ctx, cx, yd, px, yd, { color: "#e0843a", width: 1.6, head: 6 }); }
     TX(ctx, "z = " + PL.fmt(z * 100, 0) + " cm", Math.max(cx + 30 * s, (cx + px) / 2), yd + 18 * s, 10.5, "center", "#e0843a");
-    TX(ctx, "霍爾探棒", px + 24 * s, cy - 12 * s, 10, "left", PL.col("text-dim"), 0);
+    TX(ctx, "霍爾探棒", px + 30 * s, cy - 12 * s, 10, "left", PL.col("text-dim"), 0);
+    /*
+     * 探棒尖端旁的小羅盤：線圈軸線沿東西向擺放，地磁水平分量（46 μT）指北（穿入畫面）。
+     * 磁針停在合磁場方向 tan θ = B / B地磁；探棒一移動，B 改變，磁針擺過頭再阻尼停下。
+     * 靠近線圈中心 B 大、磁針幾乎轉向軸線；遠離後 B 衰減，磁針轉回指北。
+     */
+    const thN = follow(k, "needle", Math.atan(Bz / 46), { omega: 4.2, zeta: 0.16 }), ccy = cy + 22 * s;
+    ctx.fillStyle = "rgb(248,248,244)"; ctx.beginPath(); ctx.ellipse(px, ccy, 18 * s, 7 * s, 0, 0, PL.TAU); ctx.fill(); ctx.strokeStyle = "rgb(190,150,70)"; ctx.lineWidth = 1.6; ctx.stroke();
+    const nx = Math.sin(thN) * 15 * s, ny = -Math.cos(thN) * 5.5 * s;
+    ctx.lineWidth = 2.4 * s; ctx.strokeStyle = "rgb(214,52,44)"; ctx.beginPath(); ctx.moveTo(px, ccy); ctx.lineTo(px + nx, ccy + ny); ctx.stroke();
+    ctx.strokeStyle = "rgb(52,98,178)"; ctx.beginPath(); ctx.moveTo(px, ccy); ctx.lineTo(px - nx, ccy - ny); ctx.stroke();
+    // 把手抓探棒尖端：沿軸線推拉改變距離 z
+    stOf(k).biot = { cx, ppm };
+    gripOf(k, 0).place(px, cy);
     const gx0 = W * 0.42, gx1 = W - 30 * s, gy0 = 92 * s, gy1 = cy - Rc * 0.3 - 30 * s, Bmax = 4 * Math.PI * 1e-7 * 40 / (2 * 0.03) * 1e6;
     if (gy1 - gy0 > 50 * s) {
       AP.infoCard(ctx, gx0 - 12 * s, gy0 - 24 * s, gx1 - gx0 + 24 * s, gy1 - gy0 + 44 * s);
@@ -615,6 +794,41 @@
     }
     TX(ctx, "B = μ₀NIR² / 2(R² + z²)^(3/2)", W - 16 * s, 42 * s, 11, "right");
     label(ctx, 20, 18, "軸線磁場 B", PL.fmt(Bz, 1) + " μT", c);
+  };
+
+  /* ---------- 各實驗的拖曳把手（都驅動既有滑桿，讀數與探測引擎照舊） ---------- */
+  const lerpA = (C, f) => C.a[1] + clamp(f, 0, 1) * (C.a[2] - C.a[1]);
+  GRIPS["u-tube-manometer"] = (cv, a, b, st, C) => [relGrip(cv, a, "橡皮球（往左推＝捏扁加壓）", 110, -1,
+    v => (v - C.a[1]) / (C.a[2] - C.a[1]), f => lerpA(C, f))];
+  GRIPS["lens-combination"] = (cv, a, b, st) => [PL.ui.handle(cv, { slider: a, label: "凸透鏡焦點 F₁（拖曳換焦距）",
+    toValue: x => { const g = st.lens; return g ? (x - g.xl) / g.ppc : a.get(); } })];
+  GRIPS["photometry-inverse-square"] = (cv, a, b, st) => [PL.ui.handle(cv, { slider: a, label: "照度計（前後移動）",
+    // 光具座 0–4 m 是等比刻度，4 m 之後壓縮成 12 m 一段（與 X() 互為反函數）
+    toValue: x => { const g = st.photo; if (!g) return a.get(); return x <= g.X4 ? (x - g.bx) / (g.W * 0.13) : 4 + (x - g.X4) / (g.W * 0.34) * 12; } })];
+  GRIPS["prism-spectrometer"] = (cv, a, b, st) => [PL.ui.handle(cv, { slider: b, label: "望遠鏡（轉到出射光）",
+    // 出射光與入射光對稱，各偏 Dₘ/2，所以望遠鏡方向角的兩倍就是偏向角
+    toValue: (x, y) => { const g = st.prism; return g ? 2 * Math.atan2(y - g.y, x - g.x) * 180 / Math.PI : b.get(); } })];
+  GRIPS["fresnel-diffraction"] = (cv, a, b, st) => [PL.ui.handle(cv, { slider: b, label: "光屏（拖曳改距離 z）",
+    toValue: x => { const g = st.fres; return g ? (x - g.px - 30 * g.s) / (g.W * 0.34) * 6 : b.get(); } })];
+  GRIPS["voltage-divider"] = (cv, a, b, st, C) => [
+    PL.ui.handle(cv, { slider: b, label: "滑動變阻器的滑片", toValue: x => { const g = st.div; return g ? (x - g.x0) / g.w : b.get(); } }),
+    PL.ui.handle(cv, { slider: a, label: "電源旋鈕（輸入電壓）", toValue: (x, y) => { const g = st.div; return g ? lerpA(C, knobFrac(g.kn, x, y)) : a.get(); } })];
+  GRIPS["rc-timer"] = (cv, a, b, st) => [PL.ui.handle(cv, { slider: a, label: "時間游標（拖曳看各時刻）",
+    toValue: x => { const g = st.rc; return g ? (x - g.gx0) / (g.gx1 - g.gx0) * 10 : a.get(); } })];
+  GRIPS["tangent-galvanometer"] = (cv, a, b, st, C) => [PL.ui.handle(cv, { slider: a, label: "電源旋鈕（線圈電流）",
+    toValue: (x, y) => { const g = st.galv; return g ? lerpA(C, knobFrac(g.kn, x, y)) : a.get(); } })];
+  GRIPS["biot-savart-axis"] = (cv, a, b, st) => [PL.ui.handle(cv, { slider: a, label: "霍爾探棒（沿軸線推拉）",
+    toValue: x => { const g = st.biot; return g ? (x - g.cx) / g.ppm : a.get(); } })];
+
+  /*
+   * RC 計時：播放＝開關接通，時間 t 自己往前走，電容一路充電（滑桿跟著動）。
+   * 走到量程盡頭先停 1.5 s 讓學生看清「充飽」，再放電從 t = 0 重來。
+   */
+  TICK["rc-timer"] = (dt, a, b, st, C) => {
+    let tt = st.aLive != null ? st.aLive : a.get();
+    if (tt >= C.a[2] - 1e-9) { st.hold = (st.hold || 0) + dt; if (st.hold < 1.5) return; st.hold = 0; tt = 0; }
+    else tt = Math.min(C.a[2], tt + dt);
+    st.aLive = tt; a.set(tt);
   };
 
   const CAP = {
@@ -646,10 +860,10 @@
     AP.lcd(ctx, W / 2 - 110, H * 0.4, 220, 44, PL.fmt(v, Math.abs(v) < 10 ? 3 : 1) + " " + cfg.unit, { color: "rgb(130,240,170)" });
     label(ctx, 20, 18, cfg.output, PL.fmt(v, Math.abs(v) < 10 ? 3 : 1) + " " + cfg.unit, c);
   }
-  function scene(cv, config, a, b, out, time) {
+  function scene(cv, config, a, b, out, time, ext) {
     const { ctx, W, H } = cv;
     cv.clear(); D.bg(cv);
-    (SC[config.id] || fallback)({ cv, ctx, W, H, cfg: config, a, b, t: time, v: out, c: accent(), s: clamp(Math.min(W / 800, H / 464), 0.5, 1.7) });
+    (SC[config.id] || fallback)(Object.assign({ cv, ctx, W, H, cfg: config, a, b, t: time, v: out, c: accent(), s: clamp(Math.min(W / 800, H / 464), 0.5, 1.7) }, ext));
   }
 
   Object.keys(LABS).forEach(id => { LABS[id].id = id; });
@@ -661,13 +875,18 @@
       const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" }), cv = PL.canvas.create(L.canvasWrap, 0.58, 920);
       PL.ui.caption(cv, CAP[id] || "");
       const digits = param => param[6] == null ? 2 : param[6];
-      const a = PL.ui.slider(L.controls, { label: config.a[0], min: config.a[1], max: config.a[2], value: config.a[3], step: config.a[5], unit: config.a[4], digits: digits(config.a), onInput: render });
-      const b = PL.ui.slider(L.controls, { label: config.b[0], min: config.b[1], max: config.b[2], value: config.b[3], step: config.b[5], unit: config.b[4], digits: digits(config.b), onInput: render });
+      // st.aLive：播放中由 TICK 推進的連續值（滑桿本身有步距，直接讀會一格一格跳）；使用者一動滑桿就作廢
+      const st = {};
+      // onInput 會把滑桿值當第一個參數傳進來，render 的第一個參數是 dt，所以要包一層
+      const a = PL.ui.slider(L.controls, { label: config.a[0], min: config.a[1], max: config.a[2], value: config.a[3], step: config.a[5], unit: config.a[4], digits: digits(config.a), onInput: () => { st.aLive = null; render(); } });
+      const b = PL.ui.slider(L.controls, { label: config.b[0], min: config.b[1], max: config.b[2], value: config.b[3], step: config.b[5], unit: config.b[4], digits: digits(config.b), onInput: () => render() });
+      const aNow = () => st.aLive != null ? st.aLive : a.get();
+      const grips = GRIPS[id] ? GRIPS[id](cv, a, b, st, config) : [];
       PL.ui.note(L.controls, PL.templateGuide(id, config));
       PL.ui.note(L.controls, "這一題可以持續記錄量測點，資料筆數不設上限；已記錄的點會以空心點畫在關係圖上。");
       const records = [];
       const actions = PL.ui.buttonRow(L.controls);
-      PL.ui.button(actions, "記錄量測點", () => { records.push({ a: a.get(), b: b.get(), out: config.calc(a.get(), b.get()) }); render(); }, { primary: true });
+      PL.ui.button(actions, "記錄量測點", () => { records.push({ a: aNow(), b: b.get(), out: config.calc(aNow(), b.get()) }); render(); }, { primary: true });
       PL.ui.button(actions, "清空紀錄", () => { records.length = 0; render(); });
       const readout = PL.ui.readout(L.readouts, { label: config.output, unit: config.unit });
       const aReadout = PL.ui.readout(L.readouts, { label: config.a[0], unit: config.a[4] });
@@ -676,9 +895,11 @@
       const conclusion = PL.ui.readout(L.readouts, { label: "模型判讀" });
       const chart = PL.ui.chart(PL.ui.charts(root), { title: config.output + "關係圖", cap: "曲線固定第二項參數；亮點是目前設定，空心點是所有已記錄的量測資料。" });
       let elapsed = 0, animation;
-      function render() {
-        const av = a.get(), bv = b.get(), out = config.calc(av, bv);
-        scene(cv, config, av, bv, out, elapsed);
+      function render(dt) {
+        dt = dt > 0 ? dt : 0;
+        if (dt && TICK[id]) TICK[id](dt, a, b, st, config);
+        const av = aNow(), bv = b.get(), out = config.calc(av, bv);
+        scene(cv, config, av, bv, out, elapsed, { dt, running: !!(animation && animation.running), st, grips });
         readout.set(out, Math.abs(out) < 10 ? 3 : 2); aReadout.set(av, digits(config.a)); bReadout.set(bv, digits(config.b)); nReadout.set(records.length, 0); conclusion.set(config.status(av, bv, out));
         chart.setCap(PL.ui.relationChart(chart, {
           a: config.a, b: config.b, av: av, bv: bv,
@@ -686,9 +907,9 @@
           extra: function (g) { records.forEach(p => g.dot(p.a, p.out, { color: PL.col("text-dim"), r: 3 })); }
         }));
       }
-      animation = PL.loop(dt => { if (dt) elapsed += dt; render(); });
-      cv.onResize(render); chart.onResize(render); render(); animation.start();
-      return { stop() { animation.stop(); cv.destroy(); chart.destroy(); }, rerender: render };
+      animation = PL.loop(dt => { if (dt) elapsed += dt; render(dt); });
+      cv.onResize(() => render()); chart.onResize(() => render()); render(); animation.start();
+      return { stop() { animation.stop(); cv.destroy(); chart.destroy(); }, rerender: () => render() };
     }});
   });
 
@@ -719,9 +940,47 @@
       return k - 1;
     }
 
+    /*
+     * 即時計數（按播放）：一顆一顆衰變真的發生。
+     * 衰變是泊松過程——相鄰兩次衰變的間隔服從指數分布 Δt = −ln(1−u)/R，
+     * 所以喀嚓聲時密時疏，不是等間隔。每次衰變有一顆粒子從放射源飛進探管，
+     * 管內氣體被游離、整根管閃一下，計數器 +1；時間窗走完就記成一次量測。
+     * 用另一個亂數源，「計數一次」按鈕的結果序列不受影響。
+     */
+    let seed2 = 7310917;
+    function rng2() {
+      seed2 = (seed2 + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed2 ^ (seed2 >>> 15), 1 | seed2);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    }
+    const FLIGHT = 0.16;           // 粒子從放射源飛到探管窗口的時間（示意）
+    const live = { t: 0, n: 0, next: 0, flying: [], ticks: [], flash: 0 };
+    const expGap = () => -Math.log(1 - rng2()) / Math.max(sRate.get(), 1e-6);
+    function resetLive() { live.t = 0; live.n = 0; live.ticks = []; live.next = expGap(); }
+    function stepLive(dt) {
+      if (!(dt > 0)) return;
+      live.t += dt; live.flash = Math.max(0, live.flash - dt * 9);
+      live.flying.forEach(p => { p.age += dt; });
+      live.next -= dt;
+      while (live.next <= 0) { live.flying.push({ age: -live.next, dy: rng2() - 0.5 }); live.next += expGap(); }
+      live.flying = live.flying.filter(p => {
+        if (p.age < FLIGHT) return true;
+        live.n += 1; live.ticks.push(Math.max(0, live.t - (p.age - FLIGHT))); live.flash = 1;
+        return false;
+      });
+      // 時間窗走完：這一窗的計數就是一次量測
+      if (live.t >= sWin.get()) { trials.push(live.n); live.t -= sWin.get(); live.n = 0; live.ticks = []; }
+    }
+    let clock = null;
+
     PL.ui.section(L.controls, "量測條件");
     const sRate = PL.ui.slider(L.controls, { label: "平均計數率 R", min: 0.5, max: 50, step: 0.5, value: 15, unit: "次/s", digits: 1, onInput: () => clearTrials() });
     const sWin = PL.ui.slider(L.controls, { label: "每次量測時間窗", min: 1, max: 60, step: 1, value: 10, unit: "s", digits: 0, onInput: () => clearTrials() });
+    // 把手抓放射源：拖近探管、計數率變大（與畫面上 srcX 的換算互為反函數）
+    const srcGrip = relGrip(cv, sRate, "放射源（拖近探管→計數率變大）", 150, -1,
+      v => (Math.sqrt(v) - Math.sqrt(0.5)) / (Math.sqrt(50) - Math.sqrt(0.5)),
+      f => (Math.sqrt(0.5) + f * (Math.sqrt(50) - Math.sqrt(0.5))) ** 2);
     const row = PL.ui.buttonRow(L.controls);
     const bCount = PL.ui.button(row, "計數一次", () => countOnce(), { primary: true });
     PL.ui.button(row, "連續計數 8 次", () => {
@@ -749,6 +1008,7 @@
       rate = sRate.get();
       windowSec = sWin.get();
       trials = [];
+      resetLive();
       draw();
     }
     function countOnce(silent) {
@@ -779,20 +1039,47 @@
       ctx.fillStyle = "rgba(200,206,214,0.55)";
       for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { ctx.beginPath(); ctx.arc(154 + i * 8, 54 + j * 9, 2, 0, TAU); ctx.fill(); }
       ctx.restore();
-      AP.lcd(ctx, 34, 50, 108, 28, st ? "N=" + st.last : "N=—", { color: "rgb(130,240,170)" });
+      // 播放過就顯示本窗的即時計數（一顆一顆往上跳），否則顯示上一次量測
+      const liveOn = !!(clock && clock.t > 0);
+      AP.lcd(ctx, 34, 50, 108, 28, liveOn ? "N=" + live.n : st ? "N=" + st.last : "N=—", { color: "rgb(130,240,170)" });
+      if (live.flash > 0) {
+        // 喇叭孔跟著「喀」一聲亮一下
+        ctx.save(); ctx.fillStyle = `rgba(255,236,150,${(0.8 * live.flash).toFixed(3)})`;
+        for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { ctx.beginPath(); ctx.arc(154 + i * 8, 54 + j * 9, 2.4, 0, TAU); ctx.fill(); }
+        ctx.restore();
+      }
       PL.theme.note(ctx, "rgb(44,48,56)", 27, 82, 120, 18);
       D.text(ctx, "蓋革計數器", 88, 96, { color: "rgba(230,236,244,0.9)", size: 10, align: "center", weight: "700" });
       AP.cable(ctx, [{ x: 24, y: 96 }, { x: 14, y: 118 }, { x: 34, y: 128 }], "rgb(40,44,52)", 3, 4);
       AP.steel(ctx, 34, 120, 92, 16, 8);
+      if (live.flash > 0) {
+        // 游離放電：整根探管閃一下（每一顆粒子都觸發一次完整的放電脈衝，所以只能「數顆數」）
+        ctx.save(); ctx.shadowColor = "rgba(140,220,255,0.95)"; ctx.shadowBlur = 12 * live.flash;
+        ctx.fillStyle = `rgba(150,225,255,${(0.75 * live.flash).toFixed(3)})`; AP.rrPath(ctx, 36, 122, 88, 12, 5); ctx.fill(); ctx.restore();
+      }
       ctx.fillStyle = "rgb(30,32,38)"; ctx.beginPath(); ctx.ellipse(127, 128, 3, 8, 0, 0, TAU); ctx.fill();
-      AP.brassDisc(ctx, 168, 128, 13);
+      // 放射源的位置跟著計數率走：越近，進入探管窗口的立體角越大，計數率越高（約 ∝ 1/距離²）
+      const fq = (Math.sqrt(rate) - Math.sqrt(0.5)) / (Math.sqrt(50) - Math.sqrt(0.5)), srcX = 142 + 58 * (1 - PL.clamp(fq, 0, 1));
+      AP.brassDisc(ctx, srcX, 128, 13);
       ctx.fillStyle = "rgb(30,30,30)";
-      for (let i = 0; i < 3; i++) { const a = -Math.PI / 2 + i * TAU / 3; ctx.beginPath(); ctx.moveTo(168, 128); ctx.arc(168, 128, 10, a - 0.5, a + 0.5); ctx.closePath(); ctx.fill(); }
-      ctx.fillStyle = "rgb(236,186,40)"; ctx.beginPath(); ctx.arc(168, 128, 3, 0, TAU); ctx.fill();
-      ctx.save(); ctx.strokeStyle = "rgba(255,120,80,0.85)"; ctx.lineWidth = 1.4;
-      const nTr = Math.max(1, Math.min(10, Math.round(sRate.get() / 5))), rs = trials.length * 7 + 3;
-      for (let i = 0; i < nTr; i++) { const q = Math.sin(rs + i * 12.9898) * 43758.5453, u = q - Math.floor(q), y0 = 122 + u * 12; ctx.beginPath(); ctx.moveTo(154, 128 + (u - 0.5) * 8); ctx.lineTo(131 + u * 4, y0); ctx.stroke(); }
+      for (let i = 0; i < 3; i++) { const a = -Math.PI / 2 + i * TAU / 3; ctx.beginPath(); ctx.moveTo(srcX, 128); ctx.arc(srcX, 128, 10, a - 0.5, a + 0.5); ctx.closePath(); ctx.fill(); }
+      ctx.fillStyle = "rgb(236,186,40)"; ctx.beginPath(); ctx.arc(srcX, 128, 3, 0, TAU); ctx.fill();
+      ctx.save(); ctx.strokeStyle = "rgba(255,120,80,0.85)"; ctx.fillStyle = "rgb(255,110,70)"; ctx.lineWidth = 1.4;
+      if (!liveOn) {
+        // 還沒播放：畫幾道示意軌跡（條數隨 R）
+        const nTr = Math.max(1, Math.min(10, Math.round(sRate.get() / 5))), rs = trials.length * 7 + 3;
+        for (let i = 0; i < nTr; i++) { const q = Math.sin(rs + i * 12.9898) * 43758.5453, u = q - Math.floor(q), y0 = 122 + u * 12; ctx.beginPath(); ctx.moveTo(srcX - 14, 128 + (u - 0.5) * 8); ctx.lineTo(131 + u * 4, y0); ctx.stroke(); }
+      } else {
+        // 播放中：飛行中的粒子，帶一小段軌跡尾巴
+        live.flying.forEach(p => {
+          const f = PL.clamp(p.age / FLIGHT, 0, 1), x0 = srcX - 12, x = x0 + (130 - x0) * f, y = 128 + p.dy * 9 * (1 - f);
+          const fb = Math.max(0, f - 0.25), xb = x0 + (130 - x0) * fb, yb = 128 + p.dy * 9 * (1 - fb);
+          ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.moveTo(xb, yb); ctx.lineTo(x, y); ctx.stroke();
+          ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(x, y, 2.2, 0, TAU); ctx.fill();
+        });
+      }
       ctx.restore();
+      srcGrip.place(srcX, 128);
       const tubeX = 24, tubeY = 122, tubeH = 34;
       D.text(ctx, "R = " + PL.fmt(rate, 1) + " 次/s · 窗 " + windowSec + " s", tubeX, 158,
         { color: PL.col("text-faint"), size: 10 });
@@ -828,6 +1115,14 @@
       D.text(ctx, "σ ≈ " + PL.fmt(sigmaExp, 1) + "（√N̄）", railX, tickTop + 20,
         { color: PL.col("warn"), size: 9.5 });
 
+      // 本窗時間軸：每一道刻痕是一次「喀」——間隔時密時疏，這就是隨機（泊松）到達
+      const stripY = tickTop + 44;
+      D.text(ctx, liveOn ? "本窗 " + PL.fmt(Math.min(live.t, windowSec), 1) + " / " + windowSec + " s：已計 " + live.n + " 次" : "按播放：粒子一顆顆進管、即時計數",
+        railX, stripY - 6, { color: PL.col("text-faint"), size: 9 });
+      D.rect(ctx, railX, stripY, railW, 14, { fill: PL.theme.shade(0.45), stroke: PL.theme.pale(0.22), width: 1, r: 3 });
+      live.ticks.forEach(tk => { const tx = railX + railW * PL.clamp(tk / windowSec, 0, 1); D.line(ctx, tx, stripY + 2, tx, stripY + 12, PL.col("accent-2"), 1.2); });
+      if (liveOn) { const cx0 = railX + railW * PL.clamp(live.t / windowSec, 0, 1); D.line(ctx, cx0, stripY - 2, cx0, stripY + 16, PL.col("warn"), 2); }
+
       if (!trials.length) {
         D.text(ctx, "放射性衰變是隨機的：同一條件每次計數都會不一樣", W / 2, H * 0.52,
           { color: PL.col("text"), size: 13, align: "center", weight: "700" });
@@ -851,6 +1146,8 @@
           { color: accent(), size: 10 });
       }
       trials.forEach((v, i) => g.dot(i + 1, v, { color: PL.col("accent-2"), r: 4 }));
+      // 正在累積的這一窗：淡色點隨每次喀嚓往上爬，窗結束就變成正式的一筆
+      if (liveOn && live.n > 0) g.dot(trials.length + 1, live.n, { color: PL.col("text-dim"), r: 3 });
 
       chart.clear();
       const cg = PL.graph(chart, { x: 46, y: 16, w: chart.W - 62, h: chart.H - 40 },
@@ -876,7 +1173,9 @@
         : "s ≈ " + PL.fmt(st.s, 1) + "，√N̄ ≈ " + PL.fmt(st.theory, 1) + "——統計漲落的量級");
     }
 
-    cv.onResize(draw); chart.onResize(draw); draw();
-    return { stop() { cv.destroy(); chart.destroy(); }, rerender: draw };
+    resetLive();
+    cv.onResize(() => draw()); chart.onResize(() => draw()); draw();
+    clock = PL.motion.clock(dt => { stepLive(dt); draw(); });
+    return { stop() { clock.stop(); cv.destroy(); chart.destroy(); }, rerender: () => draw() };
   }});
 })();

@@ -15,17 +15,50 @@
   PL.register("coulomb", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.7);
-    const sQ1 = PL.ui.slider(L.controls, { label: "電荷 q₁", min: -5, max: 5, step: 0.5, value: 3, unit: "μC", digits: 1, onInput: draw });
-    const sQ2 = PL.ui.slider(L.controls, { label: "電荷 q₂", min: -5, max: 5, step: 0.5, value: -2, unit: "μC", digits: 1, onInput: draw });
-    const sR = PL.ui.slider(L.controls, { label: "距離 r", min: 2, max: 10, step: 0.5, value: 5, unit: "cm", digits: 1, onInput: draw });
+    const sQ1 = PL.ui.slider(L.controls, { label: "電荷 q₁", min: -5, max: 5, step: 0.5, value: 3, unit: "μC", digits: 1, onInput: () => draw() });
+    const sQ2 = PL.ui.slider(L.controls, { label: "電荷 q₂", min: -5, max: 5, step: 0.5, value: -2, unit: "μC", digits: 1, onInput: () => draw() });
+    const sR = PL.ui.slider(L.controls, { label: "距離 r", min: 2, max: 10, step: 0.5, value: 5, unit: "cm", digits: 1, onInput: () => draw() });
+    PL.ui.note(L.controls, "可直接抓住 q₂ 的絕緣架左右移動改變 r。播放時，電力線上的小亮點是放在油裡的「試探正電荷」：受力沿電場方向漂移，場越強漂得越快——靠近球面最快、離遠了幾乎停住。");
     const rF = PL.ui.readout(L.readouts, { label: "靜電力 F", unit: "（相對）" });
     const rDir = PL.ui.readout(L.readouts, { label: "方向" });
+    // 把手抓 q₂ 的絕緣架：水平位置直接換算成桌前公分尺上的 r
+    let geo = { ox: 90, sc: 1 };
+    const grip = PL.ui.handle(cv, { slider: sR, label: "q₂ 絕緣架（距離 r）", toValue: x => (x - geo.ox) / geo.sc });
+    /*
+     * 試探電荷的漂移：在黏滯液體（例如油）裡，帶電小粒子的終端速度 v = qE / b ∝ E，
+     * 所以亮點沿電力線前進的速率正比於當地場強。亮點以固定的時間間隔從起點放出，
+     * 場弱的地方走得慢、自然擠在一起，也畫得較淡——一眼看出哪裡場強、哪裡場弱。
+     */
+    const clock = PL.motion.clock(() => draw());
+    const DRIFT_GAP = 0.3;                         // 每隔 0.3 秒放出一顆試探電荷
+    function driftDots(ctx, pts, speedAt, t, color) {
+      if (pts.length < 3) return;
+      // 沿線累積「抵達時間」：dτ = ds / v
+      const tau = [0];
+      for (let i = 1; i < pts.length; i++) {
+        const ds = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+        tau.push(tau[i - 1] + ds / speedAt(pts[i - 1]));
+      }
+      const T = tau[tau.length - 1];
+      ctx.save(); ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 5;
+      let k = 1;
+      for (let s = ((t % DRIFT_GAP) + DRIFT_GAP) % DRIFT_GAP; s < T; s += DRIFT_GAP) {
+        while (k < tau.length - 1 && tau[k] < s) k++;
+        const a = pts[k - 1], b = pts[k], u = (s - tau[k - 1]) / Math.max(1e-6, tau[k] - tau[k - 1]);
+        const x = a[0] + (b[0] - a[0]) * u, y = a[1] + (b[1] - a[1]) * u;
+        // 場越弱越淡：慢下來的亮點擠在一起時不至於糊成一條線
+        ctx.globalAlpha = PL.clamp(speedAt(a) / 150, 0.2, 1);
+        ctx.beginPath(); ctx.arc(x, y, 2.2, 0, TAU); ctx.fill();
+      }
+      ctx.restore();
+    }
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const q1 = sQ1.get(), q2 = sQ2.get(), r = sR.get(), F = 9 * q1 * q2 / (r * r);
       const attract = q1 * q2 < 0, AP = PL.apparatus;
       const sh = Math.round(H * 0.46), benchY = sh - 16, cy = Math.round(benchY * 0.46);
       const ox = 90, sc = (W - 180) / 10, x1 = ox, x2 = ox + r * sc;
+      geo = { ox, sc };
       const r1 = 12 + Math.abs(q1) * 2.4, r2 = 12 + Math.abs(q2) * 2.4;
       AP.labStrip(ctx, W, sh, benchY, {});
       // 電力線：從電荷出發沿電場一步一步走，碰到另一顆球或走出桌面上方就停
@@ -56,6 +89,10 @@
         const k = Math.floor(l.pts.length * 0.4), a = l.pts[k], b = l.pts[k + 1], dx = (b[0] - a[0]) * l.sgn, dy = (b[1] - a[1]) * l.sgn, m = Math.hypot(dx, dy) || 1;
         D.arrow(ctx, a[0] - dx / m * 4, a[1] - dy / m * 4, a[0] + dx / m * 4, a[1] + dy / m * 4, { color: PL.theme.isLight() ? "rgba(214,120,30,0.75)" : "rgba(255,196,110,0.7)", width: 1.2, head: 5 });
       });
+      // 試探正電荷沿 E 的方向漂移：從負電荷描出的線要反過來走（正電荷是被吸過去的）
+      const speedAt = p => { const e = Ex(p[0], p[1]); return PL.clamp(2e5 * Math.hypot(e[0], e[1]), 24, 260); };
+      const dotCol = PL.theme.isLight() ? "#c81e1e" : "#fff1b8";
+      lines.forEach(l => driftDots(ctx, l.sgn > 0 ? l.pts : l.pts.slice().reverse(), speedAt, clock.t, dotCol));
       // 桌前的公分尺：兩球球心分別對準 0 與 r
       const ry = benchY + 2;
       ctx.fillStyle = "rgb(246,238,206)"; ctx.fillRect(ox - 16, ry, 10 * sc + 32, 12);
@@ -77,6 +114,7 @@
         D.text(ctx, (q >= 0 ? "+" : "−") + Math.abs(q) + " μC", x, cy - rr - 8, { color: q >= 0 ? POS : NEG, size: 11, align: "center", weight: "800" });
       };
       ball(x1, q1, r1); ball(x2, q2, r2);
+      grip.place(x2, (cy + benchY) / 2 + 10);
       // 一對大小相等、方向相反的靜電力
       if (q1 && q2) {
         const fl = PL.clamp(12 + Math.abs(F) * 5, 12, 90), dir = attract ? 1 : -1;
@@ -93,8 +131,8 @@
       g.dot(r, Math.abs(F), { color: PL.col("warn"), glow: PL.col("warn") });
       rF.set(Math.abs(F), 2); rDir.set(attract ? "相吸" : q1 * q2 > 0 ? "相斥" : "無");
     }
-    cv.onResize(draw); draw();
-    return { stop() { cv.destroy(); }, rerender: draw };
+    cv.onResize(() => draw()); draw();
+    return { stop() { clock.stop(); cv.destroy(); }, rerender: () => draw() };
   }});
 
   /* 歐姆定律與電路 */
@@ -439,10 +477,10 @@
     const cv = PL.canvas.create(L.canvasWrap, 0.58);
     let records = [], feedback = "調整可變電阻後，記錄一組電壓計與安培計讀值。";
     PL.ui.section(L.controls, "量測電路");
-    const sE = PL.ui.slider(L.controls, { label: "電源電壓 E", min: 3, max: 12, step: 0.5, value: 9, unit: "V", digits: 1, onInput: draw });
+    const sE = PL.ui.slider(L.controls, { label: "電源電壓 E", min: 3, max: 12, step: 0.5, value: 9, unit: "V", digits: 1, onInput: () => draw() });
     const sR = PL.ui.slider(L.controls, { label: "被測電阻 R", min: 2, max: 20, step: 1, value: 8, unit: "Ω", digits: 0, onInput: () => { records = []; feedback = "被測電阻已更換，請重新量測。"; draw(); } });
-    const sRv = PL.ui.slider(L.controls, { label: "可變電阻 Rᵥ", min: 1, max: 40, step: 1, value: 10, unit: "Ω", digits: 0, onInput: draw });
-    PL.ui.note(L.controls, "量測接線：安培計 A 與被測電阻串聯；電壓計 V 並聯在被測電阻兩端。");
+    const sRv = PL.ui.slider(L.controls, { label: "可變電阻 Rᵥ", min: 1, max: 40, step: 1, value: 10, unit: "Ω", digits: 0, onInput: () => draw() });
+    PL.ui.note(L.controls, "量測接線：安培計 A 與被測電阻串聯；電壓計 V 並聯在被測電阻兩端。可直接拖曳滑動變阻器的滑片；播放時導線上的亮點速率正比於電流，電壓計那兩條線幾乎沒有電流流過。");
     /*
      * 檢視切換：實物圖用新器材（電池盒、圓形電表、編織導線），
      * 電路圖用課本符號，兩者共用同一個迴路外框。
@@ -482,19 +520,35 @@
       const den = records.length * sxx - sx * sx;
       return Math.abs(den) < 1e-10 ? null : (records.length * sxy - sx * sy) / den;
     }
-    function meter(x, y, value, max, label, unit, color) {
+    /*
+     * 動態：主迴路上的亮點代表流動的電荷，速率正比於電流 I（每 1 A 約 90 px/s），
+     * 所以調大 Rᵥ 時整圈一起慢下來——串聯電路電流處處相同。
+     * 理想電壓計內阻極大，並聯的那兩條藍線上電荷不動。
+     * 指針式電表的指針有轉動慣量與阻尼，換檔或調電阻後會晃一下再停在讀數上。
+     */
+    let sMain = 0;
+    const needleA = PL.motion.follower(0, { omega: 9, zeta: 0.3 });
+    const needleV = PL.motion.follower(0, { omega: 9, zeta: 0.3 });
+    const clock = PL.motion.clock(dt => { sMain += Math.min(280, 90 * state().I) * dt; draw(dt); });
+    const RV_MAX = 40;
+    let rhGeo = { x0: 0, span: 1 };
+    // 把手抓滑動變阻器的滑片：滑片離左端越遠，接入電路的電阻線越長
+    const grip = PL.ui.handle(cv, { slider: sRv, label: "滑動變阻器滑片（Rᵥ）", toValue: x => (x - rhGeo.x0) / rhGeo.span * RV_MAX });
+    function meter(x, y, value, max, label, unit, needle, dt) {
       const { ctx } = cv;
-      // 圓形金屬框電表（實物級）；frac 帶動指針
-      AP.meter(ctx, x, y, 30, PL.clamp(value / max, 0, 1), label);
+      // 圓形金屬框電表（實物級）；frac 帶動指針，指針用阻尼追隨器擺到讀數
+      const f = needle.update(PL.clamp(value / max, 0, 1), dt, clock.running);
+      AP.meter(ctx, x, y, 30, PL.clamp(f, 0, 1.03), label);
       D.text(ctx, PL.fmt(value, value < 1 ? 3 : 2) + " " + unit, x, y + 54, { color: PL.col("text-dim"), size: 10, align: "center" });
     }
-    function draw() {
+    function draw(dt) {
       const { ctx, W, H } = cv, s = state(); cv.clear(); D.bg(cv);
       const top = 58, bot = H - 42, left = 48, right = W - 46, mid = (top + bot) / 2;
       const AP = PL.apparatus, active = MC();
       AP.circuitBoard(ctx, W, H, view === "schematic");
       const wireColor = "rgb(186,54,48)";
       const rvx = right - 54, rx = W * 0.48, vx = W * 0.76, vy = mid;
+      const dotCol = "#ffe14d";
 
       if (view === "schematic") {
         // 課本符號版：同一個迴路外框，位置與實物圖一一對應
@@ -510,20 +564,34 @@
         AP.symWire(ctx, [{ x: rx + 36, y: bot }, { x: rx + 36, y: vy }, { x: vx + 15, y: vy }], "rgba(58,96,168,0.9)", 1.5);
         AP.symJunction(ctx, rx - 36, bot, ink); AP.symJunction(ctx, rx + 36, bot, ink);
         AP.symMeter(ctx, vx, vy, "V", PL.fmt(s.U, 2) + " V", ink, PL.col("accent-2"));
+        PL.motion.flow(ctx, [[left, bot], [left, top], [right, top], [right, bot], [left, bot]], sMain, { gap: 24, r: 2.2, color: PL.theme.isLight() ? "#c2410c" : dotCol, glow: 4 });
         D.text(ctx, "A 串聯、V 並聯——與實物圖位置一一對應", W / 2, 20, { color: PL.col("text-faint"), size: 10, align: "center" });
+        grip.hide();
       } else {
-        // 實物圖：編織導線＋電池盒＋圓形電表
-        AP.cable(ctx, [{ x: left, y: bot }, { x: left, y: top }, { x: right, y: top },
-                        { x: right, y: bot }, { x: left, y: bot }], wireColor, 3.4, 5);
-        AP.battery(ctx, left - 15, mid - 30, 30, 60);
-        meter(W * 0.47, top, s.I, 1.5, "A", "A", MC());
-        AP.resistorBox(ctx, rvx, top, 56, null, false); D.line(ctx, rvx, top - 26, rvx + 16, top - 7, PL.col("warn"), 1.8);
-        AP.valueChip(ctx, rvx - 30, top - 44, "Rᵥ=" + s.Rv + "Ω", active);
+        // 實物圖：編織導線＋電池盒＋圓形電表；右上角是課堂用的滑動變阻器
+        const rhW = Math.min(124, W * 0.2), rhX = right - rhW / 2 - 30, frac = PL.clamp(s.Rv / RV_MAX, 0, 1);
+        // 先算出變阻器接線柱與滑片位置（與 AP.rheostat 的幾何一致），導線畫完再把變阻器蓋上去
+        const rhHw = rhW / 2, rodY = top + 2 - 34;
+        const rh = { posts: { tubeL: { x: rhX - rhHw + 8, y: top }, rodR: { x: rhX + rhHw - 6, y: rodY } },
+                     slider: { x: rhX - rhHw + 6 + (rhW - 12) * frac, y: rodY } };
+        rhGeo = { x0: rhX - rhHw + 6, span: rhW - 12 };
+        // 接法：電流從瓷管左端進、經電阻線走到滑片、再由金屬桿右端出——只有左端到滑片這段接入電路
+        const tubeY = top - 14;
+        AP.cable(ctx, [{ x: left, y: bot }, { x: left, y: top }, rh.posts.tubeL], wireColor, 3.4, 0);
+        AP.cable(ctx, [rh.posts.rodR, { x: right, y: rh.posts.rodR.y }, { x: right, y: bot }, { x: left, y: bot }], wireColor, 3.4, 0);
+        AP.rheostat(ctx, rhX, top + 2, rhW, frac);
         AP.resistorBox(ctx, rx, bot, 62, null, false);
+        const loop = [[left, bot], [left, top], [rh.posts.tubeL.x, top], [rh.posts.tubeL.x + 2, tubeY], [rh.slider.x, tubeY],
+                      [rh.slider.x, rh.slider.y], [rh.posts.rodR.x, rh.posts.rodR.y], [right, rh.posts.rodR.y], [right, bot], [left, bot]];
+        PL.motion.flow(ctx, loop, sMain, { gap: 22, r: 2.6, color: dotCol, glow: 6 });
+        AP.battery(ctx, left - 15, mid - 30, 30, 60);
+        AP.valueChip(ctx, rhX - 30, top + 12, "Rᵥ=" + s.Rv + "Ω", active);
         AP.valueChip(ctx, rx - 52, bot + 16, "被測 R=" + s.R + "Ω", active);
         AP.cable(ctx, [{ x: rx - 36, y: bot }, { x: rx - 36, y: vy }, { x: vx - 31, y: vy }], "rgb(58,96,168)", 2.6, 3);
         AP.cable(ctx, [{ x: rx + 36, y: bot }, { x: rx + 36, y: vy }, { x: vx + 31, y: vy }], "rgb(58,96,168)", 2.6, 3);
-        meter(vx, vy, s.U, 12, "V", "V", PL.col("accent-2"));
+        meter(W * 0.47, top, s.I, 1.5, "A", "A", needleA, dt);
+        meter(vx, vy, s.U, 12, "V", "V", needleV, dt);
+        grip.place(rh.slider.x, rh.slider.y - 6);
         D.text(ctx, "A 串聯", W * 0.47, 20, { color: PL.col("text-faint"), size: 10, align: "center" });
         D.text(ctx, "V 並聯於被測電阻兩端", vx, H - 13, { color: PL.col("text-faint"), size: 10, align: "center" });
       }
@@ -538,8 +606,8 @@
       const slope = fittedSlope();
       rFit.set(slope == null ? "待量測" : slope, slope == null ? undefined : 2);
     }
-    cv.onResize(draw); chart.onResize(draw); draw();
-    return { stop() { cv.destroy(); chart.destroy(); }, rerender: draw };
+    cv.onResize(() => draw()); chart.onResize(() => draw()); draw();
+    return { stop() { clock.stop(); cv.destroy(); chart.destroy(); }, rerender: () => draw() };
   }});
 
   /* 閉合電路：伏安法、安阻法、伏阻法與內電阻量測 */
@@ -554,8 +622,8 @@
     const sr = PL.ui.stepper(L.controls, { label: "內電阻 r", min: 0.1, max: 4, step: 0.1, value: 0.5, unit: "Ω", digits: 1, onInput: clearForSourceChange });
     const sR = PL.ui.slider(L.controls, { label: "外電阻 R（滑片）", min: 0.5, max: 30, step: 0.5, value: 12, unit: "Ω", digits: 1, onInput: () => { feedback = ""; draw(); } });
     PL.ui.section(L.controls, "儀表設定");
-    const sAmRange = PL.ui.select(L.controls, { label: "電流表量程", value: "0.6", options: [{ value: "0.6", label: "0 - 0.6 A" }, { value: "3", label: "0 - 3 A" }], onChange: draw });
-    const sVmRange = PL.ui.select(L.controls, { label: "電壓表量程", value: "3", options: [{ value: "3", label: "0 - 3 V" }, { value: "15", label: "0 - 15 V" }], onChange: draw });
+    const sAmRange = PL.ui.select(L.controls, { label: "電流表量程", value: "0.6", options: [{ value: "0.6", label: "0 - 0.6 A" }, { value: "3", label: "0 - 3 A" }], onChange: () => draw() });
+    const sVmRange = PL.ui.select(L.controls, { label: "電壓表量程", value: "3", options: [{ value: "3", label: "0 - 3 V" }, { value: "15", label: "0 - 15 V" }], onChange: () => draw() });
     const stateNote = PL.ui.note(L.controls, "閉合開關後可改變滑片位置；每個設定值可記錄成一組量測資料。");
 
     PL.ui.section(L.controls, "量測控制");
@@ -666,7 +734,26 @@
       guideNext.disabled = guideStep === GUIDE_STEPS.length - 1;
     }
 
-    function drawCircuit() {
+    /*
+     * 動態：
+     *  · 主迴路的亮點是流動的電荷，速率正比於電流 I；開關一斷開，整圈電荷立刻停住（I = 0）。
+     *    R 調小時電流變大、亮點加快，同時伏特計讀數下降——內壓降 Ir 變大的直接證據。
+     *  · 電荷穿過電池盒時也在流動：內電阻 r 就在這段路上，所以 E = U + Ir。
+     *  · 兩個指針式電表有轉動慣量與阻尼：閉合開關或調電阻後，指針晃一下才停在讀數上。
+     *  · 閘刀開關合上／拉開有一小段轉動過程。
+     */
+    let sMain = 0;
+    const needleA = PL.motion.follower(0, { omega: 9, zeta: 0.3 });
+    const needleV = PL.motion.follower(0, { omega: 9, zeta: 0.3 });
+    const blade = PL.motion.follower(0, { omega: 16, zeta: 0.8 });
+    const clock = PL.motion.clock(dt => { sMain += Math.min(300, 160 * circuitState().I) * dt; draw(dt); });
+    let rhGeo = { x0: 0, span: 1 };
+    const rMin = () => Number(sR.el.min), rMax = () => Number(sR.el.max);
+    // 把手抓滑動變阻器的滑片：滑片離左端越遠，接入電路的電阻線越長，R 越大
+    const grip = PL.ui.handle(cv, { slider: sR, label: "滑動變阻器滑片（外電阻 R）",
+      toValue: x => rMin() + (x - rhGeo.x0) / rhGeo.span * (rMax() - rMin()) });
+
+    function drawCircuit(dt) {
       const { ctx, W, H } = cv, s = circuitState();
       cv.clear(); D.bg(cv);
       const AP = PL.apparatus;
@@ -676,31 +763,46 @@
       const switchX = left + 64, meterX = W * 0.46, resistorX = W * 0.74, sourceX = W * 0.30;
       const resistorW = Math.min(120, W * 0.2), batteryW = Math.min(96, W * 0.24);
       const red = "rgb(186,54,48)", black = "rgb(40,44,52)", blue = "rgb(52,98,178)";
-      const meter = (x, y, value, unit, label, limit) => {
+      const meter = (x, y, value, unit, label, limit, needle) => {
         const over = value > limit + 1e-8;
-        AP.meter(ctx, x, y, 26, over ? 1 : PL.clamp(value / limit, 0, 1), label);
+        // 超量程時指針打到底（略超過滿刻度），未超量程時阻尼擺到讀數
+        const f = needle.update(over ? 1.04 : PL.clamp(value / limit, 0, 1), dt, clock.running);
+        AP.meter(ctx, x, y, 26, PL.clamp(f, 0, 1.04), label);
         D.text(ctx, over ? "超量程！" : PL.fmt(value, 2) + " " + unit, x, y + 50, { color: over ? PL.col("danger") : PL.col("text"), size: 11, align: "center", weight: "700" });
         D.text(ctx, "量程 0–" + PL.fmt(limit, 1) + " " + unit, x, y + 64, { color: PL.col("text-dim"), size: 9, align: "center" });
       };
       // 上排：開關 → 安培計 → 變阻器
-      const sw = AP.knifeSwitch(ctx, switchX, top + 10, 64, closed ? 0 : 1);
-      D.text(ctx, closed ? "S 閉合" : "S 斷開", switchX, top + 30, { color: PL.col("text"), size: 10, align: "center", weight: "700" });
-      const rh = AP.rheostat(ctx, resistorX, top + 16, resistorW, PL.clamp((s.R - Number(sR.el ? sR.el.min : 0)) / Math.max(1e-9, (sR.el ? Number(sR.el.max) - Number(sR.el.min) : 1)), 0, 1));
-      D.text(ctx, "滑動變阻器 R = " + PL.fmt(s.R, 1) + " Ω", resistorX, top - 34, { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
+      const open01 = PL.clamp(blade.update(closed ? 0 : 1, dt, clock.running), 0, 1.05);
+      // 開關底座兩端接線柱（與 AP.knifeSwitch 幾何一致）；開關本體等電荷畫完再蓋上，斷開時刀口下不會有懸空的亮點
+      const sw = { left: { x: switchX - 32 + 7, y: top + 10 - 2 }, right: { x: switchX + 32 - 7, y: top + 10 - 2 } };
+      const rh = AP.rheostat(ctx, resistorX, top + 16, resistorW, PL.clamp((s.R - rMin()) / Math.max(1e-9, rMax() - rMin()), 0, 1));
+      rhGeo = { x0: rh.posts.rodL.x, span: rh.posts.rodR.x - rh.posts.rodL.x };
+      // 標籤抬高到滑片把手之上，免得被把手蓋住
+      D.text(ctx, "滑動變阻器 R = " + PL.fmt(s.R, 1) + " Ω", resistorX, top - 60, { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
       // 下排：電池盒（內阻 r）與伏特計
       const bh = 44;
       AP.battery(ctx, sourceX - batteryW / 2, bottom - bh / 2, batteryW, bh);
       D.text(ctx, "E = " + PL.fmt(s.E, 1) + " V　r = " + PL.fmt(s.r, 1) + " Ω", sourceX, bottom + bh / 2 + 18, { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
       const vmX = W * 0.62, vmY = bottom - 8;
       // 導線（主迴路紅線，伏特計並聯在電池兩端用藍線）
-      AP.cable(ctx, [{ x: sourceX - batteryW / 2 - 1, y: bottom }, { x: left, y: bottom }, { x: left, y: top + 8 }, sw.left], red, 3, 3);
-      AP.cable(ctx, [sw.right, { x: meterX - 20, y: top + 8 + 26 * 1.12 + 4 }], red, 3, 4);
-      AP.cable(ctx, [{ x: meterX + 20, y: top + 8 + 26 * 1.12 + 4 }, rh.posts.tubeL], red, 3, 4);
-      AP.cable(ctx, [rh.slider, { x: right, y: top - 14 }, { x: right, y: bottom }, { x: sourceX + batteryW / 2 + 1, y: bottom }], black, 3, 3);
+      const jackY = top + 8 + 26 * 1.12 + 4;
+      AP.cable(ctx, [{ x: sourceX - batteryW / 2 - 1, y: bottom }, { x: left, y: bottom }, { x: left, y: top + 8 }, sw.left], red, 3, 0);
+      AP.cable(ctx, [sw.right, { x: meterX - 20, y: jackY }], red, 3, 0);
+      AP.cable(ctx, [{ x: meterX + 20, y: jackY }, rh.posts.tubeL], red, 3, 0);
+      AP.cable(ctx, [rh.slider, { x: right, y: top - 14 }, { x: right, y: bottom }, { x: sourceX + batteryW / 2 + 1, y: bottom }], black, 3, 0);
       AP.cable(ctx, [{ x: sourceX + batteryW / 2 + 1, y: bottom + 8 }, { x: vmX - 20, y: vmY + 26 * 1.12 + 4 }], blue, 2.2, 5);
       AP.cable(ctx, [{ x: vmX + 20, y: vmY + 26 * 1.12 + 4 }, { x: right - 6, y: bottom + 6 }], blue, 2.2, 5);
-      meter(meterX, top + 8, s.I, "A", "A", +sAmRange.get());
-      meter(vmX, vmY, s.U, "V", "V", +sVmRange.get());
+      // 電荷沿整個迴路流動（外電路由電池 + 極出發，穿過電池內部回到 + 極）；斷路時停在原地
+      const tubeY = top + 16 - 16;
+      const loop = [[sourceX - batteryW / 2 - 1, bottom], [left, bottom], [left, top + 8], [sw.left.x, sw.left.y], [sw.right.x, sw.right.y],
+        [meterX - 20, jackY], [meterX + 20, jackY], [rh.posts.tubeL.x, rh.posts.tubeL.y], [rh.posts.tubeL.x + 2, tubeY], [rh.slider.x, tubeY],
+        [rh.slider.x, rh.slider.y], [right, top - 14], [right, bottom], [sourceX + batteryW / 2 + 1, bottom], [sourceX - batteryW / 2 - 1, bottom]];
+      PL.motion.flow(ctx, loop, sMain, { gap: 22, r: 2.6, color: "#ffe14d", glow: 6 });
+      AP.knifeSwitch(ctx, switchX, top + 10, 64, open01);
+      D.text(ctx, closed ? "S 閉合" : "S 斷開", switchX, top + 30, { color: PL.col("text"), size: 10, align: "center", weight: "700" });
+      meter(meterX, top + 8, s.I, "A", "A", +sAmRange.get(), needleA);
+      meter(vmX, vmY, s.U, "V", "V", +sVmRange.get(), needleV);
+      grip.place(rh.slider.x, rh.slider.y - 6);
       if (closed) D.arrow(ctx, meterX + 36, top - 18, resistorX - resistorW / 2 - 10, top - 18, { color: PL.col("warn"), width: 1.8, label: "I" });
       D.text(ctx, closed ? "閉合電路：E = U + Ir" : "開關斷開：I = 0，U = E", W / 2, 24, { color: PL.col("text"), size: 12, align: "center", weight: "700" });
     }
@@ -731,7 +833,7 @@
       D.text(charChart.ctx, "短路 Iₛ=" + PL.fmt(s.E / s.r, 2) + " A", charChart.W - 8, 14, { color: PL.col("text-faint"), size: 10, align: "right" });
     }
 
-    function draw() {
+    function draw(dt) {
       const s = circuitState(), fit = inferredParams(lineFit(records.map(pointFor)));
       const ammeterOver = s.I > +sAmRange.get() + 1e-8, voltmeterOver = s.U > +sVmRange.get() + 1e-8;
       switchBtn.textContent = closed ? "斷開開關 S" : "閉合開關 S";
@@ -740,14 +842,14 @@
         ? "目前可記錄第 " + (records.length + 1) + " 組資料。改變 R 後再記錄，使用 " + ({ va: "伏安法", ar: "安阻法", vr: "伏阻法" }[method]) + " 擬合。"
         : "開關已斷開，電流為 0。閉合後才能記錄有效量測點。";
       stateNote.textContent = feedback || defaultNote;
-      updateGuide(); drawCircuit(); drawFitChart(s); drawCharacteristic(s);
+      updateGuide(); drawCircuit(dt); drawFitChart(s); drawCharacteristic(s);
       rI.set(s.I, 3); rU.set(s.U, 3); rIr.set(s.drop, 3); rP.set(s.loadP, 3); rLoss.set(s.lossP, 3); rEta.set(s.eta, 1);
       rMeter.set(ammeterOver || voltmeterOver ? (ammeterOver ? "電流表超量程" : "電壓表超量程") : "量程正常");
       rFit.set(fit ? "E=" + PL.fmt(fit.E, 2) + " V；r=" + PL.fmt(fit.r, 2) + " Ω" : "記錄至少 2 個不同設定");
     }
 
-    cv.onResize(draw); fitChart.onResize(draw); charChart.onResize(draw); draw();
-    return { stop() { cv.destroy(); fitChart.destroy(); charChart.destroy(); }, rerender: draw };
+    cv.onResize(() => draw()); fitChart.onResize(() => draw()); charChart.onResize(() => draw()); draw();
+    return { stop() { clock.stop(); cv.destroy(); fitChart.destroy(); charChart.destroy(); }, rerender: () => draw() };
   }});
 
   /* 電阻串並聯
@@ -1019,19 +1121,48 @@
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
 
-  /* 惠斯登電橋 */
+  /* 惠斯登電橋
+   *
+   * 動態：四條橋臂、電池線與檢流計支路上的亮點都是流動的電荷，速率正比於該支路電流
+   * （以克希荷夫定律解整個電橋，檢流計內阻取 5 Ω）。不平衡時檢流計支路有電流，
+   * 亮點往電位低的一側跑、指針偏轉；調到 R₁Rₓ = R₂R₃ 時兩端等電位，
+   * 檢流計支路的電荷停住、指針晃一晃後歸零——「指零」就是這個樣子。
+   * 把手抓可變電阻 R₃ 上的滑片，邊看檢流計邊調，正是課堂上找平衡的動作。
+   */
   PL.register("wheatstone", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
-    const sR1 = PL.ui.slider(L.controls, { label: "R₁", min: 1, max: 20, step: 1, value: 6, unit: "Ω", digits: 0, onInput: draw });
-    const sR2 = PL.ui.slider(L.controls, { label: "R₂", min: 1, max: 20, step: 1, value: 4, unit: "Ω", digits: 0, onInput: draw });
-    const sR3 = PL.ui.slider(L.controls, { label: "R₃", min: 1, max: 20, step: 1, value: 9, unit: "Ω", digits: 0, onInput: draw });
-    const sRx = PL.ui.slider(L.controls, { label: "Rₓ（未知）", min: 1, max: 20, step: 1, value: 6, unit: "Ω", digits: 0, onInput: draw });
-    PL.ui.note(L.controls, "調到檢流計歸零即平衡：R₁Rₓ = R₂R₃。");
+    const sR1 = PL.ui.slider(L.controls, { label: "R₁", min: 1, max: 20, step: 1, value: 6, unit: "Ω", digits: 0, onInput: () => draw() });
+    const sR2 = PL.ui.slider(L.controls, { label: "R₂", min: 1, max: 20, step: 1, value: 4, unit: "Ω", digits: 0, onInput: () => draw() });
+    const sR3 = PL.ui.slider(L.controls, { label: "R₃", min: 1, max: 20, step: 1, value: 9, unit: "Ω", digits: 0, onInput: () => draw() });
+    const sRx = PL.ui.slider(L.controls, { label: "Rₓ（未知）", min: 1, max: 20, step: 1, value: 6, unit: "Ω", digits: 0, onInput: () => draw() });
+    PL.ui.note(L.controls, "調到檢流計歸零即平衡：R₁Rₓ = R₂R₃。可直接拖曳 R₃ 上的滑片；播放時看檢流計那條藍線上的電荷——平衡時它們停住不動。");
     const rG = PL.ui.readout(L.readouts, { label: "檢流計", unit: "" });
     const rBal = PL.ui.readout(L.readouts, { label: "狀態" });
     const rRx = PL.ui.readout(L.readouts, { label: "平衡時 Rₓ", unit: "Ω" });
-    function draw() {
+    const EMF = 6, RG = 5, V_PER_A = 70;          // 電池 6 V、檢流計內阻 5 Ω；每 1 A 對應 70 px/s
+    // 以節點電位法解電橋：上節點電位 E、下節點 0，左右兩節點電位 VL、VR
+    function solve() {
+      const R1 = sR1.get(), R2 = sR2.get(), R3 = sR3.get(), Rx = sRx.get();
+      const a11 = 1 / R1 + 1 / R3 + 1 / RG, a12 = -1 / RG, b1 = EMF / R1;
+      const a21 = -1 / RG, a22 = 1 / R2 + 1 / Rx + 1 / RG, b2 = EMF / R2;
+      const det = a11 * a22 - a12 * a21;
+      const VL = (b1 * a22 - a12 * b2) / det, VR = (a11 * b2 - a21 * b1) / det;
+      return { I1: (EMF - VL) / R1, I2: (EMF - VR) / R2, I3: VL / R3, Ix: VR / Rx, Ig: (VL - VR) / RG };
+    }
+    const flow = { bat: 0, a1: 0, a2: 0, a3: 0, ax: 0, g: 0 };
+    const needle = PL.motion.follower(0.5, { omega: 8, zeta: 0.22 });
+    const clock = PL.motion.clock(dt => {
+      const c = solve(), v = i => PL.clamp(i * V_PER_A, -260, 260);
+      flow.bat += v(c.I1 + c.I2) * dt; flow.a1 += v(c.I1) * dt; flow.a2 += v(c.I2) * dt;
+      flow.a3 += v(c.I3) * dt; flow.ax += v(c.Ix) * dt; flow.g += v(c.Ig) * dt;
+      draw(dt);
+    });
+    // R₃ 的滑片沿橋臂方向移動：投影到橋臂上的位置換算成阻值
+    let r3Geo = { mx: 0, my: 0, ux: 1, uy: 0, len: 1 };
+    const grip = PL.ui.handle(cv, { slider: sR3, label: "可變電阻 R₃ 的滑片",
+      toValue: (x, y) => { const g = r3Geo, p = ((x - g.mx) * g.ux + (y - g.my) * g.uy) / g.len + 0.5; return 1 + p * 19; } });
+    function draw(dt) {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const R1 = sR1.get(), R2 = sR2.get(), R3 = sR3.get(), Rx = sRx.get();
       const cx = W / 2, cy = H / 2 + 8, s = Math.min(W, H) * 0.34;
@@ -1039,30 +1170,52 @@
       /* 桌上的惠斯登電橋：四顆電阻接成菱形，中間跨一個檢流計，上方接電池盒 */
       AP.circuitBoard(ctx, W, H, false);
       const T = { x: cx, y: cy - s }, B = { x: cx, y: cy + s }, Ln = { x: cx - s, y: cy }, Rn = { x: cx + s, y: cy };
-      const red = "rgb(186,54,48)";
+      const red = "rgb(186,54,48)", dotCol = "#ffe14d", bodyLen = s * 0.5;
       const arm = (a, b, lab, c) => {
         AP.cable(ctx, [a, b], red, 2.6, 0);
         const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, ang = Math.atan2(b.y - a.y, b.x - a.x);
-        ctx.save(); ctx.translate(mx, my); ctx.rotate(ang); AP.resistorBox(ctx, 0, 0, s * 0.5, null, false); ctx.restore();
+        ctx.save(); ctx.translate(mx, my); ctx.rotate(ang); AP.resistorBox(ctx, 0, 0, bodyLen, null, false); ctx.restore();
         D.text(ctx, lab, mx + (mx < cx ? -30 : 30), my + (my < cy ? -8 : 18), { color: c, size: 11.5, align: "center", weight: "800" });
       };
       arm(T, Ln, "R₁=" + R1, PL.col("accent-2")); arm(T, Rn, "R₂=" + R2, PL.col("accent-2"));
       arm(Ln, B, "R₃=" + R3, MC()); arm(Rn, B, "Rₓ=" + Rx, MC());
       // 電池盒接在上下兩個節點之間（繞到左側）
+      const bx = cx - s - 69;
       AP.battery(ctx, cx - s - 96, cy - 22, 54, 44);
-      AP.cable(ctx, [T, { x: cx - s - 69, y: T.y }, { x: cx - s - 69, y: cy - 24 }], red, 2.6, 2);
-      AP.cable(ctx, [{ x: cx - s - 69, y: cy + 24 }, { x: cx - s - 69, y: B.y }, B], "rgb(40,44,52)", 2.6, 2);
+      AP.cable(ctx, [T, { x: bx, y: T.y }, { x: bx, y: cy - 24 }], red, 2.6, 0);
+      AP.cable(ctx, [{ x: bx, y: cy + 24 }, { x: bx, y: B.y }, B], "rgb(40,44,52)", 2.6, 0);
       // 檢流計跨在左右兩節點之間
       const VL = R3 / (R1 + R3), VR = Rx / (R2 + Rx), diff = VL - VR;
-      AP.cable(ctx, [Ln, { x: cx - 30, y: cy }], "rgb(52,98,178)", 2.2, 2);
-      AP.cable(ctx, [{ x: cx + 30, y: cy }, Rn], "rgb(52,98,178)", 2.2, 2);
-      AP.meter(ctx, cx, cy - 6, 22, PL.clamp(0.5 + diff * 2, 0, 1), "G");
+      AP.cable(ctx, [Ln, { x: cx - 30, y: cy }], "rgb(52,98,178)", 2.2, 0);
+      AP.cable(ctx, [{ x: cx + 30, y: cy }, Rn], "rgb(52,98,178)", 2.2, 0);
+      // 電荷：電池 → 上節點 → 四條橋臂 → 下節點 → 回電池；檢流計支路由左往右為正
+      const P = p => [p.x, p.y], o = { gap: 20, r: 2.4, color: dotCol, glow: 5 };
+      PL.motion.flow(ctx, [[bx, cy - 24], [bx, T.y], P(T)], flow.bat, o);
+      PL.motion.flow(ctx, [P(B), [bx, B.y], [bx, cy + 24]], flow.bat, o);
+      PL.motion.flow(ctx, [P(T), P(Ln)], flow.a1, o); PL.motion.flow(ctx, [P(T), P(Rn)], flow.a2, o);
+      PL.motion.flow(ctx, [P(Ln), P(B)], flow.a3, o); PL.motion.flow(ctx, [P(Rn), P(B)], flow.ax, o);
+      PL.motion.flow(ctx, [P(Ln), P(Rn)], flow.g, o);
+      // R₃ 是可變電阻：滑片位置對應阻值（1–20 Ω）
+      const ux = (B.x - Ln.x) / Math.hypot(B.x - Ln.x, B.y - Ln.y), uy = (B.y - Ln.y) / Math.hypot(B.x - Ln.x, B.y - Ln.y);
+      const mx3 = (Ln.x + B.x) / 2, my3 = (Ln.y + B.y) / 2, p3 = (R3 - 1) / 19 - 0.5;
+      r3Geo = { mx: mx3, my: my3, ux, uy, len: bodyLen };
+      const kx = mx3 + ux * p3 * bodyLen, ky = my3 + uy * p3 * bodyLen;
+      // 滑片：垂直壓在電阻體上的一小塊金屬
+      ctx.save(); ctx.translate(kx, ky); ctx.rotate(Math.atan2(uy, ux));
+      D.rect(ctx, -3.5, -14, 7, 18, { fill: "rgb(96,106,120)", stroke: "rgba(24,32,44,0.85)", r: 2 });
+      ctx.restore();
+      AP.brassDisc(ctx, kx + uy * 12, ky - ux * 12, 3.6);
+      grip.place(kx + uy * 12, ky - ux * 12);
+      // 檢流計指針：有轉動慣量與阻尼，平衡時晃一晃後停在零點
+      const nf = needle.update(PL.clamp(0.5 + diff * 2, 0, 1), dt, clock.running);
+      AP.meter(ctx, cx, cy - 6, 22, PL.clamp(nf, 0, 1), "G");
       [T, B, Ln, Rn].forEach(p => AP.brassDisc(ctx, p.x, p.y, 4));
       const balanced = Math.abs(R1 * Rx - R2 * R3) < 0.5;
+      if (balanced) D.text(ctx, "檢流計支路電流 = 0", cx, cy + 46, { color: PL.col("ok"), size: 11, align: "center", weight: "700" });
       rG.set(diff * 100, 1); rBal.set(balanced ? "平衡 ✓" : "不平衡"); rRx.set(R2 * R3 / R1, 2);
     }
-    cv.onResize(draw); draw();
-    return { stop() { cv.destroy(); }, rerender: draw };
+    cv.onResize(() => draw()); draw();
+    return { stop() { clock.stop(); cv.destroy(); }, rerender: () => draw() };
   }});
 
   /* 帶電粒子在電場中的偏轉 */
