@@ -191,6 +191,25 @@ R.section("靜態實驗：沒有播放／單步／速度，提示改成調整參
   if (api && api.stop) api.stop();
 }
 
+R.section("穩態動畫進場就播放，一次性事件仍等學生開始");
+{
+  window.PhysicsLabNoAutoplay = false;
+  const run = id => {
+    const r = document.createElement("div");
+    r.dataset = { simId: id };
+    const a = PL.get(id).build(r);
+    const t = r._labTransport;
+    const playing = !!t && /暫停/.test(t.playBtn.textContent);
+    try { if (a && a.stop) a.stop(); } catch (e) {}
+    return playing;
+  };
+  R.ok(run("snell") === true, "snell（光在走）進場就播放");
+  R.ok(run("wheatstone") === true, "wheatstone（電流在流）進場就播放");
+  R.ok(run("collision") === false, "collision（碰撞）仍等學生按播放");
+  R.ok(run("doppler") === false, "doppler（設有觀察點）不自動播放，免得觀察卡突然跳出");
+  window.PhysicsLabNoAutoplay = true;
+}
+
 R.section("全站動態：每個實驗都有時間軸（播放時畫面會動）");
 {
   /*

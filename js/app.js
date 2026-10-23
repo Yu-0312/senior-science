@@ -1424,6 +1424,17 @@
       "第 " + (f.indexInMod + 1) + " 個實驗";
     $("#exp-title").textContent = exp.title;
     $("#exp-lead").textContent = exp.concept;
+    // 學測／分科／課本實驗對應：標題上方一枚標籤，教材區多一段「考題怎麼問」
+    const examTag = exp.exam && exp.exam.tag;
+    if (examTag) {
+      const b = el("span", "exp-exam-tag", $("#exp-crumb"));
+      b.textContent = examTag;
+    }
+    const examBox = $("#guide-exam");
+    if (examBox) {
+      examBox.hidden = !(exp.exam && exp.exam.how);
+      $("#guide-exam-how").textContent = exp.exam && exp.exam.how ? exp.exam.how : "";
+    }
     paintLevelBadge(id);
     renderExperimentLearningPath(id);
     renderLearningOutput(f);

@@ -870,8 +870,19 @@
                      建置結束後（例如按鈕觸發的 start()）行為完全不變。
      ---------------------------------------------------------------- */
   const STEP_DT = 1 / 60;
+  /* 進場就播放的穩態動畫實驗名單放在延遲載入的 sim-apparatus.js（PL.ambientIds），不佔首次載入 */
+  const AMBIENT_IDS = { has: id => !!(window.PhysicsLab && window.PhysicsLab.ambientIds && window.PhysicsLab.ambientIds.has(id)) };
+  function noAutoplay() {
+    if (typeof window === "undefined") return true;
+    if (window.PhysicsLabNoAutoplay) return true;   // 自動化測試要從 t = 0 量起
+    try { return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); }
+    catch (e) { return false; }
+  }
 
-  function loop(step, maxFps) {
+  function loop(step, maxFps, opts) {
+    // 第二個參數可直接給選項物件：loop(step, { fps, ambient })
+    if (maxFps && typeof maxFps === "object") { opts = maxFps; maxFps = opts.fps; }
+    opts = opts || {};
     const frameMs = 1000 / clamp(Number(maxFps) || 45, 15, 60);
     let raf = null, running = false, listening = false, last = 0, t = 0;
     let speed = 1;
@@ -938,7 +949,9 @@
       get t() { return t; },
       get running() { return running; },
       /* 建置期要求過自動播放：時間控制列據此決定要不要顯示播放鍵。 */
-      get armed() { return armed; }
+      get armed() { return armed; },
+      /* 穩態動畫（光在走、電流在流、指針在擺）：進場就播放，見 finishBuild */
+      ambient: !!opts.ambient
     };
     if (buildContext) buildContext.loops.push(ctrl);
     return ctrl;
@@ -2030,7 +2043,18 @@
      * 只有「真的顯示播放鍵」的實驗才 wiggle；自帶觸發鈕或靜態實驗
      * 已經在旁邊寫了怎麼開始，不需要抖一顆看不見的按鈕。
      */
-    if (showPlay && loops.some(l => l.armed)) {
+    /*
+     * 穩態動畫進場就播放（2026-10）：光在走、電流在流這類畫面沒有可被破梗的結局，
+     * 停在第一格反而像靜態圖。拋射、碰撞、釋放等一次性事件仍等學生開始（PhET 的先預測再觀察）。
+     * 系統設定「減少動態」時不自動播放。
+     */
+    const ambient = showPlay && loops.length && !noAutoplay() &&
+      (AMBIENT_IDS.has(context.id) || loops.some(l => l.ambient));
+    if (ambient) {
+      loops.forEach(l => l.start());
+      root.classList.add("is-ambient");
+      paint();
+    } else if (showPlay && loops.some(l => l.armed)) {
       root.classList.add("show-wiggle");
       ui.playBtn.classList.add("wiggle");
       setTimeout(stopWiggle, 6000);

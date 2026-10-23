@@ -4,6 +4,14 @@
   const PL = window.PhysicsLab, D = PL.draw, TAU = PL.TAU;
   const AP = () => PL.apparatus || {};
   const MC = () => PL.col("m-color", "#ffb74d");
+  // 相對拖曳（步進器沒有 input 元素，onDrag 直接 set；滑桿走 toValue）：拖多少就加減多少，horiz 為左右拖
+  const relGrip = (s, k, label, horiz) => {
+    let st = null;
+    const val = (x, y) => { if (!st) st = { x, y, v: s.get() }; return st.v + (horiz ? x - st.x : st.y - y) * k; };
+    const o = { label, onGrab: () => { st = null; }, onRelease: () => { st = null; } };
+    if (s.el && s.el.type === "range") { o.slider = s; o.toValue = val; } else o.onDrag = (x, y) => s.set(val(x, y));
+    return o;
+  };
   const nmColor = nm => { let r = 0, g = 0, b = 0; if (nm < 440) { r = -(nm - 440) / 60; b = 1; } else if (nm < 490) { g = (nm - 440) / 50; b = 1; } else if (nm < 510) { g = 1; b = -(nm - 510) / 20; } else if (nm < 580) { r = (nm - 510) / 70; g = 1; } else if (nm < 645) { r = 1; g = -(nm - 645) / 65; } else r = 1; return `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`; };
 
   /* 光電效應 */
@@ -26,6 +34,9 @@
     const cvK = PL.canvas.create(w1, 0.6); PL.el("div", "cap", w1).textContent = "Kmax = hf − W：直線斜率為 h、與 f 軸交點即底限頻率 f₀，與金屬種類無關（只平移）。";
     const w2 = PL.el("div", "sim-chart", charts); PL.el("div", "chart-title", w2).textContent = "光電流 – 電壓 I–V";
     const cvV = PL.canvas.create(w2, 0.6); PL.el("div", "cap", w2).textContent = "反向電壓達遏止電壓 Vₛ 時電流歸零（eVₛ = Kmax）；飽和電流正比於光強。";
+    // 換光源：燈管上下拖改頻率（顏色跟著變）；光束左右拖改強度——對照「頻率決定有沒有、強度只決定多少」
+    const gF = PL.ui.handle(cv, relGrip(sF, 0.05, "光源（上下拖改頻率 f）"));
+    const gI = PL.ui.handle(cv, relGrip(sI, 0.8, "光束（左右拖改光強度）", true));
     const Eph = () => 0.414 * sF.get(), Kmax = () => Math.max(0, Eph() - Wf), f0 = () => Wf / 0.414, Isat = () => sI.get() / 100;
     function scene() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
@@ -45,6 +56,7 @@
       }
       // 紫外/可見光源：燈管本體（石英管）＋燈座，斜向照射
       const lx = 20, ly = cy - 108;
+      gF.place(lx + 40 + 37 * Math.cos(0.5), ly + 37 * Math.sin(0.5)); gI.place(cath - 34, cy + 46);
       ctx.save();
       ctx.translate(lx + 40, ly); ctx.rotate(0.5);
       // 燈座
@@ -138,6 +150,15 @@
     const rHl = PL.ui.readout(L.readouts, { label: "經過半衰期", unit: "個" });
     function reset() { t = 0; nuclei = []; for (let i = 0; i < N0; i++) nuclei.push(1); }
     reset();
+    /* 曲線上「剩一半」的那一點：左右拖改半衰期。橫軸跟著 T½ 縮放，所以用相對拖曳（每 80 px 加倍） */
+    let grab = null;
+    const gT = PL.ui.handle(cv, { label: "半衰期點（左右拖）",
+      onGrab: () => { grab = null; },
+      onDrag: x => {
+        if (!grab) grab = { x, T: sT.get() };
+        const v = PL.clamp(Math.round(grab.T * Math.pow(2, (x - grab.x) / 80) * 2) / 2, 1, 6);
+        if (v !== sT.get()) { sT.el.value = String(v); sT.el.dispatchEvent(new Event("input", { bubbles: true })); }
+      } });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const remain = nuclei.reduce((a, b) => a + b, 0);
@@ -168,6 +189,7 @@
       g.fn(tt => N0 * Math.pow(0.5, tt / sT.get()), { color: MC(), width: 2.2 });
       for (let k = 1; k <= 4; k++) { g.vline(k * sT.get(), { color: "rgba(255,255,255,0.15)", dash: [2, 3], width: 1 }); }
       g.dot(Math.min(t, Tm), remain, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+      gT.place(bx + bw / 5, by + bh / 2);
       rN.set(remain, 0); rHl.set(t / sT.get(), 2);
     }
     const anim = PL.loop(dt => {
@@ -190,6 +212,10 @@
     const rQ = PL.ui.readout(L.readouts, { label: "油滴電量 q", unit: "C" });
     const rN = PL.ui.readout(L.readouts, { label: "= 基本電荷", unit: "×e" });
     const rState = PL.ui.readout(L.readouts, { label: "狀態" });
+    // 極板上下拖調電壓找懸浮點（放在下極板，提示框才不會被畫布頂端切掉）；油滴本身可以拖回視野中央再觀察
+    let mg = null;
+    const gV = PL.ui.handle(cv, relGrip(sV, 2, "極板電壓（上下拖調 V）"));
+    const gDrop = PL.ui.handle(cv, { label: "油滴（拖回視野再觀察）", onDrag: (x, py) => { if (mg) { y = PL.clamp(mg.botY - 20 - py, -(cv.H - 110), cv.H - 110); draw(); } } });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const q = n * e, E = sV.get() / d, Fnet = q * E - mass * g;
@@ -212,6 +238,7 @@
       D.text(ctx, "＋ " + sV.get() + "V", cx - 100, topY - 18, { color: "#d9463b", size: 11, weight: "700" });
       D.text(ctx, "－", cx - 100, botY + 26, { color: "#2f6fd0", size: 12, weight: "700" });
       const dropY = PL.clamp(botY - 20 - y, topY + 14, botY - 12);
+      mg = { botY }; gV.place(cx + 70, botY + 6); gDrop.place(cx, dropY);
       D.disc(ctx, cx, dropY, 7, { fill: "#ffe08a", glow: "#ffe08a", glowSize: 12 });
       D.arrow(ctx, cx + 22, dropY, cx + 22, dropY + 30, { color: PL.col("warn"), width: 2, label: "mg" });
       if (E > 0) D.arrow(ctx, cx - 22, dropY, cx - 22, dropY - PL.clamp(q * E * 4e13, 6, 40), { color: "#5aa2ff", width: 2, label: "qE" });
@@ -243,6 +270,8 @@
     const sB = PL.ui.slider(L.controls, { label: "瞄準參數 b", min: 0, max: 60, step: 2, value: 20, unit: "", digits: 0, onInput: () => { if (hi) hi.hl = false; hi = spawn(sB.get(), true); alphas.push(hi); } });
     PL.ui.note(L.controls, "多數 α 粒子幾乎直穿；瞄準參數 b 越小、越接近原子核，散射角越大，正對時會被彈回。右下角累計螢光屏上各角度的閃光次數。");
     const rAng = PL.ui.readout(L.readouts, { label: "此粒子散射角", unit: "°" });
+    // 抓住入射的那條瞄準線上下移：離「正對原子核的中線」多遠就是瞄準參數 b
+    const grip = PL.ui.handle(cv, { slider: sB, label: "瞄準線（上下拖改瞄準參數 b）", toValue: (x, y) => cv.H / 2 - y });
     const rBack = PL.ui.readout(L.readouts, { label: "反彈（>90°）比例", unit: "%" });
     const rnd = () => { seed = (seed * 1664525 + 1013904223) | 0; return ((seed >>> 8) & 0xffffff) / 0xffffff; };
     const nucleus = () => ({ x: cv.W * 0.58, y: cv.H / 2 });
@@ -305,6 +334,7 @@
       D.text(ctx, (Z === 79 ? "金原子核" : "原子核") + "（+" + Z + "e）", N.x, N.y - nr - 12, { color: "#ffb4ab", size: 11, align: "center", weight: "700" });
       // 瞄準參數 b：入射線到「正對原子核那條線」的垂直距離
       const hy = N.y - b;
+      grip.place(34, hy);
       D.line(ctx, 0, hy, N.x - 50, hy, "rgba(127,231,255,0.4)", 1, [4, 4]);
       D.line(ctx, 0, N.y, N.x - nr - 4, N.y, "rgba(255,255,255,0.2)", 1, [2, 4]);
       if (b >= 6) {

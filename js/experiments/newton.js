@@ -108,6 +108,9 @@
     const rA = PL.ui.readout(L.readouts, { label: "加速度 a", unit: "m/s²" });
     const rV = PL.ui.readout(L.readouts, { label: "速度 v", unit: "m/s" });
     const rX = PL.ui.readout(L.readouts, { label: "位移 x", unit: "m" });
+    // 手拉彈簧秤：拖拉力箭頭的尖端改 F（4 px/N），小車跑動中也即時生效
+    let fX0 = 0;
+    const grip = PL.ui.handle(cv, { slider: sF, label: "手的拉力 F（拖曳箭頭）", toValue: x => (x - fX0) / 4 });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const AP = PL.apparatus;
@@ -135,6 +138,7 @@
       AP.springScale(ctx, hx, hy, 70, F / 24);
       AP.hand(ctx, hx + 86, hy, -1, 0.85, { pull: true });
       if (F > 0) D.arrow(ctx, hx + 4, hy - 24, hx + 4 + F * 4, hy - 24, { color: PL.col("accent-2"), width: 2.5, label: "F = " + F + " N" });
+      fX0 = hx + 4; grip.place(hx + 4 + F * 4, hy - 24);
       D.text(ctx, "a = F / m = " + PL.fmt(a, 2) + " m/s²", 24, 28, { color: MC(), size: 13 });
       D.text(ctx, "紙帶每 0.1 s 打一點：點距越來越大 → 等加速度", 24, 48, { color: PL.col("text-dim"), size: 10.5 });
       rA.set(a, 2); rV.set(v, 2); rX.set(x, 1);
@@ -167,6 +171,8 @@
     const rN = PL.ui.readout(L.readouts, { label: "正向力 N", unit: "×mg" });
     const rState = PL.ui.readout(L.readouts, { label: "狀態" });
     const cc = PL.ui.chart(PL.ui.charts(root), { title: "加速度 a 對 傾角 θ", cap: "a = g(sinθ − μcosθ)；當 θ ≤ 臨界角 θc = tan⁻¹μ 時物體靜止（a = 0）。" });
+    // 抓斜面頂端繞底角轉：抬高就是加大傾角（底角固定在 (50, H−40)）
+    const grip = PL.ui.handle(cv, { slider: sTh, label: "斜面頂端（繞底角轉改傾角 θ）", toValue: (x, y) => Math.atan2(cv.H - 40 - y, x - 50) * 180 / Math.PI });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const th = sTh.get() * Math.PI / 180, mu = sMu.get(), m = MC();
@@ -177,6 +183,7 @@
       const AP = PL.apparatus;
       AP.benchTop(ctx, W, H, A.y + 4);
       AP.ramp(ctx, A.x, A.y, Lpx, th);
+      grip.place(A.x + (Lpx - 10) * Math.cos(th), A.y - (Lpx - 10) * Math.sin(th));
       const u = { x: -Math.cos(th), y: Math.sin(th) }; // 下坡方向
       const n = { x: -Math.sin(th), y: -Math.cos(th) }; // 外法線
       // 斜面上貼的刻度尺（每一格代表斜面長的十分之一）
@@ -300,13 +307,20 @@
   PL.register("atwood", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.72);
-    let y = 0, v = 0;
-    const reset = () => { y = 0; v = 0; };
-    const s1 = PL.ui.slider(L.controls, { label: "左質量 m₁", min: 0.5, max: 8, step: 0.5, value: 3, unit: "kg", digits: 1, onInput: () => draw(), onReset: reset });
-    const s2 = PL.ui.slider(L.controls, { label: "右質量 m₂", min: 0.5, max: 8, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: () => draw(), onReset: reset });
+    /* y0：用手把砝碼拉到的起始高度差（預設 0＝兩邊等高），「釋放」從這裡開始；「重設」才歸零 */
+    let y = 0, v = 0, y0 = 0, held = false;
+    const reset = () => { y = y0; v = 0; }, clear = () => { y0 = 0; reset(); };
+    const s1 = PL.ui.slider(L.controls, { label: "左質量 m₁", min: 0.5, max: 8, step: 0.5, value: 3, unit: "kg", digits: 1, onInput: () => draw(), onReset: clear });
+    const s2 = PL.ui.slider(L.controls, { label: "右質量 m₂", min: 0.5, max: 8, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: () => draw(), onReset: clear });
     const row = PL.ui.buttonRow(L.controls);
     PL.ui.button(row, "釋放", () => { reset(); anim.start(); }, { primary: true, trigger: true });
-    PL.ui.button(row, "重設", reset);
+    PL.ui.button(row, "重設", clear);
+    // 用手抓住任一邊砝碼上下移（另一邊跟著反向）；抓著時不受力，放手後若在播放就從這裡接著動
+    const lim = () => (cv.H - 90) / 2 - 14;
+    const hold = sgn => PL.ui.handle(cv, { label: (sgn > 0 ? "左" : "右") + "砝碼（上下拉，設定起始位置）",
+      onGrab: () => { held = true; }, onRelease: () => { held = false; },
+      onDrag: (x, py) => { y0 = y = PL.clamp(sgn * (py - 14 - (cv.H - 108) / 2 - 82), -lim(), lim()); v = 0; draw(); } });
+    const g1 = hold(1), g2 = hold(-1);
     const rA = PL.ui.readout(L.readouts, { label: "加速度 a", unit: "m/s²" });
     const rT = PL.ui.readout(L.readouts, { label: "繩張力 T", unit: "N" });
     function draw() {
@@ -325,11 +339,12 @@
       const bw1 = 26 + m1 * 3.4, bw2 = 26 + m2 * 3.4;
       A.weight(ctx, lx, y1, bw1, 28, m1 + " kg");
       A.weight(ctx, rx, y2, bw2, 28, m2 + " kg");
+      g1.place(lx - 6, y1 + 14); g2.place(rx + 6, y2 + 14);
       const dir = a > 0.01 ? "m₁ 下降" : a < -0.01 ? "m₂ 下降" : "平衡靜止";
       D.text(ctx, dir, cx, H - 16, { color: PL.col("text-dim"), size: 12, align: "center" });
       rA.set(Math.abs(a), 2); rT.set(T, 1);
     }
-    const anim = PL.loop(dt => { if (dt) { const m1 = s1.get(), m2 = s2.get(); const a = (m1 - m2) * 9.8 / (m1 + m2); v += a * dt * 6; y += v * dt; const lim = (cv.H - 90) / 2 - 14; if (y > lim || y < -lim) { v = 0; } y = PL.clamp(y, -lim, lim); } draw(); });
+    const anim = PL.loop(dt => { if (dt && !held) { const m1 = s1.get(), m2 = s2.get(); const a = (m1 - m2) * 9.8 / (m1 + m2); v += a * dt * 6; y += v * dt; const lim = (cv.H - 90) / 2 - 14; if (y > lim || y < -lim) { v = 0; } y = PL.clamp(y, -lim, lim); } draw(); });
     cv.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
@@ -514,6 +529,11 @@
             "沒有先空桿調平的話，每一組數據都會系統性偏向同一邊——這種誤差多做幾次也消不掉。"
     });
 
+    /* 抓砝碼沿橫桿左右滑：位置就是力臂（只看水平投影，桿子傾斜時一樣準） */
+    let tg = { cx: 0, k: 1 };
+    const gD1 = PL.ui.handle(cv, { slider: sD1, label: "左側砝碼（沿桿滑動改力臂 d₁）", toValue: x => (tg.cx - x) / tg.k });
+    const gD2 = PL.ui.handle(cv, { slider: sD2, label: "右側砝碼（沿桿滑動改力臂 d₂）", toValue: x => (x - tg.cx) / tg.k });
+
     /* 目前的滑桿設定下，桿子最終會停在哪個角度 */
     const targetAng = () => PL.clamp((tau2() - tau1()) / 60, -0.34, 0.34);
     /* 預設值切換後讓桿子直接就位，不必等動畫 */
@@ -548,9 +568,10 @@
       D.text(ctx, "支點", cx, cy + 68, { color: PL.col("text-faint"), size: 10, align: "center" });
 
       /* 一側的砝碼、重量箭頭與力臂標註 */
-      function side(dist, m, weight, sign, name, tone) {
+      function side(dist, m, weight, sign, name, tone, gp) {
         const ax = cx + sign * dist * sc * c, ay = cy + sign * dist * sc * s;
         const bw = 20 + m * 4, bh = 16 + m * 2;
+        gp.place(ax, ay + 22 + bh / 2);
         AP.cord(ctx, ax, ay, ax, ay + 18);
         AP.massBlock(ctx, ax, ay + 22 + bh, bw, bh, { color: tone, label: PL.fmt(m, 1) + " kg", hook: true, noShadow: true });
         // 重量箭頭：長度正比於 W，讓「力」有大小可看
@@ -565,8 +586,9 @@
         D.text(ctx, (sign < 0 ? "d₁ = " : "d₂ = ") + PL.fmt(dist, 1) + " m", (cx + ax) / 2, dimY - 9,
           { color: PL.col("accent"), size: 10, align: "center" });
       }
-      side(d1, m1, W1, -1, "W₁", MC());
-      side(d2, m2, W2, 1, "W₂", "#ffab80");
+      tg = { cx, k: sc * c };
+      side(d1, m1, W1, -1, "W₁", MC(), gD1);
+      side(d2, m2, W2, 1, "W₂", "#ffab80", gD2);
 
       /* 力矩長條比較：把「誰比較大」變成長度而不是兩個數字 */
       const barY = H - 46, barX = 56, barW = W - 112 - 110, tMax = Math.max(t1, t2, 1);

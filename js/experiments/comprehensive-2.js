@@ -68,7 +68,7 @@
 
   /* 混合熱水與冷水：熱水放熱、冷水吸熱，最後停在同一個平衡溫度 */
   SC["calorimetry-mixing"] = k => {
-    const { ctx, W, H, a: Th, b: Tc, t, s, c, v: Te } = k;
+    const { ctx, W, H, a: Th, b: Tc, t, s, c, v: Te, st } = k;
     const benchY = H * 0.84;
     AP.labRoom(ctx, W, H, benchY, {});
     const hx = W * 0.1, cx2 = W * 0.27, kx = W * 0.45, bw = 62 * s, bh = 82 * s;
@@ -79,6 +79,9 @@
     AP.beaker(ctx, cx2, benchY, bw, bh, 0.53, "#6fb7e0");
     if (Tc < 6) for (let i = 0; i < 3; i++) { const ix = cx2 - 20 * s + i * 15 * s, iy = benchY - bh * 0.53 - 3 * s + Math.sin(t * 2 + i) * 1.5; ctx.fillStyle = "rgba(236,248,255,0.92)"; ctx.fillRect(ix - 6 * s, iy - 5 * s, 12 * s, 10 * s); ctx.strokeStyle = "rgba(140,184,220,0.9)"; ctx.lineWidth = 1; ctx.strokeRect(ix - 6 * s, iy - 5 * s, 12 * s, 10 * s); }
     AP.thermometer(ctx, cx2 + bw * 0.28, benchY - bh - 44 * s, benchY - 10 * s, 8 * s, Tc / 100);
+    // 把手抓兩支溫度計的液柱頂：上下拖就是設定熱水、冷水的初溫
+    [[hx, hp, Th, 0], [cx2, benchY, Tc, 1]].forEach(q => { const yT = q[1] - bh - 44 * s, yB = q[1] - 10 * s;
+      put(st, q[3], q[0] + bw * 0.28, Math.max(thY(yT, yB, 8 * s, q[2] / 100), yT + 10), (x, y) => 100 * thF(yT, yB, 8 * s, y)); });
     TX(ctx, "熱水 1.4m　" + PL.fmt(Th, 0) + "°C", hx, hp - bh - 56 * s, 11, "center", "#d0553a");
     TX(ctx, "冷水 m　" + PL.fmt(Tc, 0) + "°C", cx2, benchY - bh - 56 * s, 11, "center", "#2f7fd8");
     const u = Te / 100, mixC = "rgb(" + Math.round(111 + 121 * u) + "," + Math.round(183 - 63 * u) + "," + Math.round(224 - 134 * u) + ")";
@@ -111,7 +114,7 @@
 
   /* 弦上的波：一端掛砝碼拉緊繩子，撥一下產生脈衝；張力越大、線越細，波跑得越快 */
   SC["string-wave-speed"] = k => {
-    const { ctx, W, H, a: T, b: mu, t, s, c, v, cfg } = k;
+    const { ctx, W, H, a: T, b: mu, t, s, c, v, cfg, st } = k;
     const benchY = H * 0.72;
     AP.labRoom(ctx, W, H, benchY, {});
     const x0 = W * 0.1, x1 = W * 0.84, sy = benchY - 56 * s, Ls = x1 - x0, pr = 13 * s;
@@ -124,6 +127,8 @@
     const hgTop = benchY + 18 * s;
     AP.cord(ctx, x1 + pr, hy, x1 + pr, hgTop);
     for (let i = 0; i < nd; i++) AP.weight(ctx, x1 + pr, hgTop + 6 * s + i * 7 * s, dw, 6.5 * s, null);
+    // 把手在砝碼串底端：每片約 2 kg（19.6 N），往下拉就是多掛幾片
+    put(st, 0, x1 + pr, hgTop + 3 * s + T / 19.6 * 7 * s, (x, y) => (y - hgTop - 3 * s) / (7 * s) * 19.6);
     AP.pulley(ctx, x1, hy, pr);
     ctx.save(); ctx.lineCap = "round"; ctx.strokeStyle = "rgba(40,30,20,0.5)"; ctx.lineWidth = sw + 1.5; ctx.beginPath();
     const yAt = x => sy - (u <= 1 ? 18 * s * Math.exp(-Math.pow((x - xp) / (24 * s), 2)) : 0);
@@ -149,7 +154,7 @@
   /* 聲音的三要素：訊號產生器推動喇叭，空氣分子疏密傳到麥克風，示波器看頻率與振幅 */
   const NOTE = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"], SOL = ["do", "do♯", "re", "re♯", "mi", "fa", "fa♯", "sol", "sol♯", "la", "la♯", "si"];
   SC["sound-properties"] = k => {
-    const { ctx, W, H, a: f, b: A, t, s, c, v: db, cfg } = k;
+    const { ctx, W, H, a: f, b: A, t, s, c, v: db, cfg, st } = k;
     const benchY = H * 0.68;
     AP.labRoom(ctx, W, H, benchY, {});
     const gen = AP.powerSupply(ctx, 16 * s, benchY - 60 * s, 116 * s, 58 * s, PL.fmt(f, 0) + " Hz", { label: "訊號產生器", color: "rgb(130,230,255)", knob: fr(f, cfg.a) });
@@ -166,7 +171,9 @@
     const ox = W * 0.62, ow = W - ox - 16 * s, oh = Math.min(170 * s, benchY - 40 * s), oy = benchY - oh - 2;
     AP.cable(ctx, [{ x: mcx, y: benchY - 3 * s }, { x: ox + 14 * s, y: benchY - 3 * s }], "rgb(40,44,52)", 2.4 * s, 2);
     const scr = AP.oscilloscope(ctx, ox, oy, ow, oh, { label: "示波器" });
-    const cyc = f * 0.005, ya = pa * scr.h * 0.42;
+    const cyc = f * 0.005, ya = pa * scr.h * 0.42, kn = psKnob(16 * s, benchY - 60 * s, 116 * s, 58 * s), ym = scr.y + scr.h / 2;
+    // 旋鈕調頻率；示波器上的波峰高度就是振幅（pa = A/2）
+    put(st, 0, kn.x, kn.y); put(st, 1, scr.x + scr.w * 0.6, ym - ya, (x, y) => 2 * (ym - y) / (scr.h * 0.42));
     ctx.save(); ctx.strokeStyle = "rgb(255,226,90)"; ctx.shadowColor = "rgba(255,226,90,0.8)"; ctx.shadowBlur = 5; ctx.lineWidth = 2; ctx.beginPath();
     for (let i = 0; i <= 240; i++) { const q = i / 240, x = scr.x + q * scr.w, y = scr.y + scr.h / 2 - ya * Math.sin(PL.TAU * (q * cyc - t * 0.4)); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
     ctx.stroke(); ctx.restore();
@@ -197,12 +204,14 @@
     ctx.restore();
   }
   SC["echo-ultrasound"] = k => {
-    const { ctx, W, H, a: te, b: vs, t, s, c, v: d } = k;
+    const { ctx, W, H, a: te, b: vs, t, s, c, v: d, st } = k;
     const gy = H * 0.88;
     AP.outdoor(ctx, W, H, gy, { t, hills: true, sunX: W * 0.5 });
     for (let i = 0; i < 7; i++) AP.tree(ctx, 20 * s + i * W / 6.5, gy + 2, (70 + (i % 3) * 22) * s, 5 + i);
     const bx = W * 0.1, by = H * 0.42, mx = bx + 50 * s + Math.sqrt(d / 36) * (W * 0.82 - 50 * s), my = by + Math.sin(t * 1.3) * 6 * s, D2 = mx - bx - 16 * s;
     const cyc = clamp(1 + 10 * te, 1, 3), u = (t % cyc) / cyc;
+    // 拖飛蛾改距離 d，再換回回波時間 t = 2d/v（mx 用 √d 刻度）
+    put(st, 0, mx, by, x => { const q = clamp((x - bx - 50 * s) / (W * 0.82 - 50 * s), 0, 1); return 72 * q * q / vs; });
     ctx.save(); ctx.lineWidth = 2;
     for (let j = 0; j < 3; j++) {
       const q = u * 2 - j * 0.06;
@@ -233,7 +242,7 @@
 
   /* 地震與隔震：地面左右搖晃，建築坐在橡膠隔震墊上；地面頻率接近建築的自然頻率就會共振 */
   SC["seismic-waves"] = k => {
-    const { ctx, W, H, a: f, b: Tb, t, s, c, v: R, cfg } = k;
+    const { ctx, W, H, a: f, b: Tb, t, s, c, v: R, cfg, st } = k;
     const L = isL(), gy = H * 0.8;
     AP.outdoor(ctx, W, H, gy, { t, city: true, hills: true, sunX: W * 0.6 });
     const fv = Math.min(f, 2.4) * 0.8, ag = 5 * s, ph = PL.TAU * fv * t, xg = ag * Math.sin(ph), Rv = Math.min(R, 3.6), xb = Rv * ag * 1.6 * Math.sin(ph - 0.5);
@@ -246,6 +255,8 @@
       for (let j = 1; j < 4; j++) { const q = j / 4; ctx.beginPath(); ctx.moveTo(x0 - pw / 2 + (x1 - x0) * q, fy - padH * q); ctx.lineTo(x0 + pw / 2 + (x1 - x0) * q, fy - padH * q); ctx.stroke(); }
     }
     const baseY = fy - padH, sway = xb * 0.25;
+    // 地面的雙箭頭（搖晃頻率）與最右邊那顆隔震墊（墊越厚週期越長）
+    put(st, 0, bx - 30 * s, gy + 30 * s); put(st, 1, bx + 61 * s, fy - padH / 2);
     for (let i = 0; i < nF; i++) {
       const y1 = baseY - i * fh, off = xb + xg * 0.2 + sway * (i / nF);
       ctx.fillStyle = i % 2 ? (L ? "#dfd6c6" : "#46464e") : (L ? "#e9e1d2" : "#4e4e56"); ctx.fillRect(bx - bw / 2 + off, y1 - fh, bw, fh);
@@ -269,7 +280,7 @@
 
   /* 針孔成像：燭光穿過紙盒上的小孔，在半透明紙上形成倒立的像；像的大小 = 物高 × 光屏距離 ÷ 物距 */
   SC["shadow-pinhole"] = k => {
-    const { ctx, W, H, a: dO, b: dS, t, s, c, v: mag } = k;
+    const { ctx, W, H, a: dO, b: dS, t, s, c, v: mag, st } = k;
     const L = isL(), benchY = H * 0.8;
     AP.labRoom(ctx, W, H, benchY, {});
     const xo = W * 0.08, ppm = W * 0.6 / (dO + dS), xp = xo + dO * ppm, xs = xp + dS * ppm, hC = Math.max(14 * s, 0.2 * ppm);
@@ -277,6 +288,8 @@
     if (cb < benchY - 1) { ctx.fillStyle = PL.theme.isLight() ? "rgb(170,130,84)" : "rgb(110,82,52)"; ctx.fillRect(xo - 20 * s, cb, 40 * s, benchY - cb); }
     const cd = AP.candle(ctx, xo, cb, { h: hC, r: Math.max(4, hC * 0.14) });
     const top = cd.flameY - 4 * s, bot = cb - 6 * s;
+    // 畫面固定燭光到光屏的總長，針孔所在比例 u = dO/(dO+dS)；拖針孔（光屏距離不變）反解物距
+    put(st, 0, xp, ay + bxh * 0.3, x => { const u = clamp((x - xo) / (0.6 * W), 0.02, 0.98); return u * dS / (1 - u); });
     const imgT = ay + (ay - top) * dS / dO, imgB = ay + (ay - bot) * dS / dO;
     ctx.fillStyle = L ? "rgb(196,160,112)" : "rgb(120,96,66)"; ctx.fillRect(xp, ay - bxh / 2, Math.max(4 * s, xs - xp), bxh);
     ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(xp, ay - bxh / 2, Math.max(4 * s, xs - xp), 5 * s);
@@ -368,7 +381,7 @@
 
   /* 光纖：雷射光在纖芯裡一路全反射前進；距離越長、彎得越急，損耗越大 */
   SC["fiber-optics"] = k => {
-    const { ctx, W, H, a: Lk, b: rb, t, s, c, v: I, cfg } = k;
+    const { ctx, W, H, a: Lk, b: rb, t, s, c, v: I, cfg, st } = k;
     const L = isL(), benchY = H * 0.86;
     AP.labRoom(ctx, W, H, benchY, {});
     const lbx = 26 * s, spx = W * 0.42, spy = benchY - 56 * s, sr = 50 * s, mx = W * 0.8;
@@ -382,6 +395,7 @@
     ctx.strokeStyle = "rgb(70,76,88)"; ctx.lineWidth = 4 * s; ctx.beginPath(); ctx.arc(spx, spy, sr, 0, PL.TAU); ctx.stroke(); AP.brassDisc(ctx, spx, spy, 10 * s);
     AP.steel(ctx, spx - 6 * s, spy + sr, 12 * s, benchY - spy - sr, 10);
     TX(ctx, "光纖捲 " + PL.fmt(Lk, 0) + " km", spx, spy - sr - 10 * s, 11, "center");
+    put(st, 0, spx + wr, spy);
     AP.cable(ctx, [{ x: spx + wr, y: spy }, { x: mx - 50 * s, y: benchY - 24 * s }], "rgb(250,200,60)", 3 * s, 8);
     const mt = AP.multimeter(ctx, mx - 50 * s, benchY - 118 * s, 100 * s, 116 * s, PL.fmt(I, 1), { unit: "%" });
     ctx.save(); ctx.shadowColor = `rgba(255,60,40,${(I / 100).toFixed(2)})`; ctx.shadowBlur = 14; ctx.fillStyle = `rgba(255,80,60,${(0.15 + 0.85 * I / 100).toFixed(2)})`; ctx.beginPath(); ctx.arc(mx - 52 * s, benchY - 24 * s, 4 * s, 0, PL.TAU); ctx.fill(); ctx.restore();
@@ -389,6 +403,8 @@
     const cx0 = 24 * s, cy0 = 60 * s, cw = W - 48 * s, ch = spy - sr - 30 * s - cy0;
     ctx.fillStyle = "rgb(14,18,28)"; AP.rrPath(ctx, cx0, cy0, cw, ch, 10 * s); ctx.fill(); noteC(ctx, "rgb(14,18,28)", cx0, cy0, cw, ch);
     const Rb = (18 + 1.6 * rb) * s, fy = cy0 + ch * 0.36, fx0 = cx0 + 20 * s, fxb = cx0 + cw * 0.62, cl = 22 * s, co = 9 * s;
+    // 抓放大圖中光纖往下彎的那一段：離彎曲中心的水平距離就是彎曲半徑
+    put(st, 1, fxb + Rb, Math.min(fy + Rb, cy0 + ch - 14 * s), x => ((x - fxb) / s - 18) / 1.6);
     const path = () => { ctx.beginPath(); ctx.moveTo(fx0, fy); ctx.lineTo(fxb, fy); ctx.arc(fxb, fy + Rb, Rb, -Math.PI / 2, 0); ctx.lineTo(fxb + Rb, cy0 + ch + 2); };
     ctx.save(); ctx.beginPath(); ctx.rect(cx0, cy0, cw, ch); ctx.clip(); ctx.lineCap = "butt";
     path(); ctx.strokeStyle = "rgba(170,200,230,0.35)"; ctx.lineWidth = cl; ctx.stroke();
@@ -474,7 +490,7 @@
 
   /* 相機曝光：光圈（N 越小開越大）與快門時間一起決定進光量；快門久了，動的東西會拖影 */
   SC["camera-exposure"] = k => {
-    const { ctx, W, H, a: N, b: ts, t, s, c, v: ex } = k;
+    const { ctx, W, H, a: N, b: ts, t, s, c, v: ex, st } = k;
     const L = isL(), fy = H * 0.9;
     AP.labRoom(ctx, W, H, fy, { bench: "none" }); AP.woodFloor(ctx, W, H, fy);
     const cx = W * 0.2, cy = H * 0.46, bw = 190 * s, bh = 130 * s;
@@ -485,6 +501,9 @@
     ctx.fillStyle = "rgb(20,20,24)"; ctx.beginPath(); ctx.arc(cx, cy, lr, 0, PL.TAU); ctx.fill();
     ctx.strokeStyle = "rgb(90,94,104)"; ctx.lineWidth = 4 * s; ctx.beginPath(); ctx.arc(cx, cy, lr - 2 * s, 0, PL.TAU); ctx.stroke();
     const ar = (lr - 10 * s) * 1.4 / N, nb = 7;
+    // 光圈開口半徑 ∝ 1/N：抓開口邊緣往外拉＝開大；快門轉盤放在快門鈕上
+    put(st, 0, cx, cy + ar, (x, y) => (lr - 10 * s) * 1.4 / Math.max(1, Math.hypot(x - cx, y - cy)));
+    put(st, 1, cx + bw * 0.34, cy - bh / 2 - 4 * s);
     ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, lr - 6 * s, 0, PL.TAU); ctx.clip();
     ctx.fillStyle = "rgb(60,62,70)"; ctx.beginPath(); ctx.arc(cx, cy, lr - 6 * s, 0, PL.TAU);
     for (let i = nb; i >= 0; i--) { const a = i / nb * PL.TAU + 0.3; i === nb ? ctx.moveTo(cx + Math.cos(a) * ar, cy + Math.sin(a) * ar) : ctx.lineTo(cx + Math.cos(a) * ar, cy + Math.sin(a) * ar); }
@@ -589,7 +608,7 @@
 
   /* 電熱：電源加在電熱絲上，功率 P = V²/R 轉成熱，把水加熱 */
   SC["electric-heating"] = k => {
-    const { ctx, W, H, a: V, b: R, t, s, c, v: P, cfg } = k;
+    const { ctx, W, H, a: V, b: R, t, s, c, v: P, cfg, st } = k;
     const benchY = H * 0.84;
     AP.labRoom(ctx, W, H, benchY, {});
     const ps = AP.powerSupply(ctx, 22 * s, benchY - 74 * s, 138 * s, 72 * s, PL.fmt(V, 0) + " V", { label: "電源供應器", knob: fr(V, cfg.a) });
@@ -597,6 +616,7 @@
     const wy = benchY - bh * 0.72, coilX = bx - 26 * s, coilW = 52 * s, turns = 4 + Math.round(8 * fr(R, cfg.b)), cy2 = benchY - 44 * s;
     AP.cable(ctx, [ps.red, { x: ps.red.x, y: benchY - 100 * s }, { x: coilX, y: benchY - 188 * s }, { x: coilX, y: cy2 - 18 * s }], "rgb(186,54,48)", 3 * s, 6);
     AP.cable(ctx, [ps.black, { x: ps.black.x + 10 * s, y: benchY - 110 * s }, { x: coilX + coilW, y: benchY - 196 * s }, { x: coilX + coilW, y: cy2 - 18 * s }], "rgb(40,44,52)", 3 * s, 6);
+    const kn = psKnob(22 * s, benchY - 74 * s, 138 * s, 72 * s); put(st, 0, kn.x, kn.y); put(st, 1, coilX + coilW / 2, cy2);
     const glow = P < 1 ? "rgb(120,80,60)" : AP.kColor(700 + 1500 * heat);
     ctx.save(); if (heat > 0.3) { ctx.shadowColor = glow; ctx.shadowBlur = 12 * heat; }
     ctx.strokeStyle = glow; ctx.lineWidth = 3 * s; ctx.beginPath();
@@ -626,7 +646,7 @@
   /* 家庭用電：電器一個個打開，總電流 I = P/110 V；超過斷路器額定電流就跳脫斷電 */
   const APPL = [["電燈", 60], ["電視", 150], ["電鍋", 800], ["微波爐", 1100], ["吹風機", 1200], ["電暖器", 1500], ["冷氣", 2000], ["熱水器", 2200]];
   SC["household-circuit"] = k => {
-    const { ctx, W, H, a: P, b: Ir, t, s, c, v: load } = k;
+    const { ctx, W, H, a: P, b: Ir, t, s, c, v: load, st } = k;
     const L = isL(), fy = H * 0.86;
     AP.labRoom(ctx, W, H, fy, { bench: "none" }); AP.woodFloor(ctx, W, H, fy);
     const I = P / 110, over = load > 100, cyc = 5, tt = t % cyc, tripped = over && tt > 1.3, on = !tripped;
@@ -657,6 +677,14 @@
       TX(ctx, ap[0], x, top + 18 * s, 10, "center");
       TX(ctx, ap[1] + " W", x, top + 32 * s, 9, "center", PL.col("text-dim"), 0);
     });
+    /*
+     * 沿電線拖的把手：第 i 台電器的位置對應「開到第 i 台」的累計功率，中間線性內插，
+     * 往右拖就是一台台把電器打開。斷路器本身上下拖換一顆不同額定的。
+     */
+    const xs = [], ps = []; let cum = 0;
+    APPL.forEach((ap, i) => { cum += ap[1]; xs.push(px + pw + 30 * s + i * cw + cw / 2); ps.push(Math.max(100, cum)); });
+    const seg = (A, B, v) => { for (let i = 1; i < A.length; i++) if (v <= A[i] || i === A.length - 1) return B[i - 1] + (B[i] - B[i - 1]) * clamp((v - A[i - 1]) / (A[i] - A[i - 1]), 0, 1); };
+    put(st, 0, seg(ps, xs, P), wy + 5 * s, x => seg(xs, ps, x)); put(st, 1, px + pw / 2, py + 65 * s);
     const nOn = APPL.filter((ap, i) => APPL.slice(0, i + 1).reduce((a, b) => a + b[1], 0) <= P + 1).length;
     AP.dial(ctx, px + pw / 2, py + ph + 66 * s, 44 * s, clamp(load / 150, 0, 1), { max: 150, unit: "%", majors: 3 });
     TX(ctx, "負載率", px + pw / 2, py + ph + 12 * s, 10.5, "center");
@@ -667,7 +695,7 @@
 
   /* RLC 共振：訊號產生器從 10 Hz 掃到 20 kHz，頻率等於 f₀ 時電流最大、燈泡最亮 */
   SC["rlc-resonance"] = k => {
-    const { ctx, W, H, a: Lm, b: Cu, t, s, c, v: f0, cfg } = k;
+    const { ctx, W, H, a: Lm, b: Cu, t, s, c, v: f0, cfg, st } = k;
     const benchY = H * 0.86;
     AP.circuitBoard(ctx, W, H, false);
     const fs = 10 * Math.pow(2000, (t % 7) / 7), Q = 4, resp = 1 / Math.sqrt(1 + Q * Q * Math.pow(fs / f0 - f0 / fs, 2));
@@ -684,6 +712,7 @@
     ctx.fillStyle = "rgb(190,196,206)"; ctx.fillRect(cxC - cr, cyC - ch2 / 2, cr * 2, 4 * s);
     TX(ctx, "電容 C = " + PL.fmt(Cu, 1) + " μF", cxC - cr - 10 * s, cyC + 4, 11, "right");
     AP.bulb(ctx, (xL + xR) / 2 + 60 * s, T + 30 * s, 16 * s, resp);
+    put(st, 0, lx, ly); put(st, 1, cxC, cyC);
     const lw = Math.min(W * 0.38, 320 * s), lh = Math.min(H * 0.56, 230 * s);
     const scr = AP.laptop(ctx, W - lw - 16 * s, H * 0.14, lw, lh);
     const gx0 = scr.x + 26 * s, gx1 = scr.x + scr.w - 10 * s, gy0 = scr.y + 26 * s, gy1 = scr.y + scr.h - 22 * s;
@@ -748,7 +777,7 @@
 
   /* 電磁鐵：鐵釘繞漆包線通電就能吸迴紋針；匝數越多、電流越大，吸得越多 */
   SC["electromagnet"] = k => {
-    const { ctx, W, H, a: N, b: I, t, s, c, v: B, cfg } = k;
+    const { ctx, W, H, a: N, b: I, t, s, c, v: B, cfg, st } = k;
     const benchY = H * 0.86;
     AP.labRoom(ctx, W, H, benchY, {});
     const nx = W * 0.44, nTop = H * 0.14, nBot = H * 0.56, nw = 16 * s;
@@ -759,6 +788,7 @@
     const tv = 4 + Math.round(22 * fr(N, cfg.a)), c0 = nTop + 24 * s, c1 = nBot - 20 * s;
     for (let i = 0; i < tv; i++) { const y = c0 + (c1 - c0) * (i + 0.5) / tv; ctx.strokeStyle = "rgb(200,120,60)"; ctx.lineWidth = Math.max(2, (c1 - c0) / tv * 0.8); ctx.beginPath(); ctx.ellipse(nx, y, nw * 0.9, 3 * s, 0, 0, PL.TAU); ctx.stroke(); }
     const ps = AP.powerSupply(ctx, W * 0.66, benchY - 72 * s, 140 * s, 70 * s, PL.fmt(I, 1) + " A", { label: "直流電源", knob: fr(I, cfg.b) });
+    const kn = psKnob(W * 0.66, benchY - 72 * s, 140 * s, 70 * s); put(st, 0, nx, (c0 + c1) / 2); put(st, 1, kn.x, kn.y);
     const w1 = [{ x: nx + nw, y: c0 }, { x: nx + 70 * s, y: c0 - 20 * s }, { x: ps.red.x, y: benchY - 110 * s }, ps.red], w2 = [{ x: nx + nw, y: c1 }, { x: nx + 80 * s, y: c1 + 10 * s }, { x: ps.black.x, y: benchY - 96 * s }, ps.black];
     AP.cable(ctx, w1, "rgb(186,54,48)", 2.6 * s, 4); AP.cable(ctx, w2, "rgb(40,44,52)", 2.6 * s, 4);
     AP.flowDots(ctx, w1.slice().reverse(), t, 10 + 14 * I, { gap: 16 * s });
@@ -779,7 +809,7 @@
 
   /* 直流馬達：磁場中的線圈通電受力轉動，換向器每半圈換一次電流方向；帶動絞盤把重物吊起 */
   SC["dc-motor"] = k => {
-    const { ctx, W, H, a: I, b: tq, t, s, c, v: rpm, cfg } = k;
+    const { ctx, W, H, a: I, b: tq, t, s, c, v: rpm, cfg, st } = k;
     const benchY = H * 0.86;
     AP.labRoom(ctx, W, H, benchY, {});
     const mx = W * 0.34, my = H * 0.44, gap = 150 * s, ang = t * Math.min(rpm / 60 * PL.TAU, 9) * 0.25;
@@ -810,6 +840,7 @@
     const lift = rpm > 0 ? ((t * rpm / 1200) % 1) * 60 * s : 0, ww = (22 + 26 * fr(tq, cfg.b)) * s, wt = benchY - 40 * s - ww * 0.8 - lift;
     AP.cord(ctx, dx + dR, dy, dx + dR, wt);
     AP.weight(ctx, dx + dR, wt, ww, ww * 0.8, null);
+    const kn = psKnob(24 * s, benchY - 70 * s, 136 * s, 68 * s); put(st, 0, kn.x, kn.y); put(st, 1, dx + dR, wt + ww * 0.4);
     TX(ctx, "負載力矩 " + PL.fmt(tq, 1) + " N·m", dx + dR - ww / 2 - 8 * s, wt + ww * 0.5, 10.5, "right");
     if (rpm <= 0) TX(ctx, "負載太重，馬達轉不動！", mx, my - chh - 40 * s, 12, "center", "#e0473c");
     else { ctx.save(); ctx.strokeStyle = "#e0843a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(mx, my - chh - 12 * s, 36 * s, 8 * s, 0, 0.2, Math.PI * 1.7); ctx.stroke(); ctx.restore(); TX(ctx, PL.fmt(rpm, 0) + " rpm", mx, my - chh - 28 * s, 11.5, "center", "#e0843a"); }
@@ -874,7 +905,7 @@
 
   /* 原子光譜：放電管裡的原子從高能階跳回低能階放出光子，分光鏡看到一條亮線；λ = 1240/ΔE */
   SC["spectroscopy"] = k => {
-    const { ctx, W, H, a: dE, b: In, t, s, c, v: lam } = k;
+    const { ctx, W, H, a: dE, b: In, t, s, c, v: lam, st } = k;
     const benchY = H * 0.86;
     AP.labRoom(ctx, W, H, benchY, {});
     const col = AP.nmColor(lam), gc = col || "rgb(170,160,200)", vis = !!col;
@@ -904,6 +935,8 @@
     TX(ctx, vis ? "看到的譜線：" + PL.fmt(lam, 0) + " nm" : "λ = " + PL.fmt(lam, 0) + " nm 眼睛看不見（" + (lam < 380 ? "紫外線" : "紅外線") + "）", x0 + cw / 2, y0 + ch - 10 * s, 11, "center");
     const lx0 = W * 0.44, lyT = 60 * s, lyB = y0 - 34 * s, e2y = lyB - (lyB - lyT) * clamp((dE - 1.2) / 4.2, 0, 1) * 0.85 - 10 * s;
     ctx.strokeStyle = PL.col("text"); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(lx0, lyB); ctx.lineTo(lx0 + 120 * s, lyB); ctx.moveTo(lx0, e2y); ctx.lineTo(lx0 + 120 * s, e2y); ctx.stroke();
+    // 抓高能階那條線上下拖：與 e2y 的算法互為反函數
+    put(st, 0, lx0 + 92 * s, e2y, (x, y) => 1.2 + 4.2 * (lyB - 10 * s - y) / ((lyB - lyT) * 0.85)); put(st, 1, tx, (ty0 + ty1) / 2);
     const u = (t % 2.4) / 2.4, ey = u < 0.5 ? e2y : e2y + (lyB - e2y) * Math.min(1, (u - 0.5) * 4);
     ctx.fillStyle = "#2f7fd8"; ctx.beginPath(); ctx.arc(lx0 + 40 * s, ey, 5 * s, 0, PL.TAU); ctx.fill();
     if (u > 0.6) { const px0 = lx0 + 70 * s + (u - 0.6) * 300 * s, py0 = (e2y + lyB) / 2; ctx.save(); ctx.strokeStyle = gc; ctx.lineWidth = 2.2; ctx.beginPath(); for (let i = 0; i <= 40; i++) { const x = px0 + i * 1.5 * s, y = py0 + Math.sin(i * 0.9) * 5 * s; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); ctx.restore(); }
@@ -916,7 +949,7 @@
   /* 太陽能發電：屋頂太陽能板把陽光轉成電，照度越強、面積越大，能供應的電器越多 */
   const LOADS = [["LED 燈", 10], ["電風扇", 50], ["電視", 150], ["冰箱", 300], ["冷氣", 1000], ["熱水器", 2000]];
   SC["solar-cell"] = k => {
-    const { ctx, W, H, a: G, b: A, t, s, c, v: P } = k;
+    const { ctx, W, H, a: G, b: A, t, s, c, v: P, st } = k;
     const L = isL(), gy = H * 0.86, sunX = W * 0.12, sunY = H * 0.28, cl = 1 - G / 1200;
     AP.outdoor(ctx, W, H, gy, { t, hills: true, sunX, sunY });
     for (let i = 0; i < 3; i++) AP.cloud(ctx, sunX + (i - 1) * 50 * s + Math.sin(t * 0.3 + i) * 10 * s, sunY + (i % 2) * 14 * s, 60 * s, Math.min(1, cl * 1.1));
@@ -931,6 +964,13 @@
       ctx.beginPath(); ctx.moveTo(0, -th2 / 2); ctx.lineTo(0, th2 / 2); ctx.moveTo(-tw / 2, 0); ctx.lineTo(tw / 2, 0); ctx.stroke();
       ctx.fillStyle = `rgba(255,255,255,${(0.08 + 0.25 * G / 1200).toFixed(2)})`; ctx.fillRect(-tw / 2, -th2 / 2, tw * 0.4, th2 * 0.4); ctx.restore();
     }
+    /*
+     * 鋪板把手：每片 1 m²、一排 5 片。把手停在最後一片的右緣，
+     * 拖到第 r 排第 c 片的位置就是 5r + c 片（同一排內連續變化）。
+     */
+    const gx0 = hx + 45 * s, cw2 = tw * 1.06, rh = th2 + 5 * s, row = Math.floor((Math.ceil(A) - 1) / 5);
+    put(st, 0, sunX, sunY);
+    put(st, 1, gx0 + (A - row * 5) * cw2, rt + 16 * s + row * rh + th2 / 2, (x, y) => clamp(Math.floor((y - rt - 16 * s) / rh), 0, 3) * 5 + clamp((x - gx0) / cw2, 0, 5));
     ctx.save(); ctx.strokeStyle = `rgba(255,220,110,${(0.15 + 0.5 * G / 1200).toFixed(2)})`; ctx.lineWidth = 2;
     for (let i = 0; i < 4; i++) { const tx = hx + hw * (0.25 + i * 0.15), ty = rt + 40 * s; ctx.beginPath(); ctx.moveTo(sunX + 20 * s, sunY + 10 * s); ctx.lineTo(tx, ty); ctx.stroke(); }
     ctx.restore();
@@ -1003,6 +1043,32 @@
     el.value = String(x);
     el.dispatchEvent(new Event("input", { bubbles: true }));
   }
+  /*
+   * 精簡版把手（2026-10 第二批）：場景每格用 put() 擺好位置，並附上「畫布座標 → 滑桿值」的反算，
+   * 把手就用當下的幾何換算，拖到哪器材就跟到哪。
+   * 器材本身可動幅度太小（旋鈕、線圈匝數、砝碼大小）時改用相對拖曳 relG：
+   * ax = "xy" 往右或往上增加、"-y" 往下增加、"x" 只看左右；log 為真時每 span px 變十倍。
+   */
+  function relG(cv, sl, label, span, ax, log) {
+    let o = null;
+    return PL.ui.handle(cv, { slider: sl, label, onRelease: () => { o = null; },
+      toValue: (x, y) => {
+        if (!o) o = { x, y, v: sl.get() };
+        const d = (ax === "x" ? x - o.x : ax === "-y" ? y - o.y : x - o.x + o.y - y) / span;
+        return log ? o.v * Math.pow(10, d) : o.v + d * (sl.el.max - sl.el.min);
+      } });
+  }
+  const mk = list => (cv, st, a, b) => {
+    st.grips = list.map((q, i) => { const sl = q[0] === "a" ? a : b;
+      return q[2] ? relG(cv, sl, q[1], q[2], q[3] || "xy", q[4]) : PL.ui.handle(cv, { slider: sl, label: q[1], toValue: (x, y) => st.inv && st.inv[i] ? st.inv[i](x, y) : sl.get() }); });
+  };
+  function put(st, i, x, y, f) { if (st.grips && st.grips[i]) { st.grips[i].place(x, y); (st.inv || (st.inv = []))[i] = f; } }
+  const lerp = (r, f) => r[1] + clamp(f, 0, 1) * (r[2] - r[1]);
+  // 電源旋鈕中心（與 AP.powerSupply 內部同一套算法）
+  const psKnob = (x, y, w, h) => ({ x: x + w - 11 - clamp(h * 0.15, 5, 10), y: y + 10 + clamp(h * 0.36, 12, 24) / 2 });
+  // AP.thermometer 液柱頂端的位置與反算（球泡半徑 0.85w，液柱底在球心上方 0.4 個半徑）
+  const thY = (yT, yB, w, f) => { const b = yB - 1.19 * w; return yT + (b - yT) * (1 - clamp(f, 0, 1)); };
+  const thF = (yT, yB, w, y) => { const b = yB - 1.19 * w; return (b - y) / (b - yT); };
 
   /*
    * 需要「狀態」與「把手」的場景另外在這裡掛上（做法同 comprehensive.js）：
@@ -1042,7 +1108,23 @@
     },
     "cathode-ray-em": (cv, st, a, b) => {
       st.grips = [knobGrip(cv, a, LABS["cathode-ray-em"].a, "加速電壓旋鈕（上下拖）"), knobGrip(cv, b, LABS["cathode-ray-em"].b, "線圈電流旋鈕（上下拖）")];
-    }
+    },
+    // 第二批：[滑桿, 名稱] 用場景給的反算；[滑桿, 名稱, span, ax, log] 為相對拖曳
+    "calorimetry-mixing": mk([["a", "熱水溫度計（上下拖）"], ["b", "冷水溫度計（上下拖）"]]),
+    "string-wave-speed": mk([["a", "砝碼（往下拉＝加砝碼、張力變大）"]]),
+    "sound-properties": mk([["a", "訊號產生器旋鈕（上下拖改頻率）", 160], ["b", "示波器波峰（上下拖改振幅）"]]),
+    "echo-ultrasound": mk([["a", "飛蛾（左右拖改距離）"]]),
+    "seismic-waves": mk([["a", "地面搖晃（左右拖改頻率）", 200, "x"], ["b", "隔震墊（上下拖改週期）", 140]]),
+    "shadow-pinhole": mk([["a", "針孔（左右拖改物距）"]]),
+    "fiber-optics": mk([["a", "光纖捲（往右拖＝捲更長）", 160], ["b", "光纖彎曲處（左右拖改彎曲半徑）"]]),
+    "camera-exposure": mk([["a", "光圈葉片（往外拖＝開大）"], ["b", "快門速度轉盤（左右拖）", 75, "x", true]]),
+    "electric-heating": mk([["a", "電源旋鈕（上下拖改電壓）", 140], ["b", "電熱絲（左右拖：圈數多＝電阻大）", 160]]),
+    "household-circuit": mk([["a", "沿電線往右拖＝打開更多電器"], ["b", "斷路器（上下拖換額定電流）", 140]]),
+    "rlc-resonance": mk([["a", "電感線圈（左右拖改電感）", 90, "xy", true], ["b", "電容（上下拖改電容）", 70, "xy", true]]),
+    "electromagnet": mk([["a", "線圈（上下拖改匝數）", 140], ["b", "電源旋鈕（上下拖改電流）", 140]]),
+    "dc-motor": mk([["a", "電源旋鈕（上下拖改電流）", 140], ["b", "負載砝碼（往下拉＝加重）", 120, "-y"]]),
+    "spectroscopy": mk([["a", "高能階（上下拖改能階差 ΔE）"], ["b", "放電管（上下拖改亮度）", 140]]),
+    "solar-cell": mk([["a", "太陽（往上拖＝雲散開、照度變強）", 160], ["b", "太陽能板（拖曳鋪設面積）"]])
   };
 
   /*

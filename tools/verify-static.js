@@ -22,7 +22,7 @@ const sandbox = { window: {}, document: { documentElement: {}, head: { appendChi
 sandbox.window.window = sandbox.window;
 vm.createContext(sandbox);
 ["js/site-config.js", "js/curriculum.js", "js/advanced-curriculum.js", "js/comprehensive-curriculum.js",
- "js/extension-registry.js", "js/open-curriculum.js", "js/school-curriculum.js"].forEach(f => {
+ "js/extension-registry.js", "js/open-curriculum.js", "js/school-curriculum.js", "js/exam-curriculum.js"].forEach(f => {
   const full = path.join(ROOT, f);
   if (fs.existsSync(full)) vm.runInContext(fs.readFileSync(full, "utf8"), sandbox, { filename: f });
 });

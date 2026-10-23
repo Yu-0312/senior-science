@@ -35,6 +35,10 @@
     const rW = PL.ui.readout(L.readouts, { label: "累積功 W", unit: "J" });
     const rP = PL.ui.readout(L.readouts, { label: "功率 P", unit: "W" });
     const rFx = PL.ui.readout(L.readouts, { label: "有效分力", unit: "N" });
+    /* 抓拉繩的手繞掛鉤轉＝改施力角 θ；拖 F 箭頭尖端沿繩方向伸縮＝改施力大小（6k px/N）。邊走邊拖即時生效 */
+    let wp = { px: 0, ay: 0, hx: 0, hy: 0, k: 1, th: 0 };
+    const gTh = PL.ui.handle(cv, { slider: sTh, label: "拉繩的手（繞掛鉤轉改施力角 θ）", toValue: (x, y) => Math.atan2(wp.hy - y, x - wp.hx) * 180 / Math.PI });
+    const gF = PL.ui.handle(cv, { slider: sF, label: "施力 F（沿繩方向拖曳箭頭）", toValue: (x, y) => ((x - wp.px) * Math.cos(wp.th) + (wp.ay - y) * Math.sin(wp.th)) / (6 * wp.k) });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const A = AP(), F = sF.get(), th = sTh.get() * Math.PI / 180, v = sV.get();
@@ -54,11 +58,13 @@
         const ex = hx + rl * Math.cos(th), ey = hy - rl * Math.sin(th);
         A.rope(ctx, hx, hy, ex, ey, 2.6 * k, "#c8a46a");
         A.hand(ctx, ex + 8 * Math.cos(th), ey - 8 * Math.sin(th), 1, 0.9 * k, { pull: true, ang: -th });
+        gTh.place(ex + 8 * Math.cos(th), ey - 8 * Math.sin(th)); wp = { hx, hy };
         ctx.save(); ctx.strokeStyle = PL.col("text-dim"); ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + 70 * k, hy); ctx.stroke(); ctx.setLineDash([]); ctx.beginPath(); ctx.arc(hx, hy, 34 * k, -th, 0); ctx.stroke(); ctx.restore();
         D.text(ctx, "θ = " + sTh.get() + "°", hx + 40 * k, hy - 6 * k, { color: PL.col("text"), size: 10.5, weight: "700" });
       }
       const ay = gy - 80 * k;
       D.arrow(ctx, px, ay, px + fx * 6 * k, ay - fy * 6 * k, { color: PL.col("accent-2"), width: 2.6, label: "F" });
+      Object.assign(wp, { px, ay, k, th }); gF.place(px + fx * 6 * k, ay - fy * 6 * k);
       D.arrow(ctx, px, ay, px + fx * 6 * k, ay, { color: "#2fae85", width: 2.2, label: "F cosθ", dash: [3, 3] });
       /* 速率 v 也要畫得出來：速度箭頭與功率錶（P = F cosθ · v）跟著滑桿變 */
       D.arrow(ctx, px - 30 * k, gy - 130 * k, px - 30 * k + v * 24 * k, gy - 130 * k, { color: "#e0843a", width: 2.5, label: "v" });
@@ -87,6 +93,10 @@
     const rWn = PL.ui.readout(L.readouts, { label: "淨功 W_net", unit: "J" });
     const rK = PL.ui.readout(L.readouts, { label: "動能 K", unit: "J" });
     const rV = PL.ui.readout(L.readouts, { label: "速度 v", unit: "m/s" });
+    // 拖拉力箭頭（往右）改 F、拖阻力箭頭（往左）改 f，都是 4 px/N；小車跑動中也即時生效
+    let we = { F0: 0, f0: 0 };
+    const gF = PL.ui.handle(cv, { slider: sF, label: "手的拉力 F（拖曳箭頭）", toValue: x => (x - we.F0) / 4 });
+    const gFr = PL.ui.handle(cv, { slider: sFr, label: "阻力 f（往左拖箭頭）", toValue: x => (we.f0 - x) / 4 });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const A = AP(), m = sM.get(), F = sF.get(), f = sFr.get();
@@ -115,6 +125,7 @@
       A.hand(ctx, hx + 78, hy, -1, 0.85, { pull: true });
       D.arrow(ctx, hx + 4, hy - 22, hx + 4 + F * 4, hy - 22, { color: KEc, width: 2.2, label: "F" });
       if (f > 0) D.arrow(ctx, px - bw / 2, gy - 6, px - bw / 2 - f * 4, gy - 6, { color: THc, width: 2, label: "f" });
+      we = { F0: hx + 4, f0: px - bw / 2 }; gF.place(hx + 4 + F * 4, hy - 22); gFr.place(px - bw / 2 - f * 4, gy - 6);
       energyBars(cv, 40, gy + 60, W - 120, [{ label: "淨功", v: Wnet, c: MC() }, { label: "動能 K", v: K, c: KEc }], Math.max(Wnet, K, 10));
       D.text(ctx, "W淨 = (F − f)·s = (" + F + " − " + f + ")·s　　K = ½mv²", 40, gy + 120, { color: PL.col("text-dim"), size: 11 });
       PL.ui.caption(cv, "淨功 = 動能變化：兩條長條始終等長");
@@ -239,6 +250,10 @@
       trail = []; history = [];
     }
     resetRun();
+
+    /* 抓滑板者沿軌道左右拖＝換起始位置（同時回到靜止、等待放開）；拖的是初始條件，不會自己開始滑 */
+    let et = { ox: 46, sc: 1 };
+    const grip = PL.ui.handle(cv, { slider: sStart, label: "滑板者（沿軌道拖曳改起始位置）", toValue: x => (x - et.ox) / et.sc });
 
     function energies() {
       const m = sMass.get();
@@ -407,6 +422,7 @@
       AP().skateboard(ctx, 0, 1, hk * 0.95, { color: "#e2574c" });
       AP().person(ctx, 0, -hk * 0.2, hk, { pose: "arms-up", shirt: "#2f7fd8", facing: v >= 0 ? 1 : -1 });
       ctx.restore();
+      et = { ox, sc }; grip.place(bx + Math.sin(tilt) * hk * 0.5, by - Math.cos(tilt) * hk * 0.5);
 
       // 能量長條：守恆最有說服力的呈現方式
       if (layers.has("bars")) {
@@ -523,6 +539,12 @@
     const rH = PL.ui.readout(L.readouts, { label: "當前高度", unit: "m" });
     function r() { phase = "ready"; y = 0; v = 0; comp = sX.get(); }
     r();
+    /* 把物體往下壓＝壓縮彈簧。畫面比例尺會隨壓縮量（最大高度）改變，所以逐一試算
+       每個壓縮量下物體畫在哪裡，挑離游標最近的；釋放前才能壓 */
+    const blockAt = c => { const H = cv.H, k = sK.get(), mm = sM.get(), sc = (H - 80) / (0.5 * k * c * c / (mm * g) + 0.6);
+      return H - 30 - (0.6 - c) * sc * 0.4 - 44 - (26 + mm * 6) * 0.4; };
+    const grip = PL.ui.handle(cv, { slider: sX, label: "物體（往下壓縮彈簧）", toValue: (x, y) => {
+      let best = 0.1; for (let c = 0.1; c < 0.6001; c += 0.05) if (Math.abs(blockAt(c) - y) < Math.abs(blockAt(best) - y)) best = c; return best; } });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const k = sK.get(), x0 = sX.get(), m = sM.get(), Hmax = 0.5 * k * x0 * x0 / (m * g);
@@ -537,6 +559,7 @@
       AP().steel(ctx, cx - 24, springTop - 4, 48, 5, 10);
       const by = springTop - 4 - y * sc;
       const bs = 26 + m * 6;
+      if (phase === "ready") grip.place(cx, by - bs * 0.4); else grip.hide();
       AP().massBlock ? AP().massBlock(ctx, cx, by, bs + 8, bs * 0.8, { color: "#e0703a", label: PL.fmt(m, 1) + " kg", noShadow: true })
                 : D.rect(ctx, cx - 20, by - 20, 40, 20, { fill: MC(), stroke: "rgba(255,255,255,0.4)", r: 4 });
       // 高度尺

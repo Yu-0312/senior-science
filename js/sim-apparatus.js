@@ -4396,11 +4396,13 @@
      * 給原本沒有時間軸的實驗一個時鐘：draw(dt, t) 每格被呼叫一次。
      * 建置時只畫一格（全站不自動播放），按播放才開始走。
      */
-    clock(draw, fps) {
+    clock(draw, o) {
+      // o 可以是 fps 數字，或 { fps, ambient }；ambient 表示「穩態動畫，進場就播放」
+      const opts = typeof o === "object" && o ? o : { fps: o };
       // start() 在建置期會同步畫一格；那時呼叫端的 const clock 還沒賦值，
       // draw 裡讀 clock.t 會丟 TDZ 錯誤。建置期這一格交給呼叫端自己的 draw()。
       let ready = false;
-      const c = PL.loop((dt, t) => { if (ready) draw(dt, t); }, fps);
+      const c = PL.loop((dt, t) => { if (ready) draw(dt, t); }, opts.fps, { ambient: !!opts.ambient });
       c.start();
       ready = true;
       return c;
@@ -4419,8 +4421,78 @@
    * o.toValue   (x, y) → 滑桿值；x、y 是畫布座標（與繪圖相同的 CSS px）
    * o.label     把手名稱，例如「雷射筆（入射角）」
    * o.onDrag    (x, y) → 自訂拖曳（不經過滑桿，例如把物體拉離平衡位置）
+   * o.onGrab    按下時呼叫
    * o.onRelease 放手時呼叫（例如放開後開始振盪）
+   *
+   * 不必點中圓圈：在畫布上按下，會抓起附近（72 px 內）最近的把手。
    */
+  /*
+   * 就近抓取：學生不必精準點中圓圈。
+   * 在畫布上任何地方按下，會抓起 NEAR_PX 以內最近的把手；
+   * 滑鼠移到附近時游標變成手掌、該把手亮起，事先就知道會抓到哪一個。
+   * 一張畫布只掛一組監聽器，所有把手共用。
+   */
+  const NEAR_PX = 72;
+  function dragController(cv, host) {
+    if (host._simDrag) return host._simDrag;
+    const list = [];
+    let active = null, near = null;
+    const canvas = cv.canvas;
+    function local(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: (e.clientX - r.left) * (cv.W / (r.width || cv.W)), y: (e.clientY - r.top) * (cv.H / (r.height || cv.H)) };
+    }
+    function nearest(p) {
+      let best = null, bd = NEAR_PX;
+      list.forEach(hd => {
+        if (hd.el.hidden || !hd.pos) return;
+        const d = Math.hypot(hd.pos.x - p.x, hd.pos.y - p.y);
+        if (d < bd) { bd = d; best = hd; }
+      });
+      return best;
+    }
+    function setNear(hd) {
+      if (near === hd) return;
+      if (near) near.el.classList.remove("is-near");
+      near = hd;
+      if (near) near.el.classList.add("is-near");
+      canvas.style.cursor = near ? "grab" : "";
+    }
+    const ctl = {
+      list,
+      begin(hd, e, captureEl) {
+        active = hd;
+        try { captureEl.setPointerCapture(e.pointerId); } catch (err) {}
+        hd._start();
+        hd._move(local(e));
+      },
+      move(e) { if (active) active._move(local(e)); },
+      end() { if (active) { const a = active; active = null; a._end(); } }
+    };
+    if (canvas.addEventListener) {
+      canvas.addEventListener("pointerdown", e => {
+        const hd = nearest(local(e));
+        if (!hd) return;
+        e.preventDefault();
+        canvas.style.cursor = "grabbing";
+        ctl.begin(hd, e, canvas);
+      });
+      canvas.addEventListener("pointermove", e => {
+        if (active) { ctl.move(e); return; }
+        if (e.pointerType === "touch") return;
+        setNear(nearest(local(e)));
+      });
+      canvas.addEventListener("pointerleave", () => { if (!active) setNear(null); });
+      const up = () => { if (active) { ctl.end(); canvas.style.cursor = near ? "grab" : ""; } };
+      canvas.addEventListener("pointerup", up);
+      canvas.addEventListener("pointercancel", up);
+      // 觸控：只有按在把手附近時才攔下捲動，其他地方照常捲頁
+      canvas.style.touchAction = "pan-y";
+    }
+    host._simDrag = ctl;
+    return ctl;
+  }
+
   PL.ui.handle = function handle(cv, o) {
     const host = cv.canvas.parentElement || cv.canvas.parentNode;
     let layer = host._simHandles;
@@ -4428,9 +4500,10 @@
       layer = host._simHandles = PL.el("div", "sim-handles", host);
       // 第一次出現把手時，在畫面角落提示「可以直接拖」；開始拖之後就收起來
       const hint = PL.el("div", "sim-handle-hint", layer);
-      hint.textContent = "可直接拖曳畫面上的圓形把手";
+      hint.textContent = "在實驗台上按住拖曳，就能直接操作";
       layer._hint = hint;
     }
+    const ctl = dragController(cv, host);
     const h = PL.el("div", "sim-handle", layer);
     h.tabIndex = 0;
     h.setAttribute("role", "slider");
@@ -4460,30 +4533,35 @@
       input.dispatchEvent(new Event("input", { bubbles: true }));
       syncAria();
     }
-    function local(e) {
-      const r = cv.canvas.getBoundingClientRect();
-      return { x: (e.clientX - r.left) * (cv.W / (r.width || cv.W)), y: (e.clientY - r.top) * (cv.H / (r.height || cv.H)) };
-    }
+
+    const hd = {
+      el: h, pos: null,
+      _start() {
+        dragging = true; h.classList.add("is-dragging"); layer.classList.add("is-active", "was-used");
+        if (o.onGrab) o.onGrab();
+      },
+      _move(p) {
+        if (!dragging) return;
+        // 自訂拖曳（例如把砝碼往下拉再放手）：交給呼叫端，自己負責重畫
+        if (o.onDrag) { o.onDrag(p.x, p.y); return; }
+        if (o.toValue) apply(o.toValue(p.x, p.y));
+      },
+      _end() {
+        if (!dragging) return;
+        dragging = false; h.classList.remove("is-dragging"); layer.classList.remove("is-active");
+        if (o.onRelease) o.onRelease();
+      }
+    };
+    ctl.list.push(hd);
+
     h.addEventListener("pointerdown", e => {
-      dragging = true; h.classList.add("is-dragging"); layer.classList.add("is-active", "was-used");
-      try { h.setPointerCapture(e.pointerId); } catch (err) {}
       e.preventDefault(); e.stopPropagation();
       try { h.focus({ preventScroll: true }); } catch (err) {}
+      ctl.begin(hd, e, h);
     });
-    h.addEventListener("pointermove", e => {
-      if (!dragging) return;
-      const p = local(e);
-      // 自訂拖曳（例如把砝碼往下拉再放手）：交給呼叫端，自己負責重畫
-      if (o.onDrag) { o.onDrag(p.x, p.y); return; }
-      apply(o.toValue(p.x, p.y));
-    });
-    const end = () => {
-      if (!dragging) return;
-      dragging = false; h.classList.remove("is-dragging"); layer.classList.remove("is-active");
-      if (o.onRelease) o.onRelease();
-    };
-    h.addEventListener("pointerup", end);
-    h.addEventListener("pointercancel", end);
+    h.addEventListener("pointermove", e => ctl.move(e));
+    h.addEventListener("pointerup", () => ctl.end());
+    h.addEventListener("pointercancel", () => ctl.end());
     h.addEventListener("keydown", e => {
       if (!input) return;
       const st = Number(input.step) || (Number(input.max) - Number(input.min)) / 100;
@@ -4499,8 +4577,8 @@
       el: h,
       /* 在繪圖程式算出物件位置後呼叫；x、y 用畫布座標 */
       place(x, y) {
-        if (!isFinite(x) || !isFinite(y)) { h.hidden = true; return api; }
-        px = x; py = y;
+        if (!isFinite(x) || !isFinite(y)) { h.hidden = true; hd.pos = null; return api; }
+        px = x; py = y; hd.pos = { x, y };
         const r = cv.canvas.getBoundingClientRect ? cv.canvas.getBoundingClientRect() : {}, hr = host.getBoundingClientRect ? host.getBoundingClientRect() : {};
         const sx = (r.width || cv.W) / cv.W, sy = (r.height || cv.H) / cv.H;
         const ox = r.width ? r.left - hr.left : cv.canvas.offsetLeft, oy = r.height ? r.top - hr.top : cv.canvas.offsetTop;
@@ -4508,10 +4586,41 @@
         h.hidden = false;
         return api;
       },
-      hide() { h.hidden = true; return api; },
+      hide() { h.hidden = true; hd.pos = null; return api; },
       get dragging() { return dragging; }
     };
     return api;
   };
+
+  /*
+   * 進場就播放的穩態動畫實驗（sim-core 的 finishBuild 讀取；新實驗也可用 loop／clock 的 ambient 選項）。
+   * 名單來自實測：播放 25 秒後畫面仍在動、沒有「一次性結局」的實驗。
+   * 拋射、碰撞、釋放、加熱混合，以及設有觀察點（sim-observe）的實驗不在名單內。
+   */
+  PL.ambientIds = new Set([
+    "relative-motion", "measurement-error", "motion-sensor", "apparent-weight", "spring-series-parallel",
+    "lever-machine", "pulley-system", "contact-pressure", "air-column-resonance", "string-wave-speed",
+    "sound-properties", "echo-ultrasound", "seismic-waves", "string-harmonic-spectrum", "noise-barrier",
+    "resonance-tube-sound-speed", "snell", "mirror", "lens-displacement", "diffraction", "polarization",
+    "dispersion", "grating", "critical-angle", "refraction-slab", "optical-instruments", "malus-law",
+    "thin-film", "fizeau-light-speed", "shadow-pinhole", "rgb-color-mixing", "fiber-optics",
+    "electrostatic-induction", "electric-heating", "rlc-resonance", "voltage-divider", "electrolysis",
+    "bode-low-pass", "wire-resistivity", "resistance-vs-temperature", "current-field", "lorentz", "lenz",
+    "ac-generator", "transformer", "mass-spec", "ampere-force", "motional-emf", "coil-torque", "hall-effect",
+    "current-balance", "em-polarization", "antenna-resonance", "electromagnet", "dc-motor",
+    "tangent-galvanometer", "cyclotron-frequency", "mutual-induction", "biot-savart-axis", "rutherford",
+    "blackbody", "radiation-shielding", "cathode-ray-em", "solar-cell", "geiger-statistics", "energy-forms",
+    "hydroelectric-power", "wind-turbine", "circular", "centripetal", "angular-momentum", "rotation",
+    "banked-curve", "rotation-dynamics", "cavendish-balance", "spring", "shm-energy", "damped-oscillation",
+    "coupled-oscillators", "physical-pendulum", "torsion-pendulum", "resonance-phase-lag",
+    "pendulum-measure-g", "spring-measure-k", "buoyancy", "bernoulli", "gas-laws", "thermo1",
+    "hydrostatic-pressure", "heat-transfer", "thermal-expansion", "viscosity-reynolds",
+    "continuity-hydraulic", "density-lab", "atmospheric-pressure", "work-angle", "resonance-tube",
+    "reflection-boundary", "sound-intensity", "human-eye", "camera-exposure", "lens-combination",
+    "photometry-inverse-square", "prism-spectrometer", "fresnel-diffraction", "lens-focal-measurement",
+    "coulomb", "iv-measurement", "closed-circuit-emf", "resistors", "wheatstone", "kirchhoff",
+    "meter-loading", "electrostatic-shield", "diode-rectifier", "semiconductor-led", "oscilloscope",
+    "e-deflection", "circuit-sandbox"
+  ]);
 
 })();

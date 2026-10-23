@@ -89,6 +89,12 @@
 
     function reset() { t = 0; sTime.set(0); draw(); }
 
+    /* 直接在路上操作：抓乙車車尾左右拖改初始間距，拖兩車的速度箭頭尖端改初速（3.2 px 代表 1 m/s） */
+    let cg = { k: 1, xa: 0, xb: 0 };
+    const gGap = PL.ui.handle(cv, { slider: sGap, label: "乙車（左右拖改初始間距 Δx₀）", toValue: x => (x + 22 - 40) / cg.k });
+    const gVa = PL.ui.handle(cv, { slider: sVa, label: "甲的初速（拖曳箭頭）", toValue: x => (x - cg.xa - 29) / 3.2 });
+    const gVb = PL.ui.handle(cv, { slider: sVb, label: "乙的初速（拖曳箭頭）", toValue: x => (x - cg.xb - 29) / 3.2 });
+
     PL.ui.note(L.controls,
       "「後車比前車快，遲早追上」這句話只對了一半。" +
       "前車在剎車，它終會停下，你遲早追得上，只是這段觀察時間夠不夠而已；" +
@@ -221,6 +227,10 @@
 
       drawCar(ctx, px(xa), laneA, CAR_A, "甲", A.v, A.stopped);
       drawCar(ctx, px(xb), laneB, CAR_B, "乙", B.v, B.stopped);
+      // 把手只在 t = 0（起跑前）出現：拖的是初始條件，改了本來就會回到 t = 0
+      cg = { k: (W - 80) / X_MAX, xa: px(xa), xb: px(xb) };
+      [[gGap, px(xb) - 22, laneB], [gVa, px(xa) + 29 + sVa.get() * 3.2, laneA], [gVb, px(xb) + 29 + sVb.get() * 3.2, laneB]]
+        .forEach(([gp, x, y]) => t === 0 ? gp.place(x, y) : gp.hide());
 
       PL.ui.caption(cv, scenarios[scenarioKey] ? scenarios[scenarioKey].note
         : "改變任一台車的初速或加速度，再看下方三張圖怎麼變。");

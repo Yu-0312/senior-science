@@ -3,6 +3,18 @@
   "use strict";
   const PL = window.PhysicsLab, D = PL.draw;
   const MC = () => PL.col("m-color", "#4dd0e1");
+  /* 把手用：照滑桿的範圍與步距寫入、發 input，走原本的更新路徑（一個把手改兩根滑桿時用） */
+  function slTo(sl, v) {
+    const e = sl.el, mn = +e.min, mx = +e.max, st = +e.step || 0;
+    v = PL.clamp(v, mn, mx); if (st) v = PL.clamp(Math.round((v - mn) / st) * st + mn, mn, mx);
+    v = +v.toFixed(6);
+    if (isFinite(v) && +e.value !== v) { e.value = v; e.dispatchEvent(new Event("input", { bubbles: true })); }
+  }
+  /* 步進器沒有 input 元素：自己跑回呼，再補發 input 讓暫停重畫與探測引擎同步 */
+  function stepTo(sp, v, cb) {
+    const p = sp.get(); sp.set(v);
+    if (sp.get() !== p) { if (cb) cb(sp.get()); sp.el.dispatchEvent(new Event("input", { bubbles: true })); }
+  }
 
   /* 等加速度直線運動 */
   PL.register("uniform-accel", { build(root) {
@@ -83,11 +95,12 @@
         D.arrow(ctx, cx, bodyTop - 20, cx + aLen, bodyTop - 20,
           { color: PL.col("accent-2"), width: 2.6, label: "v " + PL.fmt(s.v, 1) + " m/s", lsize: 10 });
       }
+      // a 箭頭 9 px／(m/s²)，尖端就是「油門／煞車」把手：播放中拖也即時生效
       if (Math.abs(a) > 0.05) {
-        const aLen = PL.clamp(a * 3.5, -56, 56);
-        D.arrow(ctx, cx, bodyTop - 42, cx + aLen, bodyTop - 42,
+        D.arrow(ctx, cx, bodyTop - 42, cx + a * 9, bodyTop - 42,
           { color: PL.col("warn"), width: 2.2, label: "a " + PL.fmt(a, 1) + " m/s²", lsize: 10 });
       }
+      aX0 = cx; grip.place(cx + a * 9, bodyTop - 42);
 
       // 下半：x–t / v–t（全程 0–TMAX）
       const gH = Math.max(88, H - graphTop - 16), gap = 14, gW = (W - 40 - gap) / 2, gx1 = 26, gx2 = 26 + gW + gap;
@@ -116,6 +129,10 @@
     const rT = PL.ui.readout(L.readouts, { label: "時間 t", unit: "s" });
     const rX = PL.ui.readout(L.readouts, { label: "位置 x", unit: "m" });
     const rV = PL.ui.readout(L.readouts, { label: "速度 v", unit: "m/s" });
+    // 改 a 會讓整條路的比例尺重算、車跟著平移；箭頭起點在按下時凍住，才不會越拖越遠
+    let aX0 = 0, aG = null;
+    const grip = PL.ui.handle(cv, { slider: sA, label: "加速度 a（拖曳箭頭：油門／煞車）", toValue: x => (x - (aG == null ? aX0 : aG)) / 9,
+      onGrab: () => { aG = aX0; }, onRelease: () => { aG = null; } });
 
     cur.v = sV.get();
     const anim = PL.loop(dt => {
@@ -148,14 +165,29 @@
     const rT = PL.ui.readout(L.readouts, { label: "落下時間", unit: "s" });
     const rV = PL.ui.readout(L.readouts, { label: "速率 v", unit: "m/s" });
     const rY = PL.ui.readout(L.readouts, { label: "剩餘高度", unit: "m" });
+    /* 把手抓塔頂的電磁鐵（連同吸著的球）上下拖改 h。畫面平常把 h 縮放成整座塔：
+       往下拖時凍住按下時的比例尺，塔頂與球跟著手降；往上拖（加高）時塔已頂到畫面，
+       改成拖到畫布頂端＝80 m、刻度跟著重標。放手再重新縮放 */
+    let hold = null, fy1 = 0;
+    const grip = PL.ui.handle(cv, { slider: sH, label: "電磁鐵與鋼球（上下拖改高度 h）",
+      onGrab: () => { anim.stop(); hold = { h: sH.get(), sc: (fy1 - 43) / sH.get(), y: null }; },
+      toValue: (x, y) => {
+        if (hold.y == null) hold.y = y;
+        const dy = hold.y - y;
+        return hold.h + (dy > 0 ? dy / Math.max(10, hold.y) * (80 - hold.h) : dy / hold.sc);
+      },
+      onRelease: () => { hold = null; draw(); } });
 
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const h = sH.get(), g = sG.get(), m = MC();
       const tFall = Math.sqrt(2 * h / g);
-      const groundY = H - 34, topY = 30;
-      // 球心從 y0（吸在電磁鐵下）落到 y1（碰到沙坑），這段就是 h
-      const y0 = topY + 13, y1 = groundY - 12, scale = (y1 - y0) / h;
+      const groundY = H - 34;
+      // 球心從 y0（吸在電磁鐵下）落到 y1（碰到沙坑），這段就是 h。
+      // 平常整座塔＝h；拖電磁鐵時比例尺先凍住，塔頂與球才會跟著手上下
+      const y1 = groundY - 12, scale = Math.min(hold ? hold.sc : 1e9, (y1 - 43) / h);
+      const topY = y1 - h * scale - 13, y0 = topY + 13;
+      fy1 = y1;
       const px0 = 130;
       const AP = PL.apparatus;
       cv.calibrate(scale, "m");   // 讓可拖曳的尺能直接量落下高度
@@ -182,6 +214,7 @@
       ctx.fillStyle = `rgba(40,30,20,${shA})`;
       ctx.beginPath(); ctx.ellipse(px0, groundY + 5, 14 + (h - y) / h * 4, 3.4, 0, 0, Math.PI * 2); ctx.fill();
       AP.sportBall(ctx, px0, py, 12, "steel");
+      if (t > 0 && !landed) grip.hide(); else grip.place(px0, y0);
       if (landed) AP.dustKick(ctx, px0, groundY + 4, landAge, 1);
       if (t > 0 && !landed) D.arrow(ctx, px0, py + 18, px0, py + 18 + Math.min(46, fv * 2.4), { color: PL.col("accent-2"), width: 2, label: "v" });
       // 高度標尺：立在落點旁的測高桿
@@ -352,6 +385,18 @@
 
     function onParam() { t = 0; landed = false; landAge = 0; model = simulate(); }
 
+    /* 三個把手：砲管繞砲耳轉（發射角）、砲台上下（高度）、靶左右（距離）。
+       都是發射前的設定：飛行中收起；按下時停掉落地動畫，改完不會自己再射一次 */
+    let pg = null;
+    const halt = () => anim.stop();
+    const gAng = PL.ui.handle(cv, { label: "砲管（繞砲耳轉改發射角 θ）", onGrab: halt,
+      onDrag: (x, y) => stepTo(sA, Math.atan2(pg.py - y, x - pg.ox) * 180 / Math.PI, () => { onParam(); chart(); }) });
+    const gH = PL.ui.handle(cv, { slider: sH, label: "砲台（上下拖改高度 h₀）", onGrab: halt, toValue: (x, y) => (pg.oy - 2 - y) / pg.sc });
+    // 靶的距離也決定畫面比例尺：逐一試算每個距離畫出來的位置，挑離游標最近的，靶才跟得住手
+    const tgtPx = d => pg.ox + d * Math.min((cv.W - 116) / (Math.max(model.range, d) * 1.18 + 6), (pg.oy - 26) / (Math.max(model.peak, model.h0) * 1.35 + 4));
+    const gT = PL.ui.handle(cv, { slider: sTarget, label: "靶（左右拖改距離）", onGrab: halt,
+      toValue: x => { let best = 10; for (let d = 10; d <= 120; d++) if (Math.abs(tgtPx(d) - x) < Math.abs(tgtPx(best) - x)) best = d; return best; } });
+
     /* 射程對角度：有阻力時要逐點積分，才看得到最佳角度的移動 */
     function rangeAt(angleDeg) {
       const ammo = AMMO[ammoKey];
@@ -460,6 +505,10 @@
       // 球先畫、大砲後畫：球是從砲口「出來」的
       if (flying || !landed) AP.sportBall(ctx, bx, by, rpx, kind, t * 6);
       AP.cannon(ctx, ox, pivotY, th, { s: CS, fired: flying ? t : null });
+      pg = { ox, oy, sc, py: pivotY, drop };
+      const inAir = t > 0 && !landed;
+      [[gAng, ox + 56 * Math.cos(th), pivotY - 56 * Math.sin(th)], [gH, ox - 22, pivotY - 2], [gT, tx, oy + 4]]
+        .forEach(([gp, x, y]) => inAir || x > W - 10 ? gp.hide() : gp.place(x, y));
       D.text(ctx, sA.get() + "°", ox - 8, pivotY - 30, { color: PL.col("accent-2"), size: 12, weight: "700" });
 
       if (layers.has("vcomp") && path.length > 1 && flying) {
@@ -553,6 +602,12 @@
     const rSpd = PL.ui.readout(L.readouts, { label: "合速率", unit: "m/s" });
     const rT = PL.ui.readout(L.readouts, { label: "渡河時間", unit: "s" });
     const rD = PL.ui.readout(L.readouts, { label: "下游漂移", unit: "m" });
+    /* 抓「船」箭頭的尖端：方向＝船頭方向、長度＝船速（12 px 代表 1 m/s），像搖桿一樣即時轉舵；
+       右側水流箭頭左右拖改流速。播放中拖也即時生效，船從當下位置接著走 */
+    let rg = { bx: 0, by: 0, fx: 0 };
+    const gBoat = PL.ui.handle(cv, { label: "船頭（拖曳「船」箭頭：方向＝船頭、長度＝船速）",
+      onDrag: (x, y) => { const dx = x - rg.bx, dy = rg.by - y; slTo(sH, Math.atan2(dx, dy) * 180 / Math.PI); slTo(sB, Math.hypot(dx, dy) / 12); draw(); } });
+    const gFlow = PL.ui.handle(cv, { slider: sC, label: "水流速度（左右拖箭頭）", toValue: x => (x - rg.fx) / 9 });
 
     function velocity() {
       const b = sB.get(), c = sC.get(), th = sH.get() * Math.PI / 180;
@@ -599,6 +654,9 @@
       D.arrow(ctx, bx, by, bx + b * Math.sin(th) * 12, by - b * Math.cos(th) * 12, { color: light ? "#4c1d95" : "#ffe08a", width: 2.4, label: "船" });
       D.arrow(ctx, bx, by, bx + c * 12, by, { color: light ? "#ffffff" : "#cfe8ff", width: 2.2, label: "水流" });
       D.arrow(ctx, bx, by, bx + vx * 12, by - vy * 12, { color: light ? "#9f1239" : "#ff8a6a", width: 2.8, label: "合" });
+      rg = { bx, by, fx: W - 96 };
+      gBoat.place(bx + b * Math.sin(th) * 12, by - b * Math.cos(th) * 12);
+      gFlow.place(W - 96 + c * 9, bankBot - riverH * 0.375);
       rSpd.set(Math.hypot(vx, vy), 2); rT.set(cross, 2); rD.set(drift, 1);
     }
 
@@ -687,6 +745,9 @@
     PL.ui.button(row, "重設", reset);
 
     function reset() { t = 0; dots = 0; flash = 0; anim.stop(); draw(); }
+    // 放手前才能換重物：跑起來就收起把手（改了會重設，等於重做一次）
+    let tk0 = 0;
+    const grip = PL.ui.handle(cv, { slider: sMw, label: "重物的重力 mg（往下拉＝換重一點的重物）", toValue: (x, y) => (y - tk0) / 50 });
 
     PL.ui.note(L.controls,
       "重物一放開就把小車拉著往前，小車越跑越快，紙帶上的點也越拉越開。" +
@@ -814,11 +875,13 @@
       const ww = 22, wh = 26;
       AP.weight(ctx, hangX, weightY, ww, wh, null);
       D.text(ctx, PL.fmt(sMw.get(), 2) + " kg", hangX - ww / 2 - 4, weightY + wh / 2 + 3, { color: PL.col("text-dim"), size: 9, align: "right", weight: "700" });
-      // 重物受力箭頭：往下的重力，長度正比於 mg
+      // 重物受力箭頭：往下的重力，長度正比於 mg（50 px/kg）；尖端是把手，往下拉＝換重一點的重物
+      tk0 = weightY + wh + 18;
       if (t === 0) {
-        D.arrow(ctx, hangX, weightY + wh + 2, hangX, weightY + wh + 18 + sMw.get() * 18,
+        D.arrow(ctx, hangX, weightY + wh + 2, hangX, tk0 + sMw.get() * 50,
           { color: PL.col("accent-2"), width: 1.6, label: "mg" });
-      }
+        grip.place(hangX, tk0 + sMw.get() * 50);
+      } else grip.hide();
 
       // 小車（有車廂與兩個輪子）
       AP.cart(ctx, carX, trackY + 12, cw, ch);

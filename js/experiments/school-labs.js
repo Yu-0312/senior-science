@@ -15,6 +15,9 @@
   "use strict";
   const PL = window.PhysicsLab, D = PL.draw, TAU = PL.TAU;
   const MC = () => PL.col("m-color", PL.col("accent"));
+  // AP.thermometer 液柱頂端的位置與反算（球泡半徑 0.85w，液柱底在球心上方 0.4 個半徑）：把手抓液柱頂上下拖
+  const thY = (yT, yB, w, f) => { const b = yB - 1.19 * w; return yT + (b - yT) * (1 - PL.clamp(f, 0, 1)); };
+  const thF = (yT, yB, w, y) => { const b = yB - 1.19 * w; return (b - y) / (b - yT); };
 
   /* ------------------------------------------------------------------
      共用：量測 → 作圖 → 求斜率
@@ -123,6 +126,9 @@
       "課本要求「測 n 次全振動再除以 n」，就是為了把一次按碼錶的反應誤差攤薄。" +
       "把上面的次數從 5 調到 50，觀察資料點如何從散亂變成一條線。");
 
+    // 把手抓擺錘：離懸點多遠就是擺長（改擺長會從頭計時）
+    let pg = { x: 0, y: 0, k: 1 };
+    const grip = PL.ui.handle(cv, { slider: sL, label: "擺錘（上下拖改擺長）", toValue: (x, y) => Math.hypot(x - pg.x, y - pg.y) / pg.k });
     const rT = PL.ui.readout(L.readouts, { label: "本次週期 T", unit: "s" });
     const rSlope = PL.ui.readout(L.readouts, { label: "T²–L 斜率", unit: "s²/m" });
     const rG = PL.ui.readout(L.readouts, { label: "量得 g = 4π²/斜率", unit: "m/s²" });
@@ -191,6 +197,7 @@
       D.line(ctx, pivotX, pivotY, pivotX, pivotY + len, PL.theme.pale(0.18), 1, [4, 4]);
       AP.cord(ctx, pivotX, pivotY, bobX, bobY);
       AP.bob(ctx, bobX, bobY, 13);
+      pg = { x: pivotX, y: pivotY, k: scale }; grip.place(bobX, bobY);
 
       // 擺長標示
       D.arrow(ctx, pivotX - 92, pivotY, pivotX - 92, pivotY + len, { color: PL.col("accent-2"), width: 1.5, head: 7 });
@@ -255,6 +262,9 @@
       "同一條彈簧有兩種求 k 的方法：靜態掛砝碼量伸長量（虎克定律），" +
       "以及動態量週期。畫面上兩個結果會同時顯示，可以互相驗證。");
 
+    // 把手抓左邊（靜態）那顆砝碼：往下拉到哪，就換成伸長到那裡所需的質量
+    let sg = { y0: 0, k: 1 };
+    const grip = PL.ui.handle(cv, { slider: sM, label: "砝碼（往下拉＝加重）", toValue: (x, y) => (y - sg.y0) / sg.k });
     const rT = PL.ui.readout(L.readouts, { label: "週期 T", unit: "s" });
     const rX = PL.ui.readout(L.readouts, { label: "靜態伸長 x", unit: "cm" });
     const rKs = PL.ui.readout(L.readouts, { label: "靜態法 k = mg/x", unit: "N/m" });
@@ -302,6 +312,7 @@
         if (AP.clampHead) AP.clampHead(ctx, col.x, topY - 4, 16, 0);
         D.spring(ctx, col.x, topY, col.x, bottom, 9, 11, MC());
         AP.weight(ctx, col.x, bottom, 44, 30, m.toFixed(2) + " kg");
+        if (!col.moving) { sg = { y0: topY + natural + 15, k: 9.8 / K_TRUE * 260 }; grip.place(col.x, bottom + 15); }
         D.text(ctx, col.tag, col.x, H - 30, { color: PL.col("text-faint"), size: 11, align: "center" });
 
         if (!col.moving) {
@@ -338,7 +349,7 @@
       steel: { label: "鋼塊 / 鋼板", mu: 0.24 },
       teflon: { label: "鐵氟龍 / 鋼板", mu: 0.08 }
     };
-    let angle = 0, sliding = false, slideS = 0, key = "wood";
+    let angle = 0, sliding = false, slideS = 0, key = "wood", held = false, rg = null;
 
     PL.ui.section(L.controls, "接觸面與載重");
     PL.ui.select(L.controls, {
@@ -356,6 +367,18 @@
       "把質量從 0.2 調到 2.0 kg 再各記錄一筆：資料點會排成一條水平線。" +
       "這條「平的線」正是實驗要證明的結論——靜摩擦係數與物體重量無關。");
 
+    /*
+     * 把手抓斜面木板的上端：學生自己用手慢慢抬，超過臨界角木塊就開始滑（播放時才會滑下去）；
+     * 放低到臨界角以下，木塊放回原位。抓著的時候自動抬升暫停。
+     */
+    const grip = PL.ui.handle(cv, { label: "斜面木板（上下拖改傾角）",
+      onGrab: () => { held = true; }, onRelease: () => { held = false; },
+      onDrag: (x, y) => {
+        if (!rg) return;
+        angle = PL.clamp(Math.atan2(rg.y - y, x - rg.x) * 180 / Math.PI, 0, 45);
+        if (angle < criticalAngle()) { sliding = false; slideS = 0; } else sliding = true;
+        rAngle.set(angle, 1); draw();
+      } });
     const rAngle = PL.ui.readout(L.readouts, { label: "目前傾角 θ", unit: "°" });
     const rCrit = PL.ui.readout(L.readouts, { label: "臨界角 θc", unit: "°" });
     const rMu = PL.ui.readout(L.readouts, { label: "μs = tan θc" });
@@ -399,6 +422,8 @@
       AP.benchTop(ctx, W, H, baseY + 6);
       AP.ramp(ctx, baseX, baseY, run / Math.cos(rad), rad);
       AP.brassDisc(ctx, baseX, baseY + 2, 5);
+      const gd = Math.min(run / Math.cos(rad) * 0.9, (baseY - 24) / Math.max(Math.sin(rad), 1e-6));
+      rg = { x: baseX, y: baseY }; grip.place(baseX + gd * Math.cos(rad), baseY - gd * Math.sin(rad));
 
       // 角度弧與標示
       D.ring(ctx, baseX, baseY, 46, PL.theme.pale(0.3), 1);
@@ -427,7 +452,7 @@
     const anim = PL.loop(dt => {
       if (dt) {
         const thc = criticalAngle();
-        if (!sliding && angle < thc) { angle = Math.min(thc, angle + dt * 7); }        // 緩慢抬升
+        if (!held && !sliding && angle < thc) { angle = Math.min(thc, angle + dt * 7); }        // 緩慢抬升
         else if (!sliding && angle >= thc) { sliding = true; }
         if (sliding) { slideS = Math.min(0.5, slideS + dt * 0.35); }
         rAngle.set(angle, 1);
@@ -587,6 +612,8 @@
       "從 0 °C 每 10 °C 記錄一筆到 100 °C。金屬的點會排成直線（電阻隨溫度上升），" +
       "熱敏電阻卻是一條急速下彎的曲線——這正是它能當溫度感測器的原因：同樣溫差下變化大得多。");
 
+    let tg = null;
+    const grip = PL.ui.handle(cv, { slider: sT, label: "溫度計（上下拖設定水溫）", toValue: (x, y) => tg ? 100 * thF(tg[0], tg[1], 16, y) : sT.get() });
     const rMetal = PL.ui.readout(L.readouts, { label: "金屬電阻", unit: "Ω" });
     const rNtc = PL.ui.readout(L.readouts, { label: "熱敏電阻", unit: "Ω" });
     const rAlpha = PL.ui.readout(L.readouts, { label: "量得溫度係數 α", unit: "/°C" });
@@ -678,6 +705,7 @@
       // 溫度計
       const tx = beakerX + beakerW + 34;
       AP.thermometer(ctx, tx + 8, beakerY, beakerY + beakerH, 16, warm);
+      tg = [beakerY, beakerY + beakerH]; grip.place(tx + 8, Math.max(thY(beakerY, beakerY + beakerH, 16, warm), beakerY + 10));
       const col = (beakerH - 30) * warm;
       D.text(ctx, T + " °C", tx + 26, beakerY + beakerH - 20 - col + 4, { color: PL.col("danger"), size: 14, weight: "700" });
 
@@ -729,6 +757,14 @@
       "降溫曲線本身是彎的，很難判斷「快慢」。右下圖把縱軸換成 ln(T − T環境) 之後就變成直線，" +
       "斜率就是 −k。這是把指數關係「拉直」來讀參數的標準做法。");
 
+    /*
+     * 兩個把手：溫度計液柱頂上下拖＝重新倒一杯這個溫度的熱水（從 t = 0 重來，不會自己開始播放）；
+     * 保溫套外緣左右拖＝加厚或變薄（套子只有十幾 px 可動，改成相對拖曳，拖 150 px 走完整個量程）。
+     */
+    let ng = null, j0 = null;
+    const gripT = PL.ui.handle(cv, { slider: sT0, label: "溫度計（上下拖設定熱水初溫）", toValue: (x, y) => ng ? 5 + 95 * thF(ng[0], ng[1], 16, y) : sT0.get() });
+    const gripK = PL.ui.handle(cv, { slider: sK, label: "保溫套（往外拉＝加厚、散熱變慢）", onRelease: () => { j0 = null; },
+      toValue: x => { if (!j0) j0 = { x, v: sK.get() }; return j0.v + (x - j0.x) / 150 * 0.046; } });
     const rT = PL.ui.readout(L.readouts, { label: "目前水溫", unit: "°C" });
     const rDiff = PL.ui.readout(L.readouts, { label: "與室溫溫差", unit: "°C" });
     const rHalf = PL.ui.readout(L.readouts, { label: "溫差減半所需時間", unit: "s" });
@@ -794,6 +830,7 @@
       AP.beaker(ctx, bx + bw / 2, by + bh, bw, bh + 10, bh / (bh + 10) * 0.92, water);
       /* 保溫套：k 越小（保溫越好）套子越厚，暫停時拉滑桿也看得到差別 */
       const ins = 3 + 19 * (1 - (sK.get() - 0.004) / 0.046);
+      gripK.place(bx - ins, by + bh * 0.55);
       ctx.fillStyle = "rgba(226,196,146,0.8)"; ctx.fillRect(bx - ins, by + 10, ins, bh - 10); ctx.fillRect(bx + bw, by + 10, ins, bh - 10);
       ctx.strokeStyle = "rgba(150,110,60,0.45)"; ctx.lineWidth = 1;
       for (let yy = by + 18; yy < by + bh; yy += 10) { ctx.beginPath(); ctx.moveTo(bx - ins, yy); ctx.lineTo(bx, yy + 4); ctx.moveTo(bx + bw, yy); ctx.lineTo(bx + bw + ins, yy + 4); ctx.stroke(); }
@@ -810,6 +847,7 @@
       // 溫度計
       const tx = bx + bw + 32;
       AP.thermometer(ctx, tx + 8, by - 6, by - 6 + bh, 16, warm);
+      ng = [by - 6, by - 6 + bh]; gripT.place(tx + 8, Math.max(thY(by - 6, by - 6 + bh, 16, warm), by + 4));
       const col = (bh - 36) * warm;
       D.text(ctx, T.toFixed(1) + " °C", tx + 26, by - 6 + bh - 10 - col, { color: PL.col("danger"), size: 15, weight: "700" });
       D.text(ctx, "室溫 " + env + " °C", tx + 26, by + bh - 4, { color: PL.col("accent-2"), size: 11 });
@@ -1029,6 +1067,9 @@
       "慢慢調水位，聲音最大的位置就是共鳴點。換 5 種音叉各記錄一次，" +
       "L 對 1/f 會連成直線，斜率乘以 4 就是聲速——不必真的去追一個跑掉的聲波。");
 
+    // 把手抓管內水面：上下拖就是升降水位、改變空氣柱長度
+    let rq = { top: 0, k: 1 };
+    const grip = PL.ui.handle(cv, { slider: sLen, label: "水位（上下拖改空氣柱長度）", toValue: (x, y) => (y - rq.top) / rq.k });
     const rLoud = PL.ui.readout(L.readouts, { label: "共鳴強度", unit: "%" });
     const rFirst = PL.ui.readout(L.readouts, { label: "理論第一共鳴長", unit: "m" });
     const rSlope = PL.ui.readout(L.readouts, { label: "L–1/f 斜率", unit: "m·Hz" });
@@ -1082,6 +1123,7 @@
       AP.clampHead(ctx, tubeX - 60, top + 40, 52, 0);
       AP.clampHead(ctx, tubeX - 60, bottom - 60, 52, 0);
       AP.glassTube(ctx, tubeX + tubeW / 2, top, bottom, tubeW, waterY);
+      rq = { top, k: scale }; grip.place(tubeX + tubeW / 2, waterY);
       D.text(ctx, "水位", tubeX + tubeW + 10, waterY + 4, { color: PL.col("accent-2"), size: 11 });
 
       // 空氣柱長度標示

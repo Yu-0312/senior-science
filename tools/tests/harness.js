@@ -289,6 +289,7 @@ function def(name, value) {
     Object.defineProperty(global, name, { value, writable: true, configurable: true });
   } catch (e) { /* 真的動不了就跳過，測試會在斷言階段發現 */ }
 }
+window.PhysicsLabNoAutoplay = true;   // 測試從 t = 0 量起；穩態動畫的自動播放另由 transport-test 驗證
 def("window", window);
 def("document", document);
 def("documentElement", documentElement);
@@ -328,6 +329,7 @@ const CORE_ORDER = [
   "js/extension-registry.js",
   "js/open-curriculum.js",
   "js/school-curriculum.js",
+  "js/exam-curriculum.js",
   "js/question-bank.js",
   "js/sim-core.js",
   "js/sim-apparatus.js",

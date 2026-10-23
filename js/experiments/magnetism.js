@@ -4,6 +4,15 @@
   const PL = window.PhysicsLab, D = PL.draw, TAU = PL.TAU;
   const MC = () => PL.col("m-color", "#9575cd");
   const NP = "#ff6b6b", SP = "#5aa2ff";
+  // 相對拖曳：電源旋鈕、線圈匝數這類「位置不等於數值」的東西，拖多少就加減多少（horiz 為左右拖）；
+  // 也接受步進器（沒有 el 的 set/get 介面），那時改用 onDrag 直接 set
+  const relGrip = (s, k, label, horiz) => {
+    let st = null;
+    const val = (x, y) => { if (!st) st = { x, y, v: s.get() }; return st.v + (horiz ? x - st.x : st.y - y) * k; };
+    const o = { label, onGrab: () => { st = null; }, onRelease: () => { st = null; } };
+    if (s.el && s.el.type === "range") { o.slider = s; o.toValue = val; } else o.onDrag = (x, y) => s.set(val(x, y));
+    return o;
+  };
 
   /* 載流導線的磁場 */
   PL.register("current-field", { build(root) {
@@ -14,6 +23,10 @@
     const sDir = PL.ui.select(L.controls, { label: "電流方向", value: "out", options: [{ value: "out", label: "流出頁面 ⊙" }, { value: "in", label: "流入頁面 ⊗" }] });
     PL.ui.note(L.controls, "安培右手定則：大拇指指電流方向，四指環繞方向即磁場方向。B 與距離成反比。");
     const rB = PL.ui.readout(L.readouts, { label: "近處磁場（相對）", unit: "" });
+    // 第一個小羅盤可以拿起來繞著導線移動：走到哪，指針都沿該處的圓切線（右手定則）
+    let probe = { r: 28 + 3 * 26, a: Math.PI / 4 }, cg = null;
+    const grip = PL.ui.handle(cv, { label: "小羅盤（拖到導線周圍任一點）",
+      onDrag: (x, y) => { if (!cg) return; probe = { r: PL.clamp(Math.hypot(x - cg.cx, y - cg.cy), 30, cg.card - 14), a: Math.atan2(y - cg.cy, x - cg.cx) }; draw(); } });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const cx = W / 2, cy = H / 2, out = sDir.get() === "out", ccw = out ? 1 : -1, I = sI.get();
@@ -66,9 +79,10 @@
       }
       // 四個小羅盤擺在第三圈上：N 極沿磁場方向（逆時針或順時針）
       [0, 1, 2, 3].forEach(k => {
-        const a = k * Math.PI / 2 + Math.PI / 4, R = 28 + 3 * 26;
+        const a = k ? k * Math.PI / 2 + Math.PI / 4 : probe.a, R = k ? 28 + 3 * 26 : probe.r;
         AP.compass(ctx, cx + R * Math.cos(a), cy + R * Math.sin(a), 13, a + ccw * Math.PI / 2);
       });
+      cg = { cx, cy, card }; grip.place(cx + probe.r * Math.cos(probe.a), cy + probe.r * Math.sin(probe.a));
       rB.set(I, 1);
     }
     const anim = PL.loop(dt => { if (dt) t += dt * sI.get(); draw(); });
@@ -99,6 +113,9 @@
     PL.ui.note(L.controls, "磁力恆垂直於速度，使帶電粒子作等速率圓周運動；半徑 r = mv/qB。B 穿入畫面時正電荷逆時針、負電荷順時針。v 太大或 B 太小，圓大到會打上玻璃壁。");
     const rR = PL.ui.readout(L.readouts, { label: "迴轉半徑 r", unit: "cm" });
     const rT = PL.ui.readout(L.readouts, { label: "週期 T（相對）", unit: "" });
+    // 右側兩台電源的旋鈕上下拖：線圈電流 → B、加速電壓 → v（畫面太窄沒畫電源時就不提供）
+    const gB = PL.ui.handle(cv, relGrip(sB, 0.04, "線圈電流旋鈕（上下拖改 B）"));
+    const gV = PL.ui.handle(cv, relGrip(sV, 0.04, "加速電壓旋鈕（上下拖改 v）"));
     const cc = PL.ui.chart(PL.ui.charts(root), { title: "迴轉半徑 r – 速率 v", cap: "r = mv/qB：定磁場下半徑與速率成正比（直線過原點）；磁場越強、斜率越小。虛線是球管裝得下的最大半徑。" });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
@@ -216,6 +233,7 @@
         D.text(ctx, "粒子撞到氣體分子會發光，", px0 + 10, 76, { color: PL.col("text-dim"), size: 10.5 });
         D.text(ctx, "所以整圈軌跡看得見。", px0 + 10, 91, { color: PL.col("text-dim"), size: 10.5 });
       }
+      if (sw >= 84) { gB.place(px0 + sw - 18.5, benchY - 89); gV.place(px0 + sw - 18.5, benchY - 35); } else { gB.hide(); gV.hide(); }
       if (sw >= 84) {
         const top = AP.powerSupply(ctx, px0, benchY - 108, sw, 50, "I " + PL.fmt(B * 0.5, 2) + "A", { label: "線圈電流", knob: (B - 1) / 5, color: "rgb(130,230,255)" });
         const low = AP.powerSupply(ctx, px0, benchY - 54, sw, 50, "U " + Math.round(20 * v * v) + "V", { label: "加速電壓", knob: (v - 1) / 5 });
@@ -265,12 +283,13 @@
     /* 磁鐵位置原本只在迴圈裡同步，暫停時拉滑桿磁鐵不會移動——
        而「自己拉滑桿」本來就是這個實驗預設的操作方式。 */
     const sPos = PL.ui.slider(L.controls, { label: "磁鐵位置", min: -1.5, max: 1.5, step: 0.01, value: -1.2, unit: "", digits: 2,
-      onInput: v => { if (mode === "manual") x = v; } });
+      // 只在暫停時直接搬磁鐵；播放中交給迴圈由位置差算速度（舊版播放中也直接設 x，速度永遠是 0、拉滑桿不會感應）
+      onInput: v => { if (mode === "manual" && !anim.running) x = v; } });
     const sStrength = PL.ui.slider(L.controls, { label: "磁鐵強度", min: 0.4, max: 2.5, step: 0.1, value: 1.2, unit: "", digits: 1 });
     const sTurns = PL.ui.stepper(L.controls, { label: "線圈匝數 N", value: 20, min: 5, max: 60, step: 5 });
 
     PL.ui.section(L.controls, "推動方式");
-    PL.ui.chipGroup(L.controls, {
+    const chips = PL.ui.chipGroup(L.controls, {
       value: "manual",
       options: [
         { value: "manual", label: "自己拉滑桿" },
@@ -293,6 +312,16 @@
     const rEmf = PL.ui.readout(L.readouts, { label: "感應電動勢 ε", unit: "" });
     const rDir = PL.ui.readout(L.readouts, { label: "電流方向" });
     const rSpeed = PL.ui.readout(L.readouts, { label: "磁鐵速度", unit: "" });
+    /*
+     * 直接抓磁鐵推進、拉出線圈：拖曳走「磁鐵位置」滑桿，迴圈由位置變化算出速度，
+     * 拖得越快電動勢越大、停住就歸零。為了讓感應電流即時出現，抓起時若在暫停就開始計時，
+     * 自動模式也切回手動。
+     */
+    // 相對拖曳：一按下磁鐵不會跳到游標處（那一跳會被算成極快的推動、檢流計亂甩）
+    let ig = null, ist = null;
+    const grip = PL.ui.handle(cv, { slider: sPos, label: "磁鐵（左右拖推進、拉出線圈）",
+      toValue: px => { if (!ist) ist = { px, v: sPos.get() }; return ist.v + (px - ist.px) / ig.scale; },
+      onGrab: () => { ist = null; if (mode !== "manual") { mode = "manual"; chips.set("manual"); sPos.set(x); } if (!anim.running) anim.start(); } });
 
     const charts = PL.el("div", "sim-charts", root);
     const w1 = PL.el("div", "sim-chart", charts);
@@ -349,6 +378,7 @@
 
       // 磁鐵：南北極用顏色與字標示
       const mx = cx + x * scale;
+      ig = { cx, scale }; grip.place(mx, cy);
       /*
        * 「磁鐵強度」原本只進到磁通量公式裡，磁鐵本身永遠畫成同樣大小，
        * 學生拉這根滑桿時畫面上找不到任何線索。
@@ -491,7 +521,25 @@
     const P = 3.4;
     let t = P * 0.3;                     // 進場時磁鐵正在移動，一打開就看得到偏轉
     const sPole = PL.ui.select(L.controls, { label: "朝向線圈的磁極", value: "N", options: [{ value: "N", label: "N 極" }, { value: "S", label: "S 極" }] });
-    const sMode = PL.ui.select(L.controls, { label: "磁鐵動作", value: "approach", options: [{ value: "approach", label: "接近線圈" }, { value: "leave", label: "遠離線圈" }] });
+    const sMode = PL.ui.select(L.controls, { label: "磁鐵動作", value: "approach", options: [{ value: "approach", label: "接近線圈" }, { value: "leave", label: "遠離線圈" }], onChange: () => { hand = null; } });
+    /*
+     * 自己用手推拉磁鐵：抓起後磁鐵跟著游標走，拖曳速度就是 v——
+     * 推向線圈＝接近、拉離＝遠離，檢流計偏轉正比於速度，停手就歸零。
+     * hand.u 是磁鐵在「遠端 0 ↔ 線圈口 1」之間的位置；換「磁鐵動作」選項就回到自動示範。
+     */
+    let hand = null, lg = null;
+    const grip = PL.ui.handle(cv, { label: "磁鐵（推向或拉離線圈）",
+      onGrab: () => { hand = { u: lg ? lg.u : 0, v: 0, at: performance.now(), off: null }; if (!anim.running) anim.start(); },
+      onDrag: x => {
+        if (!lg || !hand) return;
+        // 記住按下點與磁鐵的偏移，磁鐵不會一抓就跳到游標上（那一跳會被當成極快的推動）
+        const up = (x - lg.x0) / lg.span;
+        if (hand.off == null) hand.off = up - hand.u;
+        const now = performance.now(), dt = Math.max(0.008, (now - hand.at) / 1000), u = PL.clamp(up - hand.off, -0.08, 1.04);
+        hand.v = hand.v * 0.5 + (u - hand.u) / dt * 0.5; hand.u = u; hand.at = now;
+        if (Math.abs(hand.v) > 0.05) sMode.set(hand.v > 0 ? "approach" : "leave");
+        draw();
+      } });
     PL.ui.note(L.controls, "感應電流的磁場總是反抗磁通量的變化：接近時排斥、遠離時吸引。磁鐵一停下來，檢流計就回到零。");
     const rFace = PL.ui.readout(L.readouts, { label: "線圈近端感應極" });
     const rForce = PL.ui.readout(L.readouts, { label: "磁鐵與線圈" });
@@ -530,15 +578,18 @@
       const pole = sPole.get(), approach = sMode.get() === "approach", other = pole === "N" ? "S" : "N";
       const induced = approach ? pole : other;
       // 一個循環：停 → 移動（平滑加減速）→ 停住 → 淡出重來
-      const u = (t % P) / P, k = PL.clamp((u - 0.08) / 0.5, 0, 1), sm = k * k * (3 - 2 * k);
-      const speed = u > 0.08 && u < 0.58 ? 6 * k * (1 - k) / 1.5 : 0;   // 0..1
-      const moving = speed > 0.02, alpha = u > 0.9 ? 1 - (u - 0.9) / 0.1 : 1;
+      const u = (t % P) / P, k = PL.clamp((u - 0.08) / 0.5, 0, 1);
+      let sm = k * k * (3 - 2 * k), speed = u > 0.08 && u < 0.58 ? 6 * k * (1 - k) / 1.5 : 0;   // 0..1
+      // 手動：自動示範的峰速約每秒 0.9 段行程，拿來當 speed = 1 的基準
+      if (hand) { sm = hand.u; speed = PL.clamp(Math.abs(hand.v) / 0.9, 0, 1); }
+      const moving = speed > 0.02, alpha = hand ? 1 : u > 0.9 ? 1 - (u - 0.9) / 0.1 : 1;
       const benchY = Math.round(H * 0.8);
       AP.labRoom(ctx, W, H, benchY, {});
       const cy = benchY - 72 * s, coilX = W * 0.56, span = 120 * s, halfH = 44 * s;
       const hw = 44 * s, mh = 26 * s;
       const xNear = coilX - span / 2 - 20 * s - hw, xFar = xNear - 190 * s;
-      const mx = approach ? xFar + (xNear - xFar) * sm : xNear + (xFar - xNear) * sm;
+      const mx = hand ? xFar + (xNear - xFar) * sm : approach ? xFar + (xNear - xFar) * sm : xNear + (xFar - xNear) * sm;
+      lg = { x0: xFar, span: xNear - xFar, u: (mx - xFar) / (xNear - xFar) }; grip.place(mx, cy);
       const gsign = induced === "N" ? 1 : -1, g = moving ? gsign * speed : 0;
       // 線圈底座與線圈
       AP.woodBlock(ctx, coilX, benchY, span + 40 * s, cy + halfH + 8 * s < benchY ? benchY - (cy + halfH + 8 * s) : 6);
@@ -610,7 +661,12 @@
       rForce.set(approach ? "互相排斥" : "互相吸引");
       rG.set(moving ? (g > 0 ? "向 + 偏轉" : "向 − 偏轉") : "歸零（磁鐵靜止）");
     }
-    const anim = PL.loop(dt => { if (dt) t += dt; draw(); });
+    const anim = PL.loop(dt => {
+      if (dt) t += dt;
+      // 手停住（或放開）時速度很快衰減到零：沒有 pointermove 事件就代表磁鐵沒在動
+      if (hand && dt && performance.now() - hand.at > 60) hand.v *= Math.exp(-dt * 14);
+      draw();
+    });
     cv.onResize(draw); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
@@ -664,6 +720,18 @@
     PL.ui.button(row, "回中性面", () => { t = 0; hist = []; update(); });
     PL.ui.button(row, "重置", reset);
     function reset() { t = 0; hist = []; update(); }
+    // 抓住線圈左右撥動，親手把它轉到任一角度（拖著時時間停住）；θ 往回轉時清掉波形歷史
+    let held = false, gst = null, acR = 1;
+    const grip = PL.ui.handle(cv, { label: "線圈（左右撥動轉動角度）",
+      onGrab: () => { held = true; gst = null; }, onRelease: () => { held = false; },
+      onDrag: x => {
+        const w = sW.get();
+        if (!gst) gst = { x, th: w * t };
+        let th = gst.th + (x - gst.x) / acR;
+        while (th < 0) th += TAU;
+        if (th / w < t) hist = [];
+        t = th / w; update();
+      } });
 
     PL.ui.note(L.controls,
       "線圈轉到中性面時，磁通量是最大值——但電動勢恰好是零。" +
@@ -697,6 +765,7 @@
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const m = model(t);
       const cx = W * 0.30, cy = H * 0.46, R = Math.min(W * 0.13, H * 0.26);
+      acR = R; grip.place(cx, cy);
 
       // 磁極靴與磁感線
       const AP = PL.apparatus;
@@ -811,7 +880,7 @@
     }
 
     const anim = PL.loop(dt => {
-      if (dt) {
+      if (dt && !held) {
         t += dt;
         const m = model(t);
         hist.push([t, m.e, m.phi]);
@@ -903,6 +972,10 @@
       ]
     });
 
+    // 原、副線圈上下拖＝多繞或拆掉幾匝；負載燈泡上下拖改電阻（步進器，直接 set 後重畫）
+    const gN1 = PL.ui.handle(cv, relGrip(sNp, 4, "原線圈（上下拖改匝數 n₁）"));
+    const gN2 = PL.ui.handle(cv, relGrip(sNs, 4, "副線圈（上下拖改匝數 n₂）"));
+    const gR = PL.ui.handle(cv, relGrip(sR, 8, "負載（上下拖改電阻 R）"));
     /* 理想變壓器：不計損耗，P₁ = P₂ */
     function model() {
       const n1 = sNp.get(), n2 = sNs.get(), U1 = sVp.get(), R = sR.get();
@@ -959,6 +1032,7 @@
       }
       coil(cx - coreW / 2, m.n1, PL.col("accent-2"), "p");
       coil(cx + coreW / 2, m.n2, PL.col("danger"), "s");
+      gN1.place(cx - coreW / 2, cy - 30); gN2.place(cx + coreW / 2, cy - 30);
 
       // 原邊迴路
       const lx = 60, rx = W - 60, ty = cy - coreH / 2 - 26, by = cy + coreH / 2 + 42;
@@ -985,7 +1059,9 @@
         });
         D.text(ctx, "R = " + PL.fmt(m.R, 0) + " Ω", rx, cy + 34,
           { color: PL.col("warn"), size: 10.5, align: "center" });
+        gR.place(rx, cy);
       } else {
+        gR.hide();
         // 空載：把斷口畫出來，「有電壓但沒電流」才看得懂
         D.line(ctx, rx, ty, rx, cy - 22, PL.col("danger"), 2);
         D.line(ctx, rx, cy + 22, rx, by, PL.col("danger"), 2);
@@ -1069,6 +1145,11 @@
     const rR = PL.ui.readout(L.readouts, { label: "迴轉半徑 r", unit: "" });
     const rLand = PL.ui.readout(L.readouts, { label: "落點 ∝ m" });
     const rUnits = () => sM.get() * sE.get() / (sB.get() * sB.get());     // r = mv/qB = mE/(qB²)，相對單位
+    // 兩台電源的旋鈕上下拖改 E、B；底片上的預測落點左右拖＝換一種質量的離子（落點 2r ∝ m）
+    const gE = PL.ui.handle(cv, relGrip(sE, 0.05, "選擇器電壓旋鈕（上下拖改 E）"));
+    const gB = PL.ui.handle(cv, relGrip(sB, 0.04, "電磁鐵電流旋鈕（上下拖改 B）"));
+    let msg = null;
+    const gM = PL.ui.handle(cv, { slider: sM, label: "落點（左右拖換離子質量 m）", toValue: x => (x - msg.sx) / (2 * msg.U) * sB.get() * sB.get() / sE.get() });
     function geo() {
       const W = cv.W, H = cv.H, s = PL.clamp(Math.min(W / 800, H / 560), 0.5, 1.6);
       const sx = Math.round(W * 0.16), srcTop = 12 * s, srcH = 40 * s, plateY = Math.round(H * 0.4);
@@ -1173,9 +1254,11 @@
       D.disc(ctx, ip.x, ip.y, 5, { fill: "#9ad6ff", glow: "#5aa2ff", glowSize: 9 });
       if (phase === "arc") { const cx = sx + r, fl = Math.min(22 * s, r * 0.8); D.arrow(ctx, ip.x, ip.y, ip.x + (cx - ip.x) / r * fl, ip.y + (yE - ip.y) / r * fl, { color: "#ffc766", width: 2, label: "F", lsize: 10 }); }
       if (phase === "hit") { D.disc(ctx, ip.x, ip.y, 6, { fill: "#fff0b0", glow: "#ffd27a", glowSize: 16 }); D.text(ctx, "半徑太大：打到腔壁", PL.clamp(ip.x, x0 + 70 * s, x1 - 70 * s), ip.y - 14, { color: "#ffe08a", size: 11, align: "center", weight: "700" }); }
+      msg = { sx, U }; if (thEnd >= Math.PI - 1e-9) gM.place(sx + 2 * r, plateY + 14); else gM.hide();
       if (phase === "land") D.disc(ctx, sx + 2 * r, plateY, 7, { fill: "rgba(255,236,160,0.9)", glow: "#ffe08a", glowSize: 16 });
       // 右上方兩台電源：選擇器電壓（E）與電磁鐵電流（B）
       const px0 = lx + 150 * s, bw = Math.min(150 * s, (W - 16 - px0 - 12) / 2);
+      if (bw >= 80) { const kx = 11 + Math.max(5, Math.min(10, 7.5 * s)), ky = 16 * s + 10 + Math.max(12, Math.min(24, 18 * s)) / 2; gE.place(px0 + bw - kx, ky); gB.place(px0 + 2 * bw + 12 - kx, ky); } else { gE.hide(); gB.hide(); }
       if (bw >= 80) {
         const h = 50 * s, top = 16 * s;
         const e1 = AP.powerSupply(ctx, px0, top, bw, h, "E " + PL.fmt(E, 1), { label: "選擇器電壓", knob: (E - 1) / 7 });
@@ -1257,6 +1340,9 @@
     }
     reset();
 
+    // 推棒1：抓它的速度箭頭左右拉設定初速 v₀；一抓就回到起點（一次性運動，拖曳只改初始條件）
+    let p1Start = 0;
+    const grip = PL.ui.handle(cv, { slider: sV0, label: "棒1 速度箭頭（左右拉設定初速 v₀）", onGrab: () => { reset(); drawScene(); }, toValue: x => (x - p1Start) / 16 });
     function drawScene() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const B = sB.get(), R = sR.get();
@@ -1305,6 +1391,7 @@
       };
       const p1 = rod(Math.min(x1, x2 - 0.35), c, "棒1");
       const p2 = rod(Math.max(x2, x1 + 0.35), PL.col("accent-3"), "棒2");
+      p1Start = mToPx(1.2); grip.place(p1 + v1 * 16, rail1 - 22);
       // 安培力箭頭：快棒受力與運動反向（煞車）、慢棒同向（推動）——兩棒力等大反向
       const Fnow = sB.get() * Lm * Math.abs(sB.get() * Lm * (v1 - v2) / Math.max(0.05, sR.get()));
       const Flen = Math.min(44, 6 + Fnow * 26);

@@ -31,9 +31,12 @@ const eagerGz = eager.reduce((s, p) => s + gzipSize(p), 0) + gzipSize("css/style
  * 教師課堂卡、無障礙操作說明、分層提示合計約 3 KB gzip；
  * 這三項是「打開就能用、不會卡住」的核心，壓掉它們會直接傷害使用經驗。
  * 若要再降，優先把 teaching-notes 補充改成實驗開打後再載，而不是砍內容。
+ *
+ * 2026-10 放寬到 236 KB：新增 23 個學測／銜接實驗的課程目錄（exam-curriculum.js，約 10 KB gzip）。
+ * 目錄必須在首頁就有（搜尋、模組卡片、銜接路徑都靠它），實驗程式本身仍是延遲載入。
  */
 R.section("首次載入（以壓縮後為準）");
-R.ok(eagerGz < 224 * 1024, "首次載入 gzip " + kb(eagerGz) + "（上限 224 KB）",
+R.ok(eagerGz < 236 * 1024, "首次載入 gzip " + kb(eagerGz) + "（上限 236 KB）",
   "原始 " + kb(eagerRaw) + "，" + eager.length + " 支腳本 + style.css + index.html");
 
 const expDir = "js/experiments";

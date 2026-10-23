@@ -3,6 +3,12 @@
   "use strict";
   const PL = window.PhysicsLab, D = PL.draw, TAU = PL.TAU;
   const MC = () => PL.col("m-color", "#7986cb");
+  // 相對拖曳：音叉、重物這類「位置不等於數值」的東西，拖多少就加減多少（horiz 為左右拖）
+  const relGrip = (s, k, label, horiz) => {
+    let st = null;
+    return { slider: s, label, onGrab: () => { st = null; }, onRelease: () => { st = null; },
+      toValue: (x, y) => { if (!st) st = { x, y, v: s.get() }; return st.v + (horiz ? x - st.x : st.y - y) * k; } };
+  };
 
   /* 橫波與縱波 */
   PL.register("wave-types", { build(root) {
@@ -17,6 +23,10 @@
       "波速由介質決定，所以提高頻率不會讓波跑得比較快，只會讓波長變短：λ = v / f。");
     const rV = PL.ui.readout(L.readouts, { label: "波速 v（由介質決定）", unit: "" });
     const rLam = PL.ui.readout(L.readouts, { label: "波長 λ = v/f", unit: "" });
+    // 抓住抖繩子（推彈簧）的那隻手：橫波上下拖、縱波左右拖，離中心多遠就是振幅 A
+    let gMid = 0;
+    const grip = PL.ui.handle(cv, { slider: sA, label: "手（拖曳改振幅 A）",
+      toValue: (x, y) => sType.get() === "trans" ? Math.abs(y - gMid) : Math.abs(x - 16) / 0.7 });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       /*
@@ -57,6 +67,8 @@
         D.text(ctx, "疏部", 34 + (W - 68) * 0.25, midY - 32, { color: PL.col("text-dim"), size: 10.5, align: "center", weight: "700" });
         D.text(ctx, "密部", 34 + (W - 68) * 0.5, midY - 32, { color: PL.col("text-dim"), size: 10.5, align: "center", weight: "700" });
       }
+      gMid = midY;
+      if (sType.get() === "trans") grip.place(34, midY - A); else grip.place(16 + A * 0.7, midY);
       // 以「畫面寬度為 1」的無因次尺度呈現，讓兩個讀數可以直接互相印證
       rV.set(V / W, 2); rLam.set(lambda / W, 2);
     }
@@ -75,6 +87,13 @@
     const sPh = PL.ui.slider(L.controls, { label: "相位差 Δφ", min: 0, max: 360, step: 5, value: 0, unit: "°", digits: 0 });
     const rState = PL.ui.readout(L.readouts, { label: "干涉結果" });
     const rSum = PL.ui.readout(L.readouts, { label: "合成振幅", unit: "" });
+    // 示波器上直接調訊號：兩條波右端上下拖改振幅；波 2 中段左右拖＝把它相對波 1 平移（相位差）
+    let sg = null, phSt = null;
+    const gA1 = PL.ui.handle(cv, { slider: sA1, label: "波 1 波峰（上下拖改振幅）", toValue: (x, y) => (sg.r0 - y) / sg.amp });
+    const gA2 = PL.ui.handle(cv, { slider: sA2, label: "波 2 波峰（上下拖改振幅）", toValue: (x, y) => (sg.r1 - y) / sg.amp });
+    const gPh = PL.ui.handle(cv, { slider: sPh, label: "波 2（左右拖平移，改相位差）",
+      onGrab: () => { phSt = null; },
+      toValue: x => { if (!phSt) phSt = { x, v: sPh.get() }; const v = phSt.v - (x - phSt.x) * sg.k * 180 / Math.PI; return ((v % 360) + 360) % 360; } });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const AP = PL.apparatus;
@@ -84,6 +103,8 @@
       const k = TAU / (scr.w * 0.36), w = 2.2, ph = sPh.get() * Math.PI / 180;
       const amp = scr.h / 330, A1 = sA1.get() * amp, A2 = sA2.get() * amp;
       const rows = [scr.y + scr.h * 0.2, scr.y + scr.h * 0.47, scr.y + scr.h * 0.78];
+      sg = { r0: rows[0], r1: rows[1], amp, k };
+      gA1.place(scr.x + scr.w - 30, rows[0] - A1); gA2.place(scr.x + scr.w - 30, rows[1] - A2); gPh.place(scr.x + scr.w * 0.5, rows[1]);
       const wave = (y0, f, col, wid) => {
         ctx.save(); ctx.beginPath(); ctx.rect(scr.x, scr.y, scr.w, scr.h); ctx.clip();
         ctx.shadowColor = col; ctx.shadowBlur = 6; ctx.strokeStyle = col; ctx.lineWidth = wid; ctx.beginPath();
@@ -117,6 +138,10 @@
     PL.ui.note(L.controls, "兩端固定，只有特定頻率能形成駐波：波節不動、波腹振幅最大。");
     const rF = PL.ui.readout(L.readouts, { label: "頻率 fₙ", unit: "Hz" });
     const rNodes = PL.ui.readout(L.readouts, { label: "波節數" });
+    // 重物往下拉＝加大張力→波速變快；第一個波腹左右拖＝改變一段弦上容納幾個半波長（諧波 n）
+    let swg = null;
+    const gW = PL.ui.handle(cv, relGrip(sV, -1.2, "重物（上下拖改張力／波速）"));
+    const gN = PL.ui.handle(cv, { slider: sN, label: "第一個波腹（左右拖改諧波 n）", toValue: x => swg.Ls / (2 * Math.max(4, x - swg.x0)) });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const AP = PL.apparatus;
@@ -141,6 +166,7 @@
       const q = (vWave - 40) / 160, wwid = 18 + 10 * q, whgt = 14 + 30 * q * q;
       AP.weight(ctx, x1 + 16, midY + 46, wwid, whgt, null);
       D.text(ctx, "張力", x1 + 16, midY + 60 + whgt, { color: PL.col("text-faint"), size: 10, align: "center" });
+      swg = { x0, Ls }; gW.place(x1 + 16, midY + 46 + whgt / 2); gN.place(x0 + Ls / (2 * n), midY);
 
       // 包絡
       ctx.save(); ctx.strokeStyle = PL.theme.pale(0.12); ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
@@ -213,6 +239,12 @@
       cap: "音源接近時頻率偏高，通過瞬間急速下降，遠離後偏低。距離馬路越近，下降得越陡——這就是救護車呼嘯而過的聲音。"
     });
     let history = [];
+    // 救護車左右拖到任何位置（拖著時不前進，像停在原地鳴笛）；觀測者上下拖改離馬路距離
+    let held = false, dg = null;
+    const gCar = PL.ui.handle(cv, { label: "救護車（左右拖改位置）",
+      onGrab: () => { held = true; }, onRelease: () => { held = false; },
+      onDrag: x => { if (!dg) return; sourceX = PL.clamp((x - dg.cx) / dg.sc, -340, 290); drawAll(); } });
+    const gObs = PL.ui.handle(cv, { slider: sObsY, label: "觀測者（上下拖改離馬路距離）", toValue: (x, y) => (y - dg.roadY) / dg.sc });
 
     function reset() {
       t = 0; wavefronts = []; emitAcc = 0; sourceX = -260; history = [];
@@ -304,6 +336,8 @@
         D.line(ctx, carX, roadY, ox, oy, PL.theme.pale(0.22), 1, [4, 4]);
       }
 
+      dg = { cx: W / 2, sc, roadY };
+      gCar.place(carX, roadY - 8); gObs.place(ox, oy + (obsY < 12 ? 22 : 0));
       const fNow = observedFreq(sourceX, 0, obsY, vs);
       const fFront = sF0.get() * C_SOUND / Math.max(1e-6, C_SOUND - vs);
       const fBack = sF0.get() * C_SOUND / (C_SOUND + vs);
@@ -339,7 +373,7 @@
     const anim = PL.loop(dt => {
       if (dt) {
         t += dt;
-        sourceX += sVs.get() * dt;
+        if (!held) sourceX += sVs.get() * dt;
         if (sourceX > 300) reset();
         // 依原始頻率發出波前；為了畫面清爽，只取實際頻率的一小部分
         emitAcc += dt * 9;
@@ -369,6 +403,9 @@
     const sF2 = PL.ui.slider(L.controls, { label: "頻率 f₂", min: 4, max: 12, step: 0.1, value: 9, unit: "Hz", digits: 1 });
     PL.ui.note(L.controls, "兩個頻率相近的聲音疊加，響度週期性強弱起伏，這就是「拍」。");
     const rBeat = PL.ui.readout(L.readouts, { label: "拍頻 |f₁−f₂|", unit: "Hz" });
+    // 兩支音叉各自上下拖微調頻率（像在叉臂上滑動小夾子），兩個把手錯開高度以免互搶
+    const gF1 = PL.ui.handle(cv, relGrip(sF1, 0.04, "音叉 1（上下拖微調 f₁）"));
+    const gF2 = PL.ui.handle(cv, relGrip(sF2, 0.04, "音叉 2（上下拖微調 f₂）"));
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const AP = PL.apparatus;
@@ -377,6 +414,7 @@
       AP.tuningFork(ctx, 34, H - 24, 96); AP.tuningFork(ctx, 84, H - 24, 88);
       D.text(ctx, "f₁", 34, H - 128, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
       D.text(ctx, "f₂", 84, H - 120, { color: PL.col("text"), size: 11, align: "center", weight: "700" });
+      gF1.place(34, H - 100); gF2.place(84, H - 60);
       AP.microphone(ctx, 130, H - 24, 70, 1);
       const scr = AP.oscilloscope(ctx, 170, 14, W - 186, H - 46, { label: "MIC" });
       const f1 = sF1.get(), f2 = sF2.get(), midY = scr.y + scr.h / 2, A = scr.h * 0.2, x0 = scr.x, span = scr.w;
@@ -411,6 +449,9 @@
     PL.ui.note(L.controls, "聲音是縱波：管內空氣沿著管子前後振動。閉管的封閉端是位移的節、開口端是腹；開管兩端都是腹。紅點是做了記號的空氣分子。");
     const rLam = PL.ui.readout(L.readouts, { label: "波長 λ", unit: "m" });
     const rF = PL.ui.readout(L.readouts, { label: "共鳴頻率", unit: "Hz" });
+    // 抓管口左右拉：管子伸長縮短（管長 L），音叉跟著換成新的共鳴頻率
+    let tW = 1;
+    const grip = PL.ui.handle(cv, { slider: sL, label: "管口（左右拖改管長 L）", toValue: x => ((x - 50) / (tW - 170) - 0.25) / 0.75 });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const AP = PL.apparatus, Lt = PL.theme.isLight();
@@ -420,6 +461,7 @@
       AP.labRoom(ctx, W, H, benchY, {});
       /* 管長以滑桿上限 1 m 對應最大寬度——「管子多長決定哪些頻率會共鳴」要看得見 */
       const x0 = 50, x1 = 50 + (W - 170) * (0.25 + 0.75 * Lm / 1.0), span = x1 - x0;
+      tW = W; grip.place(x1, midY);
       const shape = u => closed ? Math.sin((2 * n - 1) * Math.PI / 2 * u) : Math.cos(n * Math.PI * u);
       const ph = Math.cos(4 * t);
       // 夾具的立桿與底座（先畫，玻璃管擱在上面）

@@ -74,7 +74,7 @@ function idsIn(file) {
 
   // 課程資料有些實驗檔會在註冊時讀取，先載入
   ["js/curriculum.js", "js/advanced-curriculum.js", "js/comprehensive-curriculum.js",
-   "js/extension-registry.js", "js/open-curriculum.js", "js/school-curriculum.js"].forEach(f => {
+   "js/extension-registry.js", "js/open-curriculum.js", "js/school-curriculum.js", "js/exam-curriculum.js"].forEach(f => {
     const full = path.join(ROOT, f);
     if (fs.existsSync(full)) {
       try { vm.runInContext(fs.readFileSync(full, "utf8"), sandbox, { filename: f }); } catch (e) {}

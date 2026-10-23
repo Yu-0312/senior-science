@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>錐動擺｜物理實驗室 · 圓周運動與萬有引力</title>
+<meta name="description" content="擺錘在水平面上做等速圓周運動，繩子掃出一個圓錐。張力的鉛直分量抵消重力，水平分量提供向心力；轉得越快，繩子越張開。週期只和擺錘到懸點的鉛直高度 h 有關。" />
+<link rel="canonical" href="https://senior-science.vercel.app/p/conical-pendulum.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="錐動擺｜物理實驗室 · 圓周運動與萬有引力" />
+<meta property="og:description" content="擺錘在水平面上做等速圓周運動，繩子掃出一個圓錐。張力的鉛直分量抵消重力，水平分量提供向心力；轉得越快，繩子越張開。週期只和擺錘到懸點的鉛直高度 h 有關。" />
+<meta property="og:locale" content="zh_TW" />
+<meta property="og:url" content="https://senior-science.vercel.app/p/conical-pendulum.html" />
+<meta name="theme-color" content="#13171c" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<link rel="icon" type="image/svg+xml" href="../icons/icon.svg?v=20261023-01" />
+<link rel="apple-touch-icon" href="../icons/icon-192.png?v=20261023-01" />
+<link rel="stylesheet" href="../css/style.css?v=20261023-01" />
+<script>
+(function () {
+  try {
+    var saved = JSON.parse(localStorage.getItem("pl-theme"));
+    if (saved !== "light" && saved !== "dark") {
+      saved = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    }
+    document.documentElement.setAttribute("data-theme", saved);
+  } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+})();
+</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"LearningResource","name":"錐動擺","description":"擺錘在水平面上做等速圓周運動，繩子掃出一個圓錐。張力的鉛直分量抵消重力，水平分量提供向心力；轉得越快，繩子越張開。週期只和擺錘到懸點的鉛直高度 h 有關。","inLanguage":"zh-Hant","learningResourceType":"互動模擬","educationalLevel":"必修 · 選修力學一","isAccessibleForFree":true,"license":"https://creativecommons.org/licenses/by-nc-sa/4.0/","url":"https://senior-science.vercel.app/p/conical-pendulum.html"}</script>
+</head>
+<body class="static-page">
+<header class="license-topbar">
+  <a class="license-home" href="../index.html"><span class="license-home-mark" aria-hidden="true">PH</span>物理實驗室</a>
+  <div class="license-topbar-actions">
+    <a class="license-toplink" href="../experiments.html">全部實驗</a>
+    <a class="license-toplink" href="../licensing.html">授權</a>
+  </div>
+</header>
+<main class="license-page">
+  <p class="license-kicker">模組五 · 圓周運動與萬有引力</p>
+  <h1>錐動擺</h1>
+  <p class="license-lead">擺錘在水平面上做等速圓周運動，繩子掃出一個圓錐。張力的鉛直分量抵消重力，水平分量提供向心力；轉得越快，繩子越張開。週期只和擺錘到懸點的鉛直高度 h 有關。</p>
+  <div class="license-meta">
+    <span>必修 · 選修力學一</span>
+    <span>互動模擬</span>
+    <span>繁體中文</span>
+  </div>
+
+  <section class="license-section">
+    <h2>關鍵公式</h2>
+    <p class="static-formula">Tcos θ=mg, Tsin θ=((mv^2)/r), tan θ=((ω^2 r)/g), P=2π√(((Lcos θ)/g))</p>
+  </section>
+
+  <section class="license-section">
+    <h2>學習重點</h2>
+    <ul>
+      <li>向心力不是新的力，是張力的水平分量</li>
+      <li>張力 T = mg / cosθ，永遠大於重力</li>
+      <li>角速度越大，張角 θ 越大</li>
+      <li>週期只由鉛直高度 h = L cosθ 決定</li>
+    </ul>
+  </section>
+
+  <section class="license-section">
+    <h2>動手操作</h2>
+    <p>這個主題有可即時操作的模擬：調整參數、用碼錶與量角器量測、記錄資料並自動作圖求出物理量。</p>
+    <div class="license-cta">
+      <a class="static-cta" href="../index.html#conical-pendulum">開啟「錐動擺」互動模擬</a>
+      <a href="worksheet-conical-pendulum.html">列印學習單</a>
+    </div>
+  </section>
+
+  <nav class="license-section static-nav">
+    <a href="satellite-orbit.html">← 人造衛星：軌道速率、週期與脫離速度</a>
+    <a href="spring.html">彈簧振子 →</a>
+  </nav>
+</main>
+</body>
+</html>

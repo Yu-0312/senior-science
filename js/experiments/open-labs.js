@@ -92,12 +92,21 @@
    * 用絕對位置換算會一碰就到底。改成「從按下處拖了多少」換算：拖 span px 走完整個量程。
    * toF／fromF 是數值與 0–1 比例的互換；sign = −1 表示往左拖數值變大。
    */
-  function relGrip(cv, sl, label, span, sign, toF, fromF) {
+  function relGrip(cv, sl, label, span, sign, toF, fromF, vert) {
     let x0 = null, f0 = 0;
     return PL.ui.handle(cv, { slider: sl, label,
-      onDrag: x => { if (x0 == null) { x0 = x; f0 = toF(sl.get()); } pushSlider(sl, fromF(clamp(f0 + sign * (x - x0) / span, 0, 1))); },
+      // vert：改看上下拖（往上為正）
+      onDrag: (x, y) => { const p = vert ? -y : x; if (x0 == null) { x0 = p; f0 = toF(sl.get()); } pushSlider(sl, fromF(clamp(f0 + sign * (p - x0) / span, 0, 1))); },
       onRelease: () => { x0 = null; } });
   }
+  // 依實驗參數 P = [名稱, 最小, 最大, …] 線性換算的相對把手
+  const rg = (cv, sl, P, label, span, sign, vert) => relGrip(cv, sl, label, span, sign, v => fr(v, P), f => P[1] + f * (P[2] - P[1]), vert);
+  // 以場景存在 st[key] 的反算函式當 toValue（場景每格依目前幾何更新）
+  const ig = (cv, sl, st, key, label) => PL.ui.handle(cv, { slider: sl, label, toValue: (x, y) => st[key] ? st[key](x, y) : sl.get() });
+  // AP.thermometer 液柱頂端的位置與反算（球泡半徑 0.85w，液柱底在球心上方 0.4 個半徑）
+  const thY = (yT, yB, w, f) => { const b = yB - 1.19 * w; return yT + (b - yT) * (1 - clamp(f, 0, 1)); };
+  const thF = (yT, yB, w, y) => { const b = yB - 1.19 * w; return (b - y) / (b - yT); };
+  const lp = (P, f) => P[1] + clamp(f, 0, 1) * (P[2] - P[1]);
   // 線圈前半圈（ringCoil 的亮色那半）上的折線，讓電流光點沿線圈繞
   function coilFront(cx, cy, rx, ry, up) { const P = []; for (let i = 0; i <= 24; i++) { const ang = (up ? 1 : -1) * (Math.PI / 2 - Math.PI * i / 24); P.push([cx + Math.cos(ang) * rx, cy + Math.sin(ang) * ry]); } return P; }
 
@@ -173,6 +182,8 @@
     const gy0 = y0 + 36 * s, gy1 = y0 + ch - 34 * s, Y = T => gy1 - T / 200 * (gy1 - gy0);
     [[Tm, "金屬初溫", "#e0473c"], [Tw, "水初溫", "#2f7fd8"], [Te, "平衡溫度", "#46a36b"]].forEach((p, i) => {
       const x = x0 + cw * (0.2 + i * 0.3); AP.thermometer(ctx, x, gy0, gy1 + 10 * s, 12 * s, p[0] / 200);
+      // 前兩支是初溫：抓液柱頂上下拖就是設定金屬、水的初溫（平衡溫度是算出來的，不給拖）
+      if (i < 2) { stOf(k)["msh" + i] = (xx, y) => 200 * thF(gy0, gy1 + 10 * s, 12 * s, y); gripOf(k, i).place(x - 5 * s, Math.max(thY(gy0, gy1 + 10 * s, 12 * s, p[0] / 200), gy0 + 10)); }
       TX(ctx, PL.fmt(p[0], 1) + "°C", x, gy1 + 26 * s, 11, "center", p[2]); TX(ctx, p[1], x + 14 * s, Y(p[0]) + 4, 9.5, "left", null, 0);
     });
     TX(ctx, "金屬放熱 = 水吸熱：m金 c金 (T金 − T) = m水 c水 (T − T水)", W / 2, H - 12 * s, 11, "center");
@@ -192,6 +203,9 @@
     ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.fillRect(x0 + 4, ry - rh / 2 + 2, rl - 8, 2);
     ctx.fillStyle = isL() ? "rgb(176,132,84)" : "rgb(112,84,54)"; ctx.fillRect(x0 - 16 * s, benchY - 14 * s, 52 * s, 14 * s);
     AP.alcoholLamp(ctx, x0 + 10 * s, benchY - 14 * s, 1.1 * s, 0.35 + 0.65 * fr(dT, cfg.a));
+    // 酒精燈調火焰大小＝溫差；抓銅棒冷端左右拖＝換一根不同長度的棒
+    gripOf(k, 0).place(x0 + 10 * s, benchY - 30 * s); gripOf(k, 1).place(x1, ry);
+    stOf(k).hcL = x => lp(cfg.b, ((x - x0) / s - 130) / 440);
     const fss = clamp(1 - 35 / dT, 0, 1), tau = 0.6 + 3 * Math.pow(Lr / 2, 1.2), xm = fss * (1 - Math.exp(-(t % 12) / tau)), n = 7;
     for (let i = 0; i < n; i++) {
       const q = (i + 0.6) / (n + 0.2), x = x0 + q * rl, fallen = q < xm, drop = fallen ? Math.min(1, (xm - q) * 8) : 0;
@@ -230,11 +244,13 @@
     TX(ctx, "測站 A 的圓：半徑 = 震源距離 " + PL.fmt(d, 0) + " km", mx0 + mw / 2, my0 - 10 * s, 11, "center");
     const dx0 = W * 0.54, dw = W - dx0 - 16 * s, dy0 = 90 * s, dh = H * 0.5;
     AP.infoCard(ctx, dx0, dy0, dw, dh);
-    const Tm = niceCeil(dt * 1.8 + 10), X = tm => dx0 + 14 * s + tm / Tm * (dw - 28 * s), cyM = dy0 + dh * 0.5, tP = Tm * 0.15, now = (t * Tm / 6) % (Tm * 1.1);
+    // 拖 S 波到時標記時先鎖住時間軸刻度（st.seisTm），否則刻度一跳，標記就不在游標下
+    const st = stOf(k), Tm = st.seisTm || niceCeil(dt * 1.8 + 10), X = tm => dx0 + 14 * s + tm / Tm * (dw - 28 * s), cyM = dy0 + dh * 0.5, tP = Tm * 0.15, now = (t * Tm / 6) % (Tm * 1.1);
     ctx.save(); ctx.strokeStyle = PL.col("text"); ctx.lineWidth = 1.3; ctx.beginPath();
     for (let i = 0; i <= 420; i++) { const tm = Tm * i / 420; if (tm > now) break; let y = Math.sin(tm * 37) * 1.2 * s; if (tm > tP) y += Math.sin((tm - tP) * 9) * 10 * s * Math.exp(-(tm - tP) / 12); if (tm > tP + dt) y += Math.sin((tm - tP - dt) * 5) * 30 * s * Math.exp(-(tm - tP - dt) / 18); i ? ctx.lineTo(X(tm), cyM + y) : ctx.moveTo(X(tm), cyM + y); }
     ctx.stroke(); ctx.restore();
     D.line(ctx, X(tP), dy0 + 20 * s, X(tP), dy0 + dh - 20 * s, "#2f7fd8", 1.2, [4, 3]); D.line(ctx, X(tP + dt), dy0 + 20 * s, X(tP + dt), dy0 + dh - 20 * s, "#e0473c", 1.2, [4, 3]);
+    st.seis = { Tm, X0: dx0 + 14 * s, k: (dw - 28 * s) / Tm, tP }; gripOf(k, 0).place(X(tP + dt), dy0 + dh * 0.72);
     TX(ctx, "P 波到", X(tP) + 4 * s, dy0 + 30 * s, 10, "left", "#2f7fd8"); TX(ctx, "S 波到", X(tP + dt) + 4 * s, dy0 + 30 * s, 10, "left", "#e0473c");
     D.arrow(ctx, X(tP), dy0 + dh - 26 * s, X(tP + dt), dy0 + dh - 26 * s, { color: PL.col("text-dim"), width: 1.4, head: 5 });
     TX(ctx, "到時差 " + PL.fmt(dt, 0) + " s", (X(tP) + X(tP + dt)) / 2, dy0 + dh - 32 * s, 10.5, "center");
@@ -264,6 +280,9 @@
     AP.cord(ctx, px + pr, py, px + pr, benchY + 60 * s);
     for (let i = 0; i < nd; i++) AP.weight(ctx, px + pr, benchY + 64 * s + i * 6 * s, 30 * s, 5.5 * s, null);
     TX(ctx, "張力 T = " + PL.fmt(T, 0) + " N", px - 10 * s, benchY + 80 * s, 10.5, "right");
+    // 琴橋沿尺左右推＝弦長；砝碼串底端往下拉＝多掛幾片（每片 20 N）
+    gripOf(k, 0).place(xb, benchY - 12 * s); gripOf(k, 1).place(px + pr, benchY + 61 * s + T / 20 * 6 * s);
+    Object.assign(stOf(k), { shL: x => (x - xa) / ppm, shT: (x, y) => (y - benchY - 61 * s) / (6 * s) * 20 });
     const fv = 1.2, A = [18, 8, 5, 3.4].map(q => q * s);
     ctx.save(); ctx.strokeStyle = "rgb(226,214,176)"; ctx.lineWidth = 2; ctx.shadowColor = "rgba(255,240,200,0.4)"; ctx.shadowBlur = 4; ctx.beginPath();
     for (let i = 0; i <= 120; i++) { const u = i / 120, x = xa + u * (xb - xa); let y = 0; for (let n = 1; n <= 4; n++) y += A[n - 1] * Math.sin(n * Math.PI * u) * Math.cos(PL.TAU * fv * n * t * 0.5 + n); i ? ctx.lineTo(x, sy + y) : ctx.moveTo(x, sy + y); }
@@ -296,6 +315,9 @@
       if (rr > wx - sx && IL > 1) { const r2 = rr - (wx - sx); ctx.strokeStyle = `rgba(224,110,60,${(0.55 * (1 - a0) * Math.pow(10, -IL / 20)).toFixed(3)})`; ctx.beginPath(); ctx.arc(wx, gy - wh, r2, -1.2, 1.1); ctx.stroke(); } }
     ctx.restore();
     if (IL > 0.5) { const wg = ctx.createLinearGradient(wx, 0, wx + 12 * s, 0); wg.addColorStop(0, "rgb(150,160,170)"); wg.addColorStop(1, "rgb(110,118,128)"); ctx.fillStyle = wg; ctx.fillRect(wx, gy - wh, 12 * s, wh); ctx.strokeStyle = "rgba(40,44,52,0.5)"; ctx.lineWidth = 1; for (let y = gy - wh + 10 * s; y < gy; y += 12 * s) { ctx.beginPath(); ctx.moveTo(wx, y); ctx.lineTo(wx + 12 * s, y); ctx.stroke(); } noteC(ctx, "rgb(130,140,150)", wx, gy - wh, 12 * s, wh); }
+    // 住家沿對數刻度左右拖＝距離 r；隔音牆頂端上下拖＝牆高（隔音量）
+    gripOf(k, 0).place(hx + hwid / 2, gy - 22 * s); gripOf(k, 1).place(wx + 6 * s, gy - wh + 12 * s);
+    Object.assign(stOf(k), { nbR: x => 5 * Math.pow(32, (x - hwid / 2 - wx - 40 * s) / (W - wx - 110 * s)), nbI: (x, y) => lp(cfg.b, ((gy - y + 12 * s) / s - 8) / 104) });
     ctx.fillStyle = L ? "#f1e6d2" : "#3d3a36"; ctx.fillRect(hx, gy - 44 * s, hwid, 44 * s);
     AP.poly(ctx, [{ x: hx - 6 * s, y: gy - 44 * s }, { x: hx + hwid / 2, y: gy - 70 * s }, { x: hx + hwid + 6 * s, y: gy - 44 * s }], L ? "#b05a3e" : "#6a3024");
     ctx.fillStyle = L ? "rgb(120,160,200)" : "rgb(255,210,120)"; ctx.fillRect(hx + 8 * s, gy - 34 * s, 14 * s, 12 * s); ctx.fillRect(hx + hwid - 22 * s, gy - 34 * s, 14 * s, 12 * s);
@@ -548,6 +570,8 @@
     TX(ctx, "Cu²⁺ →", bx, wy + 30 * s, 10.5, "center", "#1f5fb0");
     TX(ctx, "正極：銅片（變薄）", ax, top - 70 * s, 10.5, "center", "#d0553a"); TX(ctx, "負極：鑰匙（鍍上銅）", cx + 30 * s, top - 50 * s, 10.5, "center");
     AP.lcd(ctx, W * 0.54, benchY - 32 * s, 100 * s, 24 * s, "t = " + PL.fmt(tt, 0) + " s", { color: "rgb(130,240,170)" });
+    const kn = knobAt(W * 0.7, benchY - 74 * s, 150 * s, 72 * s), kt = knobTip(kn, fr(I, cfg.a));
+    stOf(k).elI = (x, y) => lp(cfg.a, knobFrac(kn, x, y)); gripOf(k, 0).place(kt.x, kt.y); gripOf(k, 1).place(W * 0.54 + 104 * s, benchY - 20 * s);
     TX(ctx, "電量 Q = It = " + PL.fmt(I * tt, 0) + " C", W - 16 * s, 42 * s, 12, "right");
     TX(ctx, "m = QM / (2F)，M = 63.5 g/mol", W - 16 * s, 62 * s, 10.5, "right", PL.col("text-dim"), 0);
     label(ctx, 20, 18, "析出銅質量", PL.fmt(m, 1) + " mg", c);
@@ -620,6 +644,7 @@
     ctx.stroke(); ctx.restore();
     if (pos < tot) { const ri = r0 * Math.sqrt(kk + 1), a = (kk % 2 ? Math.PI / 2 : -Math.PI / 2) + ph, pr = (3 + 3 * Math.sqrt(mr)) * s; ctx.save(); ctx.shadowColor = "rgba(120,240,255,0.95)"; ctx.shadowBlur = 12; ctx.fillStyle = "rgb(180,250,255)"; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * ri, cy + Math.sin(a) * ri, pr, 0, PL.TAU); ctx.fill(); ctx.restore(); }
     else D.arrow(ctx, cx - gap, cy + Rm * 0.9, cx + Rm * 1.25, cy + Rm * 0.9, { color: "rgb(120,240,255)", width: 3, head: 9 });
+    gripOf(k, 0).place(cx - Rm * 0.72, cy + Rm * 0.72);
     const ps = AP.powerSupply(ctx, W * 0.72, H * 0.2, W * 0.24, 70 * s, PL.fmt(f, 1) + " MHz", { label: "高頻交流電源", color: "rgb(130,230,255)", knob: fr(f, [0, 0, 230]) });
     AP.cable(ctx, [ps.red, { x: ps.red.x, y: cy - Rm * 1.08 - 8 * s }, { x: cx + Rm * 0.4, y: cy - Rm * 1.08 - 8 * s }, { x: cx + Rm * 0.4, y: cy - Rm * 0.7 }], "rgb(186,54,48)", 2.4 * s, 2);
     AP.cable(ctx, [ps.black, { x: ps.black.x, y: cy - Rm * 1.08 - 16 * s }, { x: cx - Rm * 0.4, y: cy - Rm * 1.08 - 16 * s }, { x: cx - Rm * 0.4, y: cy - Rm * 0.7 }], "rgb(40,44,52)", 2.4 * s, 2);
@@ -638,6 +663,8 @@
     AP.ironCore(ctx, x1 - 80 * s, cy - 12 * s, x2 - x1 + 170 * s, 24 * s, 12 * s);
     AP.steel(ctx, x1 - 10 * s, cy + 12 * s, 8 * s, benchY - cy - 12 * s, 10); AP.steel(ctx, x2 + 50 * s, cy + 12 * s, 8 * s, benchY - cy - 12 * s, 10);
     AP.coilWinding(ctx, x1, cy, 90 * s, 30 * s, 9); AP.coilWinding(ctx, x2, cy, 70 * s, 30 * s, 7);
+    // 二次線圈沿鐵芯左右推：靠近一次線圈 M 變大（與 gp 的算法互為反函數）
+    gripOf(k, 0).place(x2, cy); stOf(k).miM = x => lp(cfg.b, 1 - ((x - x1 - 120 * s) / s - 14) / 150);
     const sp = (0.3 + 1.4 * fr(dI, cfg.a)), ph = Math.sin(t * sp * 2), dir = Math.cos(t * sp * 2) >= 0 ? 1 : -1;
     const rh = AP.rheostat(ctx, x1 - 40 * s, benchY, 150 * s, 0.5 + 0.42 * ph);
     const ps = AP.powerSupply(ctx, 16 * s, benchY - 170 * s, 120 * s, 64 * s, "6.0 V", { label: "一次電路" });
@@ -726,6 +753,9 @@
     const cs = (8 + 12 * (1 - fr(fc, cfg.b))) * s;
     ctx.fillStyle = "rgb(214,150,60)"; AP.rrPath(ctx, xC - cs * 0.7, (T + B) / 2 - cs, cs * 1.4, cs * 2, cs * 0.4); ctx.fill();
     TX(ctx, "R", xR, T - 14 * s, 10.5, "center"); TX(ctx, "C", xC + cs + 6 * s, (T + B) / 2 + 4, 10.5, "left");
+    // 訊號產生器旋鈕是對數刻度（10 Hz–20 kHz）；電容往上拖＝電容變大、截止頻率變低
+    const kn = knobAt(16 * s, benchY - 72 * s, 140 * s, 70 * s), kt = knobTip(kn, Math.log10(f / 10) / Math.log10(2000));
+    stOf(k).bdF = (x, y) => 10 * Math.pow(2000, knobFrac(kn, x, y)); gripOf(k, 0).place(kt.x, kt.y); gripOf(k, 1).place(xC, (T + B) / 2);
     AP.cable(ctx, [ps.red, { x: ps.red.x, y: T - 30 * s }, { x: bx + 8 * s, y: T }], "rgb(186,54,48)", 2.2 * s, 4);
     AP.cable(ctx, [ps.black, { x: ps.black.x + 8 * s, y: B + 30 * s }, { x: bx + 8 * s, y: B }], "rgb(40,44,52)", 2.2 * s, 4);
     const ox = W * 0.5, ow = W - ox - 16 * s, oh = Math.min(200 * s, benchY - 60 * s), oy = benchY - oh - 2;
@@ -817,6 +847,17 @@
     toValue: x => { const g = st.rc; return g ? (x - g.gx0) / (g.gx1 - g.gx0) * 10 : a.get(); } })];
   GRIPS["tangent-galvanometer"] = (cv, a, b, st, C) => [PL.ui.handle(cv, { slider: a, label: "電源旋鈕（線圈電流）",
     toValue: (x, y) => { const g = st.galv; return g ? lerpA(C, knobFrac(g.kn, x, y)) : a.get(); } })];
+  GRIPS["metal-specific-heat"] = (cv, a, b, st) => [ig(cv, a, st, "msh0", "金屬初溫溫度計（上下拖）"), ig(cv, b, st, "msh1", "水初溫溫度計（上下拖）")];
+  GRIPS["heat-conduction"] = (cv, a, b, st, C) => [rg(cv, a, C.a, "酒精燈（上下拖調火焰＝溫差）", 140, 1, true), ig(cv, b, st, "hcL", "銅棒冷端（左右拖換棒長）")];
+  GRIPS["seismic-triangulation"] = (cv, a, b, st) => [PL.ui.handle(cv, { slider: a, label: "S 波到時標記（左右拖）",
+    onGrab: () => { st.seisTm = st.seis && st.seis.Tm; }, onRelease: () => { st.seisTm = 0; },
+    toValue: x => { const g = st.seis; return g ? Math.min((x - g.X0) / g.k - g.tP, g.Tm * 0.85) : a.get(); } })];
+  GRIPS["string-harmonic-spectrum"] = (cv, a, b, st) => [ig(cv, a, st, "shL", "可動琴橋（左右拖改弦長）"), ig(cv, b, st, "shT", "砝碼（往下拉＝加砝碼、張力變大）")];
+  GRIPS["noise-barrier"] = (cv, a, b, st) => [ig(cv, a, st, "nbR", "住家（左右拖改距離）"), ig(cv, b, st, "nbI", "隔音牆（上下拖改高度）")];
+  GRIPS["electrolysis"] = (cv, a, b, st, C) => [ig(cv, a, st, "elI", "電源旋鈕（電流）"), rg(cv, b, C.b, "計時器（左右拖改通電時間）", 200, 1)];
+  GRIPS["bode-low-pass"] = (cv, a, b, st, C) => [ig(cv, a, st, "bdF", "訊號產生器旋鈕（頻率）"), rg(cv, b, C.b, "電容（往上拖＝電容變大、截止頻率變低）", 200, -1, true)];
+  GRIPS["cyclotron-frequency"] = (cv, a, b, st, C) => [rg(cv, a, C.a, "電磁鐵磁極（上下拖調磁場 B）", 140, 1, true)];
+  GRIPS["mutual-induction"] = (cv, a, b, st) => [ig(cv, b, st, "miM", "二次線圈（左右拖改兩線圈距離）")];
   GRIPS["biot-savart-axis"] = (cv, a, b, st) => [PL.ui.handle(cv, { slider: a, label: "霍爾探棒（沿軸線推拉）",
     toValue: x => { const g = st.biot; return g ? (x - g.cx) / g.ppm : a.get(); } })];
 

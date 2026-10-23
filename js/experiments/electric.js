@@ -4,6 +4,12 @@
   const PL = window.PhysicsLab, D = PL.draw, TAU = PL.TAU;
   const MC = () => PL.col("m-color", "#4db6ac");
   const POS = "#ff6b6b", NEG = "#5aa2ff";
+  // 相對拖曳：電源旋鈕、電子槍這類「位置不等於數值」的器材，拖多少就加減多少（horiz 為左右拖）
+  const relGrip = (s, k, label, horiz) => {
+    let st = null;
+    return { slider: s, label, onGrab: () => { st = null; }, onRelease: () => { st = null; },
+      toValue: (x, y) => { if (!st) st = { x, y, v: s.get() }; return st.v + (horiz ? x - st.x : st.y - y) * k; } };
+  };
 
   /* 庫侖定律 —— 絕緣架上的兩顆帶電金屬球，中間畫出電力線
    *
@@ -213,6 +219,11 @@
     });
 
     function onChange() { /* 參數改變時保持燒毀狀態，讓學生看到後果不會自動消失 */ }
+    // 實物圖上抓滑動變阻器的滑片左右推（串聯模式是兩顆固定電阻盒，沒有滑片可抓）；電池盒上下拖調電壓
+    let rhX = 0;
+    const gR = PL.ui.handle(cv, { slider: sR, label: "滑動變阻器滑片（左右推改 R）",
+      toValue: x => +sR.el.min + (x - rhX) / 80 * (sR.el.max - sR.el.min) });
+    const gV = PL.ui.handle(cv, relGrip(sV, 0.12, "電源（上下拖調電壓 V）"));
 
     /*
      * 電路計算
@@ -395,6 +406,9 @@
       }
 
       if (view === "schematic") drawSchematic(); else drawPhysical();
+      rhX = x1 - 40;
+      if (view === "physical" && wiring !== "series") gR.place(rhX + 80 * rFrac, by - 31); else gR.hide();
+      gV.place(x0, by);
 
       // 電子流：速度正比於電流，「電流大小」因此看得見（兩種檢視都保留）
       if (live && c.I > 0.001) {
@@ -909,6 +923,16 @@
       PL.apparatus.wire(ctx, [{ x: ax, y: ay }, { x: bx, y: by }], color === WIRECOLOR ? WIRECOLOR : color, (w || 2) + 1.2);
     }
 
+    /*
+     * 電阻長度 ∝ 阻值，所以抓電阻右端左右拉＝換一顆更大／更小的電阻；電池高度 ∝ 電壓，抓電池頂端上下拉。
+     * 兩顆電阻置中排列，toValue 依目前接法把「右端位置」反算回寬度 w = 26 + 3.4R。
+     */
+    let rg = null;
+    const wOf = r => 26 + r * 3.4, rOf = w => (w - 26) / 3.4;
+    const endW = (x, wo, sgn) => rg.series ? 2 * x - rg.W + sgn * (wo + 30) : x <= rg.W / 2 + wo / 2 ? x - rg.W / 2 + wo / 2 : 2 * (x - rg.W / 2);
+    const gR1 = PL.ui.handle(cv, { slider: sR1, label: "R₁ 右端（左右拉改阻值）", toValue: x => rOf(endW(x, wOf(sR2.get()), 1)) });
+    const gR2 = PL.ui.handle(cv, { slider: sR2, label: "R₂ 右端（左右拉改阻值）", toValue: x => rOf(endW(x, wOf(sR1.get()), -1)) });
+    const gV = PL.ui.handle(cv, { slider: sV, label: "電池（頂端上下拉改電壓）", toValue: (x, y) => (2 * (rg.mid - y) - 12) / 1.6 });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const AP = PL.apparatus;
@@ -923,6 +947,7 @@
       const bh = Math.max(26, 12 + V * 1.6), by = (top + cy) / 2 - bh / 2;
       WIRELINE(ctx, x0, top, x0, cy, WIRECOLOR, 2);
       AP.battery(ctx, x0 - 15, by, 30, bh);
+      rg = { W, series, mid: (top + cy) / 2 }; gV.place(x0, by);
       D.text(ctx, V + " V", x0 - 21, by + bh / 2 + 4, { color: PL.col("text"), size: 12, align: "right", weight: "700" });
       // 主線上的安培計（坐在下方導線上，兩個接孔就是導線的斷點）
       const amX = Math.round(W * 0.26), amY = cy - MH + 14;
@@ -946,6 +971,7 @@
           vlead(m[1], top, jk.black.x, low, jk.black); vlead(m[2], top, jk.red.x, low + 5, jk.red);
           meterAt(m[0], vy, m[3], "V");
         });
+        gR1.place(startX + w1, top); gR2.place(startX + w1 + 30 + w2, top);
         rBranch.set(Itot, 2);
         PL.ui.caption(cv, "串聯：兩顆電阻的電流點速度一模一樣——電流處處相同。電壓按電阻比例分配，兩顆伏特計的讀數加起來就是電池電壓。");
       } else {
@@ -964,6 +990,7 @@
         vlead(jx, yB, jk.black.x, low, jk.black); vlead(jx2, yB, jk.red.x, low + 5, jk.red);
         meterAt(W / 2, vy, V, "V");
         D.text(ctx, "伏特計（並聯）", W / 2 + MW / 2 + 8, vy + 14, { color: PL.col("text-dim"), size: 10 });
+        gR1.place(bx + w1, yA); gR2.place(bx + w2, yB);
         rBranch.set(i1, 2);
         PL.ui.caption(cv, "並聯：兩條支路的電壓一樣，但電阻小的那條電流點跑得明顯比較快。把 R₁ 拉到最小、R₂ 拉到最大，速度差距最清楚。");
       }
@@ -995,6 +1022,18 @@
     const rTau = PL.ui.readout(L.readouts, { label: "時間常數 τ=RC", unit: "s" });
     const rV = PL.ui.readout(L.readouts, { label: "電容電壓", unit: "×V₀" });
     const rI = PL.ui.readout(L.readouts, { label: "電流 I", unit: "×V₀/R" });
+    /*
+     * 單刀雙擲開關的閘刀：扳向「充電」或「放電」接點，等同按下對應的按鈕（從 t = 0 重新開始）。
+     * 極板右緣左右拉：極板面積 ∝ C。
+     */
+    let cg = null;
+    const gSw = PL.ui.handle(cv, { label: "開關閘刀（扳向充電／放電）",
+      onDrag: (x, y) => {
+        if (!cg) return;
+        const m = Math.hypot(x - cg.C.x, y - cg.C.y) < Math.hypot(x - cg.D.x, y - cg.D.y) ? "charge" : "discharge";
+        if (m !== mode) { mode = m; t = 0; anim.start(); draw(); }
+      } });
+    const gC = PL.ui.handle(cv, { slider: sC, label: "電容器極板（左右拉改面積 C）", toValue: x => (2 * (x - cg.xR) / cg.s - 44) / 66 * 200 });
     // 指針式電表：bipolar 為中心零點（−1..1），否則 0..1
     function gauge(ctx, cx, cy, r, val, label, bipolar) {
       const AP = PL.apparatus, w = r * 2.3, h = r * 1.9, x = cx - w / 2, y = cy - h / 2;
@@ -1063,6 +1102,7 @@
       PL.theme.note(ctx, "rgb(72,60,54)", xS - 64 * s, yT - 16 * s, 80 * s, 68 * s);
       [P, Cc, Dc].forEach(q => AP.brassDisc(ctx, q.x, q.y, 5 * s));
       const tip = charging ? Cc : Dc;
+      cg = { C: Cc, D: Dc, xR, s }; gSw.place(P.x + (tip.x - P.x) * 1.1, P.y + (tip.y - P.y) * 1.1); gC.place(xR + pw / 2, topPlate.y);
       ctx.save(); ctx.lineCap = "round";
       ctx.strokeStyle = "rgb(216,180,106)"; ctx.lineWidth = 5 * s; ctx.beginPath(); ctx.moveTo(P.x, P.y); ctx.lineTo(tip.x, tip.y); ctx.stroke();
       ctx.strokeStyle = "rgb(34,30,28)"; ctx.lineWidth = 8 * s; ctx.beginPath();
@@ -1228,9 +1268,18 @@
     PL.ui.note(L.controls, "板內水平等速、鉛直等加速，軌跡為拋物線——與拋體運動一模一樣。");
     const rY = PL.ui.readout(L.readouts, { label: "板內偏轉量", unit: "" });
     const rAng = PL.ui.readout(L.readouts, { label: "出射角", unit: "°" });
+    // 螢光屏上的亮點上下拖＝調偏轉電壓讓電子打到那裡；電子槍左右拖改加速（入射速度）
+    let edg = null;
+    const gSpot = PL.ui.handle(cv, { slider: sE, label: "螢光屏亮點（上下拖改偏轉電壓）", toValue: (x, y) => -(y - edg.cy) * edg.v * edg.v / edg.f });
+    const gGun = PL.ui.handle(cv, relGrip(sV, 0.05, "電子槍（左右拖改入射速度）", true));
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
-      const cy = H / 2 - 8, plateL = 128, plateR = W * 0.58, gap = 74, v = sV.get(), E = sE.get(), K = E / (v * v) * 0.9;
+      /*
+       * 修正：舊版 K = 0.9E/v²（px⁻¹）大了約三個數量級，預設值下電子一進板就撞上極板；
+       * 而且往 y 正向（下方的負極板）偏——電子帶負電，應偏向正極板。
+       * 改用板長歸一：出板偏轉 = 132·E/v² px（預設約 22 px，小於半板距 37 px），朝正極板（上方）。
+       */
+      const cy = H / 2 - 8, plateL = 128, plateR = W * 0.58, gap = 74, v = sV.get(), E = sE.get(), Lp = plateR - plateL, K = -132 * E / (v * v) / (Lp * Lp);
       const AP = PL.apparatus;
       AP.labRoom(ctx, W, H, cy + 150, {});
       [W * 0.22, W * 0.78].forEach(sx => { AP.steel(ctx, sx - 4, cy + 120, 8, 30, 8); AP.steel(ctx, sx - 22, cy + 146, 44, 6, -6); });
@@ -1272,21 +1321,26 @@
       ctx.strokeStyle = "rgba(120,200,150,0.5)"; ctx.lineWidth = 1; ctx.stroke();
       for (let yy = cy - 120; yy <= cy + 120; yy += 24) { D.line(ctx, scrX + 4, yy, scrX + 12, yy, "rgba(140,230,170,0.4)", 1); }
       D.text(ctx, "螢光屏", scrX + 8, cy - 140, { color: PL.col("text-faint"), size: 10, align: "center" });
-      const yR = K * (plateR - plateL) * (plateR - plateL), slope = 2 * K * (plateR - plateL);
+      const yR = K * Lp * Lp, slope = 2 * K * Lp, half = gap / 2 - 4;
+      // 撞上極板的位置（若有）：電子束停在那裡，不會穿過去打到螢光屏
+      const xHit = Math.abs(yR) > half ? plateL + Math.sqrt(half / Math.abs(K)) : Infinity;
+      const beamY = x => x <= plateR ? cy + K * (x - plateL) * (x - plateL) : cy + yR + slope * (x - plateR);
       // 電子束：亮綠螢光軌跡（外暈＋內芯）
       ctx.save(); ctx.lineCap = "round";
-      ctx.strokeStyle = "rgba(120,255,180,0.22)"; ctx.lineWidth = 7; ctx.beginPath();
-      for (let x = plateL; x <= scrX; x += 2) { let y = x <= plateR ? cy + K * (x - plateL) * (x - plateL) : cy + yR + slope * (x - plateR); if (y > cy + gap / 2 && x < plateR) { y = cy + gap / 2; } x === plateL ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke();
-      ctx.strokeStyle = "rgba(180,255,215,0.9)"; ctx.lineWidth = 2; ctx.beginPath();
-      for (let x = plateL; x <= scrX; x += 2) { let y = x <= plateR ? cy + K * (x - plateL) * (x - plateL) : cy + yR + slope * (x - plateR); if (y > cy + gap / 2 && x < plateR) { y = cy + gap / 2; } x === plateL ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke();
+      [["rgba(120,255,180,0.22)", 7], ["rgba(180,255,215,0.9)", 2]].forEach(([c, lw]) => {
+        ctx.strokeStyle = c; ctx.lineWidth = lw; ctx.beginPath();
+        for (let x = plateL; x <= Math.min(scrX, xHit); x += 2) x === plateL ? ctx.moveTo(x, beamY(x)) : ctx.lineTo(x, beamY(x));
+        ctx.stroke();
+      });
       ctx.restore();
       D.arrow(ctx, 34, cy, plateL - 4, cy, { color: "#fff", width: 2, label: "v" });
       const tt = (t * v * 26) % (scrX - plateL), xp = plateL + tt;
-      const yp = xp <= plateR ? cy + K * (xp - plateL) * (xp - plateL) : cy + yR + slope * (xp - plateR);
-      if (Math.abs(yp - cy) < gap / 2 || xp > plateR) D.disc(ctx, xp, yp, 6, { fill: "#5aa2ff", glow: "#5aa2ff", glowSize: 8 });
-      // 撞擊螢光點
-      const hitY = cy + yR + slope * (scrX - plateR);
-      if (Math.abs(hitY) < 130) {
+      if (xp < xHit) D.disc(ctx, xp, beamY(xp), 6, { fill: "#5aa2ff", glow: "#5aa2ff", glowSize: 8 });
+      // 撞擊螢光點（舊版這裡多加了一次 cy，亮點永遠不顯示）
+      const hitY = yR + slope * (scrX - plateR);
+      edg = { v, f: 132 * (1 + 2 * (scrX - plateR) / Lp), cy };
+      gSpot.place(scrX + 8, cy + PL.clamp(hitY, -122, 122)); gGun.place(gunX + 10, cy);
+      if (Math.abs(hitY) < 130 && xHit === Infinity) {
         ctx.fillStyle = "rgba(160,255,200,0.9)";
         ctx.beginPath(); ctx.arc(scrX + 8, cy + hitY, 3.4, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = "rgba(160,255,200,0.3)";

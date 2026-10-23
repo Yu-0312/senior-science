@@ -69,6 +69,13 @@
     PL.ui.section(L.controls, "元件參數");
     const sRheo = PL.ui.slider(L.controls, { label: "滑動變阻器", min: 0.5, max: 20, step: 0.5, value: 6, unit: "Ω", digits: 1, onInput: v => { rheoR = v; draw(); } });
     const sE = PL.ui.slider(L.controls, { label: "電池電動勢 E", min: 1.5, max: 9, step: 0.5, value: 6, unit: "V", digits: 1, onInput: draw });
+    /*
+     * 實物圖上滑動變阻器的滑片可以直接推。用相對拖曳：接線柱就在滑片附近，
+     * 點接線柱時會順帶抓起這個把手，相對拖曳在「只點不拖」時不改變阻值，接線照常。
+     */
+    let rst = null;
+    const grip = PL.ui.handle(cv, { slider: sRheo, label: "滑動變阻器滑片（左右推改阻值）",
+      onGrab: () => { rst = null; }, toValue: x => { if (!rst) rst = { x, v: sRheo.get() }; return rst.v + (x - rst.x) * 20 / (GEO.rheo.w - 12); } });
     PL.ui.note(L.controls, "點擊兩個接線柱（銅色小圓點）把它們接起來；再點一次已選的接線柱可取消。點擊閘刀開關本體可以開合。");
     const row = PL.ui.buttonRow(L.controls);
     PL.ui.button(row, "開關 S 開/合", () => { swClosed = !swClosed; draw(); });
@@ -238,6 +245,8 @@
       AP.bulb(ctx, GEO.bulb.cx, GEO.bulb.cy, GEO.bulb.r, bright);
       // 滑動變阻器
       AP.rheostat(ctx, GEO.rheo.cx, GEO.rheo.baseY, GEO.rheo.w, PL.clamp(rheoR / 20, 0, 1));
+      // 接線進行中（已選一個接線柱）先收起把手，免得蓋住「已選…」提示、也不會搶點擊
+      if (pending) grip.hide(); else grip.place(GEO.rheo.cx - GEO.rheo.w / 2 + 6 + (GEO.rheo.w - 12) * PL.clamp(rheoR / 20, 0, 1), GEO.rheo.baseY - 40);
       // 接線柱
       Object.entries(T).forEach(([id, p]) => {
         const sel = pending === id;
@@ -248,7 +257,7 @@
       });
       if (pending) {
         const p = T[pending];
-        D.text(ctx, p.x, p.y - 22, "已選 " + pending + "，點另一個接線柱", { color: PL.col("warn"), size: 10, align: "center", weight: "700" });
+        D.text(ctx, "已選 " + pending + "，點另一個接線柱", p.x, p.y - 22, { color: PL.col("warn"), size: 10, align: "center", weight: "700" });
       }
     }
     function drawSchematicSymbols(sol) {
@@ -267,9 +276,10 @@
       AP.circuitBoard(ctx, W, H, false);
 
       if (view === "schematic") {
+        grip.hide();
         drawWiresSchematic(sol);
         drawSchematicSymbols(sol);
-        D.text(ctx, 16, 22, "標準電路圖（符號擺在桌上那顆器材的位置）", { color: PL.col("text-faint"), size: 10.5 });
+        D.text(ctx, "標準電路圖（符號擺在桌上那顆器材的位置）", 16, 22, { color: PL.col("text-faint"), size: 10.5 });
       } else {
         drawWiresPhysical(sol);
         drawComponents(sol);

@@ -3,6 +3,12 @@
   "use strict";
   const PL = window.PhysicsLab, D = PL.draw, TAU = PL.TAU;
   const MC = () => PL.col("m-color", "#e57373");
+  // 相對拖曳：旋鈕、火焰這類沒有「位置＝數值」對應的東西，按下後上下（或左右）拖多少就加減多少
+  const relGrip = (s, k, label, horiz) => {
+    let st = null;
+    return { slider: s, label, onGrab: () => { st = null; }, onRelease: () => { st = null; },
+      toValue: (x, y) => { if (!st) st = { x, y, v: s.get() }; return st.v + (horiz ? x - st.x : st.y - y) * k; } };
+  };
 
   /* 浮力與阿基米德原理 */
   PL.register("buoyancy", { build(root) {
@@ -15,6 +21,17 @@
     const rState = PL.ui.readout(L.readouts, { label: "狀態" });
     const rSub = PL.ui.readout(L.readouts, { label: "沒入比例", unit: "%" });
     const rFb = PL.ui.readout(L.readouts, { label: "浮力 / 重力" });
+    // 抓木塊往下壓（或往上提）再放手：漂浮的會上下晃回平衡吃水線，下沉的會落回槽底
+    let push = 0, pushV = 0, held = false, geo = null;
+    const grip = PL.ui.handle(cv, { label: "物體（壓下或提起再放手）",
+      onDrag: (x, y) => { held = true; pushV = 0; push = PL.clamp(y - geo.grabY, geo.lo, geo.hi); draw(); },
+      onRelease: () => { held = false; if (!anim.running) anim.start(); } });
+    function settle(dt) {
+      if (held || !dt || !geo) return;
+      const fl = sObj.get() < sFl.get();
+      pushV += (fl ? -36 * push - 2.4 * pushV : 420 - 3 * pushV) * dt; push += pushV * dt;
+      if (!fl && push >= 0) { push = 0; pushV = 0; }
+    }
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const ro = sObj.get(), rf = sFl.get(), ratio = ro / rf, floats = ratio < 1;
@@ -28,6 +45,10 @@
       const sub = floats ? ratio : 1;
       let topY = floats ? surf - boxH * (1 - sub) + bob : surf - 0 + bob;
       if (!floats) topY = bottom - boxH; // 沉底
+      const rest = topY - bob;
+      geo = { grabY: rest + boxH - 12, lo: surf - boxH - 30 - rest, hi: bottom - boxH - rest };
+      push = PL.clamp(push, geo.lo, geo.hi); topY += push;
+      grip.place(cx, topY + boxH - 12);
       AP.woodBlock(ctx, cx, topY + boxH, boxW, boxH, 0);
       D.text(ctx, ro + "", cx, topY + boxH / 2 + 4, { color: "#2b1f10", size: 12, align: "center", weight: "700" });
       // 力向量
@@ -37,7 +58,7 @@
       D.arrow(ctx, midX + 26, wY, midX + 26, wY - 42 * (floats ? 1 : 1 / ratio), { color: PL.col("accent-2"), width: 2.4, label: "浮力" });
       rState.set(floats ? "漂浮" : "下沉"); rSub.set(sub * 100, 0); rFb.set(floats ? "平衡" : PL.fmt(1 / ratio, 2));
     }
-    const anim = PL.loop((dt, t) => { bob = Math.sin(t * 1.6) * 3; draw(); });
+    const anim = PL.loop((dt, t) => { bob = Math.sin(t * 1.6) * 3; settle(dt); draw(); });
     cv.onResize(draw); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
@@ -137,6 +158,9 @@
       let f = 1; if (t > c - band && t < c + band) { const u = (t - (c - band)) / (2 * band); f = 1 - (1 - narrow / wide) * Math.sin(Math.PI * u); }
       return wide * f;
     }
+    // 抓窄管下緣上下拖：管子捏得越細，收縮比越大、流速越快、壓力計水柱越低（上緣接著壓力計，所以抓下緣）
+    let midYg = 0;
+    const grip = PL.ui.handle(cv, { slider: sN, label: "窄管管壁（上下拖改收縮比）", toValue: (x, y) => 46 / Math.max(1, y - midYg) });
     for (let i = 0; i < 70; i++) parts.push({ x: Math.random(), y: Math.random() * 2 - 1 });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
@@ -171,6 +195,7 @@
       };
       gauge(0.12, "P₁ 高"); gauge(0.5, "P₂ 低"); gauge(0.88, "P₃");
       const v2 = v1 * A1 / shape(PW * 0.5, PW);
+      midYg = midY; grip.place(x0 + PW * 0.5, midY + shape(PW * 0.5, PW));
       rV2.set(v2, 2); rDp.set(0.5 * rho * (v2 * v2 - v1 * v1), 0);
     }
     const anim = PL.loop(dt => { if (dt) { const v1 = sV.get(); parts.forEach(p => { const PW = cv.W - 60; const h = shape(p.x * PW, PW); p.x += (v1 * 46 / h) * dt * 0.08; if (p.x > 1) { p.x = 0; p.y = Math.random() * 2 - 1; } }); } draw(); });
@@ -232,6 +257,11 @@
     const rPV = PL.ui.readout(L.readouts, { label: "P × V", unit: "" });
     const rVrms = PL.ui.readout(L.readouts, { label: "方均根速率", unit: "" });
     const rKE = PL.ui.readout(L.readouts, { label: "平均動能", unit: "" });
+
+    // 活塞左右推拉 → 體積；電熱板旋鈕上下拖 → 溫度
+    let gOx = 0, gBw = 1;
+    const gPiston = PL.ui.handle(cv, { slider: sPiston, label: "活塞（左右推拉改變體積）", toValue: x => (x - 7 - gOx) / gBw });
+    const gHeat = PL.ui.handle(cv, relGrip(sT, 5, "電熱板旋鈕（上下拖調溫度）"));
 
     const cc = PL.ui.chart(PL.ui.charts(root), {
       title: "分子速率分布",
@@ -350,6 +380,8 @@
       // 推桿末端的握把
       AP.brassDisc(ctx, W - pad, oy + boxH / 2, 8);
       D.text(ctx, "活塞", pistonPx + 7, oy - 10, { color: PL.col("text-dim"), size: 10.5, align: "center" });
+      gOx = ox; gBw = boxW; gPiston.place(pistonPx + 7, oy + boxH / 2);
+      gHeat.place(ox + boxW * 0.45 + 36, oy + boxH + 25);
 
       // 分子
       particles.forEach(p => {
@@ -556,6 +588,11 @@
     const rT2 = PL.ui.readout(L.readouts, { label: "物體2", unit: "°C" });
     function reset() { T1 = s1.get(); T2 = s2.get(); running = false; tRun = 0; }
     reset();
+    // 接觸前把兩支溫度計的液柱拉到想要的初溫（溫度計 0–100 °C 對應整支液柱）
+    let th1 = null, th2 = null;
+    const thermoT = (g, y) => g ? 100 * (1 - (y - g.top) / (g.bot - g.top)) : 0;
+    const g1 = PL.ui.handle(cv, { slider: s1, label: "物體1 溫度計（上下拖設初溫）", toValue: (x, y) => thermoT(th1, y) });
+    const g2 = PL.ui.handle(cv, { slider: s2, label: "物體2 溫度計（上下拖設初溫）", toValue: (x, y) => thermoT(th2, y) });
     const tcol = T => { const t = PL.clamp(T / 100, 0, 1); return `rgb(${Math.round(60 + 195 * t)},${Math.round(120 - 60 * t)},${Math.round(220 - 200 * t)})`; };
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
@@ -575,6 +612,11 @@
       // 溫度計插在水裡
       AP.thermometer(ctx, b1 - w1 * 0.22, benchY - bh - 58, benchY - 16, 11, PL.clamp(T1, 0, 100) / 100);
       AP.thermometer(ctx, b2 + w2 * 0.22, benchY - bh - 58, benchY - 16, 11, PL.clamp(T2, 0, 100) / 100);
+      // 液柱頂端位置：與 apparatus.thermometer 的算法一致（球泡半徑 0.85w）
+      const tTop = benchY - bh - 58, tBot = benchY - 16 - 11 * 0.85 * 1.4, colY = T => tBot - (tBot - tTop) * PL.clamp(T, 0, 100) / 100;
+      th1 = th2 = { top: tTop, bot: tBot };
+      if (running || tRun > 0) { g1.hide(); g2.hide(); }
+      else { g1.place(b1 - w1 * 0.22, colY(T1)); g2.place(b2 + w2 * 0.22, colY(T2)); }
       D.text(ctx, PL.fmt(T1, 0) + "°C", b1 + w1 * 0.08, benchY - bh * 0.4, { color: "#fff", size: 14, align: "center", weight: "700" });
       D.text(ctx, PL.fmt(T2, 0) + "°C", b2 - w2 * 0.08, benchY - bh * 0.4, { color: "#fff", size: 14, align: "center", weight: "700" });
       D.text(ctx, "物體1 " + m1 + " kg", b1, benchY + 16, { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
@@ -618,7 +660,10 @@
     PL.ui.note(L.controls, "ΔU = Q − W。等溫 ΔU=0；等容 W=0（ΔU=Q）；絕熱 Q=0（ΔU=−W）。");
     const rU = PL.ui.readout(L.readouts, { label: "內能變化 ΔU", unit: "J" });
     const rTrend = PL.ui.readout(L.readouts, { label: "溫度趨勢" });
-    let tt = 0;
+    let tt = 0, pg = null;
+    // 活塞高度直接對應作功 W（氣柱 = 0.45 缸高 + 0.5 px/J）；電熱板旋鈕上下拖改吸放熱 Q
+    const gW = PL.ui.handle(cv, { slider: sW, label: "活塞（上下拖：對外作功 W）", toValue: (x, y) => (pg.bot - y - pg.h0) / 0.5 });
+    const gQ = PL.ui.handle(cv, relGrip(sQ, 0.8, "電熱板旋鈕（上下拖：吸放熱 Q）"));
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const Q = sQ.get(), Wk = sW.get(), dU = Q - Wk, T = 300 + dU * 1.2;
@@ -637,6 +682,9 @@
         gas: "#" + [Math.round(120 + 110 * hue), Math.round(150 - 60 * hue), Math.round(220 - 150 * hue)].map(v => v.toString(16).padStart(2, "0")).join(""),
         rod: 18, weights: 2, particles: 34, t: tt * Math.sqrt(T / 300) * 1.6
       });
+      pg = { bot: cylBot, h0: cylH * 0.45 };
+      gW.place(cylX + cylW / 2, cylBot - gasH - 6);
+      gQ.place(cylX + cylW / 2 + (cylW + 30) * 0.3, benchY - 13);
       // 溫度計貼在汽缸旁：溫度 ∝ 內能
       AP.thermometer(ctx, cylX + cylW + 22, cylBot - cylH + 10, cylBot - 4, 12, PL.clamp((T - 150) / 300, 0, 1));
       D.text(ctx, PL.fmt(T, 0) + " K", cylX + cylW + 22, cylBot - cylH, { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
@@ -750,6 +798,9 @@
     ]);
 
     const thr = () => sFriction.get();
+    // 學生動手的兩件事：調酒精燈火焰（上下拖）、把塞子塞緊（往下壓）；塞子噴出後就不能再抓
+    const gLamp = PL.ui.handle(cv, relGrip(sHeat, 0.8, "酒精燈火焰（上下拖調加熱功率）"));
+    const gCork = PL.ui.handle(cv, relGrip(sFriction, -0.6, "塞子（往下壓塞緊）"));
     const stageName = s => ["待加熱", "加熱中：氣泡", "壓力升高", "膨脹做功：塞子射出", "白霧消散"][s] || "—";
 
     function draw() {
@@ -806,6 +857,8 @@
       ctx.restore();
 
       const lampX = tubeX + 14, lampY = baseY - 16;
+      gLamp.place(lampX, lampY - 22);
+      if (stage >= 3) gCork.hide(); else gCork.place(tubeX - 0.0998 * (tubeH + 14), tubeBot - 0.995 * (tubeH + 14));
       // 酒精燈：火焰大小跟著加熱功率
       AP.alcoholLamp(ctx, lampX, baseY + 6, 1.15, heat > 5 && stage < 3 ? heat / 100 : 0);
       D.text(ctx, "酒精燈", lampX, baseY + 24, { color: PL.col("text-faint"), size: 10, align: "center" });

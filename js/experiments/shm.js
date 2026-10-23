@@ -22,6 +22,11 @@
     const rV = PL.ui.readout(L.readouts, { label: "速度 v", unit: "m/s" });
     const rA = PL.ui.readout(L.readouts, { label: "加速度 a", unit: "m/s²" });
     const rF = PL.ui.readout(L.readouts, { label: "回復力 F", unit: "N" });
+    // 抓滑車左右拉開：離平衡多遠就是振幅 A，放手從靜止開始振（相位 0 或 π 看拉向哪邊）
+    let grabbed = false, geo = null;
+    const grip = PL.ui.handle(cv, { slider: sA, label: "滑車（左右拉開設定振幅，放手振動）",
+      toValue: px => { const d = (px - geo.eqX) / geo.sc; ph = d < 0 ? Math.PI : 0; if (!anim.running) setTimeout(draw); return Math.abs(d); },
+      onGrab: () => { grabbed = true; resetHist(); }, onRelease: () => { grabbed = false; resetHist(); if (!anim.running) anim.start(); } });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const m = sM.get(), k = sK.get(), A = sA.get(), w = Math.sqrt(k / m);
@@ -33,6 +38,7 @@
       const eqX = wallX + 62 + cartW / 2 + 2.5 * sc;
       cv.calibrate(sc, "m");      // 尺可直接量振幅與位移
       const mx = eqX + x * sc;
+      geo = { eqX, sc };
 
       // 場景：上半是實驗桌上的彈簧振子，下半是圖表
       AP.labStrip(ctx, W, 150, railY + 8, {});
@@ -51,6 +57,7 @@
       // 彈簧（端圈套進牆上螺栓、勾進車側眼環）與滑塊
       D.spring(ctx, post.x, ay, mx - cartW / 2 - 1, ay, 11, 11, MC());
       AP.cart(ctx, mx, railY, cartW, 34);
+      grip.place(mx, railY - 17);
 
       // 力與速度箭頭：以「目前設定的最大值」歸一，長度在情況之間可比較
       const fLen = A > 0 ? (F / (k * A)) * 62 : 0, vLen = A * w > 0 ? (v / (A * w)) * 62 : 0;
@@ -85,7 +92,7 @@
       } else rTm.set("測量中…");
     }
     const anim = PL.loop(dt => {
-      if (dt) {
+      if (dt && !grabbed) {
         t += dt;
         const m = sM.get(), k = sK.get(), A = sA.get(), w = Math.sqrt(k / m);
         ph += w * dt;
@@ -118,7 +125,17 @@
     const sTh = PL.ui.slider(L.controls, { label: "初始角 θ₀", min: 2, max: 18, step: 1, value: 12, unit: "°", digits: 0 });
     const rT = PL.ui.readout(L.readouts, { label: "週期 T", unit: "s" });
     const rTh = PL.ui.readout(L.readouts, { label: "當前角度", unit: "°" });
-    PL.ui.note(L.controls, "小角度下週期只與擺長、重力有關，與擺錘質量、振幅無關。");
+    PL.ui.note(L.controls, "小角度下週期只與擺長、重力有關，與擺錘質量、振幅無關。也可以直接把擺錘拉開再放手。");
+    // 抓擺錘繞懸點拉開 → 初始角 θ₀；拉住時時間停住，放手從該側靜止開始擺
+    let grabbed = false, piv = null;
+    const grip = PL.ui.handle(cv, { slider: sTh, label: "擺錘（拉開角度，放手擺動）",
+      toValue: (x, y) => {
+        const a = Math.atan2(x - piv.x, y - piv.y);
+        t = a < 0 ? Math.PI / Math.sqrt(sG.get() / sL.get()) : 0;
+        if (!anim.running) setTimeout(draw);
+        return Math.abs(a) * 180 / Math.PI;
+      },
+      onGrab: () => { grabbed = true; }, onRelease: () => { grabbed = false; if (!anim.running) anim.start(); } });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const Lm = sL.get(), g = sG.get(), th0 = sTh.get() * Math.PI / 180, w = Math.sqrt(g / Lm);
@@ -137,12 +154,13 @@
       D.line(ctx, px, py, px, py + Lpx, PL.theme.pale(0.18), 1, [4, 4]);
       A.cord(ctx, px, py, bx, by);
       A.bob(ctx, bx, by, 17);
+      piv = { x: px, y: py }; grip.place(bx, by);
       /* 重力箭頭長度 ∝ g：月球、地球、木星上同一個擺，拉的力不一樣 */
       D.arrow(ctx, bx, by + 18, bx, by + 18 + g * 3.2, { color: PL.col("danger"), width: 2.2, label: "mg" });
       D.text(ctx, g < 2.5 ? "像在月球上" : g < 5 ? "像在火星上" : g < 11 ? "地球表面" : "像在木星附近", W - 20, 34, { color: PL.col("text"), size: 12, align: "right", weight: "700" });
       rT.set(TAU / w, 2); rTh.set(th * 180 / Math.PI, 1);
     }
-    const anim = PL.loop(dt => { if (dt) t += dt; draw(); });
+    const anim = PL.loop(dt => { if (dt && !grabbed) t += dt; draw(); });
     cv.onResize(draw); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
@@ -158,6 +176,11 @@
     const rE = PL.ui.readout(L.readouts, { label: "總能 E", unit: "J" });
     const rK = PL.ui.readout(L.readouts, { label: "動能 K", unit: "J" });
     const rU = PL.ui.readout(L.readouts, { label: "位能 U", unit: "J" });
+    // 抓滑車拉離平衡：拉多遠就是振幅 A（總能 ½kA² 跟著變），放手從端點開始振
+    let grabbed = false, geo = null;
+    const grip = PL.ui.handle(cv, { slider: sA, label: "滑車（拉開設定振幅，放手振動）",
+      toValue: px => { const d = (px - geo.eqX) / geo.sc; t = d < 0 ? Math.PI / Math.sqrt(sK.get()) : 0; if (!anim.running) setTimeout(draw); return Math.abs(d); },
+      onGrab: () => { grabbed = true; }, onRelease: () => { grabbed = false; if (!anim.running) anim.start(); } });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const A = sA.get(), k = sK.get(), w = Math.sqrt(k / 1), x = A * Math.cos(w * t);
@@ -167,7 +190,7 @@
        * sc 以滑桿上限為準的固定比例尺：振幅變大，振子真的跑更遠。
        * 能量圖的座標軸同樣固定，兩根滑桿的作用都看得出來。
        */
-      const A_MAX = 0.5, K_MAX = 60;
+      const A_MAX = 2, K_MAX = 40;
       const AP = PL.apparatus;
       const midY = 58, sc = (W - 120) / (2 * A_MAX), eqX = W / 2, mx = eqX + x * sc;
       const cartW = 42, railY = midY + 27;
@@ -181,6 +204,7 @@
       D.line(ctx, eqX + A * sc, midY - 42, eqX + A * sc, railY + 6, "rgba(255,255,255,0.13)", 1, [4, 4]);
       D.spring(ctx, postE.x, midY, mx - cartW / 2 - 1, midY, 10, 10, MC());
       AP.cart(ctx, mx, railY, cartW, 32);
+      geo = { eqX, sc }; grip.place(mx, railY - 16);
       // 能量對位置 圖
       const bx = 40, by = 120, bw = W - 80, bh = H - by - 16;
       const E_MAX = 0.5 * K_MAX * A_MAX * A_MAX;
@@ -193,7 +217,7 @@
       g.dot(x, U, { color: MC(), glow: MC() }); g.dot(x, K, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
       rE.set(E, 1); rK.set(K, 1); rU.set(U, 1);
     }
-    const anim = PL.loop(dt => { if (dt) t += dt; draw(); });
+    const anim = PL.loop(dt => { if (dt && !grabbed) t += dt; draw(); });
     cv.onResize(draw); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
@@ -208,6 +232,9 @@
     PL.ui.note(L.controls, "當驅動頻率接近自然頻率 f₀＝1 Hz 時，振幅出現尖峰；阻尼越小峰越高。");
     const rAmp = PL.ui.readout(L.readouts, { label: "穩態振幅", unit: "" });
     const rF0 = PL.ui.readout(L.readouts, { label: "自然頻率 f₀", unit: "Hz" });
+    // 沒有實體旋鈕可抓：讓學生沿共振曲線左右拖工作點來改驅動頻率，振子振幅即時跟著變
+    let gX = null;
+    const grip = PL.ui.handle(cv, { slider: sF, label: "工作點（沿曲線拖改驅動頻率 f）", toValue: x => gX(x) });
     const amp = wd => 1 / Math.sqrt((w0 * w0 - wd * wd) ** 2 + (sD.get() * wd) ** 2) * (w0 * w0);
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
@@ -238,6 +265,7 @@
       g.vline(1.0, { color: "rgba(255,255,255,0.25)", dash: [3, 3], width: 1 });
       g.label(1.02, amax, "f₀", { color: PL.col("text-dim"), size: 10 });
       g.dot(sF.get(), A, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+      gX = x => 0.2 + (x - bx) / bw * 1.8; grip.place(g.X(sF.get()), g.Y(A));
       rAmp.set(A, 2); rF0.set(1.0, 2);
     }
     const anim = PL.loop(dt => { if (dt) t += dt; draw(); });

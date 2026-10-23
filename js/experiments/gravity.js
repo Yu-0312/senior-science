@@ -17,6 +17,8 @@
     const rV = PL.ui.readout(L.readouts, { label: "線速率 v=ωr", unit: "m/s" });
     const rA = PL.ui.readout(L.readouts, { label: "向心加速度", unit: "m/s²" });
     const rT = PL.ui.readout(L.readouts, { label: "週期 T", unit: "s" });
+    // 抓鋼珠往外／往內拖＝改它黏在盤上的半徑（只看離軸心的距離，轉盤照轉）
+    const grip = PL.ui.handle(cv, { slider: sR, label: "鋼珠（往外拖加大半徑 r）", toValue: (x, y) => (Math.hypot(x - cv.W / 2, y - cv.H / 2) - 34) / (Math.min(cv.W, cv.H) * 0.3) * 5 });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const A = AP();
@@ -39,6 +41,7 @@
       D.arrow(ctx, bx, by, bx - vl * Math.sin(ang), by + vl * Math.cos(ang), { color: PL.col("accent-2"), width: 2.4, label: "v" });
       D.arrow(ctx, bx, by, bx + (cx - bx) * al, by + (cy - by) * al, { color: PL.col("danger"), width: 2.4, label: "a_c" });
       A.sportBall ? A.sportBall(ctx, bx, by, 11, "steel") : D.disc(ctx, bx, by, 11, { fill: MC() });
+      grip.place(bx, by);
       rV.set(w * r, 2); rA.set(w * w * r, 2); rT.set(TAU / w, 2);
     }
     const anim = PL.loop(dt => { if (dt) ang += sW.get() * dt; draw(); });
@@ -71,6 +74,10 @@
     const rT = PL.ui.readout(L.readouts, { label: "週期 T", unit: "s" });
     const K = 0.26;                                  // 透視：水平圓看成橢圓的扁率
     const geo = () => { const W = cv.W, H = cv.H, Rmax = Math.min(W * 0.36, H * 0.56); return { W, H, cx: W * 0.44, ty: H * 0.3, Rmax, R: Rmax * sR.get() / 0.8 }; };
+    /* 抓管子下方的墊圈上下拉：繩子穿過玻璃管，下端往下拉、上面甩的那段就變短（半徑變小）。
+       墊圈高度 = 管口 + 24 + (Rmax − R)/2，反算回 r */
+    const grip = PL.ui.handle(cv, { slider: sR, label: "墊圈（上下拉繩改半徑 r）", toValue: (x, y) => {
+      const G = geo(); return (G.Rmax - 2 * (y - 10 - G.ty - 174)) / G.Rmax * 0.8; } });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const A = AP(), G = geo(), { cx, ty, R, Rmax } = G;
@@ -97,6 +104,7 @@
       const hy = tb + 24 + (Rmax - R) * 0.5 + drop;
       if (broken) A.cord(ctx, cx, hy - 50, cx, hy); else A.cord(ctx, cx, ty, cx, hy);
       if (!broken) { ctx.strokeStyle = "rgb(150,160,176)"; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.ellipse(cx, tb + 12, 3, 6, 0, 0, TAU); ctx.stroke(); }
+      if (broken) grip.hide(); else grip.place(cx, hy + 10);
       const n = PL.clamp(Math.round(Mg / 10), 1, 30);
       ctx.strokeStyle = "rgb(150,160,176)"; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(cx, hy + 3, 4, Math.PI * 1.1, Math.PI * 1.9 + Math.PI * 0.2); ctx.stroke();
       for (let i = 0; i < n; i++) {
@@ -155,6 +163,8 @@
     const rL = PL.ui.readout(L.readouts, { label: "角動量 L", unit: "（守恆）" });
     const rW = PL.ui.readout(L.readouts, { label: "角速度 ω", unit: "rad/s" });
     const rV = PL.ui.readout(L.readouts, { label: "線速率 v", unit: "m/s" });
+    // 抓小球往洞口拖＝把繩子往下拉、縮短半徑（R = 30 + 42r px）；球照轉，只看離洞口多遠
+    const grip = PL.ui.handle(cv, { slider: sR, label: "小球（往洞口拖＝拉繩縮短半徑）", toValue: (x, y) => (Math.hypot(x - cv.W / 2, y - cv.H / 2) - 30) / 42 });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const A = AP();
@@ -183,6 +193,7 @@
       D.arrow(ctx, cx, cy, cx + (bx - cx) * 0.4, cy + (by - cy) * 0.4, { color: PL.col("danger"), width: 2, label: "拉力" });
       const va = 18 + v * 6; D.arrow(ctx, bx, by, bx - va * Math.sin(ang), by + va * Math.cos(ang), { color: PL.col("accent-2"), width: 2, label: "v" });
       A.poolBall ? A.poolBall(ctx, bx, by, 12, "#2f6fd0", null) : D.disc(ctx, bx, by, 11, { fill: MC() });
+      grip.place(bx, by);
       D.text(ctx, "（繩子從中央的洞口往桌下拉）", cx, 30, { color: PL.col("text-dim"), size: 10.5, align: "center" });
       // 右下角側視小圖：桌面下的手把繩子往下拉，拉得越多半徑越小
       if (W >= 640 && A.infoCard) {
@@ -227,6 +238,13 @@
     const rI = PL.ui.readout(L.readouts, { label: "轉動慣量 I", unit: "kg·m²" });
     const rA = PL.ui.readout(L.readouts, { label: "角加速度 α", unit: "rad/s²" });
     const rW = PL.ui.readout(L.readouts, { label: "角速度 ω", unit: "rad/s" });
+    /* 兩個把手：配重所在的虛線圈（頂端）往外推＝加大 I（半徑 = R(0.28 + 0.62√((I−1)/9))，反算）；
+       力矩弧形箭頭的箭頭端沿弧拖＝改 τ（弧張角 = 0.12 + 1.1τ/12） */
+    const rg = () => ({ cx: cv.W / 2, cy: cv.H * 0.46, R: Math.min(cv.W, cv.H) * 0.32 });
+    const gI = PL.ui.handle(cv, { slider: sI, label: "配重（往外推加大轉動慣量 I）", toValue: (x, y) => {
+      const G = rg(), u = Math.max(0, (Math.hypot(x - G.cx, y - G.cy) / G.R - 0.28) / 0.62); return 1 + 9 * u * u; } });
+    const gTau = PL.ui.handle(cv, { slider: sTau, label: "外加力矩 τ（沿弧拖曳箭頭）", toValue: (x, y) => {
+      const G = rg(); return (Math.atan2(y - G.cy, x - G.cx) - 0.12) / 1.1 * 12; } });
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const cx = W / 2, cy = H * 0.46, R = Math.min(W, H) * 0.32;
@@ -244,6 +262,8 @@
       /* 力矩箭頭的弧長 ∝ τ；配重所在半徑畫成虛線圈，I 一變就看得到 */
       if (A.flywheel) D.ring(ctx, cx, cy, R * (0.28 + 0.62 * Math.sqrt((sI.get() - 1) / 9)), "rgba(255,210,110,0.55)", 1.4, [4, 4]);
       const tq = sTau.get(), span = 0.12 + 1.1 * tq / 12;
+      gI.place(cx, cy - R * (0.28 + 0.62 * Math.sqrt((sI.get() - 1) / 9)));
+      gTau.place(cx + (R + 16) * Math.cos(span), cy + (R + 16) * Math.sin(span));
       if (tq > 0) {
         ctx.save(); ctx.strokeStyle = PL.col("danger"); ctx.lineWidth = 2.4; ctx.beginPath(); ctx.arc(cx, cy, R + 16, -span, span); ctx.stroke(); ctx.restore();
         D.arrow(ctx, cx + (R + 16) * Math.cos(span), cy + (R + 16) * Math.sin(span), cx + (R + 16) * Math.cos(span + 0.16), cy + (R + 16) * Math.sin(span + 0.16), { color: PL.col("danger"), width: 2.4, label: "τ" });
@@ -277,6 +297,9 @@
     function reset() { beta = 0; dir = 1; mode = "circle"; drops = []; spin = 0; }
     reset();
     const speed2 = b => sV.get() * sV.get() - 2 * g * sR.get() * (1 - Math.cos(b));
+    // 開甩前（水桶在最低點、未播放）拖速度箭頭尖端改 v₀（7 px 代表 1 m/s）；甩動中收起
+    let vX0 = 0;
+    const grip = PL.ui.handle(cv, { slider: sV, label: "最低點速率 v₀（拖曳箭頭）", toValue: x => (x - vX0) / 7 });
     const geo = () => { const W = cv.W, H = cv.H; return { W, H, cx: W / 2, cy: H * 0.44, R: Math.min(W, H) * 0.29 }; };
     // 水桶：原點在提把頂端（繩子綁的地方），局部 +y 朝外（桶底方向）
     function bucket(ctx, x, y, ang, water) {
@@ -320,11 +343,13 @@
         D.arrow(ctx, bxm, bym, bxm, bym + 40, { color: PL.col("warn"), width: 2, label: "mg" });
         const vl = 12 + v * 7;
         D.arrow(ctx, bxm, bym, bxm + dir * Math.cos(beta) * vl, bym - dir * Math.sin(beta) * vl, { color: PL.col("accent-2"), width: 2, label: "v" });
+        vX0 = bxm + 12;
       } else {
         bucket(ctx, px, py, spin, 0.15);
         drops.forEach(d => D.disc(ctx, d.x, d.y, d.r, { fill: "rgba(70,160,235,0.85)" }));
         D.text(ctx, "頂點速率不夠：繩子鬆掉，水桶脫離圓周，水灑出來了！", cx, H - 30, { color: PL.col("danger"), size: 12, align: "center", weight: "700" });
       }
+      if (mode === "circle" && beta === 0 && !anim.running) grip.place(vX0 + sV.get() * 7, cy + R + 36); else grip.hide();
       rTop.set(vt2 > 0 ? Math.sqrt(vt2) : 0, 2); rT.set(m * sV.get() * sV.get() / r + m * g, 1); rMin.set(vmin, 2);
     }
     const anim = PL.loop(dt => {

@@ -63,6 +63,15 @@
   const mixRgb = (a, b, u) => { const A = hexC(a), B = hexC(b); return "rgb(" + A.map((q, i) => Math.round(q + (B[i] - q) * u)).join(",") + ")"; };
   const RT = (ctx, str, x, y, size, color, align, w) => { ctx.save(); ctx.fillStyle = color; ctx.font = (w === 0 ? "" : "700 ") + size + "px 'Segoe UI','PingFang TC','Microsoft JhengHei',system-ui,sans-serif"; ctx.textAlign = align || "center"; ctx.textBaseline = "alphabetic"; ctx.fillText(str, x, y); ctx.restore(); };
   const SC = {};
+  /* 把手共用：場景算出物件位置後 pin()（x 不是有限值就藏起來）；反算用的幾何量放在 st.g */
+  const pin = (st, i, x, y) => { const h = st.grips && st.grips[i]; if (h) h.place(x, y); };
+  const inv = (u, r) => r[1] + clamp(u, 0, 1) * (r[2] - r[1]);
+  const at = (cx, cy, r, a0, sp, f) => { const q = a0 + sp * clamp(f, 0, 1); return [cx + Math.cos(q) * r, cy + Math.sin(q) * r]; };
+  // (x, y) 繞 (cx, cy) 的角度 → 0–1（從 a0 順時針掃 sp；沒用到的角度從中間切開）
+  const ang = (cx, cy, x, y, a0, sp) => { const g = (TAU - sp) / 2; return (((Math.atan2(y - cy, x - cx) - a0 + g) % TAU + TAU) % TAU - g) / sp; };
+  const GA = 1.22 * Math.PI, GS = 0.56 * Math.PI;
+  // 指針式錶頭 AP.dial：轉軸在 (cx, cy + 0.22r)，指針尖端半徑 0.855r
+  const tip = (cx, cy, r, f) => at(cx, cy + r * 0.22, r * 0.855, GA, GS, f);
 
   /* 筆電螢幕上的小折線圖（固定深色底）：pts 為 [0..1, 0..1] */
   function screenPlot(ctx, scr, pts, o) {
@@ -101,7 +110,10 @@
     ctx.fillStyle = "rgb(40,44,52)"; AP.rrPath(ctx, snX - 16 * s, snY - 16 * s, 30 * s, 32 * s, 4 * s); ctx.fill();
     ctx.fillStyle = "rgb(214,180,90)"; ctx.beginPath(); ctx.arc(snX + 10 * s, snY, 11 * s, -Math.PI / 2, Math.PI / 2); ctx.fill();
     AP.cable(ctx, [{ x: snX - 16 * s, y: snY + 8 * s }, { x: scr.x + scr.w + 6 * s, y: tbTop - 6 * s }], "rgb(40,44,52)", 2 * s, 4);
-    const x0 = snX + 60 * s, pxPerM = (W - x0 - 40 * s) / 16, px = x0 + u * d * pxPerM;
+    const x0 = snX + 60 * s, pxPerM = (W - x0 - 40 * s) / 16, px = x0 + u * d * pxPerM, xd = x0 + d * pxPerM;
+    // 終點三角錐：同學要走到這裡，拖它改移動距離
+    ctx.fillStyle = "#e8573c"; ctx.beginPath(); ctx.moveTo(xd - 7 * s, floorY); ctx.lineTo(xd, floorY - 18 * s); ctx.lineTo(xd + 7 * s, floorY); ctx.fill();
+    k.st.g = { x0, p: pxPerM }; pin(k.st, 0, xd, floorY - 10 * s);
     for (let i = 0; i < 4; i++) { const rr = ((t * 160 * s + i * 40 * s) % Math.max(40 * s, px - snX)); ctx.strokeStyle = `rgba(255,190,80,${(0.5 * (1 - rr / Math.max(40 * s, px - snX))).toFixed(2)})`; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(snX + 12 * s, snY, rr, -0.35, 0.35); ctx.stroke(); }
     for (let m = 0; m <= 16; m += 4) { const x = x0 + m * pxPerM; ctx.fillStyle = "rgba(246,200,60,0.9)"; ctx.fillRect(x - 1.5 * s, floorY + 2, 3 * s, 12 * s); D.text(ctx, m + " m", x, floorY + 28 * s, { color: PL.col("text-dim"), size: 9.5, align: "center" }); }
     AP.person(ctx, px, floorY, 96 * s, { pose: u < 1 ? "walk" : "stand", phase: t * 7, shirt: "#e0843a", facing: 1 });
@@ -125,6 +137,9 @@
     else { const tb = Math.min(tau - tBrake, brakeT); x = P2 + vpx * (tb - tb * tb / (2 * brakeT)); }
     const carY = roadY + roadH * 0.78;
     ctx.fillStyle = "rgba(246,170,60,0.22)"; ctx.fillRect(P1 + cl / 2, roadY + 4 * s, P2 - P1, roadH - 8 * s);
+    // 車速表指針（踩油門）與反應區的右端（踩下煞車的位置）
+    k.st.g = { dx: W - 64 * s, dy: 95.5 * s, P1: P1 + cl / 2, v: vpx };
+    pin(k.st, 0, ...tip(W - 64 * s, 88 * s, 34 * s, vv / 40)); pin(k.st, 1, P2 + cl / 2, roadY + 16 * s);
     AP.dial(ctx, W - 64 * s, 88 * s, 34 * s, vv / 40, { max: 40, unit: "m/s", majors: 4 });
     const bx = P2 + vpx * brakeT / 2 + cl * 0.9, bph = clamp((tau - 0.2) / 0.8, 0, 1);
     if (tau > 0.2) { const by = roadY + roadH * (0.05 + 0.5 * bph) - Math.abs(Math.sin(bph * 9)) * 16 * s * (1 - bph); AP.sportBall(ctx, bx, by, 9 * s, "rubber", tau * 6); }
@@ -150,6 +165,7 @@
     const x0 = W * 0.12, x1 = W * 0.84, Lt = x1 - x0, xf = x0 + Lt / (1 + ratio);
     const ph = 96 * s, beamY = gy - ph * 0.44;
     const rk = 34 * s;
+    k.st.g = { L: Lt, x0 }; pin(k.st, 0, xf, beamY - 2 * s);   // 把墊在木桿下的石頭（支點）左右挪
     ctx.fillStyle = isL() ? "rgb(150,140,128)" : "rgb(80,76,70)";
     ctx.beginPath(); ctx.moveTo(xf - rk, gy); ctx.quadraticCurveTo(xf - rk * 0.6, beamY + 2, xf, beamY + 4); ctx.quadraticCurveTo(xf + rk * 0.6, beamY + 2, xf + rk, gy); ctx.closePath(); ctx.fill();
     const br = (18 + 42 * Math.sqrt(fr(load, cfg.a))) * s;
@@ -166,7 +182,7 @@
     D.arrow(ctx, xf, yb, x0, yb, { color: "#2f7fd8", width: 2, head: 7 }); D.arrow(ctx, xf, yb, x1, yb, { color: "#e0473c", width: 2, head: 7 });
     D.text(ctx, "抗力臂", (x0 + xf) / 2, yb + 16 * s, { color: "#2f7fd8", size: 11, align: "center", weight: "700" });
     D.text(ctx, "施力臂（" + PL.fmt(ratio, 1) + " 倍）", (xf + x1) / 2, yb + 16 * s, { color: "#e0473c", size: 11, align: "center", weight: "700" });
-    D.text(ctx, "支點", xf, beamY + 26 * s, { color: "#fff", size: 11, align: "center", weight: "700" });
+    D.text(ctx, "支點", xf, beamY + 36 * s, { color: "#fff", size: 11, align: "center", weight: "700" });
     D.text(ctx, "F × 施力臂 = 負載 × 抗力臂", W - 18 * s, 44 * s, { color: PL.col("text"), size: 12.5, align: "right", weight: "700" });
     label(ctx, 20, 18, "所需施力", PL.fmt(F, 0) + " N", c);
   };
@@ -181,7 +197,7 @@
     AP.ceilingBeam(ctx, 0, W, beamY, 26 * s);
     const topN = Math.ceil(n / 2), botN = Math.floor(n / 2), pr = 14 * s, sp = 2 * pr + 6 * s;
     const upY = beamY + 42 * s;
-    const lift = ((t % 4) / 4) * 30 * s, cw = (40 + 50 * Math.sqrt(fr(load, cfg.a))) * s;
+    const lift = k.st.pull != null ? k.st.pull : ((t % 4) / 4) * 30 * s, cw = (40 + 50 * Math.sqrt(fr(load, cfg.a))) * s;
     const loadTop = floorY - cw * 0.85 - 30 * s - lift, lowY = loadTop - 34 * s;
     AP.hookPlate(ctx, cx, beamY);
     AP.steel(ctx, cx - (topN * sp) / 2 - 4 * s, upY - pr - 8 * s, topN * sp + 8 * s, 6 * s, 10);
@@ -196,6 +212,7 @@
     AP.cord(ctx, cx, lowY + pr + 8 * s, cx, loadTop);
     AP.crate(ctx, cx, loadTop + cw * 0.85, cw, cw * 0.85, { label: PL.fmt(load, 0) + " N" });
     const freeX = cx + (topN * sp) / 2 + 40 * s, handY = floorY - 110 * s + n * lift * 0.6;
+    k.st.g = { h0: floorY - 110 * s, n, s }; pin(k.st, 0, freeX, handY);
     AP.cord(ctx, cx + (topN - 1) * sp / 2 + pr, upY, freeX, handY);
     AP.person(ctx, freeX + 22 * s, floorY, 100 * s, { shirt: "#46a36b", facing: -1, pose: "arms-up" });
     D.arrow(ctx, freeX - 20 * s, handY - 6 * s, freeX - 20 * s, handY - 6 * s + clamp(20 + F * 0.12, 20, 110) * s, { color: "#e0473c", width: 3, label: "F", lsize: 12 });
@@ -224,6 +241,8 @@
     ctx.fillStyle = L ? "#ffffff" : "#dde4ec";
     [-1, 1].forEach(sd => { ctx.beginPath(); ctx.ellipse(cx + sd * (fw / 2 + 10 * s), gy - 1, 12 * s, 4 * s + dp * 0.08, 0, Math.PI, 0); ctx.fill(); });
     const ph = (96 + 56 * fr(F, cfg.a)) * s, footY = gy + dp;
+    // 人越高大體重越大（上下拖頭）；鞋底寬度就是接觸面積（左右拖鞋緣）
+    k.st.g = { f: footY, s, cx }; pin(k.st, 0, cx, footY - ph * 0.93); pin(k.st, 1, cx + fw / 2, footY - 4 * s);
     AP.person(ctx, cx, footY, ph, { shirt: "#e0473c", facing: 1 });
     if (F > 700) { const bs = (0.18 + 0.16 * fr(F, [0, 700, 1400])) * ph; ctx.fillStyle = "rgb(62,100,150)"; AP.rrPath(ctx, cx - ph * 0.1 - bs * 0.62, footY - ph * 0.78, bs * 0.62, bs, 5); ctx.fill(); }
     const kind = A < 20 ? 0 : A < 150 ? 1 : 2;
@@ -314,6 +333,9 @@
     const thrusting = tau > t0 && tau < t0 + burn;
     if (thrusting) { for (let i = 0; i < 10; i++) { ctx.fillStyle = i % 2 ? "rgba(140,196,255,0.6)" : "rgba(220,240,255,0.7)"; ctx.beginPath(); ctx.ellipse(rx + (i % 3 - 1) * 3 * s, base + 10 * s + i * 8 * s * (0.6 + fr(Fth, cfg.a)), (3 + i * 2) * s, 5 * s, 0, 0, PL.TAU); ctx.fill(); } }
     const wl = clamp((m - 0.1) / 3.9, 0.08, 0.9) * (tau > t0 + burn ? 0.1 : 1);
+    // 打氣到多少壓力（轉錶針）、瓶裡裝多少水（拖水面）；水面把手只在發射前出現
+    k.st.g = { dx: rx + 140 * s, dy: gy - 51.16 * s, base, bh };
+    pin(k.st, 0, ...tip(rx + 140 * s, gy - 56 * s, 22 * s, fr(Fth, cfg.a))); pin(k.st, 1, rx, tau <= t0 ? base - bh * wl : NaN);
     const g = ctx.createLinearGradient(rx - bw, 0, rx + bw, 0);
     g.addColorStop(0, "rgba(160,200,235,0.8)"); g.addColorStop(0.3, "rgba(230,244,252,0.92)"); g.addColorStop(1, "rgba(140,180,215,0.8)");
     ctx.fillStyle = g; AP.rrPath(ctx, rx - bw, base - bh, bw * 2, bh, 10 * s); ctx.fill();
@@ -357,6 +379,8 @@
     AP.infoCard(ctx, 20 * s, 64 * s, cw, ch);
     const gx0 = 34 * s, gx1 = 20 * s + cw - 12 * s, gy0 = 84 * s, gy1 = 64 * s + ch - 14 * s;
     const Tax = 1.6, hmax = 250, pk = Math.min(1.05, F * Math.PI / 2 / hmax);
+    // 車在動，抓不住：改拖感測器 F–t 圖上撞擊脈衝的結束點
+    k.st.g = { x0: gx0, w: gx1 - gx0 }; pin(k.st, 0, gx0 + ts / Tax * (gx1 - gx0), gy1);
     ctx.strokeStyle = PL.theme.pale(0.4); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(gx0, gy0); ctx.lineTo(gx0, gy1); ctx.lineTo(gx1, gy1); ctx.stroke();
     ctx.strokeStyle = "#e0473c"; ctx.lineWidth = 2; ctx.beginPath();
     for (let i = 0; i <= 40; i++) { const tt = ts * i / 40, x = gx0 + tt / Tax * (gx1 - gx0), y = gy1 - pk * Math.sin(Math.PI * i / 40) * (gy1 - gy0); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
@@ -376,6 +400,8 @@
     const hA = 88 * s, hB = (68 + 36 * fr(mB, cfg.b)) * s, cx = W / 2;
     const k2 = 40 * s, tt = Math.max(0, tau - pushV), dA = vA * k2 * tt * (1 - tt / 8), dB = vB * k2 * tt * (1 - tt / 8);
     const xA = cx - 22 * s - dA, xB = cx + 22 * s + dB;
+    // B 越高大越重；推開滑走時藏起把手（只改初始條件）
+    k.st.g = { f: gy - 11 * s, s }; pin(k.st, 0, xB, !k.st.running || tau < pushV ? gy - 11 * s - hB * 0.93 : NaN);
     AP.skateboard(ctx, xA, gy, 60 * s, { color: "#e2574c" });
     AP.skateboard(ctx, xB, gy, 60 * s, { color: "#2f7fd8" });
     AP.person(ctx, xA, gy - 11 * s, hA, { shirt: "#e0843a", facing: 1, pose: tau < pushV ? "push" : "stand" });
@@ -413,6 +439,8 @@
     D.text(ctx, "能量流向（寬度 ∝ 能量）", x0 + 12 * s, y0 + 18 * s, { color: PL.col("text"), size: 11, weight: "700" });
     const wIn = (10 + 70 * E / 5000) * s, wU = wIn * eff / 100, wL = wIn - wU, ay = y0 + ch * 0.4;
     const ax0 = x0 + 20 * s, ax1 = x0 + cw * 0.45;
+    // 桑基圖：拖輸入帶下緣改輸入能量、拖光／熱分界改效率
+    k.st.g = { ay, s, top: ay - wIn / 2, w: wIn }; pin(k.st, 0, (ax0 + ax1) / 2, ay + wIn / 2); pin(k.st, 1, ax1 + cw * 0.2, ay - wIn / 2 + wU);
     ctx.fillStyle = "rgba(80,150,230,0.85)"; ctx.fillRect(ax0, ay - wIn / 2, ax1 - ax0, wIn);
     ctx.fillStyle = "rgba(246,200,60,0.9)"; ctx.fillRect(ax1, ay - wIn / 2, cw * 0.4, wU);
     ctx.beginPath(); ctx.moveTo(ax1 + cw * 0.4, ay - wIn / 2 - 6 * s); ctx.lineTo(ax1 + cw * 0.4 + 16 * s, ay - wIn / 2 + wU / 2); ctx.lineTo(ax1 + cw * 0.4, ay - wIn / 2 + wU + 6 * s); ctx.closePath(); ctx.fill();
@@ -467,6 +495,7 @@
     ctx.save(); ctx.strokeStyle = "rgb(88,92,100)"; ctx.lineWidth = 4 * s; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(dx, dy); ctx.lineTo(hx, hy); ctx.stroke(); ctx.restore();
     ctx.fillStyle = "rgb(150,104,58)"; ctx.beginPath(); ctx.arc(hx, hy, 4.5 * s, 0, PL.TAU); ctx.fill();
     const yl = wY - hOut * ppm;
+    k.st.g = { wY, ppm, loss }; pin(k.st, 0, wx, yl);   // 水桶最後停的高度 ↔ 輸入功
     ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = "#3fb86e"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(wx - sw / 2 - 18 * s, yl); ctx.lineTo(wx + sw / 2 + 62 * s, yl); ctx.stroke(); ctx.restore();
     TX(ctx, "有用功能把 15 kg 水桶提高 " + PL.fmt(hOut, 1) + " m", wx + sw / 2 + 66 * s, yl + 4, 11);
     const cw = Math.min(W * 0.42, 310 * s), ch = 84 * s, x0 = W - cw - 14 * s, y0 = 14 * s;
@@ -488,6 +517,7 @@
     const L = isL(), gy = H * 0.84, dX = W * 0.27, dh = (46 + 250 * fr(h, cfg.b)) * s, top = gy - dh, db = 26 * s + dh * 0.5;
     AP.outdoor(ctx, W, H, gy, { t, sunX: W * 0.5 });
     AP.water(ctx, 0, top + 10 * s, dX, gy - top - 4 * s, t);
+    k.st.g = { gy, s }; pin(k.st, 0, dX * 0.55, top + 10 * s);   // 水庫水面：拉高水位 = 加大落差
     AP.poly(ctx, [{ x: 0, y: top + 34 * s }, { x: dX * 0.42, y: gy + 2 }, { x: 0, y: gy + 2 }], L ? "#9c8a70" : "#3c342a");
     const dg = ctx.createLinearGradient(dX, 0, dX + db, 0);
     dg.addColorStop(0, L ? "#dcdad4" : "#6c6e72"); dg.addColorStop(1, L ? "#a6a49f" : "#46484c");
@@ -545,6 +575,7 @@
     const L = isL(), gy = H * 0.86, bx = W * 0.4;
     AP.outdoor(ctx, W, H, gy, { t: t * v / 3, hills: true, sunX: W * 0.64 });
     const hub = 1.3 * r + 2.5, ppm = (gy - 44 * s) / (hub + r + 0.6), hy = gy - hub * ppm, R = r * ppm;
+    k.st.g = { bx, G: gy - 44 * s }; pin(k.st, 0, bx + R, hy);   // 掃掠圓右緣 = 葉尖
     ctx.save(); ctx.strokeStyle = L ? "rgba(70,120,170,0.45)" : "rgba(200,220,255,0.3)"; ctx.lineWidth = 1.4;
     for (let i = 0; i < 16; i++) { const y = 20 * s + ((i * 37) % 16) / 16 * (gy - 40 * s), len = (14 + v * 2.4) * s, x = ((i * 173 + t * v * 16 * s) % (W + 120)) - 60; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len, y); ctx.stroke(); }
     ctx.restore();
@@ -590,6 +621,7 @@
     AP.labRoom(ctx, W, H, benchY, {});
     const cx = W * 0.33, rh = 70 * s, rodY = benchY - 74 * s, caseT = rodY - 128 * s;
     const dp = (16 + 128 * Math.sqrt(fr(d, cfg.b))) * s, rB = (5 + 17 * Math.cbrt(M / 120)) * s, x0 = cx - rh - 34 * s, x1 = cx + rh + 34 * s;
+    k.st.g = { x: cx + rh, s }; pin(k.st, 0, cx + rh + dp, rodY);   // 推近或拉遠大鉛球
     [cx - rh - dp, cx + rh + dp].forEach(x => {
       AP.steel(ctx, x - 3 * s, rodY + rB - 2, 6 * s, benchY - rodY - rB, 10); AP.steel(ctx, x - 16 * s, benchY - 5 * s, 32 * s, 5 * s, -6);
       const g = ctx.createRadialGradient(x - rB * 0.35, rodY - rB * 0.4, rB * 0.1, x, rodY, rB);
@@ -639,6 +671,8 @@
     const benchY = H * 0.9;
     AP.labRoom(ctx, W, H, benchY, {});
     const Lp = H * 0.5, px = W * 0.34, py = 24 * s + Lp / 2, dpx = d / 1.5 * Lp * 0.46, th = 0.28 * Math.cos(PL.TAU * t / Math.max(T, 0.45));
+    // 木板換一個孔掛上刀口：抓質心沿木板上下拖，改變 d（擺動中也能拖）
+    k.st.g = { px, py, th, L: Lp * 0.46 }; pin(k.st, 0, px + dpx * Math.sin(th), py + dpx * Math.cos(th));
     AP.standRod(ctx, px - 112 * s, benchY, py - 34 * s);
     AP.crossArm(ctx, px - 112 * s, py - 4 * s, px + 8 * s);
     ctx.save(); ctx.translate(px, py); ctx.rotate(-th);
@@ -684,7 +718,8 @@
     for (let dg = 0; dg < 360; dg += 15) { const a = dg * Math.PI / 180, r1 = RL + (dg % 45 ? 10 : 4) * s, r2 = RL + 16 * s; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r1, dcy + Math.sin(a) * r1 * ey); ctx.lineTo(cx + Math.cos(a) * r2, dcy + Math.sin(a) * r2 * ey); ctx.stroke(); }
     const P = (u, y0) => ({ x: cx + Math.cos(ph) * u, y: y0 + Math.sin(ph) * u * ey });
     ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = "rgba(224,71,60,0.7)"; ctx.lineWidth = 1.5; const s1 = P(RL, dcy), s2 = P(-RL, dcy); ctx.beginPath(); ctx.moveTo(s1.x, s1.y); ctx.lineTo(s2.x, s2.y); ctx.stroke(); ctx.restore();
-    const rm = RL * (0.28 + 0.66 * Math.sqrt(fr(I, cfg.a))), near = Math.sin(ph) > 0 ? 1 : -1;
+    const rm = RL * (0.28 + 0.66 * Math.sqrt(fr(I, cfg.a))), near = Math.sin(ph) > 0 ? 1 : -1, gp = P(rm, rodY);
+    k.st.g = { cx, y: rodY, ph, R: RL, e: ey }; pin(k.st, 0, gp.x, gp.y);   // 配重沿橫桿往外滑 → I 變大
     const mass = u => { const p = P(u, rodY), sc = 1 + 0.1 * Math.sin(ph) * Math.sign(u), mw = 18 * s * sc, mh = 22 * s * sc; AP.brass(ctx, p.x - mw / 2, p.y - mh / 2, mw, mh); ctx.fillStyle = "rgba(255,240,200,0.6)"; ctx.beginPath(); ctx.ellipse(p.x, p.y - mh / 2, mw / 2, mw * 0.18, 0, 0, PL.TAU); ctx.fill(); };
     mass(-rm * near);
     const e1 = P(RL, rodY), e2 = P(-RL, rodY);
@@ -712,13 +747,15 @@
     AP.crossArm(ctx, mx - 70 * s, my - 20 * s, mx - 20 * s);
     ctx.fillStyle = "rgb(60,66,78)"; AP.rrPath(ctx, mx - 44 * s, my - 18 * s, 30 * s, 36 * s, 4 * s); ctx.fill();
     ctx.fillStyle = "rgb(200,206,216)"; ctx.beginPath(); ctx.arc(mx, my, 16 * s, 0, PL.TAU); ctx.fill(); ctx.strokeStyle = "rgba(40,46,56,0.7)"; ctx.lineWidth = 1; ctx.stroke();
-    const pin = { x: mx + Math.cos(th) * Ad, y: my + Math.sin(th) * Ad };
+    const crank = { x: mx + Math.cos(th) * Ad, y: my + Math.sin(th) * Ad };
     const ys = my + Math.sin(th) * Ad;
     AP.steel(ctx, mx - 20 * s, ys - 2 * s, 40 * s, 4 * s, 8);
-    AP.brassDisc(ctx, pin.x, pin.y, 3.5 * s);
+    AP.brassDisc(ctx, crank.x, crank.y, 3.5 * s);
     AP.steel(ctx, mx - 2 * s, ys, 4 * s, 40 * s, 10);
     const yTop = ys + 40 * s, yEq = my + 160 * s, ym = yEq + Math.min(amp, 3) * Ad * Math.sin(th - phi);
     const mw = (22 + 26 * (1 - fr(f0, cfg.b))) * s, mh = mw * 0.72;
+    // 馬達調速：沿馬達左半圈轉（下慢上快）；重物左緣：拉大 = 換重的物體、f₀ 變低
+    k.st.g = { mx, my, s }; pin(k.st, 0, ...at(mx, my, 16 * s, 0.6 * Math.PI, 0.8 * Math.PI, fr(f, cfg.a))); pin(k.st, 1, mx - mw / 2, ym);
     ctx.save(); ctx.strokeStyle = "rgba(40,44,52,0.7)"; ctx.lineWidth = 3; ctx.beginPath();
     for (let i = 0; i <= 120; i++) { const u = i / 120, y = yTop + (ym - mh / 2 - 4 * s - yTop) * u, x = mx + Math.sin(u * 12 * PL.TAU) * 9 * s; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
     ctx.stroke(); ctx.strokeStyle = "rgb(190,198,210)"; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
@@ -754,6 +791,7 @@
     const cube = (x, yb, sd) => { const g = ctx.createLinearGradient(x - sd / 2, yb - sd, x + sd / 2, yb); g.addColorStop(0, mixRgb(mat[1], "#ffffff", 0.3)); g.addColorStop(1, mixRgb(mat[1], "#000000", 0.28)); ctx.fillStyle = g; ctx.fillRect(x - sd / 2, yb - sd, sd, sd); ctx.strokeStyle = "rgba(20,24,30,0.55)"; ctx.lineWidth = 1; ctx.strokeRect(x - sd / 2 + 0.5, yb - sd + 0.5, sd - 1, sd - 1); };
     const bx = W * 0.19, pan = AP.balance(ctx, bx, benchY, 160 * s, PL.fmt(m, 0) + " g");
     cube(bx, pan, side);
+    k.st.g = { bx, s }; pin(k.st, 0, bx + side / 2, pan - side / 2);   // 拉方塊右緣改體積
     TX(ctx, "① 秤質量", bx, pan - side - 12 * s, 11.5, "center");
     const tx0 = W * 0.42, tx1 = W - 24 * s, tTop = benchY - 236 * s, wTop = benchY - 196 * s, tb = benchY - 8 * s;
     ctx.fillStyle = PL.theme.isLight() ? "rgba(110,180,225,0.32)" : "rgba(60,130,180,0.4)"; ctx.fillRect(tx0, wTop, tx1 - tx0, tb - wTop);
@@ -823,7 +861,9 @@
     AP.poly(ctx, [{ x: mx0 + mw * 0.47, y: my0 + 21 * s }, { x: mx0 + mw * 0.55, y: my0 + 12 * s }, { x: mx0 + mw * 0.63, y: my0 + 21 * s }], "#fff");
     const u = alt / 5000, fx = mx0 + 10 * s + (mw * 0.55 - 10 * s) * u, fy = my0 + mh - 8 * s - (mh - 20 * s) * u;
     ctx.fillStyle = "#e0473c"; ctx.beginPath(); ctx.arc(fx, fy, 4 * s, 0, PL.TAU); ctx.fill();
-    TX(ctx, PL.fmt(alt, 0) + " m", fx + 8 * s, fy + 4, 9.5, "left", null);
+    // 登山的人沿山坡拖（海拔）；半球的拉環左右拖（大小）。標示往右移，避開把手
+    k.st.g = { cx, s, x0: mx0 + 10 * s, w: mw * 0.55 - 10 * s }; pin(k.st, 0, fx, fy); pin(k.st, 1, cx + R + 5 * s, cy);
+    TX(ctx, PL.fmt(alt, 0) + " m", fx + 20 * s, fy + 4, 9.5, "left", null);
     TX(ctx, "海拔 " + PL.fmt(alt, 0) + " m：大氣壓 p = " + PL.fmt(p, 1) + " kPa", W - 18 * s, 44 * s, 11.5, "right");
     TX(ctx, "壓力差合力 F = p × A = " + PL.fmt(F, 2) + " kN；每邊約需 " + need + " 匹馬（每匹約 0.75 kN）", W / 2, H - 14 * s, 11.5, "center");
     label(ctx, 20, 18, "壓差合力", PL.fmt(F, 2) + " kN", c);
@@ -963,6 +1003,12 @@
           } })
       ];
     },
+    // 抓繩子自由端往下拉：重物只升高繩端的 1/n；放手重物落回
+    "pulley-system": (cv, st, a, b, render) => {
+      st.grips = [PL.ui.handle(cv, { label: "繩端（往下拉，重物上升）",
+        onDrag: (x, y) => { const g = st.g; if (g) { st.pull = clamp((y - g.h0) / (g.n * 0.6), 0, 30 * g.s); render(); } },
+        onRelease: () => { st.pull = null; render(); } })];
+    },
     "surface-tension": (cv, st, a, b, render, play) => {
       st.grips = [
         PL.ui.handle(cv, { label: "管架（往上提出水面，放手插回去）",
@@ -970,6 +1016,41 @@
           onRelease: () => { st.lift = 0; st.hs = [0, 0, 0]; play(); } })
       ];
     }
+  };
+
+  /*
+   * 驅動滑桿的把手：id → [[0 = 第一根滑桿／1 = 第二根, 名稱, (x, y, g, cfg) → 滑桿值], …]
+   * g 是場景存在 st.g 的幾何量；順序對應場景裡 pin(st, i, …) 的 i。
+   */
+  const tall = (y, g, h0, dh, r) => inv(((g.f - y) / 0.93 / g.s - h0) / dh, r);   // 人越高越重：頭頂位置 → 體重
+  const SG = {
+    "motion-sensor": [[0, "終點標記（左右拖改變移動距離）", (x, y, g) => (x - g.x0) / g.p]],
+    "reaction-time": [[0, "車速表（轉指針改變車速）", (x, y, g) => 40 * ang(g.dx, g.dy, x, y, GA, GS)],
+      [1, "煞車點（左右拖改變反應時間）", (x, y, g) => (x - g.P1) / g.v]],
+    "lever-machine": [[1, "支點（左右拖改變力臂比）", (x, y, g) => g.L / Math.max(1, x - g.x0) - 1]],
+    "contact-pressure": [[0, "人（上下拖改變體重）", (x, y, g, c) => tall(y, g, 96, 56, c.a)],
+      [1, "鞋底邊緣（左右拖改變接觸面積）", (x, y, g, c) => inv(Math.pow(clamp((2 * (x - g.cx) / g.s - 10) / 96, 0, 1), 2), c.b)]],
+    "water-rocket": [[0, "壓力錶（轉指針改變推力）", (x, y, g, c) => inv(ang(g.dx, g.dy, x, y, GA, GS), c.a)],
+      [1, "瓶中的水（上下拖改變總質量）", (x, y, g) => 0.1 + 3.9 * (g.base - y) / g.bh]],
+    "crumple-zone": [[1, "撞擊脈衝終點（左右拖改變停止時間）", (x, y, g) => 1.6 * (x - g.x0) / g.w]],
+    "skateboard-push": [[1, "B 同學（上下拖改變體重）", (x, y, g, c) => tall(y, g, 68, 36, c.b)]],
+    "energy-forms": [[0, "輸入電能（上下拖改變粗細）", (x, y, g) => (2 * (y - g.ay) / g.s - 10) / 70 * 5000],
+      [1, "光／熱分界（上下拖改變效率）", (x, y, g) => (y - g.top) / g.w * 100]],
+    "simple-machine-efficiency": [[0, "水桶到達高度（上下拖改變輸入功）", (x, y, g) => (g.wY - y) / g.ppm * 147 / (1 - g.loss / 100)]],
+    "hydroelectric-power": [[1, "水庫水位（上下拖改變落差）", (x, y, g, c) => inv(((g.gy - y) / g.s + 10 - 46) / 250, c.b)]],
+    // R = r·G/(2.3r + 3.1)（畫面隨葉片自動縮放）的反函數
+    "wind-turbine": [[0, "葉尖（左右拖改變葉片半徑）", (x, y, g) => { const u = Math.min(0.4345, (x - g.bx) / g.G); return 3.1 * u / (1 - 2.3 * u); }]],
+    "cavendish-balance": [[1, "大鉛球（左右拖改變球心距離）", (x, y, g, c) => inv(Math.pow(clamp(((x - g.x) / g.s - 16) / 128, 0, 1), 2), c.b)]],
+    "physical-pendulum": [[1, "木板質心（上下拖改變 d）", (x, y, g) => ((x - g.px) * Math.sin(g.th) + (y - g.py) * Math.cos(g.th)) / g.L * 1.5]],
+    "torsion-pendulum": [[0, "配重（沿橫桿拖改變轉動慣量）", (x, y, g, c) => {
+      const u = Math.abs((x - g.cx) * Math.cos(g.ph) + (y - g.y) / g.e * Math.sin(g.ph));
+      return inv(Math.pow(clamp((u / g.R - 0.28) / 0.66, 0, 1), 2), c.a);
+    }]],
+    "resonance-phase-lag": [[0, "馬達調速（繞馬達轉，往上加快）", (x, y, g, c) => inv(ang(g.mx, g.my, x, y, 0.6 * Math.PI, 0.8 * Math.PI), c.a)],
+      [1, "重物（左右拖改變大小，越重 f₀ 越低）", (x, y, g, c) => inv(1 - (2 * (g.mx - x) / g.s - 22) / 26, c.b)]],
+    "density-lab": [[1, "方塊（左右拖改變體積）", (x, y, g) => Math.pow(Math.max(0, 2 * (x - g.bx)) / (7.2 * g.s), 3)]],
+    "atmospheric-pressure": [[0, "登山位置（沿山坡拖改變海拔）", (x, y, g) => 5000 * (x - g.x0) / g.w],
+      [1, "半球拉環（左右拖改變大小）", (x, y, g) => { const q = Math.max(0, ((x - g.cx) / g.s - 19) / 56 * 0.22 + 0.056); return Math.PI * q * q; }]]
   };
 
   Object.keys(LABS).forEach(id => { LABS[id].id = id; });
@@ -994,6 +1075,7 @@
       let elapsed = 0;
       const st = { dt: 0, running: false, fresh: true };
       if (GRIPS[id]) GRIPS[id](cv, st, a, b, () => render(), () => { if (animation && !animation.running) animation.start(); });
+      if (SG[id]) st.grips = SG[id].map(([k, label, f]) => PL.ui.handle(cv, { slider: k ? b : a, label, toValue: (x, y) => st.g && f(x, y, st.g, config) }));
       function render(dt) {
         const av = a.get(), bv = b.get(), result = config.calc(av, bv);
         st.dt = dt > 0 ? dt : 0; st.running = !!(animation && animation.running);

@@ -47,6 +47,7 @@ function loadCurriculum() {
     "js/extension-registry.js",
     "js/open-curriculum.js",
     "js/school-curriculum.js",
+    "js/exam-curriculum.js",
     "js/question-bank.js"
   ];
   for (const file of files) {
