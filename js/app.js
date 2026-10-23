@@ -271,7 +271,12 @@
     if (PL.apparatus) return Promise.resolve(true);
     if (!apparatusPromise) {
       const build = (window.PhysicsLabSite && window.PhysicsLabSite.build) || "";
-      apparatusPromise = loadScript("js/sim-apparatus.js" + (build ? "?v=" + build : ""))
+      /*
+       * 觀察點引擎（sim-observe.js）也跟著器材層一起載：它只在實驗建置時才有事做，
+       * 而且一定要在第一個實驗建置「之前」掛上鉤子——器材層剛好也是建置前必等的那一步。
+       */
+      const v = build ? "?v=" + build : "";
+      apparatusPromise = Promise.all([loadScript("js/sim-apparatus.js" + v), loadScript("js/sim-observe.js" + v).catch(err => { console.warn(err); })])
         .then(() => true)
         .catch(err => { console.error(err); apparatusPromise = null; return false; });
     }
@@ -1115,7 +1120,85 @@
     // 有隨機計算題的實驗，把它接在選擇題後面當作最後一題
     renderNumericQuestion(root, f, questions.length);
     typeset(root);
+    updateFinish();
   }
+
+  /* ------------------------------- 實驗進度：觀察點 → 完成實驗 -------------------------------
+   * 實驗中由 sim-observe.js 在兩個階段彈出觀察題（播放時、改變參數後），
+   * 這裡把進度畫在教材欄的「實驗進度」清單，全部觀察完再引導到最下方的總結題。
+   */
+  const OBS = { id: null, stages: [], done: {}, nudged: false };
+  const OBS_TEXT = {
+    play: ["播放並觀察", "按播放看實驗跑起來；跑到一個段落會停下來問你看到什麼"],
+    param: ["改變一個參數", "暫停時把一根滑桿調一段，放手後會問你哪個讀數變了"]
+  };
+  function finishStats() {
+    const root = $("#practice-list");
+    const items = root ? Array.from(root.querySelectorAll(".practice-status")) : [];
+    return { right: items.filter(n => n.textContent === "答對").length, total: items.length };
+  }
+  function updateFinish() {
+    const st = finishStats();
+    const c = $("#finish-count"); if (c) c.textContent = st.right + " / " + st.total;
+    const card = $("#finish-card"); if (card) card.classList.toggle("is-complete", st.total > 0 && st.right === st.total);
+    renderObserveTrack();
+  }
+  function renderObserveTrack() {
+    const list = $("#observe-steps");
+    if (!list) return;
+    list.innerHTML = "";
+    const steps = OBS.stages.map(k => ({ key: k, title: OBS_TEXT[k][0], desc: OBS_TEXT[k][1], state: OBS.done[k] || "" }));
+    const st = finishStats();
+    steps.push({ key: "finish", title: "完成總結題", desc: st.total ? st.right + " / " + st.total + " 題答對" : "載入中…",
+      state: st.total && st.right === st.total ? "right" : "" });
+    steps.forEach((s, i) => {
+      const li = el("li", "observe-step" + (s.state ? " is-" + s.state : ""), list);
+      const n = el("span", "observe-step-n", li); n.textContent = s.state ? "✓" : String(i + 1);
+      const tx = el("div", "observe-step-text", li);
+      const b = el("b", null, tx); b.textContent = s.title;
+      const d = el("span", null, tx); d.textContent = s.state === "seen" ? "已觀察（答案在解說裡）" : s.desc;
+      if (s.key === "finish") {
+        li.classList.add("is-link"); li.tabIndex = 0; li.setAttribute("role", "button");
+        const go = () => { const card = $("#finish-card"); if (card) card.scrollIntoView({ behavior: "smooth", block: "start" }); };
+        li.addEventListener("click", go);
+        li.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+      }
+    });
+  }
+  function nudgeFinish() {
+    if (OBS.nudged) return;
+    const st = finishStats();
+    if (st.total && st.right === st.total) return;
+    OBS.nudged = true;
+    document.querySelectorAll(".finish-nudge").forEach(n => n.remove());
+    const t = el("div", "finish-nudge", document.body);
+    t.setAttribute("role", "status");
+    const tx = el("div", null, t);
+    const b = el("b", null, tx); b.textContent = "觀察完成！";
+    const sp = el("span", null, tx); sp.textContent = "最後做「完成實驗」的總結題，確認你真的看懂了。";
+    const go = el("button", "finish-nudge-go", t); go.type = "button"; go.textContent = "去做總結題";
+    const x = el("button", "finish-nudge-x", t); x.type = "button"; x.setAttribute("aria-label", "關閉"); x.textContent = "×";
+    const close = () => t.remove();
+    go.addEventListener("click", () => { close(); const card = $("#finish-card"); if (card) card.scrollIntoView({ behavior: "smooth", block: "start" }); });
+    x.addEventListener("click", close);
+    setTimeout(close, 12000);
+  }
+  window.addEventListener("pl-observe-ready", e => {
+    const d = e.detail || {};
+    if (d.id !== currentId) return;
+    OBS.id = d.id; OBS.stages = d.stages || []; OBS.done = d.done || {};
+    renderObserveTrack();
+  });
+  window.addEventListener("pl-observe", e => {
+    const d = e.detail || {};
+    if (d.id !== currentId) return;
+    OBS.done = d.done || OBS.done;
+    renderObserveTrack();
+    if (OBS.stages.length && OBS.stages.every(k => OBS.done[k])) setTimeout(nudgeFinish, 900);
+  });
+  document.addEventListener("click", e => {
+    if (e.target.closest && e.target.closest("#practice-list")) setTimeout(updateFinish, 0);
+  });
 
   /* ------------------------------- 學習存檔與計劃 ------------------------------- */
   function showSaveStatus(message, tone) {
@@ -1411,6 +1494,10 @@
     if (currentSim && currentSim.stop) { try { currentSim.stop(); } catch (e) {} }
     currentSim = null; currentId = id;
     const { exp, mod } = f;
+    Object.assign(OBS, { id, stages: [], done: {}, nudged: false });
+    document.querySelectorAll(".finish-nudge").forEach(n => n.remove());
+    const plist = $("#practice-list"); if (plist) plist.innerHTML = "";
+    updateFinish();
 
     showView("exp");
     const view = $("#exp-view");

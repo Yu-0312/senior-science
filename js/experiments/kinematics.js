@@ -746,8 +746,19 @@
 
     function reset() { t = 0; dots = 0; flash = 0; anim.stop(); draw(); }
     // 放手前才能換重物：跑起來就收起把手（改了會重設，等於重做一次）
-    let tk0 = 0;
-    const grip = PL.ui.handle(cv, { slider: sMw, label: "重物的重力 mg（往下拉＝換重一點的重物）", toValue: (x, y) => (y - tk0) / 50 });
+    /*
+     * 把手在 mg 箭頭尖端：尖端位置 = 槽碼串底端 + 18 + m·50。
+     * 槽碼串的高度本身也隨 m 變（多一片就長一截），所以不能直接用 (y − 起點)/50 反推，
+     * 改成在滑桿允許的每一個質量裡找「尖端最靠近手指」的那一個。
+     */
+    let wTop0 = 0;
+    const STK = { bigH: 6, smallH: 4 };
+    const tipAt = m => wTop0 + PL.apparatus.stackPlan(m, STK).h + 12 + m * 50;
+    const grip = PL.ui.handle(cv, { slider: sMw, label: "重物的重力 mg（往下拉＝多掛一片槽碼）", toValue: (x, y) => {
+      let best = sMw.get(), bd = Infinity;
+      for (let m = 0.05; m <= 0.6 + 1e-9; m += 0.05) { const d = Math.abs(tipAt(m) - y); if (d < bd) { bd = d; best = Math.round(m * 100) / 100; } }
+      return best;
+    } });
 
     PL.ui.note(L.controls,
       "重物一放開就把小車拉著往前，小車越跑越快，紙帶上的點也越拉越開。" +
@@ -858,7 +869,9 @@
          所以這裡按「小車跑完全程的比例」在可用高度內下落，示意「重物掉、小車加速」。 */
       const ropeY = trackY - 4;                       // 小車掛鉤的高度＝滑輪頂緣
       const weightTop = pulleyY + pulleyR + 14;
-      const weightY = weightTop + (H * 0.18) * frac;
+      const plan = AP.stackPlan(sMw.get(), STK);
+      // 下落距離不能讓槽碼串掉進下方的紙帶區
+      const weightY = weightTop + Math.max(0, Math.min(H * 0.18, sceneBot - 6 - weightTop - plan.h)) * frac;
       const hangX = pulleyX + pulleyR;                 // 繩子從滑輪外緣垂下
       AP.cord(ctx, carX + cw / 2 + 2, ropeY, pulleyX, pulleyY - pulleyR);
       AP.cord(ctx, hangX, pulleyY, hangX, weightY - 5);
@@ -871,12 +884,27 @@
       AP.pulley(ctx, pulleyX, pulleyY, pulleyR);
       D.text(ctx, "滑輪", pulleyX, pulleyY - pulleyR - 8, { color: PL.col("text-faint"), size: 10, align: "center" });
 
-      // 重物
-      const ww = 22, wh = 26;
-      AP.weight(ctx, hangX, weightY, ww, wh, null);
-      D.text(ctx, PL.fmt(sMw.get(), 2) + " kg", hangX - ww / 2 - 4, weightY + wh / 2 + 3, { color: PL.col("text-dim"), size: 9, align: "right", weight: "700" });
-      // 重物受力箭頭：往下的重力，長度正比於 mg（50 px/kg）；尖端是把手，往下拉＝換重一點的重物
-      tk0 = weightY + wh + 18;
+      // 重物：槽碼串，100 g 一大片、50 g 一小片——重物超過一片就自動疊成兩片
+      const ww = 24;
+      AP.weightStack(ctx, hangX, weightY, sMw.get(), Object.assign({ w: ww }, STK));
+      const wh = plan.h;
+      const parts = [];
+      if (plan.big) parts.push("100g" + (plan.big > 1 ? "×" + plan.big : ""));
+      if (plan.small) parts.push("50g");
+      // 標籤卡：總質量＋組成（「100g×2＋50g」）。墊一張小卡，免得壓在桌腳與夾具上看不清楚
+      {
+        const l1 = PL.fmt(sMw.get(), 2) + " kg", l2 = parts.join("＋");
+        ctx.save(); ctx.font = "700 9.5px system-ui, sans-serif";
+        const tw = Math.max(ctx.measureText(l1).width, ctx.measureText(l2).width);
+        ctx.restore();
+        const bw = tw + 12, bx = hangX - ww / 2 - 6 - bw, by = weightY - 3;
+        D.rect(ctx, bx, by, bw, 28, { fill: PL.col("panel-2", "rgba(10,14,20,0.7)"), stroke: PL.col("border"), width: 1, r: 5 });
+        D.text(ctx, l1, bx + bw - 6, by + 12, { color: PL.col("text"), size: 9.5, align: "right", weight: "700" });
+        D.text(ctx, l2, bx + bw - 6, by + 23, { color: PL.col("text-dim"), size: 8.5, align: "right" });
+      }
+      // 重物受力箭頭：往下的重力，長度正比於 mg（50 px/kg）；尖端是把手，往下拉＝多掛一片槽碼
+      wTop0 = weightY;
+      const tk0 = weightY + wh + 12;
       if (t === 0) {
         D.arrow(ctx, hangX, weightY + wh + 2, hangX, tk0 + sMw.get() * 50,
           { color: PL.col("accent-2"), width: 1.6, label: "mg" });

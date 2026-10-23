@@ -29,7 +29,12 @@ files.forEach(f => {
   if (fast && SLOW.has(f)) { skipped += 1; console.log("－ " + f.padEnd(24) + "（--fast 略過）"); return; }
   const t0 = Date.now();
   try {
-    const out = execFileSync(process.execPath, [path.join(dir, f)],
+    /*
+     * meaning-audit 一口氣建置數千個實驗實例、而且整段同步跑完（計時器與影格佇列都沒機會清空），
+     * 2026-10 時原始版本就已經用到 2.27 GB，貼著 Node 預設 2.2 GB 的堆積上限——
+     * 任何一點新增都會讓它 OOM。給子行程 4 GB 的上限，讓測試量的是「滑桿有沒有作用」而不是記憶體運氣。
+     */
+    const out = execFileSync(process.execPath, ["--max-old-space-size=4096", path.join(dir, f)],
       { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 30 * 60 * 1000 });
     const line = (out.match(/通過 \d+ 項，失敗 \d+ 項/g) || []).pop() ||
                  (out.match(/✓[^\n]*/g) || []).slice(-1)[0] || "";

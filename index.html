@@ -42,8 +42,8 @@
 
   <!-- PWA -->
   <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20261023-02" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png?v=20261023-02" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20261023-03" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png?v=20261023-03" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="物理實驗室" />
@@ -53,7 +53,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Serif+TC:wght@700;900&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=20261023-02" />
+  <link rel="stylesheet" href="css/style.css?v=20261023-03" />
 
   <!-- MathJax（LaTeX 公式排版） -->
   <script>
@@ -417,13 +417,30 @@
                 <div><h3>關鍵公式</h3><div class="formula-box" id="guide-formula"></div></div>
                 <div><h3>學習重點</h3><ul class="points" id="guide-points"></ul></div>
                 <div class="guide-exam" id="guide-exam" hidden><h3>考題怎麼問</h3><p id="guide-exam-how"></p></div>
-                <div class="practice-panel" aria-label="題目練習">
-                  <h3>題目練習</h3>
-                  <div class="practice-list" id="practice-list"></div>
+                <div class="observe-track" id="observe-track" aria-label="實驗進度">
+                  <h3>實驗進度</h3>
+                  <ol class="observe-steps" id="observe-steps"></ol>
                 </div>
               </div>
             </div>
           </div>
+
+          <!--
+            完成實驗：以前「題目練習」放在右側教材欄，和實驗台搶版面，學生也常常沒做實驗就先作答。
+            現在實驗過程中由觀察點（sim-observe.js）在關鍵階段彈出觀察題，
+            原本的題目移到這裡，當作做完實驗之後的總結。
+          -->
+          <section class="card finish-card" id="finish-card" aria-labelledby="finish-title">
+            <div class="finish-head">
+              <div>
+                <p class="finish-kicker">最後一步</p>
+                <h3 id="finish-title">完成實驗 · 總結題</h3>
+                <p class="finish-lead" id="finish-lead">實驗中的觀察題做完了嗎？用這幾題確認你真的看懂了。</p>
+              </div>
+              <div class="finish-meter" id="finish-meter" aria-live="polite"><b id="finish-count">0 / 0</b><span>題答對</span></div>
+            </div>
+            <div class="practice-list" id="practice-list"></div>
+          </section>
 
           <section class="learning-output" id="learning-output" aria-label="本次學習輸出"></section>
 
@@ -472,26 +489,25 @@
   </section>
 
   <!-- 核心 -->
-  <script src="js/site-config.js?v=20261023-02"></script>
-  <script src="js/curriculum.js?v=20261023-02"></script>
-  <script src="js/advanced-curriculum.js?v=20261023-02"></script>
-  <script src="js/comprehensive-curriculum.js?v=20261023-02"></script>
-  <script src="js/extension-registry.js?v=20261023-02"></script>
-  <script src="js/open-curriculum.js?v=20261023-02"></script>
-  <script src="js/school-curriculum.js?v=20261023-02"></script>
-  <script src="js/exam-curriculum.js?v=20261023-02"></script>
-    <script src="js/sim-core.js?v=20261023-02"></script>
-  <script src="js/sim-tools.js?v=20261023-02"></script>
-  <script src="js/sim-insight.js?v=20261023-02"></script>
-  <script src="js/sim-observe.js?v=20261023-02"></script>
-  <script src="js/teaching-notes.js?v=20261023-02"></script>
-  <script src="js/sim-a11y.js?v=20261023-02"></script>
+  <script src="js/site-config.js?v=20261023-03"></script>
+  <script src="js/curriculum.js?v=20261023-03"></script>
+  <script src="js/advanced-curriculum.js?v=20261023-03"></script>
+  <script src="js/comprehensive-curriculum.js?v=20261023-03"></script>
+  <script src="js/extension-registry.js?v=20261023-03"></script>
+  <script src="js/open-curriculum.js?v=20261023-03"></script>
+  <script src="js/school-curriculum.js?v=20261023-03"></script>
+  <script src="js/exam-curriculum.js?v=20261023-03"></script>
+    <script src="js/sim-core.js?v=20261023-03"></script>
+  <script src="js/sim-tools.js?v=20261023-03"></script>
+  <script src="js/sim-insight.js?v=20261023-03"></script>
+  <script src="js/teaching-notes.js?v=20261023-03"></script>
+  <script src="js/sim-a11y.js?v=20261023-03"></script>
 
   <!-- 實驗程式改為延遲載入：只掛對應表，開啟實驗時才抓對應的檔案 -->
-  <script src="js/experiment-manifest.js?v=20261023-02"></script>
+  <script src="js/experiment-manifest.js?v=20261023-03"></script>
 
 
   <!-- 應用外殼 -->
-  <script src="js/app.js?v=20261023-02"></script>
+  <script src="js/app.js?v=20261023-03"></script>
 </body>
 </html>

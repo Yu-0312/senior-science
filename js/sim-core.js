@@ -752,6 +752,8 @@
     const canvas = el("canvas", "sim-canvas", wrap);
     const ctx = canvas.getContext("2d");
     const cv = { canvas, ctx, W: 640, H: 400, dpr: 1, _resizeCbs: [], profile: wrap._labProfile || profileFor() };
+    // 弱參照：畫布只在「尺寸變了要重畫」時才需要找回它的實驗；不該因此把整個實驗留在記憶體裡
+    const ownerRef = buildContext && typeof WeakRef === "function" ? new WeakRef(buildContext) : null;
 
     function fit() {
       const rect = wrap.getBoundingClientRect();
@@ -839,10 +841,36 @@
     };
 
     fit();
-    let raf = 0;
+    /*
+     * 尺寸變了才重設畫布。canvas.width 一被指定（即使數值相同）整張畫布就會被清空；
+     * 暫停中的實驗沒有下一個影格會把它畫回來，於是改了視窗大小、或畫布補高之後，
+     * 實驗台變成一片空白。尺寸有變就重設，並在暫停時主動重畫一格。
+     */
+    cv.refit = () => {
+      const pw = cv.W, ph = cv.H;
+      fit();
+      if (cv.W === pw && cv.H === ph && canvas.width === Math.round(cv.W * cv.dpr)) {
+        // fit() 已經把畫布清掉了；照樣走重畫，只是不必通知其他依賴尺寸的元件
+      } else cv._resizeCbs.forEach(f => f());
+      repaintOwner();
+    };
+    function repaintOwner() {
+      const c = ownerRef && ownerRef.deref();
+      if (!c || !c.loops) return;
+      if (c.loops.some(l => l.running)) return;
+      if (c.loops.length) c.loops.forEach(l => { try { l.render(); } catch (e) {} });
+      else if (c.api && typeof c.api.rerender === "function") { try { c.api.rerender(); } catch (e) {} }
+    }
+    let raf = 0, lastBox = "";
     const ro = new ResizeObserver(() => {
       cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => { fit(); cv._resizeCbs.forEach(f => f()); });
+      raf = requestAnimationFrame(() => {
+        // 只看寬度：畫布高度是我們自己設的，高度變化不該再回頭觸發重設
+        const box = String(Math.round(wrap.getBoundingClientRect().width));
+        if (box === lastBox) return;
+        lastBox = box;
+        cv.refit();
+      });
     });
     ro.observe(wrap);
     cv.destroy = () => ro.disconnect();
@@ -1282,12 +1310,12 @@
       const row = el("div", "sim-causality-row", wrap);
       row.dataset.tone = r.tone || "";
       const name = el("div", "sim-causality-name", row); name.innerHTML = r.name;
-      const flow = el("div", "sim-causality-flow", row); flow.textContent = "—";
+      const flow = el("div", "sim-causality-flow is-empty", row); flow.textContent = "—";
       const note = el("div", "sim-causality-note", row); note.textContent = r.note || "";
       return { flow };
     });
     return {
-      set(i, text) { if (rows[i]) rows[i].flow.innerHTML = text; },
+      set(i, text) { if (rows[i]) { rows[i].flow.innerHTML = text; rows[i].flow.classList.toggle("is-empty", !text); } },
       wrap
     };
   }
@@ -2096,7 +2124,126 @@
     root.addEventListener("change", repaintIfPaused);
 
     paint();
+    context.api = api;
     builtHooks.forEach(fn => { try { fn(context, api); } catch (e) { console.warn("建置掛鉤失敗", e); } });
+    // 掛鉤（因果面板、衍生量）都插好之後再排版
+    try { arrangeStage(context); } catch (e) { console.warn("版面平衡失敗", e); }
+  }
+
+  /* --------------------------- 版面平衡 ---------------------------
+   * 寬版實驗台是左畫布、右檢視欄。兩件事讓它常常不好看：
+   *
+   *  1. 因果面板（「誰決定落體的快慢」）是好幾段說明文字，被塞進右欄的讀數卡裡，
+   *     沒有內距、貼著卡片邊緣，又把右欄拉得比畫布長一大截，左邊空出一塊。
+   *     → 一律移到實驗台正下方，整列橫排成幾張卡。
+   *
+   *  2. 右欄還是比畫布長一大截時，把「量測讀數」搬到畫布正下方（橫排成一列），
+   *     兩欄的高度差變小就留著，沒有變好就搬回去。
+   *
+   * 試過讓畫布往下長高去填空白：實驗的繪圖多半把場景錨在底部，長高只是在上面多出
+   * 一片空天空、空牆面，整個畫面重心跑掉。所以畫布永遠維持原比例，只搬面板。
+   * ---------------------------------------------------------------- */
+  function arrangeStage(context) {
+    const root = context.root;
+    if (!root || !root.classList || !root.classList.contains("lab-sim") || typeof document === "undefined") return;
+    const moveNotes = () => {
+      // 因果面板：不論插在哪一欄都搬；標準流程卡：只搬右欄的（它在右欄會把參數擠成一長條）
+      const blocks = Array.from(root.querySelectorAll(".sim-causality")).filter(n =>
+        !n.closest(".sim-insight-block") && !n.closest(".sim-notes") && n.closest(".lab-sim") === root)
+        .concat(Array.from(root.querySelectorAll(".sim-control-deck .sim-procedure-card, :scope > .sim-readout-panel .sim-procedure-card")));
+      if (!blocks.length) return;
+      let notes = root.querySelector(":scope > .sim-notes");
+      if (!notes) {
+        notes = el("section", "sim-notes");
+        notes.setAttribute("aria-label", "因果說明");
+        const after = root.querySelector(":scope > .sim-readout-panel") || root.querySelector(":scope > .sim-stage");
+        if (after && after.parentNode === root) root.insertBefore(notes, after.nextSibling);
+        else root.appendChild(notes);
+      }
+      blocks.forEach(b => notes.appendChild(b));
+    };
+    const safe = fn => () => { try { fn(); } catch (e) { /* 測試替身沒有完整的版面 API */ } };
+    safe(moveNotes)();
+    // 沒掛在頁面上（測試替身、離線建置）就沒有版面可以量，也不要留計時器抓著整個實驗
+    if (!root.isConnected) return;
+    // 部分掛鉤晚一拍才插入
+    setTimeout(safe(() => { if (root.isConnected) { moveNotes(); lastW = 0; balance(); } }), 0);
+
+    let pending = 0, lastW = 0;
+    const gapNow = () => {
+      const visual = root.querySelector(".sim-visual-panel");
+      if (!visual) return null;
+      const cols = Array.from(root.children).filter(n => n.offsetParent !== null && !n.classList.contains("sim-stage"))
+        .concat(Array.from(root.querySelectorAll(":scope > .sim-stage > *")).filter(n => n.offsetParent !== null));
+      let right = 0;
+      cols.forEach(n => { if (getComputedStyle(n).gridColumnStart === "2") right = Math.max(right, n.getBoundingClientRect().bottom); });
+      return right ? right - visual.getBoundingClientRect().bottom : null;
+    };
+    /*
+     * 可以搬進左欄（畫布卡底部）的區塊：量測讀數、因果說明列、動手前先預測、任務導讀。
+     * 搬家是真的移動 DOM（放進 .sim-visual-panel 裡），而不是調 grid 的列位置——
+     * 左欄只有畫布卡一個格子，放到下一列會落在右欄最底下，反而在畫布下面留一個洞。
+     * 每次寬度改變都先全部歸位、再重新決定，窄版（單欄）一律維持原位。
+     */
+    const KEYS = { readouts: ".sim-readout-panel", notes: ".sim-notes", predict: ".sim-predict", brief: ".sim-learning-brief" };
+    const ORDER = ["readouts", "brief", "predict", "notes"];
+    const movable = () => {
+      const m = {};
+      ORDER.forEach(k => {
+        const n = root.querySelector(":scope > " + KEYS[k]) || root.querySelector(".sim-visual-panel > " + KEYS[k]);
+        if (n && (n.parentNode !== root || getComputedStyle(n).display !== "none")) m[k] = n;
+      });
+      return m;
+    };
+    const homeAll = m => ORDER.slice().reverse().forEach(k => home(m[k]));
+    const putLeft = (m, plan) => ORDER.forEach(k => { if (plan.indexOf(k) >= 0) toLeft(m[k]); });   // 依固定順序排進畫布卡
+    function toLeft(node) {
+      const visual = root.querySelector(".sim-visual-panel");
+      if (!node || !visual || node.parentNode === visual) return;
+      node._labHome = { parent: node.parentNode, next: node.nextSibling };
+      visual.appendChild(node);
+    }
+    function home(node) {
+      const h = node && node._labHome;
+      if (!h) return;
+      if (h.next && h.next.parentNode === h.parent) h.parent.insertBefore(node, h.next);
+      else h.parent.appendChild(node);
+      node._labHome = null;
+    }
+    function balance() {
+      if (!root.isConnected) return;
+      const body = document.body;
+      const off = body && body.classList && (body.classList.contains("stage-only") || body.classList.contains("demo-mode"));
+      const w = Math.round(root.getBoundingClientRect().width);
+      if (w === lastW) return;            // 只在寬度改變時重新決定，避免搬來搬去
+      lastW = w;
+      const m = movable();
+      homeAll(m);
+      if (off || getComputedStyle(root).display !== "grid") return;
+      const g0 = gapNow();
+      if (g0 == null || g0 < 80) return;
+      // 所有組合都試一次（最多 15 種），留下兩欄高度差最小的那一種；同分時搬得少的優先
+      const keys = ORDER.filter(k => m[k]);
+      let best = { plan: [], gap: g0 };
+      for (let mask = 1; mask < (1 << keys.length); mask++) {
+        const plan = keys.filter((k, i) => mask & (1 << i));
+        putLeft(m, plan);
+        const g = gapNow();
+        if (g != null && (Math.abs(g) < Math.abs(best.gap) - 8 || (Math.abs(g) <= Math.abs(best.gap) + 8 && plan.length < best.plan.length && best.plan.length))) best = { plan, gap: g };
+        homeAll(m);
+      }
+      if (window.PhysicsLabDebugBalance) console.log("balance", context.id, w, Math.round(g0), best.plan.join("+"), Math.round(best.gap));
+      // 至少要改善 40px 才值得動
+      if (!best.plan.length || Math.abs(g0) - Math.abs(best.gap) < 40) return;
+      putLeft(m, best.plan);
+    }
+    if (typeof window.getComputedStyle !== "function" || typeof requestAnimationFrame !== "function") return;
+    const schedule = () => { cancelAnimationFrame(pending); pending = requestAnimationFrame(safe(balance)); };
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(schedule);
+      ro.observe(root);
+    }
+    // 第一次排版由上面的 setTimeout 負責（它會先搬因果面板再平衡）
   }
 
   /* --------------------------- 註冊表 --------------------------- */

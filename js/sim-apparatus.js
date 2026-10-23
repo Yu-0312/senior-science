@@ -947,6 +947,59 @@
     if (label) D.text(ctx, label, cx, topY + h / 2 + 4, { color: "#eef3fa", size: 10, align: "center", weight: "700" });
   }
 
+  /*
+   * 槽碼串：掛勾 → 掛桿 → 一片片槽碼，片數跟著質量走。
+   *
+   * 以前不管掛多重都畫同一塊砝碼，學生把重物從 0.05 kg 拉到 0.6 kg，
+   * 畫面上只有旁邊的數字在變——實驗室裡你是「多加一片」，不是砝碼自己變重。
+   * 這裡照真實的槽碼組拆成大片（預設 100 g）與小片（50 g），超過一片就疊成兩片。
+   *
+   * 回傳 { h, big, small }：整串高度（不含掛勾）與片數，給呼叫端排受力箭頭與把手。
+   */
+  function stackPlan(mass, opts) {
+    opts = opts || {};
+    const unit = opts.unit || 0.1, half = opts.half || unit / 2;
+    const big = Math.floor((mass + 1e-9) / unit);
+    const small = Math.max(0, Math.round((mass - big * unit) / half));
+    const bh = opts.bigH || 8, sh = opts.smallH || 5, gap = 1;
+    const h = 4 + big * (bh + gap) + small * (sh + gap) + 3;   // 頂部掛桿 + 槽碼 + 底盤
+    return { big, small, h, bh, sh, gap, unit, half };
+  }
+  function weightStack(ctx, cx, topY, mass, opts) {
+    opts = opts || {};
+    const P = stackPlan(mass, opts);
+    const w = opts.w || 24;
+    // 掛勾
+    ctx.strokeStyle = "rgb(170,180,194)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, topY - 5, 4.5, Math.PI * 0.15, Math.PI * 0.85, true); ctx.stroke();
+    // 掛桿（穿過每一片槽碼的中心）
+    ctx.strokeStyle = "rgb(150,160,176)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx, topY - 1); ctx.lineTo(cx, topY + P.h - 3); ctx.stroke();
+    // 由下往上疊：先畫底盤，再一片片放上去（大片在下、小片在上，和實際加槽碼的順序一樣）
+    const base = topY + P.h;
+    D.rect(ctx, cx - w * 0.36, base - 3, w * 0.72, 3, { fill: "rgb(120,130,146)", r: 1 });
+    let y = base - 3;
+    const disc = (hh, ww, tone) => {
+      y -= hh + P.gap;
+      const g = ctx.createLinearGradient(cx - ww / 2, 0, cx + ww / 2, 0);
+      g.addColorStop(0.00, tone ? "rgb(70,62,40)" : "rgb(62,70,84)");
+      g.addColorStop(0.30, tone ? "rgb(176,150,92)" : "rgb(146,156,172)");
+      g.addColorStop(0.60, tone ? "rgb(128,108,64)" : "rgb(100,109,124)");
+      g.addColorStop(1.00, tone ? "rgb(60,52,34)" : "rgb(52,59,71)");
+      D.rect(ctx, cx - ww / 2, y, ww, hh, { fill: g, r: 1.5 });
+      ctx.strokeStyle = "rgba(24,30,40,0.55)"; ctx.lineWidth = 1;
+      ctx.strokeRect(cx - ww / 2 + 0.5, y + 0.5, ww - 1, hh - 1);
+      // 槽口：槽碼側面的開口，讓它看得出是「一片一片」套上去的
+      ctx.fillStyle = "rgba(18,24,32,0.72)";
+      ctx.fillRect(cx - 1.5, y + 1, 3, hh - 2);
+      ctx.fillStyle = "rgba(220,228,240,0.35)";
+      ctx.fillRect(cx - ww / 2 + 2, y + 1, ww - 4, 1);
+    };
+    for (let i = 0; i < P.big; i++) disc(P.bh, w, false);
+    for (let i = 0; i < P.small; i++) disc(P.sh, w * 0.82, true);
+    return P;
+  }
+
   /* 木塊（斜面、摩擦力實驗用）。ang 為傾角（弧度），(cx,cy) 是底面中心。 */
   function woodBlock(ctx, cx, cy, w, h, ang) {
     ctx.save();
@@ -4284,7 +4337,7 @@
     battery, bulb, meter, wire, resistorBox, fuse,
     cable, valueChip, knifeSwitch, rheostat,
     symWire, symJunction, symBattery, symResistor, symRheostat, symBulb, symMeter, symSwitch, symFuse,
-    standRod, crossArm, weight, woodBlock, ramp, pulley, cord, bob, ruler, springScale, beaker,
+    standRod, crossArm, weight, weightStack, stackPlan, woodBlock, ramp, pulley, cord, bob, ruler, springScale, beaker,
     wallPost,
     cart, tickerTimer, vibrator, tuningFork, glassTube,
     barMagnet, coilWinding, ironCore, thermometer, polePiece,
@@ -4502,6 +4555,21 @@
       const hint = PL.el("div", "sim-handle-hint", layer);
       hint.textContent = "在實驗台上按住拖曳，就能直接操作";
       layer._hint = hint;
+      /*
+       * 提示貼在「畫布」的左下角，不是整個容器的左下角：容器裡畫布下方還有一行圖說，
+       * 以前提示疊在圖說上，把那行字蓋掉一半。
+       */
+      const fitHint = () => {
+        const c = cv.canvas;
+        const below = Math.max(0, host.clientHeight - (c.offsetTop + c.offsetHeight));
+        hint.style.bottom = (14 + below) + "px";
+      };
+      try {
+        fitHint();
+        if (cv.onResize) cv.onResize(fitHint);
+        // 版面排好後再量一次。只在真的掛在頁面上時排程：測試替身沒有版面，排了計時器只會一路抓著畫布不放
+        if (host.isConnected) setTimeout(fitHint, 0);
+      } catch (e) { /* 測試替身沒有版面資訊 */ }
     }
     const ctl = dragController(cv, host);
     const h = PL.el("div", "sim-handle", layer);

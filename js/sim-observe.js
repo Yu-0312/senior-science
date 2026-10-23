@@ -319,7 +319,7 @@
 
     const kicker = document.createElement("span");
     kicker.className = "sim-observe-kicker";
-    kicker.textContent = "觀 察 點";
+    kicker.textContent = point.kicker || "觀 察 點";
     card.appendChild(kicker);
 
     const title = document.createElement("h4");
@@ -369,7 +369,7 @@
           const cont = document.createElement("button");
           cont.type = "button";
           cont.className = "sim-observe-continue";
-          cont.textContent = "繼續播放 ▶";
+          cont.textContent = point.resumeText || "繼續播放 ▶";
           cont.addEventListener("click", () => {
             close();
             if (onAnswered) onAnswered(correct);
@@ -389,7 +389,7 @@
     const skip = document.createElement("button");
     skip.type = "button";
     skip.className = "sim-observe-skip";
-    skip.textContent = "不問了，直接繼續 ▶";
+    skip.textContent = point.skipText || "不問了，直接繼續 ▶";
     skip.addEventListener("click", () => { close(); onResume(); });
     card.appendChild(skip);
 
@@ -402,6 +402,7 @@
      引擎：掛進每個實驗建置完成後的生命週期
      ------------------------------------------------------------------ */
   PL._hooks.onBuilt && PL._hooks.onBuilt(function (context) {
+    if (document.documentElement.hasAttribute("data-embed-lab")) return;   // 關卡版有自己的題目
     const points = OBSERVE_POINTS[context.id];
     if (!points || !points.length) return;
     const hasLoops = context.loops && context.loops.length > 0;
@@ -488,6 +489,7 @@
         }, 300);
 
     function fire(p) {
+      if (document.querySelector(".sim-observe-backdrop")) { busy = false; return; }
       // 暫停所有迴圈
       const wasRunning = context.loops.some(l => l.running);
       context.loops.forEach(l => { try { l.stop(); } catch (e) {} });
@@ -495,8 +497,390 @@
       const card = buildCard(p, function onResume() {
         busy = false;
         if (wasRunning) context.loops.forEach(l => { try { l.start(); } catch (e) {} });
-      });
+      }, function onAnswered(correct) { AUTO.mark(context.id, "play", correct); });
       document.body.appendChild(card);
     }
+  });
+
+  /* ==================================================================
+     自動觀察點（2026-10）：每一個實驗都有
+     ------------------------------------------------------------------
+     上面那份手寫表只涵蓋 18 個實驗。其餘的實驗也要在「做到一個階段」時
+     停下來問一題觀察題——而且題目必須和學生剛剛親眼看到的東西一致，
+     不能是套樣板的「結果會變大／變小」。所以題目的答案一律來自當下量到的讀數：
+
+       ① 播放觀察：播放一段時間（或這一輪自己跑完）時暫停，問
+          「剛才播放時，某個讀數是怎麼變的」——一路變大、先大後小、來回振盪…
+          答案由播放期間取樣到的讀數序列判定。
+       ② 改變參數觀察：暫停中把某根滑桿調了一段、放手之後，問
+          「剛才哪個讀數怎麼變了」，答案是調整前後實際量到的差。
+          播放中調的不算：讀數本來就隨時間在變，前後相比分不出是誰造成的。
+
+     每個階段每個實驗只問一次（記在 localStorage），完成的進度用事件
+     「pl-observe-ready」「pl-observe」通知外層頁面，外層據此更新觀察清單、
+     並在觀察完成後引導到最後的「完成實驗」總結題。
+     ================================================================== */
+  const AUTO = (function () {
+    const KEY = "pl-observe-done";
+    const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } };
+    const save = v => { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) {} };
+    const emit = (name, detail) => { try { window.dispatchEvent(new CustomEvent(name, { detail })); } catch (e) {} };
+    return {
+      done(id) { return load()[id] || {}; },
+      mark(id, stage, correct) {
+        const all = load();
+        const rec = all[id] || {};
+        if (!rec[stage]) rec[stage] = correct ? "right" : "seen";
+        else if (correct) rec[stage] = "right";
+        all[id] = rec; save(all);
+        emit("pl-observe", { id, stage, correct: !!correct, done: rec });
+      },
+      ready(id, stages) { emit("pl-observe-ready", { id, stages, done: load()[id] || {} }); },
+      reset(id) { const all = load(); delete all[id]; save(all); }
+    };
+  })();
+  PL.observe = { done: AUTO.done, reset: AUTO.reset };
+
+  const GLOBAL_INPUT = { down: false, key: 0 };
+  try {
+    window.addEventListener("pointerdown", () => { GLOBAL_INPUT.down = true; }, true);
+    window.addEventListener("pointerup", () => { GLOBAL_INPUT.down = false; }, true);
+    window.addEventListener("pointercancel", () => { GLOBAL_INPUT.down = false; }, true);
+    window.addEventListener("keydown", e => { if (" sSrR".indexOf(e.key) >= 0 && e.key.length === 1) GLOBAL_INPUT.key = Date.now(); }, true);
+  } catch (e) {}
+  const QUALITATIVE = /判讀|狀態|判定|模式|提示|結論|是否|檔位|顏色|紀錄|筆數/;
+  const TIMELIKE = /時間|經過|^t$|計時|已打點|次數|圈數|計數/;
+  function nice(v) {
+    if (v == null || !isFinite(v)) return "—";
+    const a = Math.abs(v);
+    if (a !== 0 && (a >= 1e5 || a < 1e-3)) return v.toExponential(2).replace("e", "×10^").replace("+", "");
+    return String(Number(v.toPrecision(3)));
+  }
+  const withUnit = (v, u) => nice(v) + (u ? " " + u : "");
+  const shuffle = arr => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+  const TREND = {
+    up: "一直變大", down: "一直變小", updown: "先變大、再變小", downup: "先變小、再變大",
+    osc: "反覆變大變小（來回振盪）", flat: "幾乎不變"
+  };
+  /* 讀數序列的走勢：忽略小於全距 5% 的抖動，數方向轉折幾次 */
+  function trendOf(ys) {
+    const lo = Math.min.apply(null, ys), hi = Math.max.apply(null, ys);
+    const span = hi - lo, scale = Math.max(Math.abs(lo), Math.abs(hi), 1e-12);
+    if (span / scale < 0.02) return { kind: "flat", lo, hi, span: 0 };
+    const dirs = [];
+    let ref = ys[0];
+    ys.forEach(y => {
+      const d = y - ref;
+      if (Math.abs(d) > span * 0.05) { const sg = d > 0 ? 1 : -1; if (dirs[dirs.length - 1] !== sg) dirs.push(sg); ref = y; }
+    });
+    const kind = dirs.length <= 1 ? (dirs[0] === -1 ? "down" : "up")
+      : dirs.length === 2 ? (dirs[0] === 1 ? "updown" : "downup") : "osc";
+    return { kind, lo, hi, span: span / scale };
+  }
+  const usableReadouts = ctx => (ctx.readouts || []).filter(r => r && r.label && !QUALITATIVE.test(r.label));
+
+  function playQuestion(ctx, samples) {
+    const rs = usableReadouts(ctx);
+    let best = null;
+    rs.forEach(r => {
+      const ys = samples.map(sm => sm.get(r)).filter(v => typeof v === "number" && isFinite(v));
+      if (ys.length < 6) return;
+      const tr = trendOf(ys);
+      if (tr.kind === "flat") return;
+      // 時間、計數這類「本來就一直加」的讀數最沒資訊量，墊底
+      const score = tr.span * (TIMELIKE.test(r.label) ? 0.05 : 1) * (tr.kind === "up" || tr.kind === "down" ? 1 : 1.3);
+      if (!best || score > best.score) best = { r, ys, tr, score };
+    });
+    if (!best) return steadyQuestion(ctx, samples, rs);
+    const { r, ys, tr } = best;
+    const pool = ["up", "down", "updown", "osc", "flat"].filter(k => k !== tr.kind);
+    if (tr.kind === "downup") pool.splice(pool.indexOf("updown"), 1, "updown");
+    const opts = shuffle([tr.kind].concat(shuffle(pool).slice(0, 3)));
+    const y0 = ys[0], y1 = ys[ys.length - 1];
+    const how = {
+      up: "從 " + withUnit(y0, r.unit) + " 一路增加到 " + withUnit(y1, r.unit),
+      down: "從 " + withUnit(y0, r.unit) + " 一路減少到 " + withUnit(y1, r.unit),
+      updown: "先升到最高約 " + withUnit(tr.hi, r.unit) + "，再降到 " + withUnit(y1, r.unit),
+      downup: "先降到最低約 " + withUnit(tr.lo, r.unit) + "，再回升到 " + withUnit(y1, r.unit),
+      osc: "在 " + withUnit(tr.lo, r.unit) + " ～ " + withUnit(tr.hi, r.unit) + " 之間來回變化"
+    }[tr.kind];
+    return {
+      kicker: "觀 察 點 · 播 放",
+      title: "停一下：剛才播放時，你注意到什麼？",
+      hint: "回想右邊「量測讀數」裡的「" + r.label + "」，或看畫面上對應的東西怎麼動。",
+      resumeText: "繼續播放 ▶",
+      quiz: {
+        q: "剛才播放的這段時間裡，「" + r.label + "」是怎麼變化的？",
+        choices: opts.map(k => TREND[k]),
+        correct: opts.indexOf(tr.kind),
+        explain: "實驗台實測：「" + r.label + "」" + how + "。想想看：是什麼讓它這樣變？"
+      }
+    };
+  }
+
+  /*
+   * 播放期間讀數完全沒變（電流在流、光在走這類穩態畫面）：這本身就是觀察結論——
+   * 條件不變，系統就停在穩定狀態；想讓讀數變，得動參數（也就是下一個階段）。
+   */
+  function steadyQuestion(ctx, samples, rs) {
+    const ins = ctx.insight;
+    const prefer = ins && ins.primary && ins.primary.readout;
+    const cand = (prefer && rs.indexOf(prefer) >= 0 ? [prefer] : []).concat(rs.filter(r => !TIMELIKE.test(r.label)));
+    const r = cand.find(x => samples.every(sm => typeof sm.get(x) === "number" && isFinite(sm.get(x))));
+    if (!r) return null;
+    const v = samples[samples.length - 1].get(r);
+    /*
+     * 播放中不變的量多半是「由參數決定」的（加速度、終端速度、穩態電流）。
+     * 單問「有沒有變」答案永遠是「幾乎不變」，學生很快就會背答案；
+     * 探測引擎量過這個讀數對哪根滑桿有反應時，改問「那調這根會怎樣」——
+     * 先記下觀察，再預測，下一階段親手驗證。
+     */
+    const rel = ins && ins.relations ? ins.relations.filter(q => q.readout === r && q.slider && (q.direction === "up" || q.direction === "down"))
+      .sort((a, b) => b.relative - a.relative)[0] : null;
+    // 現在的讀數落在探測範圍外（例如燈泡已經燒斷、讀數變 0）：當下的狀態和探測時不同，不拿來預測
+    const span = rel ? Math.max(Math.abs(rel.max - rel.min), 1e-12) : 0;
+    const inRange = rel && v >= rel.min - span * 0.1 && v <= rel.max + span * 0.1;
+    if (rel && inRange) {
+      return {
+        kicker: "觀 察 點 · 播 放",
+        title: "停一下：「" + r.label + "」在播放時都沒變",
+        hint: "播放期間「" + r.label + "」一直停在 " + withUnit(v, r.unit) + "。畫面在動，但這個量由參數決定，跑的過程中不會變。",
+        resumeText: "繼續播放 ▶",
+        quiz: {
+          q: "那如果把「" + rel.slider.label + "」調大，「" + r.label + "」會？",
+          choices: ["變大", "變小", "幾乎不變"],
+          correct: rel.direction === "up" ? 0 : 1,
+          explain: "實驗台掃描：「" + rel.slider.label + "」從 " + withUnit(rel.slider.min, rel.slider.unit) + " 調到 " + withUnit(rel.slider.max, rel.slider.unit) +
+            "，「" + r.label + "」從 " + withUnit(rel.first, r.unit) + " 變成 " + withUnit(rel.last, r.unit) + "。等一下自己調調看，驗證這個結果。"
+        }
+      };
+    }
+    const opts = shuffle(["flat"].concat(shuffle(["up", "down", "osc"]).slice(0, 3)));
+    return {
+      kicker: "觀 察 點 · 播 放",
+      title: "停一下：播放了一段時間，讀數有變嗎？",
+      hint: "看右邊「量測讀數」裡的「" + r.label + "」。畫面在動，不代表每個量都在變。",
+      resumeText: "繼續播放 ▶",
+      quiz: {
+        q: "剛才播放的這段時間裡，「" + r.label + "」是怎麼變化的？",
+        choices: opts.map(k => TREND[k]),
+        correct: opts.indexOf("flat"),
+        explain: "實驗台實測：播放期間「" + r.label + "」一直維持在 " + withUnit(v, r.unit) +
+          "。畫面在動，但這個量由當下的條件決定，條件不變它就不變——想讓它改變，要動參數。下一步就試試看調一根滑桿。"
+      }
+    };
+  }
+
+  /*
+   * 播放中調整：讀數本來就隨時間在變，前後相比分不出是誰造成的，
+   * 改用探測引擎（sim-insight）在同一組設定下掃過這根滑桿量到的關係；
+   * 而且只挑播放期間「不隨時間變」的讀數（週期、拍頻、穩態電流…），學生看得出來。
+   */
+  function runningParamQuestion(ctx, slider, x0, x1, steadyLabels) {
+    const ins = ctx.insight;
+    if (!ins || !ins.relations) return null;
+    const rel = ins.relations.filter(q => q.slider === slider && (q.direction === "up" || q.direction === "down") &&
+      q.readout && !QUALITATIVE.test(q.readout.label) && steadyLabels.has(q.readout))
+      .sort((a, b) => b.relative - a.relative)[0];
+    if (!rel) return null;
+    const r = rel.readout, up = x1 > x0;
+    const grows = (rel.direction === "up") === up;
+    return {
+      kicker: "觀 察 點 · 改 變 參 數",
+      title: "你剛改了「" + slider.label + "」",
+      hint: "「" + slider.label + "」從 " + withUnit(x0, slider.unit) + (up ? " 調大" : " 調小") + "到 " + withUnit(x1, slider.unit) + "，實驗還在跑。",
+      resumeText: "繼續實驗 ▶",
+      skipText: "先不回答，繼續實驗 ▶",
+      quiz: {
+        q: "調整之後，「" + r.label + "」怎麼變了？",
+        choices: ["變大", "變小", "幾乎不變"],
+        correct: grows ? 0 : 1,
+        explain: "實驗台掃描：「" + slider.label + "」從 " + withUnit(rel.slider.min, slider.unit) + " 調到 " + withUnit(rel.slider.max, slider.unit) +
+          "，「" + r.label + "」從 " + withUnit(rel.first, r.unit) + " 變成 " + withUnit(rel.last, r.unit) + "。現在它是 " + withUnit(r.number, r.unit) + "。"
+      }
+    };
+  }
+
+  function paramQuestion(ctx, slider, before, after, x0, x1) {
+    const rs = usableReadouts(ctx);
+    let best = null;
+    rs.forEach(r => {
+      const a = before.get(r), b = after.get(r);
+      if (typeof a !== "number" || typeof b !== "number" || !isFinite(a) || !isFinite(b)) return;
+      const scale = Math.max(Math.abs(a), Math.abs(b), 1e-12);
+      const rel = Math.abs(b - a) / scale;
+      if (rel < 0.01) return;
+      const score = rel * (TIMELIKE.test(r.label) ? 0.05 : 1);
+      if (!best || score > best.score) best = { r, a, b, rel, score };
+    });
+    if (!best) return null;
+    const { r, a, b } = best;
+    const kind = b > a ? 0 : 1;
+    const up = x1 > x0;
+    let extra = "";
+    const ins = ctx.insight;
+    if (ins && ins.relations) {
+      const rel = ins.relations.find(q => q.slider === slider && q.readout === r);
+      const NICE = { "1": "成正比", "-1": "成反比", "2": "的平方成正比", "-2": "的平方成反比", "0.5": "的平方根成正比", "-0.5": "的平方根成反比" };
+      if (rel && rel.exponent != null) {
+        const k = [1, -1, 2, -2, 0.5, -0.5].find(n => Math.abs(rel.exponent - n) < 0.06);
+        if (k != null) extra = "把整個範圍掃過一遍會發現：「" + r.label + "」與「" + slider.label + "」" + NICE[String(k)] + "。";
+      } else if (rel && rel.direction === "peak") {
+        extra = "注意：這不是一路單調的關係，「" + r.label + "」在中間會出現極值。";
+      }
+    }
+    return {
+      kicker: "觀 察 點 · 改 變 參 數",
+      title: "你剛改了「" + slider.label + "」",
+      hint: "「" + slider.label + "」從 " + withUnit(x0, slider.unit) + (up ? " 調大" : " 調小") + "到 " + withUnit(x1, slider.unit) + "。其他條件都沒動——這就是控制變因。",
+      resumeText: "繼續實驗 ▶",
+      skipText: "先不回答，繼續實驗 ▶",
+      quiz: {
+        q: "調整之後，「" + r.label + "」怎麼變了？",
+        choices: ["變大", "變小", "幾乎不變"],
+        correct: kind,
+        explain: "實驗台實測：「" + r.label + "」從 " + withUnit(a, r.unit) + " 變成 " + withUnit(b, r.unit) + "。" + extra
+      }
+    };
+  }
+
+  PL._hooks.onBuilt && PL._hooks.onBuilt(function (context, api) {
+    const body = document.body;
+    if (document.documentElement.hasAttribute("data-embed-lab")) return;
+    if (body && (body.classList.contains("demo-mode") || body.classList.contains("stage-only"))) return;
+    const id = context.id, root = context.root;
+    if (!root || !root.isConnected) return;     // 沒掛在頁面上（測試替身）：不出題，也不留輪詢計時器
+    const loops = context.loops || [];
+    const handWritten = !!(OBSERVE_POINTS[id] && OBSERVE_POINTS[id].length);
+    const sliders = context.sliders || [];
+    const stages = [];
+    if (loops.length) stages.push("play");
+    if (sliders.length) stages.push("param");
+    AUTO.ready(id, stages);
+    if (!stages.length) return;
+    // 任務導讀裡說一聲：學生先知道「做到一半會被問」，操作時才會真的在看
+    try {
+      const briefEl = root.querySelector(".sim-learning-brief");
+      if (briefEl && !briefEl.querySelector(".sim-observe-badge")) {
+        const badge = document.createElement("div");
+        badge.className = "sim-observe-badge";
+        const when = [stages.indexOf("play") >= 0 ? "播放到一個段落" : "", stages.indexOf("param") >= 0 ? "調整參數之後" : ""].filter(Boolean).join("、或");
+        badge.innerHTML = '<span class="sim-observe-badge-dot"></span>本實驗含觀察題：' + when + "，會停下來問你剛才看到什麼。做完再到頁面下方的「完成實驗」總結。";
+        briefEl.appendChild(badge);
+      }
+    } catch (e) {}
+
+    let busy = false;
+    const anyRunning = () => loops.some(l => l.running);
+    const cardOpen = () => busy || !!document.querySelector(".sim-observe-backdrop");   // 手寫觀察點的卡也算
+    const snap = () => { const m = new Map(); usableReadouts(context).forEach(r => m.set(r, r.number)); return m; };
+    const open = (point, wasRunning, stage) => {
+      if (cardOpen()) return false;
+      busy = true;
+      loops.forEach(l => { try { l.stop(); } catch (e) {} });
+      const card = buildCard(point, function onResume() {
+        busy = false;
+        if (wasRunning) loops.forEach(l => { try { l.start(); } catch (e) {} });
+      }, function onAnswered(correct) { AUTO.mark(id, stage, correct); });
+      document.body.appendChild(card);
+      return true;
+    };
+    // 指標與鍵盤狀態用模組層的單一監聽器（GLOBAL_INPUT），不在每次建置時往 window 加監聽——
+    // 那樣每開一個實驗就多留一組閉包，整個實驗 context 都放不掉。
+    let lastUser = 0;
+    const builtAt = Date.now();
+    root.addEventListener("pointerdown", () => { lastUser = Date.now(); }, true);
+    const userAt = () => Math.max(lastUser, GLOBAL_INPUT.key > builtAt ? GLOBAL_INPUT.key : 0);
+
+    /* ---------- ① 播放觀察 ---------- */
+    let playArmed = stages.indexOf("play") >= 0 && !handWritten && !AUTO.done(id).play;
+    let samples = [], playMs = 0, lastFrame = 0, lastSample = 0, wasRun = false;
+    const previousTick = context.onTick;
+    let ring = [], lastRing = 0;
+    context.onTick = function (dt, t) {
+      if (previousTick) previousTick(dt, t);
+      const nowR = performance.now();
+      if (nowR - lastRing >= 150) { lastRing = nowR; ring.push(snap()); if (ring.length > 16) ring.shift(); }
+      if (!playArmed || cardOpen()) return;
+      // 進場就自動播放的穩態動畫：學生還沒碰實驗台之前不計時，免得一打開頁面就跳出問題
+      if (!userAt() && root.classList.contains("is-ambient")) return;
+      const now = performance.now();
+      if (lastFrame && now - lastFrame < 200) playMs += now - lastFrame;
+      lastFrame = now;
+      if (now - lastSample >= 90) { lastSample = now; samples.push(snap()); if (samples.length > 400) samples = samples.filter((_, i) => i % 2 === 0); }
+      // 播放滿 4 秒就問；放開把手前不打斷
+      if (playMs >= 4000 && !GLOBAL_INPUT.down) firePlay(true);
+    };
+    function firePlay(running) {
+      if (!playArmed || cardOpen()) return;
+      const q = samples.length >= 6 ? playQuestion(context, samples) : null;
+      if (window.PhysicsLabDebugObserve) console.log("observe-play", id, running, Math.round(playMs), samples.length, !!q);
+      if (!q) {
+        // 沒有任何可讀的數值讀數：這一階段不出題，免得硬湊
+        playArmed = false; AUTO.mark(id, "play", false);
+        return;
+      }
+      if (open(q, running, "play")) playArmed = false;
+    }
+    // 這一輪自己跑完（落地、跑到終點）而不是學生按暫停：也是提問的好時機
+    const pollPlay = setInterval(() => {
+      if (!root.isConnected) { clearInterval(pollPlay); clearInterval(pollParam); return; }
+      const run = anyRunning();
+      if (wasRun && !run && playArmed && !busy && Date.now() - userAt() > 600 && playMs > 900) firePlay(false);
+      wasRun = run;
+      if (!run) lastFrame = 0;
+    }, 250);
+    const resetBtn = root.querySelector(".sim-transport-reset");
+    if (resetBtn) resetBtn.addEventListener("click", () => { samples = []; playMs = 0; });
+    // 離開實驗（api.stop）時停掉輪詢，不留計時器抓著整個實驗不放
+    if (api && typeof api.stop === "function") {
+      const stop0 = api.stop;
+      api.stop = function () { clearInterval(pollPlay); clearInterval(pollParam); return stop0.apply(this, arguments); };
+    }
+
+    /* ---------- ② 改變參數觀察 ---------- */
+    let paramArmed = stages.indexOf("param") >= 0 && !AUTO.done(id).param;
+    let stable = { at: 0, readouts: null, values: null };
+    let changing = null, lastInput = 0;
+    const sliderVals = () => sliders.map(s => s.read());
+    root.addEventListener("input", e => {
+      if (!paramArmed || cardOpen()) return;
+      const k = sliders.findIndex(s => s.el === e.target);
+      if (k < 0) return;
+      lastInput = Date.now();
+      if (!changing) {
+        const base = stable.readouts ? stable : { readouts: snap(), values: sliderVals() };
+        // 播放中：記下這段時間裡「不隨時間變」的讀數，之後只拿它們出題
+        const steady = new Set();
+        if (ring.length >= 4) usableReadouts(context).forEach(r => {
+          const ys = ring.map(m => m.get(r)).filter(v => typeof v === "number" && isFinite(v));
+          if (ys.length < 4) return;
+          const lo = Math.min.apply(null, ys), hi = Math.max.apply(null, ys);
+          if ((hi - lo) <= Math.max(Math.abs(lo), Math.abs(hi), 1e-12) * 0.01) steady.add(r);
+        });
+        changing = { k, before: base.readouts, x0: base.values[k], running: anyRunning(), steady };
+      }
+      if (anyRunning()) changing.running = true;
+    }, true);
+    const pollParam = setInterval(() => {
+      if (!paramArmed) return;
+      const now = Date.now();
+      if (!changing) {
+        if (now - lastInput > 700 && !cardOpen()) stable = { at: now, readouts: snap(), values: sliderVals() };
+        return;
+      }
+      if (now - lastInput < 900 || GLOBAL_INPUT.down || cardOpen()) return;
+      const c = changing; changing = null;
+      const s = sliders[c.k];
+      const x1 = s.read();
+      const range = Math.abs(s.max - s.min) || 1;
+      if (Math.abs(x1 - c.x0) < range * 0.08) return;   // 只動一點點：不問
+      const running = c.running || anyRunning();
+      const q = running ? runningParamQuestion(context, s, c.x0, x1, c.steady)
+        : paramQuestion(context, s, c.before, snap(), c.x0, x1);
+      if (!q) return;          // 暫停時讀數沒反應（常常只是還沒開始動）：等下一次
+      if (open(q, running, "param")) paramArmed = false;
+    }, 250);
   });
 })();

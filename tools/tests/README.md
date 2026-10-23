@@ -6,6 +6,7 @@
 node tools/tests/run-all.js          # 全部（約 30 秒）
 node tools/tests/run-all.js --fast   # 略過兩支耗時稽核（約 5 秒）
 node tools/tests/render-test.js      # 單獨跑某一支
+node --max-old-space-size=4096 tools/tests/meaning-audit.js   # 這支單跑要給大一點的堆積（約 2.4 GB）
 ```
 
 ## 為什麼這些測試放在版控裡
