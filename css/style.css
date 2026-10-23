@@ -2696,7 +2696,8 @@ body.stage-only .content-grid > .card:first-child { background: transparent; bor
    觀察題問的是「你剛才看到什麼」，學生答題時要能回頭看實驗台與讀數；
    以前整頁霧化遮住實驗，反而看不到要觀察的東西。
    --------------------------------------------------------------------------- */
-.sim-observe-backdrop { align-items: flex-end; justify-content: flex-end; background: transparent; backdrop-filter: none; pointer-events: none; padding: 18px; }
+/* 停在左下角：右側是量測讀數，觀察題問的正是讀數，不能蓋住它 */
+.sim-observe-backdrop { align-items: flex-end; justify-content: flex-start; background: transparent; backdrop-filter: none; pointer-events: none; padding: 18px; }
 .sim-observe-card { pointer-events: auto; width: min(420px, 94vw); max-height: min(78vh, 640px); box-shadow: 0 24px 60px -18px rgba(10, 20, 40, 0.5), 0 0 0 1px var(--border); }
 .sim-observe-title { font-size: 17px; }
 @media (max-width: 640px) {
