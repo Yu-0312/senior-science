@@ -106,10 +106,17 @@
     // 「繼續」卡：回來的人第一眼就知道下一關是什麼
     const cont = $("#continue-card"); cont.innerHTML = "";
     if (next) {
+      const ic = el("div", "continue-icon", cont);
+      ic.style.setProperty("--cu", next.mod.color);
+      ic.innerHTML = ICONS.flask;
       const t = el("div", "continue-text", cont);
-      el("p", null, t, Object.keys(state.done).length ? "接著上次的進度" : "從第一關開始");
+      el("p", null, t, (Object.keys(state.done).length ? "接著上次的進度 · " : "從第一關開始 · ") + next.mod.title);
       el("h2", null, t, next.exp.title);
-      const go = el("button", "btn primary", cont, Object.keys(state.done).length ? "繼續" : "開始");
+      const totalDone = Object.keys(state.done).length;
+      const meta = el("div", "continue-meta", t);
+      const bar = el("div", "bar", meta); el("i", null, bar).style.width = Math.max(2, Math.round(totalDone / FLAT.length * 100)) + "%";
+      el("small", null, meta, "已通過 " + totalDone + " / " + FLAT.length + " 關");
+      const go = el("button", "btn primary", cont, totalDone ? "繼續" : "開始");
       go.type = "button";
       go.addEventListener("click", () => openLesson(next.exp.id));
     }
@@ -141,6 +148,7 @@
       const path = el("div", "path", unit);
       m.experiments.forEach((exp, i) => {
         const wrap = el("div", "node-wrap", path);
+        wrap.dataset.id = exp.id;
         wrap.style.setProperty("--dx", Math.round(Math.sin(i * 0.9) * 70) + "px");
         const rec = state.done[exp.id];
         const isNext = next && next.exp.id === exp.id;
@@ -148,7 +156,8 @@
         node.type = "button";
         node.setAttribute("aria-label", exp.title + (rec ? "（已通過，" + rec.stars + " 星）" : ""));
         node.innerHTML = rec ? ICONS.check : [ICONS.flask, ICONS.chart, ICONS.book][i % 3];
-        node.addEventListener("click", () => openLesson(exp.id));
+        node.setAttribute("aria-haspopup", "dialog");
+        node.addEventListener("click", e => { e.stopPropagation(); togglePop(wrap, exp, m, rec, isNext); });
         if (isNext) { wrap.classList.add("has-bubble"); el("div", "node-bubble", wrap, Object.keys(state.done).length ? "下一關" : "開始"); }
         el("div", "node-label", wrap, exp.title);
         if (rec) {
@@ -158,6 +167,75 @@
       });
     });
     renderStats();
+  }
+
+  /*
+   * 點節點先跳出說明卡，按卡上的「開始」才進關。
+   * 以前一點就直接進關，在地圖上捲動、瀏覽時很容易誤觸，也沒有機會先看這一關是什麼。
+   */
+  function closePop() {
+    document.querySelectorAll(".node-pop").forEach(n => n.remove());
+    document.querySelectorAll(".node-wrap.open").forEach(n => n.classList.remove("open"));
+  }
+  function togglePop(wrap, exp, m, rec, isNext) {
+    const wasOpen = wrap.classList.contains("open");
+    closePop();
+    if (wasOpen) return;
+    wrap.classList.add("open");
+    const pop = el("div", "node-pop" + (rec ? " done" : ""), wrap);
+    pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", exp.title);
+    pop.addEventListener("click", e => e.stopPropagation());
+    el("h3", null, pop, exp.title);
+    if (rec) {
+      const st = el("div", "node-pop-stars", pop);
+      for (let s = 0; s < 3; s++) { st.insertAdjacentHTML("beforeend", STAR); if (s < rec.stars) st.lastChild.classList.add("on"); }
+      el("p", null, pop, rec.stars < 3 ? "再練一次，拿到 3 星吧！" : "已經拿滿 3 星，可以再複習一次。");
+    } else {
+      el("p", null, pop, m.title + " · 第 " + (m.experiments.indexOf(exp) + 1) + " / " + m.experiments.length + " 關" + (isNext ? "" : "（可以跳著挑戰）"));
+    }
+    const go = el("button", "btn", pop, rec ? "再練一次" : "開始");
+    go.type = "button";
+    go.addEventListener("click", () => { closePop(); openLesson(exp.id); });
+    setTimeout(() => go.focus({ preventScroll: true }), 30);
+    // 卡片在畫面外時捲進來
+    requestAnimationFrame(() => {
+      const r = pop.getBoundingClientRect();
+      if (r.bottom > window.innerHeight - 12) window.scrollBy({ top: r.bottom - window.innerHeight + 24, behavior: "smooth" });
+    });
+  }
+  document.addEventListener("click", closePop);
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && lesson.hidden) closePop(); });
+
+  /* 回到地圖時：剛過的關卡跳一下、星星一顆顆亮起、下一關解鎖，底部提示可直接接著玩 */
+  function celebrateOnMap(info) {
+    const wrap = document.querySelector('.node-wrap[data-id="' + CSS.escape(info.id) + '"]');
+    if (!wrap) return;
+    wrap.scrollIntoView({ block: "center", behavior: "instant" in document.documentElement.style ? "instant" : "auto" });
+    const node = wrap.querySelector(".node");
+    wrap.classList.add("celebrate");
+    if (node) node.classList.add("celebrate");
+    const nx = info.nextId && document.querySelector('.node-wrap[data-id="' + CSS.escape(info.nextId) + '"]');
+    if (nx && info.firstTime) nx.classList.add("unlock");
+    setTimeout(() => { wrap.classList.remove("celebrate"); if (node) node.classList.remove("celebrate"); if (nx) nx.classList.remove("unlock"); }, 2600);
+    showToast(info);
+  }
+  let toastTimer = 0;
+  function showToast(info) {
+    document.querySelectorAll(".toast").forEach(t => t.remove());
+    clearTimeout(toastTimer);
+    const nf = info.nextId && byId[info.nextId];
+    const t = el("div", "toast", document.body);
+    t.setAttribute("role", "status");
+    const ic = el("span", "toast-ic", t); ic.innerHTML = STAR;
+    const tx = el("div", "toast-txt", t);
+    el("b", null, tx, "「" + byId[info.id].exp.title + "」" + info.stars + " 星通過！");
+    el("span", null, tx, nf ? (info.firstTime ? "解鎖下一關：" : "下一關：") + nf.exp.title : "+" + info.gained + " XP");
+    if (nf) {
+      const b = el("button", "btn primary small", t, "下一關");
+      b.type = "button";
+      b.addEventListener("click", () => { t.remove(); openLesson(nf.exp.id); });
+    }
+    toastTimer = setTimeout(() => { t.classList.add("out"); setTimeout(() => t.remove(), 320); }, 6000);
   }
 
   /* ------------------------------ 錯題本 ------------------------------ */
@@ -453,9 +531,18 @@
   /* =======================================================================
      關卡執行
      ======================================================================= */
-  const L = { f: null, items: [], queue: [], index: 0, total: 0, mistakes: 0, answered: 0, lab: null, ready: false, selected: null, phase: "answer", poll: 0, current: null, predictionPick: null, retried: null };
+  const L = { f: null, items: [], queue: [], index: 0, total: 0, mistakes: 0, answered: 0, lab: null, ready: false, selected: null, phase: "answer", poll: 0, current: null, predictionPick: null, retried: null, combo: 0, firstSeen: 0, firstRight: 0 };
   const lesson = $("#lesson"), main = $("#lesson-main"), labBox = $("#lesson-lab"), frame = $("#lab-frame");
-  const foot = $("#lesson-foot"), feedback = $("#feedback"), btnCheck = $("#btn-check"), btnSkip = $("#btn-skip");
+  const foot = $("#lesson-foot"), feedback = $("#feedback"), btnCheck = $("#btn-check"), btnSkip = $("#btn-skip"), btnAgain = $("#btn-again");
+  const comboEl = $("#lesson-combo");
+  function setCombo(n) {
+    L.combo = n;
+    comboEl.hidden = n < 2;
+    if (n >= 2) {
+      $("#combo-n").textContent = "連對 " + n;
+      comboEl.classList.remove("bump"); void comboEl.offsetWidth; comboEl.classList.add("bump");
+    }
+  }
 
   window.addEventListener("message", e => {
     if (e.origin !== location.origin || !e.data) return;
@@ -474,8 +561,13 @@
 
   function openLesson(id) {
     const f = byId[id]; if (!f) return;
-    Object.assign(L, { f, items: [], queue: [], index: 0, total: 0, mistakes: 0, answered: 0, lab: null, ready: false, selected: null, phase: "answer", current: null, predictionPick: null, retried: null });
+    Object.assign(L, { f, items: [], queue: [], index: 0, total: 0, mistakes: 0, answered: 0, lab: null, ready: false, selected: null, phase: "answer", current: null, predictionPick: null, retried: null, firstSeen: 0, firstRight: 0, finishInfo: null });
     clearInterval(L.poll);
+    closePop();
+    document.querySelectorAll(".toast, .confetti").forEach(n => n.remove());
+    lesson.classList.remove("finished", "answered-good");
+    btnAgain.hidden = true;
+    setCombo(0);
     document.body.classList.add("in-lesson");
     lesson.hidden = false;
     lesson.style.setProperty("--u", f.mod.color);
@@ -511,12 +603,35 @@
     clearInterval(L.poll); clearTimeout(L.timeout);
     lesson.hidden = true; document.body.classList.remove("in-lesson");
     setFrame("about:blank");
-    L.f = null;
+    const info = L.finishInfo;
+    L.f = null; L.finishInfo = null;
+    lesson.classList.remove("finished", "answered-good");
+    document.querySelectorAll(".confetti").forEach(n => n.remove());
     if (location.hash) history.pushState(null, "", location.pathname + location.search);
     renderMap();
+    if (info) requestAnimationFrame(() => celebrateOnMap(info));
+  }
+  /* 離開確認：用自己的底部面板取代瀏覽器的 confirm（confirm 會凍結畫面，在手機上也很突兀） */
+  function confirmLeave() {
+    if (document.querySelector(".sheet-backdrop")) return;
+    const back = el("div", "sheet-backdrop", document.body);
+    const sh = el("div", "sheet", back);
+    sh.setAttribute("role", "alertdialog"); sh.setAttribute("aria-modal", "true"); sh.setAttribute("aria-labelledby", "sheet-title");
+    el("h3", null, sh, "等等，先別走！").id = "sheet-title";
+    const left = L.queue.length + (L.phase === "answer" ? 1 : 0);
+    el("p", null, sh, "這一關" + (left > 0 ? "只剩 " + left + " 題" : "快完成了") + "。現在離開，這一關的進度不會保存。");
+    const stay = el("button", "btn primary", sh, "繼續作答"); stay.type = "button";
+    const leave = el("button", "btn ghost", sh, "離開這一關"); leave.type = "button";
+    const done = () => { back.remove(); document.removeEventListener("keydown", onKey, true); };
+    const onKey = e => { if (e.key === "Escape") { e.stopPropagation(); e.preventDefault(); done(); } };
+    document.addEventListener("keydown", onKey, true);
+    stay.addEventListener("click", done);
+    back.addEventListener("click", e => { if (e.target === back) done(); });
+    leave.addEventListener("click", () => { done(); closeLesson(); });
+    setTimeout(() => stay.focus(), 30);
   }
   $("#lesson-close").addEventListener("click", () => {
-    if (L.phase === "done" || L.answered === 0 || window.confirm("確定要離開這一關嗎？這一關的進度不會保存。")) closeLesson();
+    if (L.phase === "done" || L.answered === 0) closeLesson(); else confirmLeave();
   });
 
   function setFoot(mode, title, text) {
@@ -533,6 +648,7 @@
   function updateProgress() {
     const doneCount = L.total - L.queue.length;
     $("#lesson-bar").style.width = Math.max(4, Math.round(doneCount / Math.max(1, L.total) * 100)) + "%";
+    $("#lesson-step").textContent = Math.min(L.total, doneCount + 1) + " / " + L.total;
   }
 
   function next() {
@@ -545,10 +661,11 @@
     main.innerHTML = "";
     setFoot("idle");
     btnSkip.hidden = true;
+    btnAgain.hidden = true;
     btnCheck.hidden = false;
     btnCheck.textContent = "檢查"; btnCheck.disabled = true;
+    lesson.classList.remove("answered-good");
     const [cls, label, icon] = KIND[item.kind] || KIND.concept;
-    $("#lesson-step").textContent = label;
     const kind = el("span", "q-kind " + cls, main);
     kind.innerHTML = icon; kind.appendChild(document.createTextNode(item.retry ? label + " · 再試一次" : label));
     el("h2", "q-title", main, item.title);
@@ -621,7 +738,7 @@
   function renderLab(item) {
     const S = L.lab && L.lab.summary;
     const task = el("div", "task", main);
-    el("h3", null, task, item.mode === "explore" ? "任務" : "目標");
+    el("h3", null, task, item.mode === "explore" ? "任務" : "目標").insertAdjacentHTML("afterbegin", item.mode === "explore" ? ICONS.flask : '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/></svg>');
     const goal = el("p", "task-goal", task); goal.innerHTML = item.goal;
     const hints = el("div", "task-hints", task);
     const tools = el("div", "task-tools", task);
@@ -760,9 +877,13 @@
       setFoot("good", item.mode === "explore" ? "做得好！" : "達成目標！", text);
       return;
     }
+    if (!item.retry) { L.firstSeen++; if (ok) L.firstRight++; }
     if (ok) {
-      setFoot("good", pick(["答對了！", "太好了！", "正確！"]), item.explain || "");
+      setCombo(L.combo + 1);
+      lesson.classList.add("answered-good");
+      setFoot("good", L.combo >= 3 ? "連續答對 " + L.combo + " 題！" : pick(["答對了！", "太好了！", "正確！"]), item.explain || "");
     } else {
+      setCombo(0);
       L.mistakes++;
       const answerText = item.numeric ? withUnit(item.answer, item.unit) : item.options[item.correct];
       setFoot("bad", "正確答案：" + answerText, item.explain || item.hint || "");
@@ -786,6 +907,7 @@
     const item = L.current;
     clearInterval(L.poll);
     L.phase = "result"; L.answered++; L.mistakes++;
+    setCombo(0);
     btnSkip.hidden = true;
     const S = L.lab.summary, x = S.sliders[item.rel.s];
     setFoot("bad", "這題先跳過", "參考做法：把「" + x.label + "」調到約 " + withUnit(estimateX(item.rel, item.targetValue), x.unit) + "。下次再挑戰一次！");
@@ -809,7 +931,10 @@
     L.phase = "done";
     $("#lesson-bar").style.width = "100%";
     $("#lesson-step").textContent = "完成";
+    comboEl.hidden = true;
     labBox.hidden = true; $("#lesson-body").classList.remove("with-lab");
+    lesson.classList.remove("answered-good");
+    lesson.classList.add("finished");
     const stars = L.mistakes === 0 ? 3 : L.mistakes <= 2 ? 2 : 1;
     const gained = 10 + stars * 5;
     const prev = state.done[L.f.exp.id];
@@ -822,39 +947,95 @@
       state.streak.count = state.streak.last === yt ? state.streak.count + 1 : 1;
       state.streak.last = t;
     }
-    // 全部重答對的錯題移出錯題本
     save(); renderStats();
+
+    // 答對率只算「第一次作答」：重出的題目答對不會把比例灌水
+    const acc = L.firstSeen ? Math.round(L.firstRight / L.firstSeen * 100) : 100;
+    const nx = FLAT[L.f.order + 1];
+    L.finishInfo = { id: L.f.exp.id, stars, gained, firstTime: !prev, nextId: nx ? nx.exp.id : null };
 
     main.innerHTML = "";
     const r = el("div", "result", main);
+    const badge = el("div", "result-badge", r);
+    el("div", "medal", badge).innerHTML = stars === 3 ? '<svg viewBox="0 0 24 24"><path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 12H5z" fill="#fff" stroke="none"/></svg>' : ICONS.check;
     const st = el("div", "result-stars", r);
+    st.setAttribute("aria-label", stars + " 星");
     for (let i = 0; i < 3; i++) { st.insertAdjacentHTML("beforeend", STAR); if (i < stars) st.lastChild.classList.add("on"); }
-    el("h2", null, r, stars === 3 ? "完美通關！" : stars === 2 ? "過關！" : "過關了，再練一次會更穩");
+    el("h2", "", r, stars === 3 ? "完美通關！" : stars === 2 ? "過關！" : "過關了！").id = "lesson-title";
+    el("p", "result-sub", r, stars === 3 ? "一題都沒錯，太強了。" : stars === 2 ? "只錯了一點點，再練一次就能拿 3 星。" : "答錯的題目已收進錯題本，再練一次會更穩。");
     const grid = el("div", "result-grid", r);
-    [[gained, "XP"], [L.mistakes, "次答錯"], [state.streak.count, "天連續"]].forEach(([v, l]) => { const c = el("div", "result-cell", grid); el("b", null, c, String(v)); el("span", null, c, l); });
+    const cells = [
+      ["xp", "獲得 XP", gained, '<svg viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>', ""],
+      ["acc", "答對率", acc, '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.2 14.2-4-4 1.4-1.4 2.6 2.6 5.6-5.6 1.4 1.4z"/></svg>', "%"],
+      ["streak", "連續天數", state.streak.count, '<svg viewBox="0 0 24 24"><path d="M12 2c1 3.5 5 5.6 5 10.4A5 5 0 0 1 12 22a5 5 0 0 1-5-5c0-2.6 1.5-4.1 2.6-5.3.3 1.6 1 2.6 2 3.1C11 12 10.4 7 12 2z"/></svg>', ""]
+    ];
+    cells.forEach(([cls, label, v, icon, suffix]) => {
+      const c = el("div", "result-cell " + cls, grid);
+      el("span", null, c, label);
+      const b = el("b", null, c); b.innerHTML = icon;
+      const num = el("em", null, b, "0" + suffix); num.style.fontStyle = "normal";
+      countUp(num, v, suffix, 700);
+    });
     const take = el("p", "result-take", r);
     el("small", null, take, "這一關要帶走的");
     take.appendChild(document.createTextNode(L.f.exp.points[0] || firstSentence(L.f.exp.concept)));
-    const link = el("a", "result-link", r, "在物理實驗室打開完整版（含概念、公式與學習單）");
+    const links = el("div", "result-links", r);
+    if (nx) {
+      const go = el("button", "result-link", links, "直接挑戰下一關：" + nx.exp.title + " ›");
+      go.type = "button";
+      go.addEventListener("click", () => openLesson(nx.exp.id));
+    }
+    const link = el("a", "result-link", links, "打開完整版（概念、公式與學習單）");
     link.href = "../#" + L.f.exp.id;
+    confetti(stars);
 
-    setFoot("good", "+" + gained + " XP", "");
+    setFoot("idle");
+    btnAgain.hidden = false;
     btnCheck.hidden = false;
-    const nx = FLAT[L.f.order + 1];
     btnCheck.disabled = false;
-    btnCheck.textContent = nx ? "下一關" : "回地圖";
-    btnCheck.onclick = null;
-    L.nextId = nx ? nx.exp.id : null;
+    btnCheck.textContent = "繼續";
+    setTimeout(() => btnCheck.focus({ preventScroll: true }), 60);
+  }
+
+  function countUp(node, to, suffix, ms) {
+    if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) { node.textContent = to + suffix; return; }
+    const t0 = performance.now() + 250;
+    const tick = now => {
+      const k = Math.max(0, Math.min(1, (now - t0) / ms));
+      node.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))) + suffix;
+      if (k < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+  function confetti(stars) {
+    if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const box = el("div", "confetti", document.body);
+    box.setAttribute("aria-hidden", "true");
+    const colors = ["#58cc02", "#1cb0f6", "#ffc800", "#ff4b4b", "#ce82ff", "#ff9600"];
+    const n = 30 + stars * 15;
+    for (let i = 0; i < n; i++) {
+      const c = el("i", null, box);
+      c.style.setProperty("--x", (Math.random() * 100) + "vw");
+      c.style.setProperty("--w", (6 + Math.random() * 6) + "px");
+      c.style.setProperty("--c", colors[i % colors.length]);
+      c.style.setProperty("--d", (1.8 + Math.random() * 1.6) + "s");
+      c.style.setProperty("--delay", (Math.random() * 0.5) + "s");
+      c.style.setProperty("--dx", (Math.random() * 160 - 80) + "px");
+      c.style.setProperty("--r", (Math.random() * 720 - 360) + "deg");
+    }
+    setTimeout(() => box.remove(), 4200);
   }
 
   btnCheck.addEventListener("click", () => {
-    if (L.phase === "done") { if (L.nextId) openLesson(L.nextId); else closeLesson(); return; }
+    // 過關後回地圖看成果與解鎖動畫，不直接把學生丟進下一關
+    if (L.phase === "done") { closeLesson(); return; }
     check();
   });
   btnSkip.addEventListener("click", skipLab);
+  btnAgain.addEventListener("click", () => { if (L.f) openLesson(L.f.exp.id); });
 
   document.addEventListener("keydown", e => {
-    if (lesson.hidden) return;
+    if (lesson.hidden || document.querySelector(".sheet-backdrop")) return;
     if (e.target && e.target.tagName === "INPUT" && e.key !== "Enter") return;
     if (e.key === "Escape") { $("#lesson-close").click(); return; }
     // 焦點在按鈕上時 Enter 會由瀏覽器觸發那顆按鈕；再補一次 click 會把「檢查」和「繼續」連按兩下，

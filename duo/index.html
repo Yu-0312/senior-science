@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Noto+Sans+TC:wght@500;700;900&display=swap" />
-  <link rel="stylesheet" href="duo.css?v=20261023-01" />
+  <link rel="stylesheet" href="duo.css?v=20261023-02" />
 </head>
 <body>
   <!--
@@ -86,6 +86,7 @@
     <div class="lesson-top">
       <button class="icon-x" id="lesson-close" type="button" aria-label="離開這一關"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
       <div class="lesson-progress" aria-hidden="true"><i id="lesson-bar"></i></div>
+      <span class="combo" id="lesson-combo" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1 3.5 5 5.6 5 10.4A5 5 0 0 1 12 22a5 5 0 0 1-5-5c0-2.6 1.5-4.1 2.6-5.3.3 1.6 1 2.6 2 3.1C11 12 10.4 7 12 2z"/></svg><span id="combo-n">0</span></span>
       <span class="lesson-step" id="lesson-step">準備中</span>
     </div>
     <div class="lesson-body" id="lesson-body">
@@ -99,21 +100,22 @@
         <div class="feedback" id="feedback" aria-live="polite"></div>
         <div class="foot-actions">
           <button class="btn ghost" id="btn-skip" type="button" hidden>跳過</button>
+          <button class="btn" id="btn-again" type="button" hidden>再練一次</button>
           <button class="btn primary" id="btn-check" type="button" disabled>檢查</button>
         </div>
       </div>
     </footer>
   </section>
 
-  <script src="../js/site-config.js?v=20261023-01"></script>
-  <script src="../js/curriculum.js?v=20261023-01"></script>
-  <script src="../js/advanced-curriculum.js?v=20261023-01"></script>
-  <script src="../js/comprehensive-curriculum.js?v=20261023-01"></script>
-  <script src="../js/extension-registry.js?v=20261023-01"></script>
-  <script src="../js/open-curriculum.js?v=20261023-01"></script>
-  <script src="../js/school-curriculum.js?v=20261023-01"></script>
-  <script src="../js/exam-curriculum.js?v=20261023-01"></script>
-  <script src="../js/question-bank.js?v=20261023-01"></script>
-  <script src="duo.js?v=20261023-01"></script>
+  <script src="../js/site-config.js?v=20261023-02"></script>
+  <script src="../js/curriculum.js?v=20261023-02"></script>
+  <script src="../js/advanced-curriculum.js?v=20261023-02"></script>
+  <script src="../js/comprehensive-curriculum.js?v=20261023-02"></script>
+  <script src="../js/extension-registry.js?v=20261023-02"></script>
+  <script src="../js/open-curriculum.js?v=20261023-02"></script>
+  <script src="../js/school-curriculum.js?v=20261023-02"></script>
+  <script src="../js/exam-curriculum.js?v=20261023-02"></script>
+  <script src="../js/question-bank.js?v=20261023-02"></script>
+  <script src="duo.js?v=20261023-02"></script>
 </body>
 </html>
