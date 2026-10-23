@@ -401,7 +401,10 @@ body.checkpoint-active { overflow: hidden; }
 .review-focus-item {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0;
   padding: 8px 9px; border: 1px solid var(--border-soft); border-radius: 7px; background: var(--tint-1);
+  width: 100%; color: inherit; font: inherit; text-align: left;
 }
+button.review-focus-item { cursor: pointer; transition: border-color 0.15s; }
+button.review-focus-item:hover { border-color: var(--m-color, var(--accent)); }
 .review-focus-name { min-width: 0; color: var(--text); font-size: 12px; overflow-wrap: anywhere; }
 .review-focus-meta { color: var(--text-faint); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
@@ -1072,14 +1075,7 @@ body.demo-mode .content-grid { grid-template-columns: minmax(0, 1fr); }
 /* 演示模式的開關本身用主色點一下，讓老師找得到。 */
 .sim-command-demo { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
 body.demo-mode .sim-command-demo { background: color-mix(in srgb, var(--accent) 14%, transparent); }
-/* ---------------------------------------------------------------------------
-   教師演示版：一頁式實驗台（body.stage-only，只在實驗頁、由教師演示版進入時加上）
-   目標：1920×1080（以及 1366×768 筆電投影）整頁不捲動。
-     · 頂端一條演示列：切換實驗（選單＋上一個／下一個）、全螢幕、離開
-     · 左：實驗台畫布，高度由 sim-core 依視窗高度計算，不會撐出畫面
-     · 右：播放控制 → 情境預設 → 參數（唯一可內部捲動的區塊）→ 讀數 → 示範重點 → 課堂提問
-   頂欄、目錄、概念卡、學習閉環等自學鷹架一律收掉。
-   --------------------------------------------------------------------------- */
+/* 教師演示版：一頁式實驗台（body.stage-only）。整頁與右欄都不捲動；排版由 app.js 的 fitStage() 決定。 */
 .stage-bar, .stage-menu { display: none; }
 body.stage-only { overflow: hidden; }
 body.stage-only .topbar,
@@ -1095,39 +1091,118 @@ body.stage-only .content-grid > .card > .card-title,
 body.stage-only .sim-command-bar,
 body.stage-only .sim-visual-panel > .sim-panel-head,
 body.stage-only .sim-transport-hint,
-/* 自學用的區塊（任務導讀、流程、挑戰、謎題、關係摘要…）收掉；右欄要用的幾塊放行。 */
-body.stage-only #sim-root > :not(.sim-stage):not(.sim-a11y):not(.stage-side) { display: none !important; }
-body.stage-only .stage-side > .sim-insight-block > :not(.sim-presets) { display: none !important; }
+body.stage-only .sim-readout-head,
+body.stage-only .sim-chart .cap,
+body.stage-only #sim-root > :not(.sim-stage):not(.sim-a11y):not(.stage-side):not(.stage-dock) { display: none !important; }
+body.stage-only .stage-pane > .sim-insight-block > :not(.sim-presets) { display: none !important; }
 /* 螢幕報讀器用的文字版讀數：視覺上隱藏，但留在無障礙樹裡。 */
 body.stage-only #sim-root > .sim-a11y {
   position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 body.stage-only .layout { min-height: 0; }
-body.stage-only .main { height: 100vh; padding: 64px clamp(12px, 1.4vw, 24px) 14px; overflow: hidden; }
+body.stage-only .main { height: 100vh; height: 100dvh; padding: 60px clamp(10px, 1.2vw, 22px) 10px; overflow: hidden; }
 body.stage-only #exp-view { max-width: none; height: 100%; }
 body.stage-only .content-grid { display: block; height: 100%; gap: 0; margin: 0; }
 body.stage-only .content-grid > .card { height: 100%; border: 0; background: transparent; box-shadow: none; backdrop-filter: none; }
 body.stage-only .content-grid > .card > .card-body { height: 100%; padding: 0; }
 body.stage-only #sim-root {
+  --stage-side-w: clamp(300px, 23vw, 420px);
   display: grid; height: 100%; min-height: 0; margin: 0;
-  grid-template-columns: minmax(0, 1fr) clamp(300px, 21vw, 400px); grid-template-rows: minmax(0, 1fr); column-gap: 16px; row-gap: 0;
+  grid-template-columns: minmax(0, 1fr) var(--stage-side-w); grid-template-rows: minmax(0, 1fr) auto; column-gap: 14px; row-gap: 10px;
 }
+body.stage-only #sim-root.stage-wide { --stage-side-w: clamp(420px, 33vw, 620px); }
 body.stage-only #sim-root > .sim-stage { grid-column: 1; grid-row: 1; align-self: stretch; }
-body.stage-only #sim-root > .stage-side { grid-column: 2; grid-row: 1; align-self: stretch; }
+body.stage-only #sim-root > .stage-dock { grid-column: 1; grid-row: 2; min-width: 0; }
+body.stage-only #sim-root > .stage-side { grid-column: 2; grid-row: 1 / span 2; align-self: stretch; }
 body.stage-only #sim-root > .sim-stage { display: block; min-height: 0; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
 body.stage-only .sim-visual-panel { height: 100%; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+body.stage-only .sim-visual-panel > .sim-canvas-wrap { flex: 0 0 auto; }
+body.stage-only .sim-visual-panel > .sim-caption { flex: none; padding-bottom: 6px; }
+
 body.stage-only .stage-side {
-  display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
-  padding-right: 2px; scrollbar-width: thin;
+  display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; overflow: hidden;
 }
-body.stage-only .stage-side > * { flex: none; margin: 0 !important; order: 0 !important; }
-body.stage-only .stage-side .sim-transport { flex-wrap: wrap; }
-body.stage-only .stage-side .sim-readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-body.stage-only .stage-side .readout-value { font-size: 22px; }
+body.stage-only .stage-side > .sim-transport { flex: none; margin: 0; }
+body.stage-only .stage-side .sim-transport-play { flex: 1 1 auto; }
+.stage-tabs[hidden], .stage-tab[hidden], .stage-pane[hidden], .stage-dock[hidden] { display: none !important; }
+body.stage-only .stage-pane { display: flex; flex-direction: column; gap: 10px; flex: none; min-height: 0; }
+body.stage-only .stage-pane > * { flex: none; margin: 0 !important; order: 0 !important; }
+body.stage-only .stage-side.is-overflowing .stage-pane:not([hidden]) { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 body.stage-only .stage-side .sim-charts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+body.stage-only .stage-side .sim-chart { padding: 8px 10px; }
+body.stage-only .stage-side .sim-chart .chart-title { margin-bottom: 2px; }
 body.stage-only .sim-predict .sim-predict-kicker { font-size: 0; }
 body.stage-only .sim-predict .sim-predict-kicker::before { content: "課堂提問・先讓全班舉手"; font-size: 11.5px; }
 body.stage-only .sim-predict .sim-predict-note { display: none; }
+
+/* 右欄分頁 */
+.stage-tabs {
+  flex: none; display: flex; gap: 3px; padding: 3px;
+  border: 1px solid var(--border-soft); border-radius: 10px; background: var(--tint-1);
+}
+.stage-tab {
+  flex: 1 1 0; min-height: 32px; padding: 0 8px; border: 0; border-radius: 7px; cursor: pointer;
+  background: transparent; color: var(--text-dim); font: inherit; font-size: 13px; font-weight: 700; white-space: nowrap;
+}
+.stage-tab:hover { color: var(--text); }
+.stage-tab.is-active {
+  background: var(--panel-solid); color: var(--m-ink, var(--m-color, var(--accent)));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), inset 0 0 0 1px color-mix(in srgb, var(--m-color, var(--accent)) 40%, transparent);
+}
+.stage-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+body.stage-only .stage-side.has-tabs .sim-control-deck > .sim-panel-head { display: none; }
+
+/* 讀數列 */
+body.stage-only .stage-dock .sim-readout-panel { margin: 0; border-radius: 10px; }
+body.stage-only .stage-dock .sim-readouts { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; padding: 8px; }
+body.stage-only .stage-dock .readout { padding: 6px 12px 7px; min-width: 0; }
+body.stage-only .stage-dock .readout-value { font-size: clamp(18px, 1.5vw, 26px); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+body.stage-only .stage-dock .readout-label { margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+
+/* 緊湊排版：第一級收間距，第二級收字級，加寬則參數排兩欄 */
+body.stage-only .stage-side.is-compact { gap: 8px; }
+body.stage-only .stage-side.is-compact .stage-pane { gap: 8px; }
+body.stage-only .stage-side.is-compact > .sim-transport { padding: 6px 8px; gap: 6px; }
+body.stage-only .stage-side.is-compact .sim-control-deck > .sim-panel-head { display: none; }
+body.stage-only .stage-side.is-compact .sim-controls { padding: 9px 11px; gap: 9px; }
+body.stage-only .stage-side.is-compact .ctrl-slider .ctrl-head { margin-bottom: 2px; }
+body.stage-only .stage-side.is-compact .ctrl-section { margin: 2px 0 -3px; }
+body.stage-only .stage-side.is-compact .ctrl-stepper { display: flex; align-items: center; gap: 10px; }
+body.stage-only .stage-side.is-compact .ctrl-stepper .ctrl-label { margin: 0; flex: 1 1 auto; min-width: 0; }
+body.stage-only .stage-side.is-compact .ctrl-stepper .stepper-box { flex: 0 0 min(150px, 52%); }
+body.stage-only .stage-side.is-compact .stepper-btn { height: 30px; width: 30px; }
+body.stage-only .stage-side.is-compact .stepper-val { font-size: 14px; }
+body.stage-only .stage-side.is-compact .ctrl-select { display: flex; align-items: center; gap: 10px; }
+body.stage-only .stage-side.is-compact .ctrl-select .ctrl-label { margin: 0; flex: 0 1 auto; min-width: 0; }
+body.stage-only .stage-side.is-compact .ctrl-select select { flex: 1 1 auto; min-width: 0; padding: 5px 8px; }
+body.stage-only .stage-side.is-compact .chip-row { gap: 6px; }
+body.stage-only .stage-side.is-compact .chip { padding: 5px 10px; }
+body.stage-only .stage-side.is-compact .btn { padding: 7px 12px; }
+body.stage-only .stage-side.is-compact .sim-presets { gap: 5px; }
+body.stage-only .stage-side.is-compact .sim-preset { min-height: 26px; padding: 0 9px; }
+body.stage-only .stage-side.is-compact .sim-demo-tip { padding: 6px 10px; }
+body.stage-only .stage-side.is-compact .sim-predict { padding: 9px 11px; }
+body.stage-only .stage-side.is-compact .sim-predict-question { margin-top: 4px; }
+body.stage-only .stage-side.is-compact .sim-predict-choices { margin-top: 8px; gap: 6px; }
+body.stage-only .stage-side.is-compact .sim-predict-choice { min-height: 32px; padding: 0 12px; }
+body.stage-only .stage-side.is-compact .sim-predict-result { margin-top: 8px; padding: 7px 9px; line-height: 1.55; }
+body.stage-only .stage-side.is-dense .sim-controls { gap: 6px; padding: 8px 10px; }
+body.stage-only .stage-side.is-dense .ctrl-label, body.stage-only .stage-side.is-dense .ctrl-value, body.stage-only .stage-side.is-dense .ctrl-check { font-size: 12px; }
+body.stage-only .stage-side.is-dense .sim-presets-label { display: none; }
+body.stage-only .stage-side.is-dense .chip { padding: 4px 9px; font-size: 11.5px; }
+body.stage-only .stage-side.is-dense .sim-predict-question { font-size: 13px; line-height: 1.5; }
+body.stage-only .stage-side.is-dense .sim-transport-play, body.stage-only .stage-side.is-dense .sim-transport-btn, body.stage-only .stage-side.is-dense .sim-transport-reset { min-height: 30px; }
+/* 最後一級：情境預設收起、區段標題縮成細線 */
+body.stage-only .stage-side.is-tight .stage-pane > .sim-insight-block, body.stage-only .stage-side.is-tight .sim-controls .sim-presets { display: none !important; }
+body.stage-only .stage-side.is-tight .ctrl-section { font-size: 9.5px; margin: 0 0 -4px; }
+body.stage-only .stage-side.is-wide .sim-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; align-items: start; }
+body.stage-only .stage-side.is-wide .sim-controls > .ctrl-section,
+body.stage-only .stage-side.is-wide .sim-controls > .btn-row,
+body.stage-only .stage-side.is-wide .sim-controls > .chip-row,
+body.stage-only .stage-side.is-wide .sim-controls > .ctrl-note,
+body.stage-only .stage-side.is-wide .sim-controls > .sim-presets,
+body.stage-only .stage-side.is-wide .sim-controls > .sim-insight-block,
+body.stage-only .stage-side.is-wide .sim-controls > :not([class^="ctrl-"]) { grid-column: 1 / -1; }
 
 /* 演示列 */
 body.stage-only .stage-bar {
@@ -1143,6 +1218,8 @@ body.stage-only .stage-bar {
 .stage-picker:hover, .stage-picker[aria-expanded="true"] { border-color: var(--accent); }
 .stage-picker-mod { flex: none; font-family: var(--font-mono); font-size: 11.5px; color: var(--m-ink, var(--accent)); }
 .stage-picker-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-display); font-size: 18px; font-weight: 900; }
+.stage-picker-count { flex: none; color: var(--text-faint); font-family: var(--font-mono); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.stage-picker-count:empty { display: none; }
 .stage-picker svg, .stage-nav svg, .stage-btn svg { width: 16px; height: 16px; flex: none; }
 .stage-nav, .stage-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; min-width: 40px; padding: 0 12px;
@@ -1156,6 +1233,7 @@ body.stage-only .stage-bar {
 .stage-keys kbd { padding: 1px 6px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; font: inherit; color: var(--text-dim); }
 .stage-btn.stage-exit { color: var(--text-dim); }
 @media (max-width: 1100px) { .stage-keys { display: none; } }
+@media (max-width: 760px) { .stage-picker-count { display: none; } }
 
 /*
  * 直式畫面（手機、直拿的平板）放不下左右兩欄：右欄 300px 一佔，畫布只剩一條縫。
@@ -1165,8 +1243,9 @@ body.stage-only .stage-bar {
   body.stage-only { overflow: auto; }
   body.stage-only .main { height: auto; overflow: visible; padding-bottom: 24px; }
   body.stage-only #exp-view, body.stage-only .content-grid, body.stage-only .content-grid > .card, body.stage-only .content-grid > .card > .card-body { height: auto; }
-  body.stage-only #sim-root { height: auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; row-gap: 12px; }
-  body.stage-only #sim-root > .stage-side { grid-column: 1; grid-row: 2; overflow: visible; }
+  body.stage-only #sim-root { height: auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; row-gap: 12px; }
+  body.stage-only #sim-root > .stage-side { grid-column: 1; grid-row: 3; overflow: visible; }
+  body.stage-only #sim-root > .stage-dock { grid-row: 2; }
   body.stage-only .sim-visual-panel { height: auto; }
 }
 @media (max-width: 600px) {

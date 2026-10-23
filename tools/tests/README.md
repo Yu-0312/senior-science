@@ -48,6 +48,7 @@ node --max-old-space-size=4096 tools/tests/meaning-audit.js   # 這支單跑要�
 本專案至今每一個嚴重的畫面問題，都是使用者截圖才發現的：
 深色主題的白方塊、淺色主題的黑底板、左右不等高、滑桿拉了沒反應。
 **發佈前請實際打開瀏覽器看過。**
+教師演示版的「一頁不捲動」另有瀏覽器實測：`node tools/stage-fit-check.js`（需要 Playwright，不在 run-all 之列）。
 
 ## 測試自己出過的錯（避免重蹈）
 

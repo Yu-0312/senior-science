@@ -42,8 +42,8 @@
 
   <!-- PWA -->
   <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20261023-03" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png?v=20261023-03" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20261023-04" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png?v=20261023-04" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="物理實驗室" />
@@ -53,7 +53,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Serif+TC:wght@700;900&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=20261023-03" />
+  <link rel="stylesheet" href="css/style.css?v=20261023-04" />
 
   <!-- MathJax（LaTeX 公式排版） -->
   <script>
@@ -467,12 +467,14 @@
     <button class="stage-picker" id="stage-picker" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="stage-menu" title="選擇實驗（/）">
       <span class="stage-picker-mod" id="stage-picker-mod">—</span>
       <span class="stage-picker-title" id="stage-picker-title">選擇實驗</span>
+      <span class="stage-picker-count" id="stage-picker-count"></span>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </button>
     <button class="stage-nav" id="stage-prev" type="button" aria-label="上一個實驗" title="上一個實驗（←）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
     <button class="stage-nav" id="stage-next" type="button" aria-label="下一個實驗" title="下一個實驗（→）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
     <span class="stage-spacer"></span>
-    <span class="stage-keys" aria-hidden="true"><kbd>空白</kbd> 播放 · <kbd>S</kbd> 單步 · <kbd>R</kbd> 重設 · <kbd>←</kbd><kbd>→</kbd> 換實驗</span>
+    <span class="stage-keys" aria-hidden="true"><kbd>空白</kbd> 播放 · <kbd>R</kbd> 重設 · <kbd>←</kbd><kbd>→</kbd> 換實驗 · <kbd>/</kbd> 選單</span>
+    <button class="stage-btn stage-theme" id="stage-theme" type="button" title="切換深色／淺色（投影機偏暗時用淺色）"></button>
     <button class="stage-btn" id="stage-full" type="button" title="全螢幕（F）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>全螢幕</span></button>
     <button class="stage-btn stage-exit" id="stage-exit" type="button" title="離開演示（Esc）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg><span>離開演示</span></button>
   </div>
@@ -489,25 +491,25 @@
   </section>
 
   <!-- 核心 -->
-  <script src="js/site-config.js?v=20261023-03"></script>
-  <script src="js/curriculum.js?v=20261023-03"></script>
-  <script src="js/advanced-curriculum.js?v=20261023-03"></script>
-  <script src="js/comprehensive-curriculum.js?v=20261023-03"></script>
-  <script src="js/extension-registry.js?v=20261023-03"></script>
-  <script src="js/open-curriculum.js?v=20261023-03"></script>
-  <script src="js/school-curriculum.js?v=20261023-03"></script>
-  <script src="js/exam-curriculum.js?v=20261023-03"></script>
-    <script src="js/sim-core.js?v=20261023-03"></script>
-  <script src="js/sim-tools.js?v=20261023-03"></script>
-  <script src="js/sim-insight.js?v=20261023-03"></script>
-  <script src="js/teaching-notes.js?v=20261023-03"></script>
-  <script src="js/sim-a11y.js?v=20261023-03"></script>
+  <script src="js/site-config.js?v=20261023-04"></script>
+  <script src="js/curriculum.js?v=20261023-04"></script>
+  <script src="js/advanced-curriculum.js?v=20261023-04"></script>
+  <script src="js/comprehensive-curriculum.js?v=20261023-04"></script>
+  <script src="js/extension-registry.js?v=20261023-04"></script>
+  <script src="js/open-curriculum.js?v=20261023-04"></script>
+  <script src="js/school-curriculum.js?v=20261023-04"></script>
+  <script src="js/exam-curriculum.js?v=20261023-04"></script>
+    <script src="js/sim-core.js?v=20261023-04"></script>
+  <script src="js/sim-tools.js?v=20261023-04"></script>
+  <script src="js/sim-insight.js?v=20261023-04"></script>
+  <script src="js/teaching-notes.js?v=20261023-04"></script>
+  <script src="js/sim-a11y.js?v=20261023-04"></script>
 
   <!-- 實驗程式改為延遲載入：只掛對應表，開啟實驗時才抓對應的檔案 -->
-  <script src="js/experiment-manifest.js?v=20261023-03"></script>
+  <script src="js/experiment-manifest.js?v=20261023-04"></script>
 
 
   <!-- 應用外殼 -->
-  <script src="js/app.js?v=20261023-03"></script>
+  <script src="js/app.js?v=20261023-04"></script>
 </body>
 </html>

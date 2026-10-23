@@ -34,9 +34,12 @@ const eagerGz = eager.reduce((s, p) => s + gzipSize(p), 0) + gzipSize("css/style
  *
  * 2026-10 放寬到 236 KB：新增 23 個學測／銜接實驗的課程目錄（exam-curriculum.js，約 10 KB gzip）。
  * 目錄必須在首頁就有（搜尋、模組卡片、銜接路徑都靠它），實驗程式本身仍是延遲載入。
+ *
+ * 2026-10 再放寬到 240 KB：教師演示版的一頁式排版（讀數列、右欄分頁、自動緊湊，約 4 KB gzip）。
+ * 原本右欄放不下就捲動，1366×768 有 215 / 226 個實驗要邊講邊捲；這是演示版的核心承諾。
  */
 R.section("首次載入（以壓縮後為準）");
-R.ok(eagerGz < 236 * 1024, "首次載入 gzip " + kb(eagerGz) + "（上限 236 KB）",
+R.ok(eagerGz < 240 * 1024, "首次載入 gzip " + kb(eagerGz) + "（上限 240 KB）",
   "原始 " + kb(eagerRaw) + "，" + eager.length + " 支腳本 + style.css + index.html");
 
 const expDir = "js/experiments";

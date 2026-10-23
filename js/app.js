@@ -378,6 +378,11 @@
     const theme = t === "light" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", theme);
     store.set("pl-theme", theme);
+    const stageTheme = $("#stage-theme");
+    if (stageTheme) {
+      stageTheme.innerHTML = (theme === "light" ? moonIcon : sunIcon) + "<span>" + (theme === "light" ? "深色" : "淺色") + "</span>";
+      stageTheme.setAttribute("aria-label", theme === "light" ? "切換為深色主題" : "切換為淺色主題");
+    }
     const btn = $("#theme-toggle");
     if (btn) {
       btn.innerHTML = theme === "light" ? moonIcon + "<span>深色</span>" : sunIcon + "<span>淺色</span>";
@@ -1784,20 +1789,267 @@
   }
 
   /*
-   * 一頁式實驗台的右欄：把播放列、情境預設、參數、讀數、示範重點、課堂提問
-   * 收進同一個可捲動的側欄。右欄內容比螢幕高時只捲右欄，整頁永遠不捲。
+   * 一頁式實驗台：整頁與右欄都不捲動。讀數橫排在畫布下方；右欄依序嘗試
+   * 全部攤開 → 縮小圖表 → 兩個分頁 → 三個分頁（各再試緊湊排版），取第一個放得下的。
    */
-  const STAGE_SIDE_ORDER = [".sim-transport", ".sim-insight-block", ".sim-control-deck", ".sim-readout-panel", ".sim-charts", ".sim-demo-tip", ".sim-predict"];
+  const STAGE_PANES = [
+    { key: "params", label: "參數", nodes: root => [
+      ...Array.from(root.querySelectorAll(".sim-insight-block")).filter(n => n.querySelector(".sim-presets")),
+      root.querySelector(".sim-control-deck")
+    ] },
+    { key: "charts", label: "圖表", nodes: root => [root.querySelector(".sim-charts")] },
+    { key: "ask", label: "提問", nodes: root => [root.querySelector(".sim-demo-tip"), root.querySelector(".sim-predict")] }
+  ];
+  let stageTab = "params";   // 換實驗時沿用上一次的分頁
+  let stageFitRaf = 0, stageFitBusy = false, stageFitCount = 0, stageFitWindow = 0, stageFitLater = 0;
+
   function arrangeStage() {
     if (!document.body.classList.contains("stage-only")) return;
     const root = $("#sim-root");
     if (!root || !root.querySelector(".sim-stage")) return;
     let side = root.querySelector(":scope > .stage-side");
-    if (!side) { side = el("aside", "stage-side", root); side.setAttribute("aria-label", "實驗操作"); }
-    STAGE_SIDE_ORDER.forEach(sel => {
-      const node = root.querySelector(sel);
-      if (node && node.parentNode !== side) side.appendChild(node);
+    if (!side) {
+      side = el("aside", "stage-side", root); side.setAttribute("aria-label", "實驗操作");
+      const tabs = el("div", "stage-tabs", side); tabs.setAttribute("role", "tablist"); tabs.setAttribute("aria-label", "右欄分頁");
+      STAGE_PANES.forEach((p, i) => {
+        const pane = el("div", "stage-pane", side); pane.dataset.pane = p.key;
+        pane.id = "stage-pane-" + p.key; pane.setAttribute("role", "tabpanel");
+        const tab = el("button", "stage-tab", tabs); tab.type = "button"; tab.dataset.pane = p.key;
+        tab.setAttribute("role", "tab"); tab.setAttribute("aria-controls", pane.id);
+        tab.title = p.label + "（" + (i + 1) + "）";
+        tab.addEventListener("click", () => selectStageTab(p.key, true));
+      });
+      const dock = el("div", "stage-dock", root); dock.setAttribute("aria-label", "量測讀數");
+      // 內容長高（例如課堂提問揭曉答案）就重排
+      if (typeof ResizeObserver !== "undefined") {
+        const ro = new ResizeObserver(() => {
+          if (stageFitBusy) return;
+          const s = root.querySelector(":scope > .stage-side");
+          const v = root.querySelector(".sim-visual-panel");
+          if ((s && s.scrollHeight > s.clientHeight + 1) || (v && v.scrollHeight > v.clientHeight + 1)) scheduleStageFit(true);
+        });
+        side.querySelectorAll(".stage-pane").forEach(p => ro.observe(p));
+        ro.observe(dock);
+      }
+    }
+    const transport = root.querySelector(".sim-transport");
+    if (transport && transport.parentNode !== side) side.insertBefore(transport, side.firstChild);
+    STAGE_PANES.forEach(p => {
+      const pane = side.querySelector('.stage-pane[data-pane="' + p.key + '"]');
+      p.nodes(root).forEach(node => { if (node && node.parentNode !== pane) pane.appendChild(node); });
     });
+    const dock = root.querySelector(":scope > .stage-dock");
+    const readouts = root.querySelector(".sim-readout-panel");
+    if (dock && readouts && readouts.parentNode !== dock) dock.appendChild(readouts);
+    scheduleStageFit();
+  }
+
+  function scheduleStageFit(fromObserver) {
+    if (fromObserver) {
+      const now = Date.now();
+      if (now - stageFitWindow > 1000) { stageFitWindow = now; stageFitCount = 0; }
+      if (++stageFitCount > 4) {
+        // 太頻繁就等一秒再補排一次，不要就此放著溢出
+        if (!stageFitLater) stageFitLater = setTimeout(() => { stageFitLater = 0; scheduleStageFit(true); }, 1000);
+        return;
+      }
+    }
+    cancelAnimationFrame(stageFitRaf);
+    stageFitRaf = requestAnimationFrame(fitStage);
+  }
+
+  function selectStageTab(key, user) {
+    const side = document.querySelector("#sim-root > .stage-side");
+    if (!side) return;
+    const groups = side._stageGroups || [];
+    if (!groups.length) return;
+    const group = groups.find(g => g.includes(key)) || groups[0];
+    const tabs = Array.from(side.querySelectorAll(".stage-tab")).filter(t => !t.hidden);
+    const target = tabs.find(t => t.dataset.pane === group[0]);
+    if (user) stageTab = key;
+    tabs.forEach(t => {
+      const on = t === target;
+      t.classList.toggle("is-active", on);
+      t.setAttribute("aria-selected", on ? "true" : "false");
+      t.tabIndex = on ? 0 : -1;
+    });
+    side.querySelectorAll(".stage-pane").forEach(p => { p.hidden = !p._stageHasContent || !group.includes(p.dataset.pane); });
+    // 隱藏時量不到寬度、不會重算；顯示出來後依當下的上限補算一次
+    if (group.includes("charts")) side.querySelectorAll(".stage-pane[data-pane='charts'] .sim-chart > canvas.sim-canvas").forEach(refitCanvas);
+  }
+
+  function refitCanvas(canvas) {
+    const cv = canvas && canvas._labCv;
+    if (!cv || typeof cv.refit !== "function" || !canvas.parentNode.getBoundingClientRect().width) return;
+    try { cv.refit(); } catch (e) {}
+  }
+
+  function fitStage() {
+    if (!document.body.classList.contains("stage-only")) return;
+    const root = $("#sim-root");
+    const side = root && root.querySelector(":scope > .stage-side");
+    if (!side) return;
+    // 直式／窄螢幕上下排列、可捲動
+    const stacked = getComputedStyle(root).gridTemplateColumns.split(" ").length < 2;
+    stageFitBusy = true;
+    try {
+      const dock = root.querySelector(":scope > .stage-dock");
+      if (dock) {
+        const r = dock.querySelector(".sim-readout-panel");
+        dock.hidden = !r || r.hidden || getComputedStyle(r).display === "none" || !r.querySelector(".readout");
+      }
+      const panes = Array.from(side.querySelectorAll(".stage-pane"));
+      panes.forEach(p => {
+        p._stageHasContent = Array.from(p.children).some(n => getComputedStyle(n).display !== "none");
+      });
+      const present = panes.filter(p => p._stageHasContent).map(p => p.dataset.pane);
+      const chartWraps = Array.from(side.querySelectorAll(".stage-pane[data-pane='charts'] .sim-chart"));
+      const chartCanvas = w => w.querySelector(":scope > canvas.sim-canvas");
+      const setChartCap = (cap, min) => chartWraps.forEach(w => {
+        const c = chartCanvas(w); if (!c) return;
+        w._stageMaxH = cap; w._stageMinH = min;
+        refitCanvas(c);
+      });
+
+      if (stacked) {
+        side.classList.remove("is-compact", "is-dense", "is-wide", "is-tight", "is-overflowing", "has-tabs");
+        root.classList.remove("stage-wide");
+        side._stageGroups = [present];
+        side.querySelector(".stage-tabs").hidden = true;
+        panes.forEach(p => { p.hidden = !p._stageHasContent; });
+        setChartCap(0, 0);
+        return;
+      }
+
+      // 主畫布：扣掉讀數列與畫布卡其他內容後的高度
+      const fitMain = () => {
+        const stage = root.querySelector(":scope > .sim-stage");
+        const visual = stage && stage.querySelector(".sim-visual-panel");
+        const main = visual && visual.querySelector(".sim-canvas-wrap > canvas.sim-canvas");
+        if (!main) return;
+        const wrap = main.parentNode;
+        let chrome = 0;
+        Array.from(visual.children).forEach(n => {
+          if (getComputedStyle(n).display === "none" || getComputedStyle(n).position === "absolute") return;
+          if (n === wrap) {
+            const cs = getComputedStyle(n);
+            chrome += (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+            Array.from(n.children).forEach(k => {
+              if (k === main) return;
+              const ks = getComputedStyle(k);
+              if (ks.display === "none" || ks.position === "absolute" || ks.position === "fixed") return;
+              chrome += k.getBoundingClientRect().height;
+            });
+          } else {
+            const ns = getComputedStyle(n);
+            chrome += n.getBoundingClientRect().height + (parseFloat(ns.marginTop) || 0) + (parseFloat(ns.marginBottom) || 0);
+          }
+        });
+        const vs = getComputedStyle(visual);
+        chrome += (parseFloat(vs.borderTopWidth) || 0) + (parseFloat(vs.borderBottomWidth) || 0) + (parseFloat(vs.paddingTop) || 0) + (parseFloat(vs.paddingBottom) || 0);
+        const cap = Math.floor(stage.clientHeight - chrome - 2);
+        if (cap > 0 && Math.abs((wrap._stageMaxH || 0) - cap) > 1) { wrap._stageMaxH = cap; wrap._stageMinH = 160; refitCanvas(main); }
+      };
+
+      const tabsBar = side.querySelector(".stage-tabs");
+      const has = k => present.includes(k);
+      const plans = [];
+      const all = [present];
+      plans.push({ groups: all, shrink: false });
+      if (has("charts")) plans.push({ groups: all, shrink: true, min: 130 });
+      if (has("charts") && present.length > 1) {
+        const rest = present.filter(k => k !== "charts");
+        plans.push({ groups: [rest, ["charts"]], shrink: true, min: 110 });
+      }
+      if (present.length > 2 || (present.length === 2 && !has("charts"))) plans.push({ groups: present.map(k => [k]), shrink: true, min: 100 });
+
+      const overflow = () => side.scrollHeight - side.clientHeight;
+      const applyGroups = groups => {
+        side._stageGroups = groups;
+        const tabbed = groups.length > 1;
+        side.classList.toggle("has-tabs", tabbed);
+        tabsBar.hidden = !tabbed;
+        side.querySelectorAll(".stage-tab").forEach(t => {
+          const g = groups.find(x => x[0] === t.dataset.pane);
+          t.hidden = !g;
+          if (g) {
+            const label = g.map(k => STAGE_PANES.find(p => p.key === k).label).join("・");
+            const n = g.includes("charts") ? chartWraps.length : 0;
+            t.textContent = label + (n > 1 ? " " + n : "");
+          }
+        });
+      };
+      const groupFits = (group, plan) => {
+        side.querySelectorAll(".stage-pane").forEach(p => { p.hidden = !p._stageHasContent || !group.includes(p.dataset.pane); });
+        if (group.includes("charts") && chartWraps.length) {
+          setChartCap(0, 0);
+          let over = overflow();
+          if (over > 1 && plan.shrink) {
+            const heights = chartWraps.map(w => { const c = chartCanvas(w); return c ? c.getBoundingClientRect().height : 0; });
+            const cap = Math.floor(Math.max(...heights) - over / chartWraps.length) - 2;
+            if (cap < plan.min) return false;
+            setChartCap(cap, plan.min);
+            over = overflow();
+          }
+          return over <= 1;
+        }
+        return overflow() <= 1;
+      };
+      const DENSITY = [[], ["is-compact"], ["is-compact", "is-dense"]];
+      const setDensity = (d, wide, tight) => {
+        side.classList.remove("is-compact", "is-dense", "is-wide", "is-tight", "is-overflowing");
+        root.classList.toggle("stage-wide", !!wide);
+        DENSITY[d].forEach(c => side.classList.add(c));
+        if (wide) side.classList.add("is-wide");
+        if (tight) side.classList.add("is-tight");
+      };
+
+      setDensity(0, false);
+      fitMain();
+      let chosen = null;
+      const tryPlan = (plan, d, wide, tight) => {
+        setDensity(d, wide, tight);
+        applyGroups(plan.groups);
+        const caps = [];
+        for (const g of plan.groups) {
+          if (!groupFits(g, plan)) return false;
+          caps.push(g.includes("charts") ? (chartWraps[0] && chartWraps[0]._stageMaxH) || 0 : null);
+        }
+        chosen = { plan, d, wide, tight, caps };
+        return true;
+      };
+      outer:
+      for (const plan of plans) {
+        for (let d = 0; d < DENSITY.length; d++) {
+          if (d === 2 && plan.groups.length === 1 && plans.length > 1) continue;
+          if (tryPlan(plan, d, false)) break outer;
+        }
+      }
+      if (!chosen) {
+        const last = plans[plans.length - 1];
+        if (!tryPlan(last, 2, true) && !tryPlan(last, 2, true, true)) {
+          // 最後一招：讓分頁自己捲
+          chosen = { plan: last, d: 2, wide: true, caps: [], scroll: true };
+          setDensity(2, true, true); applyGroups(last.groups);
+        }
+      }
+      side.classList.toggle("is-overflowing", !!chosen.scroll);
+      const chartsGroupIndex = chosen.plan.groups.findIndex(g => g.includes("charts"));
+      if (chartsGroupIndex >= 0) {
+        const cap = chosen.caps[chartsGroupIndex];
+        const g = chosen.plan.groups[chartsGroupIndex];
+        panes.forEach(p => { p.hidden = !p._stageHasContent || !g.includes(p.dataset.pane); });
+        setChartCap(cap || 0, chosen.plan.min || 0);
+      }
+      fitMain();
+      selectStageTab(stageTab, false);
+    } finally {
+      requestAnimationFrame(() => {
+        stageFitBusy = false;
+        // 排版期間內容又變了（例如播放中按鈕文字改變）就再排一次
+        if (side.isConnected && side.scrollHeight > side.clientHeight + 1) scheduleStageFit(true);
+      });
+    }
   }
 
   /* ---------------------------- 教師演示列 ---------------------------- */
@@ -1808,6 +2060,8 @@
     if (bar) bar.style.setProperty("--m-color", f.mod.color);
     const mod = $("#stage-picker-mod"); if (mod) mod.textContent = "模組" + f.mod.no;
     const title = $("#stage-picker-title"); if (title) title.textContent = f.exp.title;
+    const count = $("#stage-picker-count");
+    if (count) count.textContent = (f.mod.experiments.indexOf(f.exp) + 1) + " / " + f.mod.experiments.length;
     const prev = $("#stage-prev"), next = $("#stage-next");
     if (prev) prev.disabled = !FLAT[f.order - 1];
     if (next) next.disabled = !FLAT[f.order + 1];
@@ -2084,7 +2338,7 @@
         return;
       }
       status.textContent = navigator.onLine
-        ? "基本內容已可離線使用。按下方按鈕可把全部 245 個實驗一次存起來（約 485 KB），之後沒有網路也能開。"
+        ? "基本內容已可離線使用。按下方按鈕可把全部 " + FLAT.length + " 個實驗一次存起來（壓縮後約 550 KB），之後沒有網路也能開。"
         : "目前沒有網路連線。已經看過的實驗仍可正常開啟。";
     }
     describe();
@@ -2186,6 +2440,14 @@
     const stagePrev = $("#stage-prev"); if (stagePrev) stagePrev.addEventListener("click", () => stepStage(-1));
     const stageNext = $("#stage-next"); if (stageNext) stageNext.addEventListener("click", () => stepStage(1));
     const stageFull = $("#stage-full"); if (stageFull) stageFull.addEventListener("click", toggleStageFullscreen);
+    const stageThemeBtn = $("#stage-theme");
+    if (stageThemeBtn) stageThemeBtn.addEventListener("click", () => {
+      applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
+    });
+    document.addEventListener("fullscreenchange", () => {
+      const label = stageFull && stageFull.querySelector("span");
+      if (label) label.textContent = document.fullscreenElement ? "離開全螢幕" : "全螢幕";
+    });
     const stageInput = $("#stage-menu-input");
     if (stageInput) {
       stageInput.addEventListener("input", () => renderStageMenu(stageInput.value));
@@ -2256,6 +2518,10 @@
         if (e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA" && !e.repeat) {
           if (e.key === "/") { e.preventDefault(); openStageMenu(); return; }
           if (e.key === "f" || e.key === "F") { e.preventDefault(); toggleStageFullscreen(); return; }
+          if (e.key === "1" || e.key === "2" || e.key === "3") {
+            const tab = document.querySelector('#sim-root .stage-tab[data-pane="' + STAGE_PANES[+e.key - 1].key + '"]');
+            if (tab && !tab.hidden && !tab.parentNode.hidden) { e.preventDefault(); tab.click(); return; }
+          }
         }
       }
       if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
@@ -2287,6 +2553,13 @@
       if (e.key === "Escape") closeSidebarMobile();
     });
 
+    let stageResizeTimer = 0;
+    window.addEventListener("resize", () => {
+      if (!document.body.classList.contains("stage-only")) return;
+      clearTimeout(stageResizeTimer);
+      stageResizeTimer = setTimeout(scheduleStageFit, 120);
+    });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => scheduleStageFit()).catch(() => {});
     window.addEventListener("hashchange", route);
     route();
 

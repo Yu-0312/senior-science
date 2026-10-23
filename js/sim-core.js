@@ -752,6 +752,7 @@
     const canvas = el("canvas", "sim-canvas", wrap);
     const ctx = canvas.getContext("2d");
     const cv = { canvas, ctx, W: 640, H: 400, dpr: 1, _resizeCbs: [], profile: wrap._labProfile || profileFor() };
+    canvas._labCv = cv;
     // 弱參照：畫布只在「尺寸變了要重畫」時才需要找回它的實驗；不該因此把整個實驗留在記憶體裡
     const ownerRef = buildContext && typeof WeakRef === "function" ? new WeakRef(buildContext) : null;
 
@@ -794,6 +795,8 @@
       if (vh && landscape && typeof document !== "undefined" && document.body && document.body.classList &&
           document.body.classList.contains("stage-only")) {
         viewportCap = Math.max(220, vh - 104);
+        // app.js 的 fitStage() 量過實際空間後寫入的上限
+        if (wrap._stageMaxH > 0) viewportCap = Math.max(wrap._stageMinH || 90, Math.min(viewportCap, wrap._stageMaxH));
       }
       /*
        * 嵌入頁（關卡挑戰版）的 iframe 高度跟著內容長，用 iframe 自己的視窗高算上限會
