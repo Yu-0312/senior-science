@@ -170,9 +170,10 @@
     AP.beaker(ctx, hx, hp, bw, bh, 0.72, Tm > 100 ? "#e0b060" : "#e8785a");
     AP.bubbles(ctx, hx - bw / 2 + 4 * s, hp - bh * 0.7, bw - 8 * s, bh * 0.68, t, Tm >= 95 ? 10 : 2, { speed: 40 });
     AP.calorimeter(ctx, kx, benchY, 76 * s, 86 * s, 0.8, "#6fb7e0", Te / 100);
-    const cyc = 7, u = clamp((t % cyc - 1) / 2.2, 0, 1), ex = hx + (kx - hx) * u, ey = hp - bh * 0.38 - Math.sin(u * Math.PI) * 120 * s + u * (benchY - 86 * s * 0.4 - hp + bh * 0.38);
+    const u = clamp((k.once(3.6) - 1) / 2.2, 0, 1), ex = hx + (kx - hx) * u, ey = hp - bh * 0.38 - Math.sin(u * Math.PI) * 120 * s + u * (benchY - 86 * s * 0.4 - hp + bh * 0.38);
     AP.cord(ctx, ex, ey - 60 * s - Math.sin(u * Math.PI) * 10 * s, ex, ey - 12 * s);
     ctx.fillStyle = "rgb(150,156,166)"; AP.rrPath(ctx, ex - 13 * s, ey - 12 * s, 26 * s, 22 * s, 3 * s); ctx.fill(); ctx.strokeStyle = "rgba(40,44,52,0.6)"; ctx.lineWidth = 1; ctx.stroke();
+    k.obj(ex, ey);
     AP.heatWaves(ctx, ex - 14 * s, ey - 16 * s, 28 * s, 40 * s, t, u < 0.95 ? (Tm - 40) / 140 : 0);
     TX(ctx, "金屬塊 0.35 kg（" + PL.fmt(Tm, 0) + "°C）", hx, hp - bh - 60 * s, 11, "center", "#d0553a");
     TX(ctx, "水 0.25 kg（" + PL.fmt(Tw, 0) + "°C）", kx, benchY - 180 * s, 11, "center", "#2f7fd8");
@@ -206,7 +207,7 @@
     // 酒精燈調火焰大小＝溫差；抓銅棒冷端左右拖＝換一根不同長度的棒
     gripOf(k, 0).place(x0 + 10 * s, benchY - 30 * s); gripOf(k, 1).place(x1, ry);
     stOf(k).hcL = x => lp(cfg.b, ((x - x0) / s - 130) / 440);
-    const fss = clamp(1 - 35 / dT, 0, 1), tau = 0.6 + 3 * Math.pow(Lr / 2, 1.2), xm = fss * (1 - Math.exp(-(t % 12) / tau)), n = 7;
+    const fss = clamp(1 - 35 / dT, 0, 1), tau = 0.6 + 3 * Math.pow(Lr / 2, 1.2), xm = fss * (1 - Math.exp(-k.once(Math.min(12, tau * 4.5)) / tau)), n = 7;
     for (let i = 0; i < n; i++) {
       const q = (i + 0.6) / (n + 0.2), x = x0 + q * rl, fallen = q < xm, drop = fallen ? Math.min(1, (xm - q) * 8) : 0;
       ctx.fillStyle = "rgba(250,244,220,0.95)"; ctx.beginPath(); ctx.ellipse(x, ry + rh / 2 + 2 * s, 5 * s, (fallen ? 1.5 : 4) * s, 0, 0, PL.TAU); ctx.fill();
@@ -863,11 +864,14 @@
 
   /*
    * RC 計時：播放＝開關接通，時間 t 自己往前走，電容一路充電（滑桿跟著動）。
-   * 走到量程盡頭先停 1.5 s 讓學生看清「充飽」，再放電從 t = 0 重來。
+   * 走到量程盡頭就停在「充飽」（一次就停，不自己重來）；再按播放才放電、從 t = 0 重新充。
    */
   TICK["rc-timer"] = (dt, a, b, st, C) => {
     let tt = st.aLive != null ? st.aLive : a.get();
-    if (tt >= C.a[2] - 1e-9) { st.hold = (st.hold || 0) + dt; if (st.hold < 1.5) return; st.hold = 0; tt = 0; }
+    if (tt >= C.a[2] - 1e-9) {
+      if (!st.ended) { st.ended = true; return; }
+      st.ended = false; tt = 0;
+    }
     else tt = Math.min(C.a[2], tt + dt);
     st.aLive = tt; a.set(tt);
   };
@@ -936,11 +940,15 @@
       const conclusion = PL.ui.readout(L.readouts, { label: "模型判讀" });
       const chart = PL.ui.chart(PL.ui.charts(root), { title: config.output + "關係圖", cap: "曲線固定第二項參數；亮點是目前設定，空心點是所有已記錄的量測資料。" });
       let elapsed = 0, animation;
+      // 一次性的動作跑完就停，拖回起點重來
+      const once = PL.motion.onceDriver(cv, { get: () => elapsed, set: v => { elapsed = v; }, render: () => render() });
       function render(dt) {
         dt = dt > 0 ? dt : 0;
-        if (dt && TICK[id]) TICK[id](dt, a, b, st, config);
+        if (dt && TICK[id]) { TICK[id](dt, a, b, st, config); if (st.ended && animation && animation.running) animation.stop(); }
         const av = aNow(), bv = b.get(), out = config.calc(av, bv);
-        scene(cv, config, av, bv, out, elapsed, { dt, running: !!(animation && animation.running), st, grips });
+        once.before();
+        scene(cv, config, av, bv, out, elapsed, Object.assign({ dt, running: !!(animation && animation.running), st, grips }, once.kit(elapsed)));
+        once.after();
         readout.set(out, Math.abs(out) < 10 ? 3 : 2); aReadout.set(av, digits(config.a)); bReadout.set(bv, digits(config.b)); nReadout.set(records.length, 0); conclusion.set(config.status(av, bv, out));
         chart.setCap(PL.ui.relationChart(chart, {
           a: config.a, b: config.b, av: av, bv: bv,
@@ -948,7 +956,8 @@
           extra: function (g) { records.forEach(p => g.dot(p.a, p.out, { color: PL.col("text-dim"), r: 3 })); }
         }));
       }
-      animation = PL.loop(dt => { if (dt) elapsed += dt; render(dt); });
+      animation = PL.loop(dt => { if (dt) elapsed = once.advance(elapsed, dt); render(dt); });
+      once.attach(animation);
       cv.onResize(() => render()); chart.onResize(() => render()); render(); animation.start();
       return { stop() { animation.stop(); cv.destroy(); chart.destroy(); }, rerender: () => render() };
     }});

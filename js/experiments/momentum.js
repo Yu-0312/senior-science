@@ -90,8 +90,9 @@
     PL.ui.button(row, "重設", reset, { primary: true });
     const rP = PL.ui.readout(L.readouts, { label: "總動量 p", unit: "kg·m/s" });
     const rK = PL.ui.readout(L.readouts, { label: "總動能 K", unit: "J" });
-    let fresh = true;
-    function reset() { x1 = 5; x2 = 18; v1 = su1.get(); v2 = su2.get(); collided = false; fresh = true; }
+    let fresh = true, rp = null;
+    function start0() { x1 = 5; x2 = 18; v1 = su1.get(); v2 = su2.get(); collided = false; fresh = true; }
+    function reset() { start0(); if (rp) rp.clear(); }
     reset();
     const grips = arrowGrips(cv, su1, su2, "動量");
     function draw() {
@@ -106,6 +107,7 @@
       const w1 = 36 + m1 * 6, w2 = 36 + m2 * 6;
       // 完全非彈性：兩台滑車相對的一面貼著黏土，一碰就黏在一起
       AP.glider(ctx, ox + x1 * sc, gy, w1, 30, { tint: "#b48ad6", label: "m₁", bumperSide: 1, bumper: "clay" });
+      if (rp) rp.mark(ox + x1 * sc, gy - 15);
       AP.glider(ctx, ox + x2 * sc, gy, w2, 30, { tint: "#7ec7ff", label: "m₂", bumperSide: -1, bumper: "clay" });
       D.arrow(ctx, ox + x1 * sc, gy - 56, ox + x1 * sc + m1 * v1 * 3, gy - 56, { color: MC(), width: 3, label: "p₁" });
       D.arrow(ctx, ox + x2 * sc, gy - 56, ox + x2 * sc + m2 * v2 * 3, gy - 56, { color: CB, width: 3, label: "p₂" });
@@ -129,10 +131,14 @@
         x1 += v1 * dt; x2 += v2 * dt; fresh = false;
         const m1 = sm1.get(), m2 = sm2.get(), gap = (36 + m1 * 6 + 36 + m2 * 6) / 2 / ((cv.W - 60) / TR);
         if (!collided && x2 - x1 <= gap && (v1 - v2) > 0) { const vf = (m1 * v1 + m2 * v2) / (m1 + m2); v1 = v2 = vf; collided = true; }
-        if (x1 < 1 || x2 > TR - 1) reset();
+        if (x1 < 1 || x2 > TR - 1) rp.end();         // 滑到氣墊軌道盡頭就停，不自己重來
       }
       draw();
     });
+    rp = PL.motion.replay(cv, { loop: anim, label: "滑車 m₁（拖回起點重新開始）",
+      snapshot: () => ({ x1, x2, v1, v2, collided, fresh }),
+      restore: q => { ({ x1, x2, v1, v2, collided, fresh } = q); },
+      reset: start0, redraw: draw });
     cv.onResize(draw); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
@@ -141,8 +147,8 @@
   PL.register("impulse", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
-    let t = 0, v = 0, x = 0;
-    const reset = () => { t = 0; v = 0; x = 0; };
+    let t = 0, v = 0, x = 0, rp = null;
+    const reset = () => { t = 0; v = 0; x = 0; if (rp) rp.clear(); };
     const sF = PL.ui.slider(L.controls, { label: "作用力 F", min: 1, max: 20, step: 0.5, value: 8, unit: "N", digits: 1, onInput: reset });
     const sDt = PL.ui.slider(L.controls, { label: "作用時間 Δt", min: 0.2, max: 3, step: 0.1, value: 1.2, unit: "s", digits: 1, onInput: reset });
     const sM = PL.ui.slider(L.controls, { label: "質量 m", min: 0.5, max: 6, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: reset });
@@ -163,10 +169,11 @@
       ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, gy + 22); ctx.clip();
       AP.labRoom(ctx, W, gy + 22, gy, { bench: "wood" });
       ctx.restore();
-      const sc = (W - 120) / 20, px = 60 + (x % 20) * sc;
+      const sc = (W - 120) / 20, px = 60 + Math.min(x, 20) * sc;
       // 風扇車：風扇只在 Δt 內轉動，推力就是 F——「力作用多久」看得見
       const pushing = t < Dt && t > 0;
       AP.fanCart(ctx, px, gy, 70, 28, t, pushing);
+      if (rp) rp.mark(px, gy - 14);
       D.text(ctx, m + " kg", px + 22, gy - 50, { color: PL.col("text"), size: 10.5, align: "center", weight: "700" });
       if (t < Dt) D.arrow(ctx, px + 38, gy - 16, px + 38 + F * 5, gy - 16, { color: PL.col("accent-2"), width: 2.4, label: "F" });
       else if (v > 0) D.arrow(ctx, px + 38, gy - 16, px + 38 + v * 5, gy - 16, { color: "#fff", width: 2, label: "v" });
@@ -180,7 +187,11 @@
       g.vline(Math.min(t, g.dom.x1), { color: PL.col("accent-2"), dash: [4, 3] });
       rJ.set(J, 1); rDv.set(J / m, 2); rV.set(v, 2);
     }
-    const anim = PL.loop(dt => { if (dt) { const F = sF.get(), Dt = sDt.get(), m = sM.get(); if (t < Dt) v += F / m * dt; t += dt; x += v * dt; if (t > Dt + 3) anim.stop(); } draw(); });
+    const anim = PL.loop(dt => { if (dt) { const F = sF.get(), Dt = sDt.get(), m = sM.get(); if (t < Dt) v += F / m * dt; t += dt; x += v * dt; if (x >= 20) { x = 20; rp.end(); } else if (t > Dt + 3) rp.end(); } draw(); });
+    // 滑到軌道盡頭或滑行 3 秒後就停；把車拖回起點（或再按「施加衝量」）重來
+    rp = PL.motion.replay(cv, { loop: anim, label: "風扇車（拖回起點重新開始）",
+      snapshot: () => ({ t, v, x }), restore: q => { t = q.t; v = q.v; x = q.x; },
+      reset: () => { t = 0; v = 0; x = 0; }, redraw: draw });
     cv.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
@@ -189,7 +200,7 @@
   PL.register("collision2d", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
-    let p1, p2, done;
+    let p1, p2, done, rp = null;
     const sB = PL.ui.slider(L.controls, { label: "瞄準參數 b", min: -1, max: 1, step: 0.05, value: 0.4, unit: "×R", digits: 2, onInput: reset });
     const sMr = PL.ui.slider(L.controls, { label: "質量比 m₂/m₁", min: 0.3, max: 3, step: 0.1, value: 1, unit: "", digits: 1, onInput: reset });
     const row = PL.ui.buttonRow(L.controls);
@@ -210,6 +221,7 @@
       p1 = { x: -200, y: b, vx: 130, vy: 0, m: m1, r: R, c: MC() };
       p2 = { x: 0, y: 0, vx: 0, vy: 0, m: mr, r: R * Math.cbrt(mr), c: CB };
       done = false;
+      if (rp) rp.clear();
     }
     reset();
     let oY = 0;
@@ -224,6 +236,7 @@
       D.line(ctx, 30, oy, W - 30, oy, "rgba(255,255,255,0.18)", 1, [4, 4]);
       AP.poolBall(ctx, ox + p2.x, oy + p2.y, p2.r, "#d9463b", 3);
       AP.poolBall(ctx, ox + p1.x, oy + p1.y, p1.r, "#f4f2ea", null);
+      if (rp) rp.mark(ox + p1.x, oy + p1.y);
       // 發射前抓白球上下移改瞄準參數 b（偏離中線的距離 ÷ 2R）；打完停下後在起點留一顆淡白球，拖它就重擺下一球
       oY = oy;
       const sx0 = ox - 200, sy0 = oy + sB.get() * 2 * R, fresh = p1.x === -200;
@@ -249,10 +262,14 @@
           done = true;
         }
         p1.x += p1.vx * dt; p1.y += p1.vy * dt; p2.x += p2.vx * dt; p2.y += p2.vy * dt;
-        if (Math.abs(p1.x) > cv.W || Math.abs(p2.x) > cv.W) anim.stop();
+        if (Math.abs(p1.x) > cv.W || Math.abs(p2.x) > cv.W) rp.end();   // 兩球飛出檯面就停
       }
       draw();
     });
+    rp = PL.motion.replay(cv, { loop: anim, label: "白球（拖回起點重新發射）",
+      snapshot: () => ({ a: Object.assign({}, p1), b: Object.assign({}, p2), done }),
+      restore: q => { p1 = Object.assign({}, q.a); p2 = Object.assign({}, q.b); done = q.done; },
+      reset: () => { const keep = rp; rp = null; reset(); rp = keep; }, redraw: draw });
     cv.onResize(draw); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
@@ -261,7 +278,7 @@
   PL.register("recoil", { build(root) {
     const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.5);
-    let x1, x2, v1, v2, fired, age = 0;
+    let x1, x2, v1, v2, fired, age = 0, rp = null;
     const sM1 = PL.ui.slider(L.controls, { label: "砲身質量 M", min: 4, max: 30, step: 1, value: 16, unit: "kg", digits: 0, onInput: reset });
     const sM2 = PL.ui.slider(L.controls, { label: "砲彈質量 m", min: 0.5, max: 6, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: reset });
     const sE = PL.ui.slider(L.controls, { label: "爆炸釋放（砲彈速度）", min: 4, max: 20, step: 1, value: 12, unit: "m/s", digits: 0, onInput: reset });
@@ -271,7 +288,7 @@
     const rV1 = PL.ui.readout(L.readouts, { label: "砲身後座 V", unit: "m/s" });
     const rV2 = PL.ui.readout(L.readouts, { label: "砲彈速度 v", unit: "m/s" });
     const rP = PL.ui.readout(L.readouts, { label: "總動量 p", unit: "kg·m/s" });
-    function reset() { x1 = 0; x2 = 0; v1 = 0; v2 = 0; fired = false; age = 0; }
+    function reset() { x1 = 0; x2 = 0; v1 = 0; v2 = 0; fired = false; age = 0; if (rp) rp.clear(); }
     reset();
     // 發射前拖「預期砲彈」箭頭尖端改爆炸釋放的砲彈速度（6 px 代表 1 m/s）
     let rX0 = 0;
@@ -295,6 +312,7 @@
       D.spring(ctx, 34, gy - 18, 70, gy - 18, 4, 5, "#9aa8b8");
       const ballR = 5 + m * 1.3;
       AP.sportBall(ctx, cx + barrel - ballR + x2 * 30, pivotY, ballR, "cannonball", x2);
+      if (rp && fired) rp.mark(cx + barrel - ballR + x2 * 30, pivotY);
       AP.cannon(ctx, cx + x1 * 30, pivotY, 0, { s: cs, fired: fired ? age : null, roll: x1 * 30 / (12 * cs) });
       D.text(ctx, "M = " + M + " kg", cx + x1 * 30 - 10, gy + 26, { color: PL.col("text-dim"), size: 11, align: "center", weight: "700" });
       /*
@@ -329,7 +347,11 @@
       }
       rV1.set(Math.abs(v1), 2); rV2.set(v2, 1); rP.set(M * v1 + m * v2, 2);
     }
-    const anim = PL.loop(dt => { if (dt && fired) { age += dt; x1 += v1 * dt; x2 += v2 * dt; if (cv.W * 0.42 + 90 + x2 * 30 > cv.W - 100) anim.stop(); } draw(); });
+    const anim = PL.loop(dt => { if (dt && fired) { age += dt; x1 += v1 * dt; x2 += v2 * dt; if (cv.W * 0.42 + 90 + x2 * 30 > cv.W - 100) rp.end(); } draw(); });
+    // 砲彈飛到畫面邊緣就停；把砲彈拖回砲口（或再按「發射」）重來
+    rp = PL.motion.replay(cv, { loop: anim, label: "砲彈（拖回砲口重新發射）",
+      snapshot: () => ({ x1, x2, v1, v2, fired, age }), restore: q => { ({ x1, x2, v1, v2, fired, age } = q); },
+      reset: () => { x1 = 0; x2 = 0; v1 = 0; v2 = 0; age = 0; fired = true; }, redraw: draw });
     cv.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});

@@ -2095,6 +2095,21 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .lab-sim > .sim-readout-panel { order: 3; }
 .lab-sim > .sim-learning-brief, .lab-sim > .sim-procedure { order: 4; }
 .lab-sim > .sim-readout-panel { margin-bottom: 12px; }
+/*
+ * 工作區窄（1024 寬的平板、筆電開著目錄）時，實驗台內的「畫布＋參數」兩欄
+ * 會把畫布擠到兩百多像素寬。改看工作區寬度而不是視窗寬度：窄就上下排，
+ * 參數排兩欄；再窄（手機）參數回到單欄，滑桿才有足夠的長度。
+ */
+@container lab (max-width: 759px) {
+  .sim-stage { grid-template-columns: minmax(0, 1fr); }
+  .sim-control-deck { order: 2; }
+  .sim-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; column-gap: 14px; }
+  .sim-controls > .ctrl-section, .sim-controls > .ctrl-note, .sim-controls > .ctrl-note-collapsible,
+  .sim-controls > .btn-row, .sim-controls > .chip-row, .sim-controls > .sim-presets { grid-column: 1 / -1; }
+}
+@container lab (max-width: 519px) {
+  .sim-controls, .lab-sim[data-lab-layout="bottom"] .sim-controls { grid-template-columns: minmax(0, 1fr); }
+}
 
 @container lab (min-width: 760px) {
   .lab-sim {

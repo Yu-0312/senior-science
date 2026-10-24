@@ -93,7 +93,7 @@
     const x0 = W * 0.6, y0 = 60 * s, cw = W - x0 - 16 * s, ch = benchY - y0 - 24 * s;
     AP.infoCard(ctx, x0, y0, cw, ch);
     const gx0 = x0 + 36 * s, gx1 = x0 + cw - 14 * s, gy0 = y0 + 30 * s, gy1 = y0 + ch - 28 * s;
-    const X = q => gx0 + q * (gx1 - gx0), Y = T => gy1 - T / 100 * (gy1 - gy0), q0 = clamp((t % 9) / 7, 0, 1);
+    const X = q => gx0 + q * (gx1 - gx0), Y = T => gy1 - T / 100 * (gy1 - gy0), q0 = clamp(k.once(7.2) / 7, 0, 1);
     TX(ctx, "溫度–時間", x0 + 12 * s, y0 + 18 * s, 10.5);
     ctx.strokeStyle = PL.theme.pale(0.45); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(gx0, gy0 - 4 * s); ctx.lineTo(gx0, gy1); ctx.lineTo(gx1, gy1); ctx.stroke();
     [0, 50, 100].forEach(T => TX(ctx, T + "°", gx0 - 6 * s, Y(T) + 4, 9, "right", PL.col("text-dim"), 0));
@@ -106,6 +106,7 @@
       ctx.globalAlpha = 1; ctx.lineWidth = 2.4; ctx.beginPath();
       for (let i = 0; i <= 60; i++) { const q = q0 * i / 60; i ? ctx.lineTo(X(q), Y(T(q))) : ctx.moveTo(X(q), Y(T(q))); } ctx.stroke();
       ctx.fillStyle = p[1]; ctx.beginPath(); ctx.arc(X(q0), Y(T(q0)), 4 * s, 0, PL.TAU); ctx.fill(); ctx.restore();
+      if (p[0] === Th) k.obj(X(q0), Y(T(q0)));
     });
     TX(ctx, "平衡溫度 " + PL.fmt(Te, 1) + "°C", gx1, Y(Te) - 6 * s, 10.5, "right");
     TX(ctx, "放熱 = 吸熱：1.4m·c·(T熱 − T) = m·c·(T − T冷)", W - 16 * s, 42 * s, 11, "right");
@@ -121,7 +122,7 @@
     AP.standRod(ctx, x0 - 14 * s, benchY, sy - 40 * s);
     AP.clampHead(ctx, x0 - 14 * s, sy, 20 * s, 0);
     AP.steel(ctx, x1 - 6 * s, sy + pr, 12 * s, benchY - sy - pr, 10);
-    const tv = clamp(2.6 - 1.0 * Math.log10(v / 9), 0.4, 2.6), cyc = tv + 0.8, u = (t % cyc) / tv, xp = x0 + u * Ls;
+    const tv = clamp(2.6 - 1.0 * Math.log10(v / 9), 0.4, 2.6), u = k.once(tv + 0.3) / tv, xp = x0 + u * Ls;
     const sw = (1.2 + 4 * fr(mu, cfg.b)) * s, col = mu < 1 ? "rgb(238,238,232)" : mu < 5 ? "rgb(220,194,140)" : "rgb(172,122,70)";
     const m = T / 9.8, nd = clamp(Math.round(m / 2), 1, 12), hy = sy + pr, dw = 36 * s;
     const hgTop = benchY + 18 * s;
@@ -132,6 +133,7 @@
     AP.pulley(ctx, x1, hy, pr);
     ctx.save(); ctx.lineCap = "round"; ctx.strokeStyle = "rgba(40,30,20,0.5)"; ctx.lineWidth = sw + 1.5; ctx.beginPath();
     const yAt = x => sy - (u <= 1 ? 18 * s * Math.exp(-Math.pow((x - xp) / (24 * s), 2)) : 0);
+    if (u <= 1) k.obj(xp, sy - 18 * s);
     for (let x = x0; x <= x1; x += 3) { const y = yAt(x); x === x0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
     ctx.lineTo(x1 + pr * 0.2, sy); ctx.stroke(); ctx.strokeStyle = col; ctx.lineWidth = sw; ctx.stroke(); ctx.restore();
     AP.hand(ctx, x0 + 18 * s, sy + 16 * s, 1, 0.75 * s, { ang: -0.5 - (u < 0.08 ? 0.5 : 0) });
@@ -209,7 +211,7 @@
     AP.outdoor(ctx, W, H, gy, { t, hills: true, sunX: W * 0.5 });
     for (let i = 0; i < 7; i++) AP.tree(ctx, 20 * s + i * W / 6.5, gy + 2, (70 + (i % 3) * 22) * s, 5 + i);
     const bx = W * 0.1, by = H * 0.42, mx = bx + 50 * s + Math.sqrt(d / 36) * (W * 0.82 - 50 * s), my = by + Math.sin(t * 1.3) * 6 * s, D2 = mx - bx - 16 * s;
-    const cyc = clamp(1 + 10 * te, 1, 3), u = (t % cyc) / cyc;
+    const cyc = clamp(1 + 10 * te, 1, 3), u = k.once(cyc) / cyc;
     // 拖飛蛾改距離 d，再換回回波時間 t = 2d/v（mx 用 √d 刻度）
     put(st, 0, mx, by, x => { const q = clamp((x - bx - 50 * s) / (W * 0.82 - 50 * s), 0, 1); return 72 * q * q / vs; });
     ctx.save(); ctx.lineWidth = 2;
@@ -622,7 +624,7 @@
     ctx.strokeStyle = glow; ctx.lineWidth = 3 * s; ctx.beginPath();
     for (let i = 0; i <= turns * 16; i++) { const u = i / (turns * 16), x = coilX + coilW * u, y = cy2 + Math.sin(u * turns * PL.TAU) * 12 * s; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
     ctx.stroke(); ctx.restore();
-    const T0 = 20 + Math.min(78, ((t % 10) * P) / 60), boil = T0 > 97;
+    const T0 = 20 + Math.min(78, (k.once(10) * P) / 60), boil = T0 > 97;
     AP.beaker(ctx, bx, benchY, bw, bh, 0.72, boil ? "#e8a07a" : "#6fb7e0");
     AP.bubbles(ctx, bx - bw / 2 + 6 * s, wy + 4 * s, bw - 12 * s, cy2 - wy, t, Math.round(2 + 16 * heat), { speed: 20 + 60 * heat, seed: 9 });
     AP.heatWaves(ctx, bx - bw / 2, wy - 6 * s, bw, 60 * s, t, boil ? 1 : heat * 0.6);
@@ -649,7 +651,7 @@
     const { ctx, W, H, a: P, b: Ir, t, s, c, v: load, st } = k;
     const L = isL(), fy = H * 0.86;
     AP.labRoom(ctx, W, H, fy, { bench: "none" }); AP.woodFloor(ctx, W, H, fy);
-    const I = P / 110, over = load > 100, cyc = 5, tt = t % cyc, tripped = over && tt > 1.3, on = !tripped;
+    const I = P / 110, over = load > 100, tt = k.once(2.6), tripped = over && tt > 1.3, on = !tripped;
     const px = 24 * s, py = 88 * s, pw = 110 * s, ph = 150 * s;
     ctx.fillStyle = L ? "rgb(206,210,216)" : "rgb(70,74,82)"; AP.rrPath(ctx, px, py, pw, ph, 6 * s); ctx.fill(); ctx.strokeStyle = "rgba(30,34,40,0.5)"; ctx.lineWidth = 1; ctx.stroke();
     ctx.fillStyle = "rgb(236,238,240)"; ctx.fillRect(px + 22 * s, py + 30 * s, pw - 44 * s, 70 * s); noteC(ctx, L ? "rgb(206,210,216)" : "rgb(70,74,82)", px, py + 104 * s, pw, 30 * s);
@@ -698,8 +700,8 @@
     const { ctx, W, H, a: Lm, b: Cu, t, s, c, v: f0, cfg, st } = k;
     const benchY = H * 0.86;
     AP.circuitBoard(ctx, W, H, false);
-    const fs = 10 * Math.pow(2000, (t % 7) / 7), Q = 4, resp = 1 / Math.sqrt(1 + Q * Q * Math.pow(fs / f0 - f0 / fs, 2));
-    const ps = AP.powerSupply(ctx, 24 * s, H * 0.62, 150 * s, 76 * s, fs < 1000 ? PL.fmt(fs, 0) + " Hz" : PL.fmt(fs / 1000, 2) + " kHz", { label: "訊號產生器（掃頻）", color: "rgb(130,230,255)", knob: (t % 7) / 7 });
+    const su = k.once(7) / 7, fs = 10 * Math.pow(2000, su), Q = 4, resp = 1 / Math.sqrt(1 + Q * Q * Math.pow(fs / f0 - f0 / fs, 2));
+    const ps = AP.powerSupply(ctx, 24 * s, H * 0.62, 150 * s, 76 * s, fs < 1000 ? PL.fmt(fs, 0) + " Hz" : PL.fmt(fs / 1000, 2) + " kHz", { label: "訊號產生器（掃頻）", color: "rgb(130,230,255)", knob: su });
     const T = H * 0.27, xL = W * 0.1, xR = W * 0.46, ly = T, cxC = xR, cyC = H * 0.5;
     AP.cable(ctx, [ps.red, { x: ps.red.x, y: T }, { x: xR, y: T }, { x: xR, y: cyC - 30 * s }], "rgb(186,54,48)", 3 * s, 3);
     AP.cable(ctx, [{ x: xR, y: cyC + 30 * s }, { x: xR, y: H * 0.9 }, { x: ps.black.x, y: H * 0.9 }, ps.black], "rgb(40,44,52)", 3 * s, 3);
@@ -1021,7 +1023,7 @@
     const { ctx, W, H } = cv;
     cv.clear(); D.bg(cv);
     const f = SC[config.id];
-    if (f) f({ cv, ctx, W, H, cfg: config, a, b, t: time, v: out, c: accent(), s: clamp(Math.min(W / 800, H / 472), 0.5, 1.7), st: st || {} });
+    if (f) f(Object.assign({ cv, ctx, W, H, cfg: config, a, b, t: time, v: out, c: accent(), s: clamp(Math.min(W / 800, H / 472), 0.5, 1.7), st: st || {} }, st && st._kit));
   }
 
   /*
@@ -1147,26 +1149,31 @@
       PL.ui.note(L.controls, PL.templateGuide(id, config));
       const buttons = PL.ui.buttonRow(L.controls); let animation;
       /* 播放／暫停由引擎的傳輸列統一提供，實驗不再自備 */
-      PL.ui.button(buttons, "重設", () => { a.set(config.a[3]); b.set(config.b[3]); render(); });
+      PL.ui.button(buttons, "重設", () => { a.set(config.a[3]); b.set(config.b[3]); once.reset(); render(); });
       const reading = PL.ui.readout(L.readouts, { label: config.output, unit: config.unit });
       const parameter = PL.ui.readout(L.readouts, { label: config.b[0], unit: config.b[4] });
       const conclusion = PL.ui.readout(L.readouts, { label: "模型判讀" });
       const chart = PL.ui.chart(PL.ui.charts(root), { title: config.output + "關係圖", cap: "曲線固定第二項參數；亮點顯示目前操作條件。將圖形趨勢與本頁公式、裝置現象連結。" });
       let elapsed = 0;
       const st = { dt: 0, running: false, fresh: true };
+      // 一次性的動作（發射、煞車、加熱…）跑完就停，拖回起點重來
+      const once = PL.motion.onceDriver(cv, { get: () => elapsed, set: v => { elapsed = v; }, render: () => render() });
       if (GRIPS[id]) GRIPS[id](cv, st, a, b);
       function render(dt) {
         const av = a.get(), bv = b.get(), result = config.calc(av, bv);
         st.dt = dt > 0 ? dt : 0; st.running = !!(animation && animation.running);
         st.fresh = !st.running && (!animation || animation.t === 0);
+        once.before(); st._kit = once.kit(elapsed);
         scene(cv, config, av, bv, elapsed, result, st);
+        once.after();
         reading.set(result, Math.abs(result) >= 100 ? 1 : 3); parameter.set(bv, decimal(config.b)); conclusion.set(config.status(av, bv, result));
         chart.setCap(PL.ui.relationChart(chart, {
           a: config.a, b: config.b, av: av, bv: bv,
           calc: config.calc, output: config.output, sweep: config.sweep
         }));
       }
-      animation = PL.loop(dt => { if (dt) elapsed += dt; render(dt); });
+      animation = PL.loop(dt => { if (dt) elapsed = once.advance(elapsed, dt); render(dt); });
+      once.attach(animation);
       cv.onResize(() => render()); chart.onResize(() => render()); render(); animation.start();
       return { stop() { animation.stop(); cv.destroy(); chart.destroy(); }, rerender: render };
     }});

@@ -1830,10 +1830,15 @@
         });
         side.querySelectorAll(".stage-pane").forEach(p => ro.observe(p));
         ro.observe(dock);
+        side._stageRo = ro;
       }
     }
     const transport = root.querySelector(".sim-transport");
-    if (transport && transport.parentNode !== side) side.insertBefore(transport, side.firstChild);
+    if (transport && transport.parentNode !== side) {
+      side.insertBefore(transport, side.firstChild);
+      // 播放鍵「播放／暫停」換字、提示換行都會改變傳輸列高度，也要觸發重排
+      if (side._stageRo) side._stageRo.observe(transport);
+    }
     STAGE_PANES.forEach(p => {
       const pane = side.querySelector('.stage-pane[data-pane="' + p.key + '"]');
       p.nodes(root).forEach(node => { if (node && node.parentNode !== pane) pane.appendChild(node); });
@@ -1848,7 +1853,7 @@
     if (fromObserver) {
       const now = Date.now();
       if (now - stageFitWindow > 1000) { stageFitWindow = now; stageFitCount = 0; }
-      if (++stageFitCount > 4) {
+      if (++stageFitCount > 10) {
         // 太頻繁就等一秒再補排一次，不要就此放著溢出
         if (!stageFitLater) stageFitLater = setTimeout(() => { stageFitLater = 0; scheduleStageFit(true); }, 1000);
         return;

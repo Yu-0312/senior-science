@@ -4661,6 +4661,153 @@
   };
 
   /*
+   * 一次性的運動跑完就停，拖回起點重來（PL.motion.replay）
+   *
+   * 使用者的原則：「實驗一次就要停止。小車到終點就停，使用者把車拖回原點再重新開始；
+   * 自由落體也一樣。」以前有的實驗跑完會自己從頭再跑一遍，學生還沒看清楚結局畫面就換了。
+   *
+   * 做法：播放時每一格記下「狀態快照＋物體在畫布上的位置」。跑完（或暫停）時，
+   * 物體上出現一個把手——拖它就沿著剛才的軌跡倒帶（讀數、圖表跟著回到那一刻），
+   * 拖回起點放手就重設，可以再跑一次；停在半路放手，按播放會從那裡接著跑。
+   * 跑完之後直接按播放（或發射／釋放）也會自動從頭再跑一次。
+   *
+   *   const rp = PL.motion.replay(cv, {
+   *     loop: anim,                         // 這個實驗的 PL.loop
+   *     snapshot: () => ({ t, x, v }),      // 目前狀態（回傳新物件）
+   *     restore: s => { ({ t, x, v } = s); },
+   *     reset,                              // 回到起點（不必重畫，helper 會呼叫 redraw）
+   *     redraw: draw,
+   *     label: "小車（拖回起點重新開始）"
+   *   });
+   *   // draw() 裡算出物體位置後：rp.mark(cx, cy)
+   *   // 跑到終點時：rp.end()；按「重設」時：rp.clear()
+   */
+  PL.motion.replay = function replay(cv, o) {
+    let rec = [], ended = false, idx = -1, grabbed = false;
+    const loop = o.loop;
+    const handle = PL.ui.handle(cv, {
+      label: o.label || "拖回起點重新開始",
+      onGrab() {
+        grabbed = true;
+        if (loop && loop.running) loop.stop();
+        idx = rec.length - 1;
+      },
+      onDrag(x, y) {
+        if (rec.length < 2) return;
+        // 沿著記錄下來的軌跡找離指標最近的一格（軌跡可能折返，所以不能只看 x）
+        let best = idx < 0 ? rec.length - 1 : idx, bd = Infinity;
+        for (let i = 0; i < rec.length; i++) {
+          const d = Math.hypot(rec[i].x - x, rec[i].y - y);
+          if (d < bd) { bd = d; best = i; }
+        }
+        if (best === idx) return;
+        idx = best;
+        ended = false;
+        o.restore(rec[idx].s);
+        if (loop && loop.seek) loop.seek(rec[idx].lt);
+        o.redraw();
+      },
+      onRelease() {
+        grabbed = false;
+        if (rec.length && idx <= Math.max(1, Math.round(rec.length * 0.02))) {
+          // 拖回起點：重新開始
+          api.clear();
+          if (o.reset) o.reset();
+          if (loop && loop.seek) loop.seek(0);
+        } else if (idx >= rec.length - 1) {
+          ended = true;                       // 放回終點：再按播放就從頭跑
+        } else if (idx >= 0) {
+          // 停在半路：之後按播放就從這一刻接著跑，後面那段軌跡作廢
+          rec = rec.slice(0, idx + 1);
+          ended = false;
+        }
+        idx = -1;
+        o.redraw();
+      }
+    });
+    if (loop) {
+      // 跑完之後再按播放（或發射／釋放），從頭再跑一次
+      const start0 = loop.start;
+      loop.start = function () {
+        if (ended) { api.clear(); if (o.reset) o.reset(); if (loop.seek) loop.seek(0); }
+        return start0.apply(this, arguments);
+      };
+    }
+    const api = {
+      /* draw() 裡呼叫：播放中記錄軌跡；停下來時把把手放在物體上 */
+      mark(x, y) {
+        if (!isFinite(x) || !isFinite(y)) return;
+        if (loop && loop.running && !grabbed) {
+          const last = rec[rec.length - 1];
+          if (!last || Math.abs(last.x - x) + Math.abs(last.y - y) >= 1.5 || rec.length < 2) {
+            rec.push({ x, y, s: o.snapshot(), lt: loop ? loop.t : 0 });
+            if (rec.length > 4000) rec.splice(1, 1);   // 保留起點，砍掉最早的中間格
+          } else {
+            last.s = o.snapshot(); last.lt = loop ? loop.t : 0;   // 物體沒動但狀態在走（例如計時）
+          }
+          handle.hide();
+        } else if (rec.length > 1) {
+          handle.place(x, y);
+        } else {
+          handle.hide();
+        }
+      },
+      /* 跑到終點：停下迴圈，把手留在終點 */
+      end() {
+        ended = true;
+        if (loop && loop.running) loop.stop();
+        const l = rec[rec.length - 1];
+        if (rec.length > 1) handle.place(l.x, l.y);
+      },
+      /* 重設：清掉軌跡 */
+      clear() { rec = []; ended = false; idx = -1; handle.hide(); if (loop && loop.seek && !loop.running) loop.seek(0); },
+      get ended() { return ended; },
+      get recording() { return rec.length; },
+      handle
+    };
+    return api;
+  };
+
+  /*
+   * 模板實驗（畫面只是時間 t 的函數）的一次性播放。
+   * 場景裡把 `tau = t % 週期` 換成 `tau = k.once(秒)`，再用 k.obj(x, y) 回報正在動的物體；
+   * 模板在 render 前後呼叫 before()／after()，時間走到終點就停，物體上出現「拖回起點」把手。
+   * 狀態只有時間本身，所以倒帶就是把時間設回去。
+   */
+  PL.motion.onceDriver = function onceDriver(cv, o) {
+    let end = null, obj = null, rp = null, loop = null;
+    const drv = {
+      attach(l) {
+        loop = l;
+        rp = PL.motion.replay(cv, {
+          loop: l, label: o.label || "拖回起點重新開始",
+          snapshot: () => o.get(), restore: v => o.set(v),
+          reset: () => o.set(0), redraw: () => o.render()
+        });
+        return drv;
+      },
+      /* 給場景的 k：once(秒) 取代 t % 週期；obj(x, y) 回報移動物體的位置 */
+      kit(t) {
+        return {
+          once(d) { end = d; return Math.min(t, d); },
+          obj(x, y) { obj = [x, y]; }
+        };
+      },
+      before() { end = null; obj = null; },
+      after() {
+        if (!rp) return;
+        if (obj) rp.mark(obj[0], obj[1]);
+        if (end != null && loop && loop.running && o.get() >= end - 1e-9) rp.end();
+      },
+      /* 迴圈推進時間時套用：走到終點就停在終點 */
+      advance(t, dt) { const n = t + dt; return end != null ? Math.min(n, end) : n; },
+      reset() { o.set(0); if (rp) rp.clear(); },
+      get oneShot() { return end != null; }
+    };
+    return drv;
+  };
+
+  /*
    * 進場就播放的穩態動畫實驗（sim-core 的 finishBuild 讀取；新實驗也可用 loop／clock 的 ambient 選項）。
    * 名單來自實測：播放 25 秒後畫面仍在動、沒有「一次性結局」的實驗。
    * 拋射、碰撞、釋放、加熱混合，以及設有觀察點（sim-observe）的實驗不在名單內。

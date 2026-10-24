@@ -142,7 +142,7 @@
     const { ctx, W, H, a: m, b: acc, t, s, c, v: N } = k;
     const L = isL();
     const floorH = Math.max(64, 112 * s), pxPerM = floorH / 3.2;
-    const tau = t % 3, disp = 0.5 * acc * tau * tau * pxPerM;
+    const tau = k.once(3), disp = 0.5 * acc * tau * tau * pxPerM;
     const shaftW = Math.min(W * 0.36, 260 * s), sx = W / 2 - shaftW / 2;
     let g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, L ? "#efe9df" : "#1b2230"); g.addColorStop(1, L ? "#e3dbce" : "#141a24");
@@ -360,7 +360,7 @@
     for (let i = 0; i <= 4; i++) ctx.fillText(i + "", X(i), gy1 + 11 * s);
     ctx.textAlign = "right"; [0, 100, 200].forEach(f => ctx.fillText(f + "", gx0 - 4, Y(f) + 3));
     ctx.textAlign = "left"; ctx.fillText("F (N)", scr.x + 6, gy0 - 8 * s); ctx.textAlign = "right"; ctx.fillText("t (s)", gx1, gy1 - 4);
-    const cv0 = 0.35 + dt * 0.5, P = 1.2 + cv0 + 1.2 + 0.5, tau = t % P;
+    const cv0 = 0.35 + dt * 0.5, tau = k.once(1.2 + cv0 + 0.8);
     const inC = tau > 1.2 && tau < 1.2 + cv0, done = tau >= 1.2 + cv0;
     const tc = inC ? (tau - 1.2) / cv0 * dt : done ? dt : 0;
     const Fpk = Math.PI * J / (2 * dt);
@@ -416,7 +416,7 @@
   /* 火箭方程式：燃料燒完時的速度即 Δv */
   SC["rocket-equation"] = k => {
     const { ctx, W, H, a: ve, b: ratio, t, s, c, v: dv } = k;
-    const cyc = 7.5, tau = t % cyc, t0 = 1, burn = 4;
+    const t0 = 1, burn = 4, tau = k.once(t0 + burn + 2);
     const fuel0 = 1 - 1 / ratio, u = clamp((tau - t0) / burn, 0, 1), on = tau > t0 && tau < t0 + burn;
     const vAt = uu => ve * Math.log(1 / (1 - fuel0 * uu));
     let alt = 0;
@@ -530,7 +530,7 @@
     const ml = mx - mw / 2 + 10 * s, mr = mw - 20 * s;
     D.line(ctx, ml, benchY - 20 * s, ml + mr, benchY - 20 * s, "rgba(20,26,36,0.6)", 4);
     gp(k, 0, ml + (1 - fr(T, k.cfg.b)) * mr, benchY - 20 * s, x => inv(1 - (x - ml) / mr, k.cfg.b));
-    const cyc = T + 1.4, tau = t % cyc, u = clamp(tau / T, 0, 1);
+    const tau = k.once(T + 0.4), u = clamp(tau / T, 0, 1);
     const bw = (24 + 38 * Math.sqrt(m / 102)) * s, bh = bw * 0.78;
     const liftTop = py + pr + 26 * s, liftBot = benchY - 2;
     const loadTop = (liftBot - bh) - ((liftBot - bh) - liftTop) * u;
@@ -576,8 +576,9 @@
       D.line(ctx, x, benchY + 4 * s, x, benchY + 12 * s, PL.theme.pale(0.6), 1.2);
       D.text(ctx, mm + " m", x, benchY + 24 * s, { color: PL.theme.pale(0.75), size: 9.5, align: "center" });
     }
-    const tau = t % 3.6, u = clamp(tau / 2.3, 0, 1), dist = d * (1 - (1 - u) * (1 - u));
+    const tau = k.once(2.6), u = clamp(tau / 2.3, 0, 1), dist = d * (1 - (1 - u) * (1 - u));
     const xs = x0 + 30 * s, bx = xs + dist * pxPerM, bw = 70 * s, bh = 44 * s;
+    k.obj(bx, sy - bh * 0.5);
     if (bx > xs + 2) {
       const tg = ctx.createLinearGradient(xs, 0, bx, 0);
       tg.addColorStop(0, `rgba(255,110,30,${(0.08 + 0.25 * mu).toFixed(2)})`); tg.addColorStop(1, `rgba(255,150,50,${(0.3 + 0.65 * mu).toFixed(2)})`);
@@ -911,7 +912,7 @@
     const cx = W * 0.4;
     const plateTop = AP.hotPlate(ctx, cx, benchY, 176 * s, P / 2000), ph = Math.max(14, 31.7 * s);
     knob(k, 0, cx + 52.8 * s, benchY - ph / 2, ph * 0.28 + 9, k.cfg.b, P);   // 旋鈕位置同 AP.hotPlate
-    const Tv = 1.5 + 2.2 * Math.log10(1 + tm / 60), cyc = Tv + 1.8, tau = t % cyc;
+    const Tv = 1.5 + 2.2 * Math.log10(1 + tm / 60), tau = k.once(Tv + 1.8);
     const f = clamp(tau / Tv, 0, 1), temp = f < 1 ? 0 : (tau - Tv) / 1.8 * 12;
     const bw = 136 * s, bh = Math.min(158 * s, plateTop - 46 * s);
     const lvl = 0.14 + 0.5 * Math.sqrt(m / 4) * f;
@@ -946,7 +947,7 @@
       AP.steel(ctx, wallX - 26 * s, benchY - 8 * s, 52 * s, 8 * s, -10);
     }
     const A = (14 + 42 * fr(amp0, k.cfg.a)) * s, sig = 24 * s, v = 190 * s;
-    const P = 2 * (handX - wallX) / v + 1.1, tau = t % P;
+    const tau = k.once(2 * (handX - wallX) / v + 1.1);
     const cpos = handX + 2 * sig - v * tau, img = 2 * wallX - cpos, sg = fixed ? -1 : 1;
     const gf = x => A * Math.exp(-(x / sig) * (x / sig));
     const yAt = x => gf(x - cpos) + sg * gf(x - img);
@@ -1681,15 +1682,19 @@
       const row = PL.ui.buttonRow(L.controls);
       let anim;
       /* 播放／暫停由傳輸列提供 */
-      PL.ui.button(row, "重設", () => { sa.set(cfg.a[3]); sb.set(cfg.b[3]); render(); });
+      PL.ui.button(row, "重設", () => { sa.set(cfg.a[3]); sb.set(cfg.b[3]); once.reset(); render(); });
       const r = PL.ui.readout(L.readouts, { label: cfg.output });
       const r2 = PL.ui.readout(L.readouts, { label: cfg.b[0], unit: cfg.b[4] });
       const chart = PL.ui.chart(PL.ui.charts(root), { title: cfg.output + "關係圖", cap: "曲線以目前第二個條件為固定值；滑動任一參數可比較趨勢與當前量測點。" });
       let time = 0;
       const st = { cv, sa, sb, redraw: () => render() };
+      // 一次性的動作跑完就停，拖回起點重來
+      const once = PL.motion.onceDriver(cv, { get: () => time, set: v => { time = v; }, render: () => render() });
       function render(dt) {
         const a = sa.get(), b = sb.get(), result = cfg.calc(a, b);
-        drawScene(cv, cfg, a, b, time, result, { dt: dt > 0 ? dt : 0, running: !!(anim && anim.running), clock: anim ? anim.t : 0, st });
+        once.before();
+        drawScene(cv, cfg, a, b, time, result, Object.assign({ dt: dt > 0 ? dt : 0, running: !!(anim && anim.running), clock: anim ? anim.t : 0, st }, once.kit(time)));
+        once.after();
         r.set(result, Math.abs(result) < 1 ? 3 : 2); r2.set(b, cfg.b[4] === "" ? 2 : 1);
         chart.setCap(PL.ui.relationChart(chart, {
           a: cfg.a, b: cfg.b, av: a, bv: b,
@@ -1704,7 +1709,8 @@
           : { label: n, onDrag: (x, y) => { h.f(x, y); render(); } });
         return h;
       });
-      anim = PL.loop(dt => { if (dt) time += dt; render(dt); });
+      anim = PL.loop(dt => { if (dt) time = once.advance(time, dt); render(dt); });
+      once.attach(anim);
       // 包一層：render 的 dt 只來自迴圈
       cv.onResize(() => render()); chart.onResize(() => render()); render(); anim.start();
       return { stop() { anim.stop(); cv.destroy(); chart.destroy(); }, rerender: render };

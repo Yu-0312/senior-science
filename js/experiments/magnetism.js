@@ -518,10 +518,10 @@
   PL.register("lenz", { build(root) {
     const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.56);
-    const P = 3.4;
-    let t = P * 0.3;                     // 進場時磁鐵正在移動，一打開就看得到偏轉
+    const P = 3.4, TEND = P * 0.62;     // 一次：停 → 移動 → 停住就結束（不自己重來）
+    let t = P * 0.3, ended = false;      // 進場時磁鐵正在移動，一打開就看得到偏轉
     const sPole = PL.ui.select(L.controls, { label: "朝向線圈的磁極", value: "N", options: [{ value: "N", label: "N 極" }, { value: "S", label: "S 極" }] });
-    const sMode = PL.ui.select(L.controls, { label: "磁鐵動作", value: "approach", options: [{ value: "approach", label: "接近線圈" }, { value: "leave", label: "遠離線圈" }], onChange: () => { hand = null; } });
+    const sMode = PL.ui.select(L.controls, { label: "磁鐵動作", value: "approach", options: [{ value: "approach", label: "接近線圈" }, { value: "leave", label: "遠離線圈" }], onChange: () => { hand = null; t = 0; ended = false; draw(); } });
     /*
      * 自己用手推拉磁鐵：抓起後磁鐵跟著游標走，拖曳速度就是 v——
      * 推向線圈＝接近、拉離＝遠離，檢流計偏轉正比於速度，停手就歸零。
@@ -577,8 +577,8 @@
       const AP = PL.apparatus, s = PL.clamp(W / 700, 0.55, 1.5);
       const pole = sPole.get(), approach = sMode.get() === "approach", other = pole === "N" ? "S" : "N";
       const induced = approach ? pole : other;
-      // 一個循環：停 → 移動（平滑加減速）→ 停住 → 淡出重來
-      const u = (t % P) / P, k = PL.clamp((u - 0.08) / 0.5, 0, 1);
+      // 一次：停 → 移動（平滑加減速）→ 停住
+      const u = Math.min(t, TEND) / P, k = PL.clamp((u - 0.08) / 0.5, 0, 1);
       let sm = k * k * (3 - 2 * k), speed = u > 0.08 && u < 0.58 ? 6 * k * (1 - k) / 1.5 : 0;   // 0..1
       // 手動：自動示範的峰速約每秒 0.9 段行程，拿來當 speed = 1 的基準
       if (hand) { sm = hand.u; speed = PL.clamp(Math.abs(hand.v) / 0.9, 0, 1); }
@@ -662,7 +662,11 @@
       rG.set(moving ? (g > 0 ? "向 + 偏轉" : "向 − 偏轉") : "歸零（磁鐵靜止）");
     }
     const anim = PL.loop(dt => {
-      if (dt) t += dt;
+      if (dt && !hand) {
+        if (ended) { t = 0; ended = false; }          // 演完後再按播放：從頭再演一次
+        t += dt;
+        if (t >= TEND) { t = TEND; ended = true; anim.stop(); }
+      }
       // 手停住（或放開）時速度很快衰減到零：沒有 pointermove 事件就代表磁鐵沒在動
       if (hand && dt && performance.now() - hand.at > 60) hand.v *= Math.exp(-dt * 14);
       draw();

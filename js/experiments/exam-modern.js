@@ -708,13 +708,13 @@
     const AP = ap();
     const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.6, 900);
-    let mode = "one", clock = null, geo = null, gam = [], lastSep = 0;
+    let mode = "one", clock = null, geo = null, gam = [], lastSep = 0, stripT0 = 0;
     const tilt = PL.motion.follower(0, { omega: 3.2, zeta: 0.16 });
     PL.ui.section(L.controls, "原子核");
     const sIdx = PL.ui.slider(L.controls, { label: "原子核", min: 0, max: NUC.length - 1, step: 1, value: 3, fmt: v => (NUC[PL.clamp(Math.round(v), 0, NUC.length - 1)] || NUC[0])[0], onInput: () => draw() });
     const sSep = PL.ui.slider(L.controls, { label: "把原子核拆開（外加能量）", min: 0, max: 100, step: 1, value: 0, unit: "%", digits: 0, onInput: () => draw() });
-    const chip = PL.ui.chipGroup(L.controls, { value: "one", options: [{ value: "one", label: "單一原子核" }, { value: "fis", label: "鈾-235 分裂" }, { value: "fus", label: "氘氚融合" }], onChange: v => { mode = v; draw(); } });
-    const go = (m, i) => { mode = m; chip.set(m); if (i != null) { sIdx.set(i); sSep.set(0); } draw(); };
+    const chip = PL.ui.chipGroup(L.controls, { value: "one", options: [{ value: "one", label: "單一原子核" }, { value: "fis", label: "鈾-235 分裂" }, { value: "fus", label: "氘氚融合" }], onChange: v => { mode = v; stripT0 = clock ? clock.t : 0; draw(); } });
+    const go = (m, i) => { mode = m; stripT0 = clock ? clock.t : 0; chip.set(m); if (i != null) { sIdx.set(i); sSep.set(0); } draw(); };
     PL.ui.presets(L.controls, { label: "考題情境", options: [
       { label: "氦-4（α 粒子）", apply: () => go("one", 3) }, { label: "鐵-56（最穩定附近）", apply: () => go("one", 10) },
       { label: "鈾-235", apply: () => go("one", 15) }, { label: "²³⁵U 分裂放多少能？", apply: () => go("fis") }, { label: "²H + ³H 融合放多少能？", apply: () => go("fus") }] });
@@ -743,11 +743,11 @@
       lastSep = s; gam.forEach(g => g.age += dt); gam = gam.filter(g => g.age < 1);
       draw(dt);
     }
-    // 上方的小動畫：結合放出 γ／中子撞鈾核分裂／氘氚融合（每 3.2 秒一輪）
+    // 上方的小動畫：結合放出 γ／中子撞鈾核分裂／氘氚融合（換模式時演一次，演完停在結果）
     function strip(ctx, x, y, w, h, t, k) {
       AP.infoCard(ctx, x, y, w, h);
       ctx.save(); AP.rrPath(ctx, x, y, w, h, 7); ctx.clip();
-      const p = (t % 3.2) / 3.2, cx = x + w * 0.62, cy = y + h * 0.58, fl = (a, b) => p > a && p < b;
+      const p = Math.min(0.999, Math.max(0, t - stripT0) / 3.2), cx = x + w * 0.62, cy = y + h * 0.58, fl = (a, b) => p > a && p < b;
       if (mode === "one") {
         const i = PL.clamp(Math.round(sIdx.get()), 0, NUC.length - 1), Z = NUC[i][2], A = NUC[i][3], m = Math.min(A, 14), u = Math.min(1, p / 0.45);
         for (let j = 0; j < m; j++) { const a = j * 2.4, r = (1 - u) * h * 0.4 + 5 * Math.sqrt(j / m) * 1.6; ball(ctx, cx + r * Math.cos(a) * 1.6, cy + r * Math.sin(a), 5, j < Math.round(m * Z / A) ? P_RGB : N_RGB); }

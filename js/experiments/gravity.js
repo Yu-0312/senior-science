@@ -60,13 +60,13 @@
   PL.register("centripetal", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
-    let ang = 0, broken = false, fly = null, drop = 0, dropV = 0;
+    let ang = 0, broken = false, fly = null, drop = 0, dropV = 0, gone = false;
     const sM = PL.ui.slider(L.controls, { label: "橡皮塞質量 m", min: 0.01, max: 0.05, step: 0.005, value: 0.02, unit: "kg", digits: 3 });
     const sR = PL.ui.slider(L.controls, { label: "半徑 r", min: 0.2, max: 0.8, step: 0.05, value: 0.5, unit: "m", digits: 2 });
     const sW = PL.ui.slider(L.controls, { label: "角速度 ω", min: 2, max: 12, step: 0.2, value: 6.2, unit: "rad/s", digits: 1 });
     const row = PL.ui.buttonRow(L.controls);
-    PL.ui.button(row, "斷繩！", () => { if (!broken) { broken = true; fly = null; drop = 0; dropV = 0; } }, { primary: true });
-    PL.ui.button(row, "重新旋轉", () => { broken = false; fly = null; ang = 0; drop = 0; dropV = 0; });
+    PL.ui.button(row, "斷繩！", () => { if (!broken) { broken = true; fly = null; drop = 0; dropV = 0; gone = false; if (!anim.running) anim.start(); } }, { primary: true });
+    PL.ui.button(row, "重新旋轉", () => { broken = false; fly = null; ang = 0; drop = 0; dropV = 0; gone = false; draw(); });
     PL.ui.note(L.controls, "繩子的張力由下方墊圈的重量提供：Mg = mω²r。轉得越快、半徑越大、橡皮塞越重，就得掛越多墊圈。斷繩後橡皮塞沿切線飛出，不是往外甩。");
     const rF = PL.ui.readout(L.readouts, { label: "向心力 F_c", unit: "N" });
     const rV = PL.ui.readout(L.readouts, { label: "線速率 v", unit: "m/s" });
@@ -136,6 +136,8 @@
     }
     const anim = PL.loop(dt => {
       if (dt) {
+        // 塞子飛出畫面後就停在那裡；之後再按播放，才把新的塞子綁回去重新旋轉
+        if (gone) { broken = false; fly = null; ang = 0; drop = 0; dropV = 0; gone = false; }
         if (!broken) ang += sW.get() * dt;
         else {
           const G = geo(), w = sW.get();
@@ -143,7 +145,7 @@
           const sl = dt * 0.35;                         // 斷繩後放慢動作，切線方向才看得清楚
           fly.x += fly.vx * sl; fly.y += fly.vy * sl;
           dropV += 900 * sl; drop += dropV * sl;
-          if ((fly.x < -30 || fly.x > cv.W + 30 || fly.y < -30 || fly.y > cv.H + 30) && drop > cv.H) { broken = false; fly = null; ang = 0; drop = 0; dropV = 0; }
+          if ((fly.x < -30 || fly.x > cv.W + 30 || fly.y < -30 || fly.y > cv.H + 30) && drop > cv.H) { gone = true; anim.stop(); }
         }
       }
       draw();

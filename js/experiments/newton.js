@@ -15,12 +15,12 @@
   PL.register("inertia", { build(root) {
     const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.52);
-    let x = 0, v = 0;
+    let x = 0, v = 0, rp = null;
     const sV = PL.ui.slider(L.controls, { label: "推出初速", min: 2, max: 14, step: 0.5, value: 8, unit: "m/s", digits: 1 });
     const sMu = PL.ui.slider(L.controls, { label: "摩擦係數 μ", min: 0, max: 0.4, step: 0.01, value: 0.1, unit: "", digits: 2 });
     const row = PL.ui.buttonRow(L.controls);
-    PL.ui.button(row, "推一下", () => { x = 0; v = sV.get(); anim.start(); }, { primary: true });
-    PL.ui.button(row, "重設", () => { x = 0; v = 0; });
+    PL.ui.button(row, "推一下", () => { x = 0; v = sV.get(); if (rp) rp.clear(); anim.start(); }, { primary: true });
+    PL.ui.button(row, "重設", () => { x = 0; v = 0; if (rp) rp.clear(); draw(); });
     PL.ui.note(L.controls, "μ = 0 時滑塊永遠等速前進——這就是慣性。");
     const rV = PL.ui.readout(L.readouts, { label: "速度 v", unit: "m/s" });
     const rX = PL.ui.readout(L.readouts, { label: "滑行距離", unit: "m" });
@@ -38,8 +38,9 @@
         D.text(ctx, "冰面", W - 60, gy + 30, { color: PL.col("text-dim"), size: 10, weight: "700" });
       }
       for (let gx = 0; gx <= 30; gx += 5) { const px = 60 + gx * sc; if (px < W - 20) { D.line(ctx, px, gy, px, gy + 6, PL.col("text"), 1.2); D.text(ctx, gx + " m", px, gy + 19, { color: PL.col("text"), size: 9, align: "center" }); } }
-      const px = 60 + (x % 30) * sc;
+      const px = 60 + Math.min(x, 30) * sc;
       AP.crate(ctx, px, gy, 62, 50, {});
+      if (rp) rp.mark(px, gy - 25);
       if (v < 0.01 && x === 0) AP.hand(ctx, px - 32, gy - 25, 1, 1.15);
 
       /*
@@ -82,8 +83,13 @@
     }
     const anim = PL.loop(dt => {
       if (dt && v > 0) { const a = sMu.get() * 9.8; v = Math.max(0, v - a * dt); x += v * dt; if (sMu.get() === 0) v = sV.get() > 0 ? v || 0 : v; }
+      // 停下來或滑出 30 m 地板就結束（μ = 0 時不再繞回原點無限重跑）
+      if (dt && (x >= 30 || (v <= 0 && x > 0))) { x = Math.min(x, 30); v = x >= 30 ? v : 0; rp.end(); }
       draw();
     });
+    rp = PL.motion.replay(cv, { loop: anim, label: "木箱（拖回起點再推一次）",
+      snapshot: () => ({ x, v }), restore: q => { x = q.x; v = q.v; },
+      reset: () => { x = 0; v = sV.get(); }, redraw: draw });
     cv.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
@@ -97,9 +103,9 @@
   PL.register("newton2", { build(root) {
     const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.52);
-    let x = 0, v = 0, t = 0, dots = [], nextDot = 0;
+    let x = 0, v = 0, t = 0, dots = [], nextDot = 0, rp = null;
     const DT_DOT = 0.1;                                // 每 0.1 s 打一點
-    const reset = () => { x = 0; v = 0; t = 0; dots = []; nextDot = 0; };
+    const reset = () => { x = 0; v = 0; t = 0; dots = []; nextDot = 0; if (rp) rp.clear(); };
     const sF = PL.ui.slider(L.controls, { label: "施力 F", min: 0, max: 24, step: 1, value: 10, unit: "N", digits: 0, onInput: () => draw(), onReset: reset });
     const sM = PL.ui.slider(L.controls, { label: "質量 m", min: 0.5, max: 10, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: () => draw(), onReset: reset });
     const row = PL.ui.buttonRow(L.controls);
@@ -125,6 +131,7 @@
       dots.forEach(xk => { const dx = tx + (x - xk) * sc; if (dx < px - w / 2 - 2 && dx > tx - 56) D.disc(ctx, dx, tapeY, 1.8, { fill: "#26262c" }); });
       AP.tickerTimer(ctx, tx, tapeY, 10, v > 0.01);
       AP.cart(ctx, px, gy, w, ch, {});
+      if (rp) rp.mark(px, gy - ch * 0.5);
       // 車上疊的砝碼越多，車越重：質量是看得見的
       const nW = Math.max(1, Math.min(8, Math.round(sM.get())));
       const bodyTop = gy - Math.max(4, Math.min(9, ch * 0.26)) * 1.1 - ch;
@@ -147,10 +154,14 @@
       if (dt) {
         const a = sF.get() / sM.get(); v += a * dt; x += v * dt; t += dt;
         while (t >= nextDot) { dots.push(x); nextDot += DT_DOT; }
-        if (x > 24) reset();
+        if (x >= 24) { x = 24; rp.end(); }           // 跑到軌道盡頭就停（不自己重跑）
       }
       draw();
     });
+    rp = PL.motion.replay(cv, { loop: anim, label: "小車（拖回起點重新開始）",
+      snapshot: () => ({ x, v, t, nextDot, d: dots, n: dots.length }),
+      restore: q => { x = q.x; v = q.v; t = q.t; nextDot = q.nextDot; dots = q.d.slice(0, q.n); },
+      reset: () => { x = 0; v = 0; t = 0; dots = []; nextDot = 0; }, redraw: draw });
     cv.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
@@ -159,8 +170,8 @@
   PL.register("incline", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
-    let s = 0, v = 0;
-    const reset = () => { s = 0; v = 0; };
+    let s = 0, v = 0, rp = null;
+    const reset = () => { s = 0; v = 0; if (rp) rp.clear(); };
     PL.ui.section(L.controls, "斜面參數");
     const sTh = PL.ui.slider(L.controls, { label: "傾角 θ", min: 5, max: 60, step: 1, value: 30, unit: "°", digits: 0, onInput: () => draw(), onReset: reset });
     const sMu = PL.ui.slider(L.controls, { label: "摩擦係數 μ", min: 0, max: 1, step: 0.02, value: 0.2, unit: "", digits: 2, onInput: () => draw(), onReset: reset });
@@ -202,6 +213,7 @@
       const s0 = Lpx * 0.24, bs = Math.min(s, Lpx - s0 - 40);      // 木塊從斜面上段放手，力的箭頭才有空間
       const bx = apex.x + u.x * (bs + s0), by = apex.y + u.y * (bs + s0);
       AP.woodBlock(ctx, bx, by - 6, 54, 34, -th);
+      if (rp) rp.mark(bx, by - 6);
       const cx = bx + n.x * 23, cy = by + n.y * 23; const FS = 72;
       D.arrow(ctx, cx, cy, cx, cy + FS * 1.4, { color: PL.col("warn"), width: 2, label: "mg" });
       D.arrow(ctx, cx, cy, cx + n.x * FS * Math.cos(th), cy + n.y * FS * Math.cos(th), { color: PL.col("accent-2"), width: 2, label: "N" });
@@ -219,9 +231,12 @@
       gg.dot(sTh.get(), a, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
     }
     const anim = PL.loop(dt => {
-      if (dt) { const th = sTh.get() * Math.PI / 180, mu = sMu.get(); const a = Math.tan(th) > mu ? 9.8 * (Math.sin(th) - mu * Math.cos(th)) : 0; v += a * dt * 8; s += v * dt; const Lpx = Math.min((cv.W - 120) / Math.cos(th), (cv.H - 90) / Math.sin(th)); if (s > Lpx * 0.76 - 44) { s = 0; v = 0; } }
+      if (dt) { const th = sTh.get() * Math.PI / 180, mu = sMu.get(); const a = Math.tan(th) > mu ? 9.8 * (Math.sin(th) - mu * Math.cos(th)) : 0; v += a * dt * 8; s += v * dt; const Lpx = Math.min((cv.W - 120) / Math.cos(th), (cv.H - 90) / Math.sin(th)); if (s > Lpx * 0.76 - 44) { s = Lpx * 0.76 - 44; v = 0; rp.end(); } else if (a === 0) rp.end(); }
       draw();
     });
+    rp = PL.motion.replay(cv, { loop: anim, label: "木塊（拖回斜面上端重新開始）",
+      snapshot: () => ({ s, v }), restore: q => { s = q.s; v = q.v; },
+      reset: () => { s = 0; v = 0; }, redraw: draw });
     cv.onResize(draw); cc.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); cc.destroy(); }, rerender: draw };
   }});
@@ -236,7 +251,7 @@
   PL.register("friction", { build(root) {
     const L = PL.ui.layout(root, { chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.62);
-    let x = 0, v = 0, geo = { x0: 142 };
+    let x = 0, v = 0, geo = { x0: 142 }, rp = null;
     const sF = PL.ui.slider(L.controls, { label: "施力 F", min: 0, max: 30, step: 0.5, value: 12, unit: "N", digits: 1, onInput: () => draw() });
     const sMs = PL.ui.slider(L.controls, { label: "靜摩擦係數 μₛ", min: 0.1, max: 0.9, step: 0.02, value: 0.5, unit: "", digits: 2, onInput: () => draw() });
     const sMk = PL.ui.slider(L.controls, { label: "動摩擦係數 μₖ", min: 0.05, max: 0.8, step: 0.02, value: 0.3, unit: "", digits: 2, onInput: () => draw() });
@@ -263,6 +278,7 @@
 
       const px = 120 + x * PX_PER_M;
       AP.woodBlock(ctx, px, gy, 52, 32, 0);
+      if (rp) rp.mark(px, gy - 16);
       D.text(ctx, mass + " kg", px, gy - 12, { color: "#2b1f10", size: 11, align: "center", weight: "700" });
       AP.hand(ctx, px + 28 + 62 + 16, gy - 16, -1, 0.85, { pull: true });
       // 拉力用彈簧秤施加，指針位置就是施力大小
@@ -293,12 +309,15 @@
         const F = sF.get(), moving = F > sMs.get() * N;
         if (moving) {
           v += (F - sMk.get() * N) / mass * dt; x += v * dt;
-          // 滑到桌面盡頭：把木塊放回起點，從靜止重新拉一次
-          if (120 + x * PX_PER_M > cv.W - 150) { x = 0; v = 0; }
+          // 滑到桌面盡頭就停；把木塊拖回起點（或再按播放）重新拉一次
+          if (120 + x * PX_PER_M > cv.W - 150) { x = (cv.W - 270) / PX_PER_M; v = 0; rp.end(); }
         } else v = 0;
       }
       draw();
     });
+    rp = PL.motion.replay(cv, { loop: anim, label: "木塊（拖回起點重新拉）",
+      snapshot: () => ({ x, v }), restore: q => { x = q.x; v = q.v; },
+      reset: () => { x = 0; v = 0; }, redraw: () => draw() });
     cv.onResize(() => draw()); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: () => draw() };
   }});
@@ -882,7 +901,8 @@
       const f = sliding ? muK * F : mg;
       return { m, F, mg, fsMax, sliding, f, a: sliding ? (mg - f) / m : 0 };
     }
-    function reset() { y = 0; v = 0; released = false; draw(); }
+    let rp = null;
+    function reset() { y = 0; v = 0; released = false; if (rp) rp.clear(); draw(); }
     let pushX0 = 0;
     const grip = PL.ui.handle(cv, { slider: sF, label: "水平推力 F（拖曳箭頭尾端）", toValue: px => (pushX0 - px) / 0.47 });
     function draw() {
@@ -893,6 +913,7 @@
       AP.labRoom(ctx, W, H, H - 22, { bench: "wood" });
       AP.wallBlock(ctx, wallX, 0, H - 22, W - wallX, { dir: 1 });
       AP.massBlock(ctx, bx + bw / 2, by + bh, bw, bh, { color: MC(), label: q.m + " kg", noShadow: true });
+      if (rp) rp.mark(bx + bw / 2, by + bh / 2);
       // 手把物體壓在牆上：推力的來源
       AP.hand(ctx, bx - 2, by + bh / 2, 1, 1.05);
       const cy = by + bh / 2, forceScale = 0.55;
@@ -944,10 +965,13 @@
     const anim = PL.loop(dt => {
       if (dt && released) {
         const q = model();
-        if (q.sliding) { v += q.a * dt; y += v * dt * 34; if (y > cv.H * 0.42) { y = cv.H * 0.42; v = 0; anim.stop(); } }
+        if (q.sliding) { v += q.a * dt; y += v * dt * 34; if (y > cv.H * 0.42) { y = cv.H * 0.42; v = 0; rp.end(); } }
       }
       draw();
     });
+    rp = PL.motion.replay(cv, { loop: anim, label: "物體（拖回原處重新釋放）",
+      snapshot: () => ({ y, v }), restore: q => { y = q.y; v = q.v; },
+      reset: () => { y = 0; v = 0; released = true; }, redraw: draw });
     cv.onResize(draw); cc.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); cc.destroy(); }, rerender: draw };
   }});
@@ -979,7 +1003,8 @@
       const f = grip ? fNeed : muK * m1 * 9.8;
       return { m1, m2, F, fNeed, fMax, grip, f, aTop: f / m1, aBottom: grip ? F / (m1 + m2) : (F - f) / m2 };
     }
-    function reset() { xTop = xBottom = vTop = vBottom = 0; released = false; draw(); }
+    let rp = null;
+    function reset() { xTop = xBottom = vTop = vBottom = 0; released = false; if (rp) rp.clear(); draw(); }
     let pushX0 = 0;
     const grip = PL.ui.handle(cv, { slider: sF, label: "推動下方的力 F（拖曳箭頭）", toValue: px => (px - pushX0) / 0.86 });
     function draw() {
@@ -990,6 +1015,7 @@
       const lowerW = Math.min(160, 92 + q.m2 * 11), lowerH = 48, upperW = Math.min(112, 60 + q.m1 * 12), upperH = 40;
       const lowerX = cx + shiftBottom, upperX = cx + shiftTop;
       AP.massBlock(ctx, lowerX, gy, lowerW, lowerH, { color: "#ffab80", label: "m₂" });
+      if (rp) rp.mark(lowerX, gy - lowerH / 2);
       AP.massBlock(ctx, upperX, gy - lowerH, upperW, upperH, { color: MC(), label: "m₁", noShadow: true });
       if (!released || xBottom < 0.3) AP.hand(ctx, lowerX - lowerW / 2 - 1, gy - lowerH / 2, 1, 1.15);
       // 推力箭頭 0.86 px/N（100 N 時 86 px），不再封頂，尖端就是把手
@@ -1012,10 +1038,14 @@
     const anim = PL.loop(dt => {
       if (dt && released) {
         const q = model(); vTop += q.aTop * dt; vBottom += q.aBottom * dt; xTop += vTop * dt; xBottom += vBottom * dt;
-        if (xBottom > 26 || xTop > 26) { released = false; anim.stop(); }
+        if (xBottom > 26 || xTop > 26) rp.end();      // 推到桌邊就停；拖回起點（或再按播放）重來
       }
       draw();
     });
+    rp = PL.motion.replay(cv, { loop: anim, label: "下方木塊（拖回起點重新推）",
+      snapshot: () => ({ xTop, xBottom, vTop, vBottom }),
+      restore: q => { ({ xTop, xBottom, vTop, vBottom } = q); },
+      reset: () => { xTop = xBottom = vTop = vBottom = 0; released = true; }, redraw: draw });
     cv.onResize(draw); cc.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); cc.destroy(); }, rerender: draw };
   }});
@@ -1193,7 +1223,8 @@
       const tMatch = Math.abs(u - sV0.get()) / Math.max(0.0001, sMu.get() * 9.8);
       return { u, current, direction, f, a, tMatch };
     }
-    function reset() { v = sV0.get(); t = 0; x = 0; running = false; draw(); }
+    let rp = null;
+    function reset() { v = sV0.get(); t = 0; x = 0; running = false; if (rp) rp.clear(); draw(); }
     // 放上輸送帶前，直接拖物體上方的速度箭頭決定初速（9 px 代表 1 m/s，可往左拖成負值）
     let vX0 = 0;
     const grip = PL.ui.handle(cv, { slider: sV0, label: "物體初速 v₀（拖曳箭頭）", toValue: px => (px - vX0) / 9 });
@@ -1207,6 +1238,7 @@
       for (let px = beltX + 40; px < beltX + beltW - 30; px += 90) D.arrow(ctx, px, beltY + beltH / 2, px + 18 * Math.sign(q.u || 1), beltY + beltH / 2, { color: "#e8eef5", width: 1.6, head: 5 });
       const bx = W * 0.5 + PL.clamp(x * 22, -W * 0.24, W * 0.24), bw = 80, bh = 54, by = beltY - bh;
       AP.crate(ctx, bx, beltY, bw, bh, { label: sM.get() + " kg" });
+      if (rp) rp.mark(bx, beltY - bh / 2);
       if (q.direction) D.arrow(ctx, bx, by - 14, bx + q.direction * Math.min(72, Math.abs(q.f) * 7), by - 14, { color: q.direction > 0 ? "#7ee0c0" : PL.col("danger"), width: 2.5, label: "fₖ" });
       // 物體速度（相對地面）：和帶速比較，就知道摩擦力往哪邊
       D.arrow(ctx, bx, by - 44, bx + q.current * 9, by - 44, { color: PL.col("accent-2"), width: 2.2, head: 7, label: "v = " + PL.fmt(q.current, 1) });
@@ -1226,11 +1258,14 @@
     const anim = PL.loop(dt => {
       if (dt && running) {
         const q = model();
-        if (q.direction === 0) { v = q.u; running = false; anim.stop(); }
-        else { v += q.a * dt; x += v * dt; t += dt; if ((q.direction > 0 && v >= q.u) || (q.direction < 0 && v <= q.u)) { v = q.u; running = false; anim.stop(); } }
+        if (q.direction === 0) { v = q.u; running = false; rp.end(); }
+        else { v += q.a * dt; x += v * dt; t += dt; if ((q.direction > 0 && v >= q.u) || (q.direction < 0 && v <= q.u)) { v = q.u; running = false; rp.end(); } }
       }
       draw();
     });
+    rp = PL.motion.replay(cv, { loop: anim, label: "物體（拖回起點重新放上輸送帶）",
+      snapshot: () => ({ v, t, x, running }), restore: q => { ({ v, t, x, running } = q); },
+      reset: () => { v = sV0.get(); t = 0; x = 0; running = true; }, redraw: draw });
     cv.onResize(draw); cc.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); cc.destroy(); }, rerender: draw };
   }});
@@ -1272,11 +1307,10 @@
      * 例如往上拉得太猛又突然放鬆，木塊會先減速、停下，再由靜摩擦決定要不要倒滑回來。
      */
     const PX_PER_M = 60;
-    let s = 0, v = 0, pause = 0, geo = { c: { x: 0, y: 0 }, dir: { x: 1, y: 0 }, half: 100 };
+    let s = 0, v = 0, geo = { c: { x: 0, y: 0 }, dir: { x: 1, y: 0 }, half: 100 }, rp = null;
     function step(dt) {
       if (!(dt > 0)) return;
       const q = model();
-      if (pause > 0) { pause -= dt; if (pause <= 0) { s = 0; v = 0; } return; }
       let left = Math.min(dt, 0.1);
       while (left > 1e-6) {
         const h = Math.min(left, 1 / 240);
@@ -1290,10 +1324,13 @@
         }
         s += v * PX_PER_M * h; left -= h;
       }
-      // 滑到斜面一端：停一下，再把木塊放回中間
-      if (Math.abs(s) > geo.half) { s = Math.sign(s) * geo.half; v = 0; pause = 0.7; }
+      // 滑到斜面一端就停；把木塊拖回中間（或再按播放）重來
+      if (Math.abs(s) > geo.half) { s = Math.sign(s) * geo.half; v = 0; rp.end(); }
     }
     const clock = PL.motion.clock(dt => { step(dt); draw(); });
+    rp = PL.motion.replay(cv, { loop: clock, label: "木塊（拖回斜面中間重新開始）",
+      snapshot: () => ({ s, v }), restore: q => { s = q.s; v = q.v; },
+      reset: () => { s = 0; v = 0; }, redraw: () => draw() });
     // 把手抓 F 箭頭的尖端：沿斜面拖離木塊越遠，外力越大（箭頭長 30 + 1.4F px）
     const grip = PL.ui.handle(cv, { slider: sForce, label: "沿斜面外力 F（拖曳箭頭）",
       toValue: (x, y) => ((x - geo.c.x) * geo.dir.x + (y - geo.c.y) * geo.dir.y - 30) / 1.4 });
@@ -1311,6 +1348,7 @@
       const d0 = slopeLength * 0.48 + s;
       const point = { x: top.x + down.x * d0, y: top.y + down.y * d0 };
       AP.massBlock(ctx, point.x + normal.x * 1, point.y + normal.y * 1, 50, 28, { color: MC(), label: q.m + " kg", ang: -q.th, noShadow: true });
+      if (rp) rp.mark(point.x + normal.x * 14, point.y + normal.y * 14);
       const c = { x: point.x + normal.x * 13, y: point.y + normal.y * 13 }, scale = 3.1;
       const moving = Math.abs(v) > 1e-6;
       D.arrow(ctx, c.x, c.y, c.x, c.y + 50, { color: PL.col("warn"), width: 2.2, label: "mg" });

@@ -189,7 +189,7 @@
     G(k, { xA, xB, yB }); pin(k, 0, xA + 7 * s, yA);
     AP.steel(ctx, xB + 2 * s, yB - 18 * s, 6 * s, 20 * s, 6);
     const R = 20 * s, pxPerM = len / 2, aPx = Math.max(0.02, acc) * pxPerM;
-    const T = Math.sqrt(2 * (len - 2.6 * R) / aPx), cyc = T + 0.8, tau = t % cyc, tt = Math.min(tau, T);
+    const T = Math.sqrt(2 * (len - 2.6 * R) / aPx), tau = k.once(T + 0.3), tt = Math.min(tau, T);
     const pos = d => ({ x: xA + (R * 0.6 + d) * Math.cos(thr) + nx * R, y: yA + (R * 0.6 + d) * Math.sin(thr) + ny * R });
     const kind = beta < 0.03 ? "block" : beta < 0.45 ? "ball" : "disk";
     const hole = kind === "disk" ? R * clamp((beta - 0.5) / 0.5, 0, 0.84) : 0;
@@ -215,6 +215,7 @@
     for (let q = 0.25; q < tt; q += 0.25) { const d = 0.5 * aPx * q * q; drawObj(pos(d), d / R, 0.22); }
     const d = 0.5 * aPx * tt * tt, p = pos(d);
     drawObj(p, d / R, 1);
+    k.obj(p.x, p.y);
     const v = aPx * tt;
     if (v > 4) D.arrow(ctx, p.x, p.y - R - 8 * s, p.x + Math.cos(thr) * Math.min(90 * s, v * 0.35), p.y - R - 8 * s + Math.sin(thr) * Math.min(90 * s, v * 0.35), { color: PL.col("accent-2"), width: 2.2, label: "v" });
     const names = { block: "無摩擦滑塊（β = 0）", ball: "實心球（β ≈ 0.4）", disk: beta < 0.7 ? "實心圓柱（β ≈ 0.5）" : "圓環（β ≈ 1）" };
@@ -231,7 +232,7 @@
   GRIPS["multistage-rocket"] = st => grip(st, st.sb, "第一節燃料（上下拉）", (x, y, g) => 1 / (1 - clamp((g.w1 - 2 - y) / (g.w1 - g.w0 - 4), 0, 0.9)), 1);
   SC["multistage-rocket"] = k => {
     const { ctx, W, H, a: ve, b: ratio, t, s, c, v: dv, cfg } = k;
-    const cyc = 9, tau = t % cyc, f1 = 1 - 1 / ratio;
+    const tau = k.once(7.5), f1 = 1 - 1 / ratio;
     const u1 = clamp((tau - 1) / 2.5, 0, 1), u2 = clamp((tau - 4) / 2.5, 0, 1);
     const on1 = tau > 1 && tau < 3.5, on2 = tau > 4 && tau < 6.5, sep = tau >= 3.5;
     const v1 = ve * Math.log(1 / (1 - f1 * u1)), vNow = v1 + ve * Math.log(1 / (1 - f1 * u2));
@@ -256,6 +257,7 @@
     const b2 = by - h1 - 2 * s;
     if (on2) flame(ctx, padX, b2 + 6, wr * 0.9, flameL * 0.9, t);
     rocketBody(ctx, padX, b2, wr * 0.92, h2, f1 * (1 - u2), true, false, "rgb(70,110,200)");
+    k.obj(padX, b2 - h2 * 0.5);
     AP.lcd(ctx, W - 176 * s, 20, 158 * s, 24 * s, "v = " + PL.fmt(vNow, 0) + " m/s", { color: "rgb(120,236,255)" });
     const st = tau < 1 ? "倒數點火…" : on1 ? "第一節燃燒中" : tau < 4 ? "第一節分離！丟掉空殼" : on2 ? "第二節燃燒中" : "兩節都燒完：Δv = 2vₑ ln(比)";
     D.text(ctx, st, W - 18 * s, 66 * s, { color: sep && tau < 4 ? PL.col("danger") : PL.col("text"), size: 12, align: "right", weight: "700" });
@@ -473,7 +475,7 @@
     ctx.fillStyle = L ? "rgba(90,84,76,0.35)" : "rgba(0,0,0,0.35)"; ctx.fillRect(W * 0.1, pitY, W * 0.8, H - pitY - 8 * s);
     D.text(ctx, "地板剖面", W * 0.1 + 6 * s, H - 14 * s, { color: PL.theme.pale(0.7), size: 9.5 });
     const xs = W * 0.22, xl = W * 0.62, ws = 26 * s, wl = clamp(ws * Math.sqrt(ratio), 34 * s, W * 0.3);
-    const oil = "rgba(222,168,44,0.9)", cyc = 1.4, n = Math.floor(t / cyc) % 8, ph = (t % cyc) / cyc;
+    const oil = "rgba(222,168,44,0.9)", cyc = 1.4, tp = k.once(8 * cyc - 0.01), n = Math.min(7, Math.floor(tp / cyc)), ph = (tp - n * cyc) / cyc;
     const push = ph < 0.5 ? ph * 2 : 1 - (ph - 0.5) * 2, d1 = 34 * s;
     const lift = Math.min(96 * s, (n + (ph < 0.5 ? push : 1)) * d1 / ratio);
     const sTop = floorY - 80 * s, pS = sTop + 14 * s + push * d1;
@@ -679,8 +681,8 @@
   SC["rl-transient"] = k => {
     const { ctx, W, H, a: Lh, b: R, t, s, c, v: tau, cfg } = k;
     AP.circuitBoard(ctx, W, H, false);
-    const tv = clamp(0.3 + 0.8 * Math.log10(1 + tau * 10), 0.25, 2.6), cyc = 6 * tv + 1, tt = t % cyc;
-    const on = tt < 6 * tv, cur = on ? 1 - Math.exp(-tt / tv) : 0;
+    const tv = clamp(0.3 + 0.8 * Math.log10(1 + tau * 10), 0.25, 2.6), tt = k.once(6 * tv);
+    const on = true, cur = on ? 1 - Math.exp(-tt / tv) : 0;
     const Lx = W * 0.1, Rx = W * 0.56, T = H * 0.22, B = H * 0.8, mid = (T + B) / 2;
     const red = "rgb(186,54,48)";
     AP.cable(ctx, [{ x: Lx, y: mid - 36 * s }, { x: Lx, y: T }, { x: Rx, y: T }, { x: Rx, y: B }, { x: Lx, y: B }, { x: Lx, y: mid + 36 * s }], red, 3 * s, 3);
@@ -1220,16 +1222,20 @@
       PL.ui.note(L.controls, PL.templateGuide(id, config));
       const buttons = PL.ui.buttonRow(L.controls); let anim;
       /* 播放／暫停由引擎的傳輸列統一提供，實驗不再自備 */
-      PL.ui.button(buttons, "重設", () => { a.set(config.a[3]); b.set(config.b[3]); render(); });
+      PL.ui.button(buttons, "重設", () => { a.set(config.a[3]); b.set(config.b[3]); once.reset(); render(); });
       const reading = PL.ui.readout(L.readouts, { label: config.output, unit: config.unit });
       const parameter = PL.ui.readout(L.readouts, { label: config.b[0], unit: config.b[4] });
       const conclusion = PL.ui.readout(L.readouts, { label: "模型判讀" });
       const chart = PL.ui.chart(PL.ui.charts(root), { title: config.output + "關係圖", cap: "曲線固定目前第二個參數；亮點表示正在操作的條件。讀取曲線趨勢，再用本頁公式說明原因。" });
       let time = 0;
       const st = { cv, sa: a, sb: b, redraw: () => render(), rewind: () => { time = 0; render(); } };
+      // 一次性的動作跑完就停，拖回起點重來
+      const once = PL.motion.onceDriver(cv, { get: () => time, set: v => { time = v; }, render: () => render() });
       function render(dt) {
         const av = a.get(), bv = b.get(), result = config.calc(av, bv);
-        scene(cv, config, av, bv, time, result, { dt: dt > 0 ? dt : 0, running: !!(anim && anim.running), clock: anim ? anim.t : 0, st });
+        once.before();
+        scene(cv, config, av, bv, time, result, Object.assign({ dt: dt > 0 ? dt : 0, running: !!(anim && anim.running), clock: anim ? anim.t : 0, st }, once.kit(time)));
+        once.after();
         reading.set(result, Math.abs(result) >= 100 ? 1 : 3); parameter.set(bv, config.b[4] === "" ? 2 : 2); conclusion.set(config.status(av, bv, result));
         chart.setCap(PL.ui.relationChart(chart, {
           a: config.a, b: config.b, av: av, bv: bv,
@@ -1238,7 +1244,8 @@
       }
       // 畫面上可以直接抓的器材（檢偏器、旋鈕…）：建立一次，位置由場景每格更新
       if (GRIPS[id]) GRIPS[id](st, config);
-      anim = PL.loop(dt => { if (dt && !st.hold) time += dt; render(dt); });
+      anim = PL.loop(dt => { if (dt && !st.hold) time = once.advance(time, dt); render(dt); });
+      once.attach(anim);
       // 縮放回呼可能帶參數進來，包一層確保 render 收到的 dt 只來自迴圈
       cv.onResize(() => render()); chart.onResize(() => render()); render(); anim.start();
       return { stop() { anim.stop(); cv.destroy(); chart.destroy(); }, rerender: render };

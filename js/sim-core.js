@@ -970,6 +970,8 @@
       toggle() { running ? ctrl.stop() : ctrl.start(); },
       render() { step(0, t); },
       reset() { t = 0; last = 0; },
+      /* 倒帶（PL.motion.replay）：把模擬時間設回某一刻，傳輸列的時間顯示才會跟著回去 */
+      seek(v) { t = Math.max(0, Number(v) || 0); last = 0; },
       /* 單步：暫停狀態下前進一個固定時距，方便逐格觀察。 */
       stepOnce(dt) {
         if (running) ctrl.stop();
@@ -2025,6 +2027,17 @@
       const speed = primary ? primary.speed : 1;
       ui.speedBtns.forEach(b => b.classList.toggle("active", Number(b.dataset.speed) === speed));
     }
+
+    /*
+     * 實驗自己停下來（落地、跑到終點）或被觸發鈕啟動時，傳輸列也要立刻跟著變。
+     * 以前只靠播放中每 0.25 s 的 onTick 更新——迴圈一停就沒有下一次，
+     * 播放鍵會一直顯示「暫停」，按下去反而什麼事都沒發生。
+     */
+    loops.forEach(l => {
+      const stop0 = l.stop, start0 = l.start;
+      l.stop = function () { const r = stop0.apply(this, arguments); paint(); return r; };
+      l.start = function () { const r = start0.apply(this, arguments); paint(); return r; };
+    });
 
     ui.playBtn.addEventListener("click", () => {
       if (anyRunning()) loops.forEach(l => l.stop());

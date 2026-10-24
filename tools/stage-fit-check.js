@@ -45,14 +45,19 @@ async function check(browser, base, w, h) {
   for (let i = 0; i < ids.length; i++) {
     // 每 20 個換一個分頁：大量畫布累積在無頭瀏覽器裡會把行程撐垮
     if (i % 20 === 0) await open(ids[i]);
-    else { await page.evaluate(id => { location.hash = "#" + id; }, ids[i]); await page.waitForTimeout(700); }
+    else {
+      await page.evaluate(id => { location.hash = "#" + id; }, ids[i]);
+      // 實驗程式是延遲載入的：等這個實驗真的建好（較大的檔案要一秒左右），再給排版一點時間
+      await page.waitForFunction(id => { const r = document.querySelector("#sim-root"); return r && r.dataset.simId === id && r.querySelector(".stage-side"); }, ids[i], { timeout: 8000 }).catch(() => {});
+      await page.waitForTimeout(500);
+    }
     const r = await page.evaluate(async () => {
       const raf = () => new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res)));
       const side = document.querySelector(".stage-side");
       if (!side) return { missing: true };
       let over = side.scrollHeight - side.clientHeight;
       const tabs = Array.from(side.querySelectorAll(".stage-tab")).filter(t => !t.hidden && !t.parentNode.hidden);
-      for (const t of tabs) { t.click(); await raf(); over = Math.max(over, side.scrollHeight - side.clientHeight); }
+      for (const t of tabs) { t.click(); await raf(); await new Promise(res => setTimeout(res, 150)); over = Math.max(over, side.scrollHeight - side.clientHeight); }
       if (tabs[0]) tabs[0].click();
       const vis = document.querySelector(".sim-visual-panel");
       return {

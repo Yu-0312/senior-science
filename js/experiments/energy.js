@@ -24,8 +24,8 @@
   PL.register("work-power", { build(root) {
     const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.52);
-    let x = 0, W_ = 0;
-    const reset = () => { x = 0; W_ = 0; };
+    let x = 0, W_ = 0, rp = null;
+    const reset = () => { x = 0; W_ = 0; if (rp) rp.clear(); };
     const sF = PL.ui.slider(L.controls, { label: "施力 F", min: 2, max: 20, step: 1, value: 10, unit: "N", digits: 0, onInput: () => draw(), onReset: reset });
     const sTh = PL.ui.slider(L.controls, { label: "施力角 θ", min: 0, max: 80, step: 1, value: 30, unit: "°", digits: 0, onInput: () => draw(), onReset: reset });
     const sV = PL.ui.slider(L.controls, { label: "移動速率 v", min: 0.5, max: 4, step: 0.5, value: 2, unit: "m/s", digits: 1, onInput: () => draw(), onReset: reset });
@@ -42,12 +42,13 @@
     function draw() {
       const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
       const A = AP(), F = sF.get(), th = sTh.get() * Math.PI / 180, v = sV.get();
-      const k = Math.max(0.6, Math.min(1.5, W / 800)), gy = H * 0.8, sc = (W - 190 * k) / 16, px = 70 * k + (x % 16) * sc;
+      const k = Math.max(0.6, Math.min(1.5, W / 800)), gy = H * 0.8, sc = (W - 190 * k) / 16, px = 70 * k + Math.min(x, 16) * sc;
       /* 操場上用繩子斜拉一箱木頭雪橇：繩子方向就是施力方向 θ，地上的標線看得出走了多遠 */
       if (A.outdoor) {
         A.outdoor(ctx, W, H, gy, { t: x * 0.3, hills: true, ground: "field", sunX: W * 0.5 });
         for (let mm = 0; mm <= 16; mm += 2) { const mx = 70 * k + mm * sc; ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.fillRect(mx - 1, gy + 2, 2, 10 * k); D.text(ctx, mm + " m", mx, gy + 24 * k, { color: PL.col("text"), size: 9.5, align: "center" }); }
-        const fx0 = 70 * k + Math.min(x % 16, 16) * sc;
+        const fx0 = 70 * k + Math.min(x, 16) * sc;
+        if (rp) rp.mark(px, gy - 14 * k);
         ctx.fillStyle = "rgba(47,174,133,0.35)"; ctx.fillRect(70 * k, gy + 12 * k, Math.max(0, fx0 - 70 * k), 5 * k);
         ctx.strokeStyle = "rgb(120,84,44)"; ctx.lineWidth = 3 * k; ctx.beginPath(); ctx.moveTo(px - 34 * k, gy - 3 * k); ctx.lineTo(px + 30 * k, gy - 3 * k); ctx.quadraticCurveTo(px + 42 * k, gy - 4 * k, px + 40 * k, gy - 16 * k); ctx.stroke();
         A.crate(ctx, px, gy - 6 * k, 62 * k, 44 * k, { label: "木箱" });
@@ -73,7 +74,11 @@
       PL.ui.caption(cv, "只有沿移動方向的分力 F cosθ 才做功：W = F cosθ × 位移");
       rW.set(W_, 1); rP.set(fx * v, 1); rFx.set(fx, 1);
     }
-    const anim = PL.loop(dt => { if (dt) { const F = sF.get(), th = sTh.get() * Math.PI / 180, v = sV.get(); const dx = v * dt; x += dx; W_ += F * Math.cos(th) * dx; if (x > 32) reset(); } draw(); });
+    const anim = PL.loop(dt => { if (dt) { const F = sF.get(), th = sTh.get() * Math.PI / 180, v = sV.get(); const dx = v * dt; x += dx; W_ += F * Math.cos(th) * dx; if (x >= 16) { x = 16; rp.end(); } } draw(); });
+    // 拉到 16 m 標線就停；把雪橇拖回起點（或再按播放）重新拉
+    rp = PL.motion.replay(cv, { loop: anim, label: "雪橇（拖回起點重新開始）",
+      snapshot: () => ({ x, W_ }), restore: q => { x = q.x; W_ = q.W_; },
+      reset: () => { x = 0; W_ = 0; }, redraw: draw });
     cv.onResize(draw); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
@@ -82,8 +87,8 @@
   PL.register("work-energy", { build(root) {
     const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
     const cv = PL.canvas.create(L.canvasWrap, 0.56);
-    let x = 0, v = 0, Wnet = 0;
-    const reset = () => { x = 0; v = 0; Wnet = 0; };
+    let x = 0, v = 0, Wnet = 0, rp = null;
+    const reset = () => { x = 0; v = 0; Wnet = 0; if (rp) rp.clear(); };
     const sF = PL.ui.slider(L.controls, { label: "施力 F", min: 2, max: 20, step: 1, value: 12, unit: "N", digits: 0, onInput: () => draw(), onReset: reset });
     const sFr = PL.ui.slider(L.controls, { label: "阻力 f", min: 0, max: 10, step: 0.5, value: 2, unit: "N", digits: 1, onInput: () => draw(), onReset: reset });
     const sM = PL.ui.slider(L.controls, { label: "質量 m", min: 1, max: 6, step: 0.5, value: 2, unit: "kg", digits: 1, onInput: reset });
@@ -118,6 +123,7 @@
         D.text(ctx, "s = " + PL.fmt(Math.min(x, 16), 1) + " m", (x0 + px) / 2, gy - bh - 27, { color: PL.col("text-dim"), size: 10, align: "center" });
       }
       A.cart(ctx, px, gy, bw + 10, bh);
+      if (rp) rp.mark(px, gy - bh * 0.5);
       D.text(ctx, PL.fmt(m, 1) + " kg", px, gy - bh - 8, { color: PL.col("text"), size: 10, align: "center", weight: "700" });
       // 手拉彈簧秤：指針就是 F
       const hy = gy - bh / 2 - 8, hx = px + (bw + 10) / 2 + 6;
@@ -131,7 +137,11 @@
       PL.ui.caption(cv, "淨功 = 動能變化：兩條長條始終等長");
       rWn.set(Wnet, 1); rK.set(K, 1); rV.set(v, 2);
     }
-    const anim = PL.loop(dt => { if (dt) { const F = sF.get(), f = sFr.get(), m = sM.get(); const net = F - f; const a = net / m; const dx = Math.max(0, v) * dt + 0.5 * a * dt * dt; v += a * dt; x += Math.max(0, dx); Wnet += net * Math.max(0, dx); if (x > 16) reset(); } draw(); });
+    const anim = PL.loop(dt => { if (dt) { const F = sF.get(), f = sFr.get(), m = sM.get(); const net = F - f; const a = net / m; const dx = Math.max(0, v) * dt + 0.5 * a * dt * dt; v += a * dt; x += Math.max(0, dx); Wnet += net * Math.max(0, dx); if (x >= 16) { x = 16; rp.end(); } } draw(); });
+    // 拉到 16 m 尺的盡頭就停；把小車拖回起點（或再按「施力」）重新開始
+    rp = PL.motion.replay(cv, { loop: anim, label: "小車（拖回起點重新開始）",
+      snapshot: () => ({ x, v, Wnet }), restore: q => { x = q.x; v = q.v; Wnet = q.Wnet; },
+      reset: () => { x = 0; v = 0; Wnet = 0; }, redraw: draw });
     cv.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});

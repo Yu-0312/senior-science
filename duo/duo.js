@@ -378,7 +378,8 @@
       }
     } else {
       items.push({ kind: "lab", mode: "explore", title: "動手玩實驗台", prediction,
-        goal: S && S.sliders.length ? "至少調整 " + Math.min(2, S.sliders.length) + " 個參數，並按「播放」看看會發生什麼。" : "按「播放」觀察實驗台，看清楚發生了什麼再繼續。" });
+        goal: (S && S.sliders.length ? "至少調整 " + Math.min(2, S.sliders.length) + " 個參數" : "")
+          + (S && S.start ? (S.sliders.length ? "，並" : "") + "按「" + S.start + "」看看會發生什麼。" : (S && S.sliders.length ? "，看看畫面怎麼變。" : "觀察實驗台，看清楚發生了什麼再繼續。")) });
     }
 
     const quiz = [];

@@ -103,7 +103,7 @@
     AP.table(ctx, tbX, tbX + tbW, tbTop, floorY, { thick: 10 * s });
     const lw = tbW - 40 * s, lh = Math.min(H * 0.42, lw * 0.7);
     const scr = AP.laptop(ctx, tbX + 10 * s, tbTop - lh - 2, lw, lh);
-    const cyc = T + 1.2, tau = t % cyc, u = clamp(tau / T, 0, 1);
+    const tau = k.once(T + 0.4), u = clamp(tau / T, 0, 1);
     screenPlot(ctx, scr, [[0, 0], [T / 12, d / 16]], { dot: [u * T / 12, u * d / 16], xl: "t (s)", yl: "x (m)" });
     D.text(ctx, "斜率 = " + PL.fmt(v, 2) + " m/s", scr.x + scr.w - 8, scr.y + 14, { color: "rgb(140,224,255)", size: 10, align: "right", weight: "700" });
     const snX = tbX + tbW - 14 * s, snY = tbTop - 22 * s;
@@ -117,6 +117,7 @@
     for (let i = 0; i < 4; i++) { const rr = ((t * 160 * s + i * 40 * s) % Math.max(40 * s, px - snX)); ctx.strokeStyle = `rgba(255,190,80,${(0.5 * (1 - rr / Math.max(40 * s, px - snX))).toFixed(2)})`; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(snX + 12 * s, snY, rr, -0.35, 0.35); ctx.stroke(); }
     for (let m = 0; m <= 16; m += 4) { const x = x0 + m * pxPerM; ctx.fillStyle = "rgba(246,200,60,0.9)"; ctx.fillRect(x - 1.5 * s, floorY + 2, 3 * s, 12 * s); D.text(ctx, m + " m", x, floorY + 28 * s, { color: PL.col("text-dim"), size: 9.5, align: "center" }); }
     AP.person(ctx, px, floorY, 96 * s, { pose: u < 1 ? "walk" : "stand", phase: t * 7, shirt: "#e0843a", facing: 1 });
+    k.obj(px, floorY - 48 * s);
     AP.lcd(ctx, W - 150 * s, 20, 132 * s, 24 * s, "t = " + PL.fmt(u * T, 1) + " s", { color: "rgb(130,240,170)" });
     label(ctx, 20, 18, "平均速度 v = Δx/Δt", PL.fmt(v, 2) + " m/s", c);
   };
@@ -130,7 +131,7 @@
     AP.road(ctx, 0, W, roadY, roadH, { laneAt: 0.55 });
     for (let i = 0; i < 6; i++) AP.tree(ctx, 30 * s + i * W / 6, gy + 2, (46 + (i % 3) * 10) * s, 11 + i);
     const pxPerM = (W - 120 * s) / 110, x0 = 40 * s, cl = 64 * s, vpx = vv * pxPerM;
-    const tSee = 0.6, tBrake = tSee + tr, brakeT = 1.1, cyc = tBrake + brakeT + 1.2, tau = t % cyc;
+    const tSee = 0.6, tBrake = tSee + tr, brakeT = 1.1, tau = k.once(tBrake + brakeT + 0.5);
     const P1 = x0 + vpx * tSee, P2 = P1 + vpx * tr;
     let x;
     if (tau < tBrake) x = x0 + vpx * tau;
@@ -144,6 +145,7 @@
     const bx = P2 + vpx * brakeT / 2 + cl * 0.9, bph = clamp((tau - 0.2) / 0.8, 0, 1);
     if (tau > 0.2) { const by = roadY + roadH * (0.05 + 0.5 * bph) - Math.abs(Math.sin(bph * 9)) * 16 * s * (1 - bph); AP.sportBall(ctx, bx, by, 9 * s, "rubber", tau * 6); }
     AP.car(ctx, x, carY, cl, { color: "#2f7fd8", facing: 1, roll: x / (cl * 0.1), brake: tau >= tBrake });
+    k.obj(x, carY - cl * 0.15);
     if (tau >= tSee) {
       const yb = roadY + roadH + 16 * s;
       D.line(ctx, P1 + cl / 2, roadY + 6, P1 + cl / 2, yb, "rgba(255,255,255,0.8)", 1.2, [4, 3]);
@@ -197,7 +199,7 @@
     AP.ceilingBeam(ctx, 0, W, beamY, 26 * s);
     const topN = Math.ceil(n / 2), botN = Math.floor(n / 2), pr = 14 * s, sp = 2 * pr + 6 * s;
     const upY = beamY + 42 * s;
-    const lift = k.st.pull != null ? k.st.pull : ((t % 4) / 4) * 30 * s, cw = (40 + 50 * Math.sqrt(fr(load, cfg.a))) * s;
+    const lift = k.st.pull != null ? k.st.pull : (k.once(4) / 4) * 30 * s, cw = (40 + 50 * Math.sqrt(fr(load, cfg.a))) * s;
     const loadTop = floorY - cw * 0.85 - 30 * s - lift, lowY = loadTop - 34 * s;
     AP.hookPlate(ctx, cx, beamY);
     AP.steel(ctx, cx - (topN * sp) / 2 - 4 * s, upY - pr - 8 * s, topN * sp + 8 * s, 6 * s, 10);
@@ -211,6 +213,7 @@
     } else AP.steel(ctx, cx - 10 * s, lowY - 3 * s, 20 * s, 8 * s, 10);
     AP.cord(ctx, cx, lowY + pr + 8 * s, cx, loadTop);
     AP.crate(ctx, cx, loadTop + cw * 0.85, cw, cw * 0.85, { label: PL.fmt(load, 0) + " N" });
+    k.obj(cx, loadTop + cw * 0.42);
     const freeX = cx + (topN * sp) / 2 + 40 * s, handY = floorY - 110 * s + n * lift * 0.6;
     k.st.g = { h0: floorY - 110 * s, n, s }; pin(k.st, 0, freeX, handY);
     AP.cord(ctx, cx + (topN - 1) * sp / 2 + pr, upY, freeX, handY);
@@ -319,8 +322,11 @@
     const { ctx, W, H, a: Fth, b: m, t, s, c, v: acc, cfg } = k;
     const gy = H * 0.86;
     AP.outdoor(ctx, W, H, gy, { t, hills: true, ground: "field" });
-    const rx = W * 0.44, cyc = 4.2, tau = t % cyc, t0 = 1, burn = 0.35;
+    const rx = W * 0.44, t0 = 1, burn = 0.35;
     const v1 = Math.min(600, acc * burn * 9) * s;
+    // 一次：打氣 → 噴射 → 飛上去再落回發射架，落地就停
+    const h1 = 0.5 * v1 * burn, dg = 130 * s, tFly = acc > 0.01 ? (v1 + Math.sqrt(v1 * v1 + 4 * dg * h1)) / (2 * dg) : 0;
+    const tau = k.once(t0 + burn + tFly + 0.4);
     let y = 0;
     if (tau > t0) { const tt = tau - t0; y = tt < burn ? 0.5 * (v1 / burn) * tt * tt : 0.5 * v1 * burn + v1 * (tt - burn) - 0.5 * 260 * s * (tt - burn) * (tt - burn); }
     y = Math.max(0, y);
@@ -343,6 +349,7 @@
     ctx.fillStyle = "rgb(230,70,60)"; ctx.beginPath(); ctx.moveTo(rx - bw + 2, base - bh + 4); ctx.quadraticCurveTo(rx - 8 * s, base - bh - 14 * s, rx, base - bh - 30 * s); ctx.quadraticCurveTo(rx + 8 * s, base - bh - 14 * s, rx + bw - 2, base - bh + 4); ctx.closePath(); ctx.fill();
     ctx.fillStyle = "rgb(250,150,70)"; [-1, 1].forEach(sd => { ctx.beginPath(); ctx.moveTo(rx + sd * bw, base - 26 * s); ctx.lineTo(rx + sd * (bw + 14 * s), base + 2 * s); ctx.lineTo(rx + sd * bw, base); ctx.closePath(); ctx.fill(); });
     ctx.fillStyle = "rgb(60,64,72)"; ctx.fillRect(rx - 5 * s, base, 10 * s, 6 * s);
+    k.obj(rx, base - bh * 0.5);
     if (acc <= 0.01) D.text(ctx, "推力 ≤ 重力：飛不起來", rx, gy - 110 * s, { color: "#e0473c", size: 12.5, align: "center", weight: "700" });
     else if (tau < t0) D.text(ctx, "打氣加壓中…", rx, gy - 110 * s, { color: PL.col("text"), size: 11.5, align: "center", weight: "700" });
     D.text(ctx, "a = F/m − g", W - 18 * s, 44 * s, { color: PL.col("text"), size: 13, align: "right", weight: "700" });
@@ -357,7 +364,7 @@
     AP.labRoom(ctx, W, H, floorY, { bench: "none" });
     AP.concreteFloor(ctx, W, H, floorY);
     const wallX = W * 0.74, cl = (m < 700 ? 110 : m < 1500 ? 140 : 160) * s, kind = m < 1500 ? "car" : "truck";
-    const vis = 0.3 + 0.9 * fr(ts, cfg.b), cyc = 1.4 + vis + 1.3, tau = t % cyc;
+    const vis = 0.3 + 0.9 * fr(ts, cfg.b), tau = k.once(1.4 + vis + 0.9);
     const crush = (6 + 40 * fr(ts, cfg.b)) * s;
     let front;
     if (tau < 1.4) front = wallX - (1.4 - tau) * 200 * s;
@@ -365,6 +372,7 @@
     else front = wallX + crush;
     const cx = front - cl / 2;
     AP.car(ctx, cx, floorY, cl, { color: "#f0a020", facing: 1, kind, roll: cx / 14 });
+    k.obj(cx, floorY - cl * 0.2);
     const hit = tau >= 1.4;
     const hx = cx + cl * 0.02 + (hit ? Math.min(1, (tau - 1.4) / vis) * cl * 0.1 : 0);
     ctx.fillStyle = "rgb(250,210,60)"; ctx.beginPath(); ctx.arc(hx, floorY - cl * 0.24, cl * 0.06, 0, PL.TAU); ctx.fill();
@@ -396,7 +404,7 @@
     const { ctx, W, H, a: tp, b: mB, t, s, c, v: vB, cfg } = k;
     const gy = H * 0.8;
     AP.outdoor(ctx, W, H, gy, { t, hills: true, ground: "asphalt", city: true, sunX: W * 0.5 });
-    const mA = 60, vA = 150 * tp / mA, pushV = 0.3 + 0.8 * fr(tp, cfg.a), cyc = pushV + 3.2, tau = t % cyc;
+    const mA = 60, vA = 150 * tp / mA, pushV = 0.3 + 0.8 * fr(tp, cfg.a), tau = k.once(pushV + 3);
     const hA = 88 * s, hB = (68 + 36 * fr(mB, cfg.b)) * s, cx = W / 2;
     const k2 = 40 * s, tt = Math.max(0, tau - pushV), dA = vA * k2 * tt * (1 - tt / 8), dB = vB * k2 * tt * (1 - tt / 8);
     const xA = cx - 22 * s - dA, xB = cx + 22 * s + dB;
@@ -406,6 +414,7 @@
     AP.skateboard(ctx, xB, gy, 60 * s, { color: "#2f7fd8" });
     AP.person(ctx, xA, gy - 11 * s, hA, { shirt: "#e0843a", facing: 1, pose: tau < pushV ? "push" : "stand" });
     AP.person(ctx, xB, gy - 11 * s, hB, { shirt: "#3f7fcf", facing: -1, pose: tau < pushV ? "push" : "stand" });
+    k.obj(xA, gy - hA * 0.5);
     if (tau >= pushV) {
       D.arrow(ctx, xA, gy - hA - 30 * s, xA - clamp(vA * 24, 8, 180) * s, gy - hA - 30 * s, { color: "#e0843a", width: 3, label: "v_A = " + PL.fmt(vA, 2) + " m/s", lsize: 10.5, lx: -70 });
       D.arrow(ctx, xB, gy - hB - 30 * s, xB + clamp(vB * 24, 8, 180) * s, gy - hB - 30 * s, { color: "#3f7fcf", width: 3, label: "v_B = " + PL.fmt(vB, 2) + " m/s", lsize: 10.5 });
@@ -472,13 +481,14 @@
     for (let y = gy, i = 0; y < H; y += 12 * s, i++) [-1, 1].forEach(sd => { ctx.fillStyle = (i + (sd > 0 ? 1 : 0)) % 2 ? "rgb(126,116,104)" : "rgb(100,92,84)"; ctx.fillRect(sd < 0 ? wx - sw / 2 - 8 * s : wx + sw / 2, y, 8 * s, 11 * s); });
     AP.water(ctx, wx - sw / 2, wY, sw, H - wY, t);
     for (let m = 0; m <= 28; m += 4) { const y = wY - m * ppm; ctx.fillStyle = "rgba(250,236,200,0.9)"; ctx.fillRect(wx + sw / 2 + 8 * s, y - 1, 10 * s, 2); TX(ctx, m + " m", wx + sw / 2 + 22 * s, y + 4, 9.5, "left", null, 0); }
-    const hOut = out / 147, u = clamp((t % 5) / 3.4, 0, 1), hb = hOut * u * u * (3 - 2 * u) * ppm;
+    const hOut = out / 147, u = clamp(k.once(3.6) / 3.4, 0, 1), hb = hOut * u * u * (3 - 2 * u) * ppm;
     [-1, 1].forEach(sd => { const x0 = sd < 0 ? wx - sw / 2 - 16 * s : wx + sw / 2; ctx.fillStyle = L ? "rgb(166,156,142)" : "rgb(96,90,84)"; ctx.fillRect(x0, gy - 20 * s, 16 * s, 20 * s); ctx.strokeStyle = "rgba(40,34,28,0.5)"; ctx.strokeRect(x0 + 0.5, gy - 20 * s + 0.5, 16 * s - 1, 20 * s - 1); ctx.beginPath(); ctx.moveTo(x0, gy - 10 * s); ctx.lineTo(x0 + 16 * s, gy - 10 * s); ctx.stroke(); });
     const dR = 13 * s, dx = wx - dR, dy = gy - 78 * s;
     ctx.save(); ctx.strokeStyle = L ? "rgb(128,88,48)" : "rgb(104,72,42)"; ctx.lineWidth = 7 * s; ctx.lineCap = "round";
     ctx.beginPath(); ctx.moveTo(dx - 46 * s, gy - 2); ctx.lineTo(dx, dy); ctx.lineTo(dx + 62 * s, gy - 2); ctx.stroke(); ctx.restore();
     const bw = 26 * s, bh = 22 * s, by = wY + 5 * s - hb - bh;
     AP.cord(ctx, wx, dy, wx, by - bw * 0.45);
+    k.obj(wx, by + bh * 0.5);
     ctx.fillStyle = "rgb(150,104,58)"; ctx.beginPath(); ctx.moveTo(wx - bw / 2, by); ctx.lineTo(wx + bw / 2, by); ctx.lineTo(wx + bw * 0.38, by + bh); ctx.lineTo(wx - bw * 0.38, by + bh); ctx.closePath(); ctx.fill();
     ctx.fillStyle = "rgb(66,70,78)"; ctx.fillRect(wx - bw * 0.47, by + 4 * s, bw * 0.94, 2.5 * s); ctx.fillRect(wx - bw * 0.41, by + bh - 6 * s, bw * 0.82, 2.5 * s);
     if (hb > 2) { ctx.fillStyle = "rgba(120,190,235,0.9)"; ctx.beginPath(); ctx.ellipse(wx, by + 1, bw * 0.46, 2.5 * s, 0, 0, PL.TAU); ctx.fill(); }
@@ -650,7 +660,7 @@
     AP.laser(ctx, lx, ly, Math.PI, { len: 50 * s });
     const dx = 0.01 * th, R = niceCeil(dx * 1.25), um = R < 1, un = um ? "μm" : "mm", k2 = um ? 1000 : 1;
     const sx0 = W * 0.64, sw = W * 0.3, sy = caseT - 6 * s, zx = sx0 + sw * 0.12, spp = sw * 0.7 / R;
-    const wob = 1 - 0.45 * Math.exp(-(t % 16) / 4) * Math.cos(t % 16 * 1.6), spot = zx + dx * spp * wob;
+    const tw = k.once(16), wob = 1 - 0.45 * Math.exp(-tw / 4) * Math.cos(tw * 1.6), spot = zx + dx * spp * wob;
     ctx.fillStyle = "rgb(250,248,238)"; ctx.fillRect(sx0, sy, sw, 26 * s); ctx.strokeStyle = "rgba(60,60,50,0.6)"; ctx.strokeRect(sx0 + 0.5, sy + 0.5, sw - 1, 26 * s - 1);
     noteC(ctx, "rgb(250,248,238)", sx0, sy, sw, 26 * s);
     for (let i = 0; i <= 10; i++) { const x = zx + R * i / 10 * spp; ctx.fillStyle = "rgba(40,40,40,0.8)"; ctx.fillRect(x - 0.5, sy, 1, i % 5 ? 6 * s : 10 * s); if (i % 5 === 0) { const lv = R * i / 10 * k2; TX(ctx, PL.fmt(lv, Math.abs(lv - Math.round(lv)) > 1e-6 ? 1 : 0), x, sy + 21 * s, 9, "center", "#333", 0); } }
@@ -658,6 +668,7 @@
     ctx.save(); ctx.strokeStyle = "rgba(255,40,30,0.85)"; ctx.lineWidth = 1.5; ctx.shadowColor = "rgba(255,40,30,0.8)"; ctx.shadowBlur = 5;
     ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(cx + 5 * s, my); ctx.lineTo(spot, sy + 13 * s); ctx.stroke();
     ctx.fillStyle = "rgb(255,60,40)"; ctx.beginPath(); ctx.arc(spot, sy + 13 * s, 3.5 * s, 0, PL.TAU); ctx.fill(); ctx.restore();
+    k.obj(spot, sy + 13 * s);
     ctx.fillStyle = "rgba(40,160,90,0.9)"; ctx.fillRect(zx + dx * spp - 1, sy - 5 * s, 2, 5 * s);
     TX(ctx, "光點位移 Δx = 2θL = " + PL.fmt(dx * k2, dx * k2 < 10 ? 2 : 1) + " " + un + "（L = 5 m）", sx0 + sw, sy - 12 * s, 10.5, "right");
     TX(ctx, "鏡子", cx + 10 * s, my - 8 * s, 9.5, "left", null, 0);
@@ -974,7 +985,7 @@
     const { ctx, W, H } = cv;
     cv.clear(); D.bg(cv);
     const f = SC[config.id];
-    if (f) f({ cv, ctx, W, H, cfg: config, a, b, t: time, v: out, c: accent(), s: clamp(Math.min(W / 800, H / 472), 0.5, 1.7), st: st || {} });
+    if (f) f(Object.assign({ cv, ctx, W, H, cfg: config, a, b, t: time, v: out, c: accent(), s: clamp(Math.min(W / 800, H / 472), 0.5, 1.7), st: st || {} }, st && st._kit));
   }
 
   /*
@@ -1067,27 +1078,32 @@
       PL.ui.note(L.controls, PL.templateGuide(id, config));
       const buttons = PL.ui.buttonRow(L.controls); let animation;
       /* 播放／暫停由引擎的傳輸列統一提供，實驗不再自備 */
-      PL.ui.button(buttons, "重設", () => { a.set(config.a[3]); b.set(config.b[3]); render(); });
+      PL.ui.button(buttons, "重設", () => { a.set(config.a[3]); b.set(config.b[3]); once.reset(); render(); });
       const reading = PL.ui.readout(L.readouts, { label: config.output, unit: config.unit });
       const parameter = PL.ui.readout(L.readouts, { label: config.b[0], unit: config.b[4] });
       const conclusion = PL.ui.readout(L.readouts, { label: "模型判讀" });
       const chart = PL.ui.chart(PL.ui.charts(root), { title: config.output + "關係圖", cap: "曲線固定第二項參數；亮點顯示目前操作條件。將圖形趨勢與本頁公式、裝置現象連結。" });
       let elapsed = 0;
       const st = { dt: 0, running: false, fresh: true };
+      // 一次性的動作（發射、煞車、加熱…）跑完就停，拖回起點重來
+      const once = PL.motion.onceDriver(cv, { get: () => elapsed, set: v => { elapsed = v; }, render: () => render() });
       if (GRIPS[id]) GRIPS[id](cv, st, a, b, () => render(), () => { if (animation && !animation.running) animation.start(); });
       if (SG[id]) st.grips = SG[id].map(([k, label, f]) => PL.ui.handle(cv, { slider: k ? b : a, label, toValue: (x, y) => st.g && f(x, y, st.g, config) }));
       function render(dt) {
         const av = a.get(), bv = b.get(), result = config.calc(av, bv);
         st.dt = dt > 0 ? dt : 0; st.running = !!(animation && animation.running);
         st.fresh = !st.running && (!animation || animation.t === 0);
+        once.before(); st._kit = once.kit(elapsed);
         scene(cv, config, av, bv, elapsed, result, st);
+        once.after();
         reading.set(result, Math.abs(result) >= 100 ? 1 : 3); parameter.set(bv, decimal(config.b)); conclusion.set(config.status(av, bv, result));
         chart.setCap(PL.ui.relationChart(chart, {
           a: config.a, b: config.b, av: av, bv: bv,
           calc: config.calc, output: config.output, sweep: config.sweep
         }));
       }
-      animation = PL.loop(dt => { if (dt) elapsed += dt; render(dt); });
+      animation = PL.loop(dt => { if (dt) elapsed = once.advance(elapsed, dt); render(dt); });
+      once.attach(animation);
       cv.onResize(() => render()); chart.onResize(() => render()); render(); animation.start();
       return { stop() { animation.stop(); cv.destroy(); chart.destroy(); }, rerender: render };
     }});

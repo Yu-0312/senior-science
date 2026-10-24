@@ -88,6 +88,7 @@
       // 減速中（a 與 v 反向）亮煞車燈：加速度的方向看得見
       const braking = a * s.v < -0.01;
       AP2.car(ctx, cx, trackY + 2, cartW * 0.92, { color: "#d9463b", roll: (cx - tX0) / (cartW * 0.09), brake: braking });
+      if (rp) rp.mark(cx, trackY - cartW * 0.12);
 
       const bodyTop = trackY - cartW * 0.92 * 0.3 - 6;
       if (Math.abs(s.v) > 0.15) {
@@ -120,7 +121,8 @@
 
       rT.set(t, 2); rX.set(s.x, 1); rV.set(s.v, 1);
     }
-    function reset() { t = 0; hist = []; cur = { x: 0, v: sV.get() }; draw(); }
+    let rp = null;
+    function reset() { t = 0; hist = []; cur = { x: 0, v: sV.get() }; if (rp) rp.clear(); draw(); }
     const sV = PL.ui.slider(L.controls, { label: "初速 v₀", min: -8, max: 20, step: 0.5, value: 6, unit: "m/s", digits: 1, onInput: reset });
     const sA = PL.ui.slider(L.controls, { label: "加速度 a", min: -6, max: 6, step: 0.5, value: 2, unit: "m/s²", digits: 1, onInput: () => draw(), onReset: reset });
     const row = PL.ui.buttonRow(L.controls);
@@ -135,15 +137,24 @@
       onGrab: () => { aG = aX0; }, onRelease: () => { aG = null; } });
 
     cur.v = sV.get();
+    // 跑滿 TMAX 就停在終點（不再自己從頭重跑）；把車拖回起點、或再按播放，才重新開始
     const anim = PL.loop(dt => {
-      if (dt) {
+      if (dt && t < TMAX) {
         const a = sA.get();
-        t += dt;
-        if (t > TMAX) { t = 0; hist = []; cur = { x: 0, v: sV.get() }; }
-        else { cur = { x: cur.x + cur.v * dt + 0.5 * a * dt * dt, v: cur.v + a * dt }; }
+        const d = Math.min(dt, TMAX - t);
+        t += d;
+        cur = { x: cur.x + cur.v * d + 0.5 * a * d * d, v: cur.v + a * d };
         hist.push([t, cur.x, cur.v]);
+        if (t >= TMAX - 1e-9) rp.end();
       }
       draw();
+    });
+    rp = PL.motion.replay(cv, {
+      loop: anim, label: "小車（拖回起點重新開始）",
+      snapshot: () => ({ t, cur, h: hist, n: hist.length }),
+      restore: st => { t = st.t; cur = st.cur; hist = st.h.slice(0, st.n); },
+      reset: () => { t = 0; hist = []; cur = { x: 0, v: sV.get() }; },
+      redraw: draw
     });
     cv.onResize(draw); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
@@ -156,7 +167,8 @@
     let t = 0, landed = false, strobe = [], landAge = 0;
     // 已落下距離 fy 與速度 fv 逐格積分：落下途中改 g，球從當下的位置與速度繼續加速（高度 h 是起始條件，改它才重來）
     let fy = 0, fv = 0;
-    const reset = () => { t = 0; landed = false; strobe = []; landAge = 0; fy = 0; fv = 0; };
+    let rp = null;
+    const reset = () => { t = 0; landed = false; strobe = []; landAge = 0; fy = 0; fv = 0; if (rp) rp.clear(); };
     const sH = PL.ui.slider(L.controls, { label: "初始高度 h", min: 5, max: 80, step: 1, value: 45, unit: "m", digits: 0, onInput: reset });
     const sG = PL.ui.slider(L.controls, { label: "重力加速度 g", min: 1.6, max: 20, step: 0.1, value: 9.8, unit: "m/s²", digits: 1, onInput: () => draw(), onReset: reset });
     const row = PL.ui.buttonRow(L.controls);
@@ -215,6 +227,7 @@
       ctx.beginPath(); ctx.ellipse(px0, groundY + 5, 14 + (h - y) / h * 4, 3.4, 0, 0, Math.PI * 2); ctx.fill();
       AP.sportBall(ctx, px0, py, 12, "steel");
       if (t > 0 && !landed) grip.hide(); else grip.place(px0, y0);
+      if (rp) rp.mark(px0, py);
       if (landed) AP.dustKick(ctx, px0, groundY + 4, landAge, 1);
       if (t > 0 && !landed) D.arrow(ctx, px0, py + 18, px0, py + 18 + Math.min(46, fv * 2.4), { color: PL.col("accent-2"), width: 2, label: "v" });
       // 高度標尺：立在落點旁的測高桿
@@ -248,8 +261,16 @@
         t += d; fy = Math.min(h, fy + fv * d + 0.5 * g * d * d); fv += g * d; acc += dt;
         if (acc > 0.18) { acc = 0; strobe.push(fy); }
       }
-      else if (dt && landed) { landAge += dt; if (landAge > 1) anim.stop(); }
+      else if (dt && landed) { landAge += dt; if (landAge > 1) rp.end(); }
       draw();
+    });
+    // 落地就停；把鋼球拖回電磁鐵下（或再按「釋放」）重新開始，拖到半路可以倒帶看任一時刻
+    rp = PL.motion.replay(cv, {
+      loop: anim, label: "鋼球（拖回電磁鐵下重新開始）",
+      snapshot: () => ({ t, fy, fv, landed, landAge, sb: strobe, n: strobe.length }),
+      restore: st => { t = st.t; fy = st.fy; fv = st.fv; landed = st.landed; landAge = st.landAge; strobe = st.sb.slice(0, st.n); },
+      reset: () => { t = 0; landed = false; strobe = []; landAge = 0; fy = 0; fv = 0; },
+      redraw: draw
     });
     cv.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
@@ -293,7 +314,7 @@
      * （兩個開關）；而且傳輸列的「單步」推進的是迴圈、不是 flying，所以逐格看根本沒反應。
      * 改成 landed 之後，發射＝t 歸零並開跑、落地＝停住，單步也能一格一格把球往前推。
      */
-    let t = 0, landed = false, shots = [], landAge = 0, clock = 0;
+    let t = 0, landed = false, shots = [], landAge = 0, clock = 0, rp = null;
 
     PL.ui.section(L.controls, "發射參數");
     const sV = PL.ui.stepper(L.controls, { label: "初速 v₀ (m/s)", value: 24, min: 5, max: 45, step: 1, onInput: onParam });
@@ -322,8 +343,8 @@
 
     const row = PL.ui.buttonRow(L.controls);
     /* trigger: true → 這顆就是唯一的「開始」，按下時引擎會順便啟動迴圈並藏掉傳輸列的播放。 */
-    PL.ui.button(row, "發射", () => { t = 0; landAge = 0; landed = false; }, { primary: true, trigger: true });
-    PL.ui.button(row, "清除落點", () => { shots = []; t = 0; landed = false; landAge = 0; anim.stop(); drawAll(); });
+    PL.ui.button(row, "發射", () => { t = 0; landAge = 0; landed = false; if (rp) rp.clear(); }, { primary: true, trigger: true });
+    PL.ui.button(row, "清除落點", () => { shots = []; t = 0; landed = false; landAge = 0; anim.stop(); if (rp) rp.clear(); drawAll(); });
 
     PL.ui.note(L.controls,
       "先在真空下找出射程最遠的角度，再打開空氣阻力重找一次——最佳角度會往下移。" +
@@ -383,7 +404,7 @@
 
     let model = simulate();
 
-    function onParam() { t = 0; landed = false; landAge = 0; model = simulate(); }
+    function onParam() { t = 0; landed = false; landAge = 0; model = simulate(); if (rp) rp.clear(); }
 
     /* 三個把手：砲管繞砲耳轉（發射角）、砲台上下（高度）、靶左右（距離）。
        都是發射前的設定：飛行中收起；按下時停掉落地動畫，改完不會自己再射一次 */
@@ -487,6 +508,7 @@
       const idx = Math.min(path.length - 1, Math.max(0, Math.floor(frac * (path.length - 1))));
       const now = path[idx];
       const bx = px(now[0]), by = py(now[1]);
+      if (rp) rp.mark(bx, by);
       const rpx = PL.clamp(model.ammo.radius * sc * 2.6, 8, 12);
       const kind = { bowling: "bowling", basket: "basketball", melon: "watermelon", balloon: "balloon" }[ammoKey];
       const flying = t > 0;
@@ -568,11 +590,16 @@
         } else {
           // 落地後再跑一下，讓揚塵與彩帶播完，然後停住不空轉
           landAge += dt;
-          if (landAge > 1.5) anim.stop();
+          if (landAge > 1.5) rp.end();
         }
       }
       scene();
     }, 50);
+    // 落地就停；把球拖回砲口（或再按「發射」）重新發射，拖到半路可以看任一時刻的位置與速度
+    rp = PL.motion.replay(cv, { loop: anim, label: "砲彈（拖回砲口重新發射）",
+      snapshot: () => ({ t, landed, landAge, sh: shots.slice() }),
+      restore: q => { t = q.t; landed = q.landed; landAge = q.landAge; shots = q.sh.slice(); },
+      reset: () => { t = 0; landed = false; landAge = 0; }, redraw: scene });
 
     cv.onResize(scene); cvR.onResize(chart);
     drawAll(); anim.start();
@@ -592,7 +619,8 @@
     const RW = 60; // 河寬 m
     // 船相對碼頭的位置（x 下游、y 對岸，單位 m）、歷史軌跡、水面波紋相位、抵岸後的停留計時
     let pos = { x: 0, y: 0 }, trail = [[0, 0]], flowPhase = 0, hold = 0, lastLoopT = 0, trailAcc = 0;
-    const restart = () => { pos = { x: 0, y: 0 }; trail = [[0, 0]]; hold = 0; trailAcc = 0; };
+    let rp = null;
+    const restart = () => { pos = { x: 0, y: 0 }; trail = [[0, 0]]; hold = 0; trailAcc = 0; if (rp) rp.clear(); };
     // 滑桿只更新畫面，不重置：播放中途改參數時船繼續前進
     const sB = PL.ui.slider(L.controls, { label: "船速（對水）", min: 1, max: 8, step: 0.5, value: 4, unit: "m/s", digits: 1, onInput: () => draw(), onReset: () => { restart(); draw(); } });
     const sC = PL.ui.slider(L.controls, { label: "水流速度", min: 0, max: 6, step: 0.5, value: 3, unit: "m/s", digits: 1, onInput: () => draw(), onReset: () => { restart(); draw(); } });
@@ -650,6 +678,7 @@
       trail.forEach((p, i) => (i ? ctx.lineTo(ox + p[0] * sc, oy - p[1] * sc) : ctx.moveTo(ox + p[0] * sc, oy - p[1] * sc)));
       ctx.lineTo(bx, by); ctx.stroke(); ctx.restore();
       AP.boatTop(ctx, bx, by, 46, -Math.PI / 2 + th, { color: "#e2574c" });
+      if (rp) rp.mark(bx, by);
       // 速度向量
       D.arrow(ctx, bx, by, bx + b * Math.sin(th) * 12, by - b * Math.cos(th) * 12, { color: light ? "#4c1d95" : "#ffe08a", width: 2.4, label: "船" });
       D.arrow(ctx, bx, by, bx + c * 12, by, { color: light ? "#ffffff" : "#cfe8ff", width: 2.2, label: "水流" });
@@ -668,8 +697,8 @@
         const { c, vx, vy } = velocity();
         flowPhase += c * 8 * dt;                      // 波紋相位用累加的，改水速時才不會跳
         if (pos.y >= RW) {
-          hold += dt;                                 // 抵岸後停一下讓人看清楚落點，再自動回頭重來
-          if (hold > 1.2) restart();
+          hold += dt;                                 // 抵岸後停一下讓人看清楚落點就停住（不自己重來）
+          if (hold > 0.6) rp.end();
         } else {
           pos.x += vx * dt; pos.y = Math.min(RW, pos.y + vy * dt);
           trailAcc += dt;
@@ -678,6 +707,10 @@
       }
       draw();
     });
+    rp = PL.motion.replay(cv, { loop: anim, label: "小船（拖回碼頭重新過河）",
+      snapshot: () => ({ pos: { x: pos.x, y: pos.y }, tr: trail, n: trail.length, hold, trailAcc, lastLoopT }),
+      restore: q => { pos = { x: q.pos.x, y: q.pos.y }; trail = q.tr.slice(0, q.n); hold = q.hold; trailAcc = q.trailAcc; lastLoopT = q.lastLoopT; },
+      reset: () => { pos = { x: 0, y: 0 }; trail = [[0, 0]]; hold = 0; trailAcc = 0; lastLoopT = 0; }, redraw: draw });
     cv.onResize(draw); anim.start();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});
@@ -741,10 +774,11 @@
      * 暫停、單步與速度一律由引擎的傳輸列負責；實驗自己再做一個開關的話，
      * 兩個開關必須同時打開才會動，而傳輸列按了沒反應時學生看不出原因。
      */
-    PL.ui.button(row, "開始", () => { t = 0; dots = 0; flash = 0; anim.start(); draw(); }, { primary: true, trigger: true });
+    PL.ui.button(row, "開始", () => { t = 0; dots = 0; flash = 0; if (rp) rp.clear(); anim.start(); draw(); }, { primary: true, trigger: true });
     PL.ui.button(row, "重設", reset);
 
-    function reset() { t = 0; dots = 0; flash = 0; anim.stop(); draw(); }
+    let rp = null;
+    function reset() { t = 0; dots = 0; flash = 0; anim.stop(); if (rp) rp.clear(); draw(); }
     // 放手前才能換重物：跑起來就收起把手（改了會重設，等於重做一次）
     /*
      * 把手在 mg 箭頭尖端：尖端位置 = 槽碼串底端 + 18 + m·50。
@@ -913,6 +947,7 @@
 
       // 小車（有車廂與兩個輪子）
       AP.cart(ctx, carX, trackY + 12, cw, ch);
+      if (rp) rp.mark(carX, trackY + 12 - ch * 0.5);
       D.text(ctx, "小車", carX, trackY - ch - 10, { color: PL.col("text-dim"), size: 10, align: "center", weight: "700" });
       // 速度箭頭：長度正比於當前速率，停著時不畫
       const vNow = a * t;
@@ -1011,7 +1046,7 @@
     const anim = PL.loop(dt => {
       if (dt) {
         const T = sT.get();
-        if (t >= T_END()) { anim.stop(); }
+        if (t >= T_END()) { rp.end(); }
         else {
           t = Math.min(T_END(), t + dt * SLOW);
           // 補打這段時間內所有應該打的點（速度倍率調高時一格可能跨過好幾個週期）
@@ -1021,6 +1056,10 @@
       }
       draw();
     });
+    // 打完就停；把小車拖回計時器旁（或再按「開始」）重來，拖到半路紙帶上的點也會跟著退回去
+    rp = PL.motion.replay(cv, { loop: anim, label: "小車（拖回起點重新開始）",
+      snapshot: () => ({ t, dots, flash }), restore: q => { t = q.t; dots = q.dots; flash = q.flash; },
+      reset: () => { t = 0; dots = 0; flash = 0; }, redraw: draw });
     cv.onResize(draw); draw();
     return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
   }});

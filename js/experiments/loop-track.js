@@ -59,12 +59,14 @@
      */
     PL.ui.button(row, "釋放", () => {
       s = 0; detached = null; flightT = 0;
+      if (rp) rp.clear();
       anim.start();
       update();
     }, { primary: true, trigger: true });
     PL.ui.button(row, "重置", reset);
 
-    function reset() { s = 0; detached = null; flightT = 0; anim.stop(); update(); }
+    let rp = null;
+    function reset() { s = 0; detached = null; flightT = 0; anim.stop(); if (rp) rp.clear(); update(); }
 
     PL.ui.note(L.controls,
       "先把釋放高度拉到剛好 2R：能量足夠把小球舉到環頂，但到了那裡速率是零——它過不去。" +
@@ -319,6 +321,7 @@
         const p = pointAt(Math.min(s, total));
         bx = p.x; by = p.y; v = speedAt(p.y);
       }
+      if (rp) rp.mark(PX(bx), PY(by));
       const E = energies();
       const ke = 0.5 * sM.get() * v * v;
       const pe = sM.get() * sG.get() * by;
@@ -462,13 +465,13 @@
           detached.vy -= sG.get() * dt;
           detached.x += detached.vx * dt;
           detached.y += detached.vy * dt;
-          if (detached.y <= 0) { detached.y = 0; anim.stop(); }
+          if (detached.y <= 0) { detached.y = 0; rp.end(); }
         } else {
           const p = pointAt(Math.min(s, total));
           const v = speedAt(p.y);
           if (v <= 1e-6 && p.part === "loop") {
             // 速度歸零：能量連爬到這裡都不夠，往回滑
-            anim.stop();
+            rp.end();
           } else {
             /*
              * 只用 v = √(2g(h − y)) 推進，從靜止釋放的那一刻 v = 0，小球永遠起不了步
@@ -493,11 +496,16 @@
             };
             flightT = 0;
           }
-          if (s >= total) { s = total; anim.stop(); }
+          if (s >= total) { s = total; rp.end(); }
         }
       }
       update();
     }, 50);
+    // 跑完（過環、脫軌落地或爬不上去）就停；把小球拖回起點（或再按「釋放」）重來
+    rp = PL.motion.replay(cv, { loop: anim, label: "小球（拖回起點重新釋放）",
+      snapshot: () => ({ s, flightT, d: detached ? Object.assign({}, detached) : null }),
+      restore: q => { s = q.s; flightT = q.flightT; detached = q.d ? Object.assign({}, q.d) : null; },
+      reset: () => { s = 0; detached = null; flightT = 0; }, redraw: update });
 
     cv.onResize(update); chart.onResize(update);
     update();
