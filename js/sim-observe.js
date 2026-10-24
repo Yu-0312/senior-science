@@ -403,6 +403,9 @@
      ------------------------------------------------------------------ */
   PL._hooks.onBuilt && PL._hooks.onBuilt(function (context) {
     if (document.documentElement.hasAttribute("data-embed-lab")) return;   // 關卡版有自己的題目
+    // 教師演示：老師自己掌控節奏，觀察卡會把動畫停下來、蓋住實驗台
+    const body = document.body;
+    if (body && (body.classList.contains("demo-mode") || body.classList.contains("stage-only"))) return;
     const points = OBSERVE_POINTS[context.id];
     if (!points || !points.length) return;
     const hasLoops = context.loops && context.loops.length > 0;

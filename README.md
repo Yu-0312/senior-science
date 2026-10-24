@@ -1,14 +1,52 @@
+<div align="center">
+
+<img src="icons/icon-192.png" width="88" alt="物理實驗室圖示">
+
 # 物理實驗室 · 台灣中學互動物理
 
-從國中自然的生活物理銜接到教育部 **108 課綱**自然科學領域物理的互動模擬網站。全站繁體中文，涵蓋國中基礎、必修物理與選修物理加深加廣內容，目前提供 **12 個學習模組、226 個實驗主題、226 個即時 Canvas 互動模擬**；目錄採資料驅動擴充，沒有預設的實驗或題型數量上限。
+**看得見的物理，可以動手玩的實驗室**
 
-**線上網站：** [https://senior-science.vercel.app/](https://senior-science.vercel.app/)
-**使用授權：** [免費教育使用與推廣授權](https://senior-science.vercel.app/licensing.html)
+從國中自然的生活物理，銜接到 108 課綱高中物理與大學入門的互動模擬網站
 
+[![線上網站](https://img.shields.io/badge/%E7%B7%9A%E4%B8%8A%E7%B6%B2%E7%AB%99-senior--science.vercel.app-0f766e?style=flat-square&logo=vercel&logoColor=white)](https://senior-science.vercel.app/)
+[![實驗](https://img.shields.io/badge/%E4%BA%92%E5%8B%95%E5%AF%A6%E9%A9%97-226%20%E5%80%8B-2563eb?style=flat-square)](https://senior-science.vercel.app/experiments.html)
+[![模組](https://img.shields.io/badge/%E5%AD%B8%E7%BF%92%E6%A8%A1%E7%B5%84-12%20%E5%80%8B-7c3aed?style=flat-square)](#curriculum)
+[![課綱](https://img.shields.io/badge/108%20%E8%AA%B2%E7%B6%B1-%E5%9C%8B%E4%B8%AD%20%E2%86%92%20%E9%AB%98%E4%B8%AD%20%E2%86%92%20%E5%A4%A7%E5%AD%B8-db2777?style=flat-square)](#curriculum)
+<br>
+[![Build and test](https://github.com/Yu-0312/senior-science/actions/workflows/deploy.yml/badge.svg)](https://github.com/Yu-0312/senior-science/actions/workflows/deploy.yml)
+[![Vanilla JS](https://img.shields.io/badge/Vanilla%20JS-%E7%84%A1%E6%A1%86%E6%9E%B6%E3%80%81%E5%85%8D%E5%BB%BA%E7%BD%AE-f7df1e?style=flat-square&logo=javascript&logoColor=black)](#architecture)
+[![PWA](https://img.shields.io/badge/PWA-%E5%8F%AF%E9%9B%A2%E7%B7%9A-5a0fc8?style=flat-square&logo=pwa&logoColor=white)](#features)
+[![授權](https://img.shields.io/badge/%E6%8E%88%E6%AC%8A-CC%20BY--NC--SA%204.0-ef9421?style=flat-square&logo=creativecommons&logoColor=white)](#license)
+
+[**🌐 線上使用**](https://senior-science.vercel.app/) ·
+[🧑‍🏫 教師演示版](#teacher) ·
+[📖 自學完整版](#student) ·
+[🎮 關卡挑戰版](#duo) ·
+[🔬 實驗一覽](#gallery) ·
+[🛠️ 開發者](#architecture)
+
+<br>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.webp">
+  <img src="docs/images/hero-light.webp" alt="物理實驗室首頁：標題、即時擺動的單擺標本與三種使用方式的入口" width="100%">
+</picture>
+
+</div>
+
+全站繁體中文，涵蓋國中基礎、必修物理與選修物理加深加廣內容，目前提供 **12 個學習模組、226 個實驗主題、226 個即時 Canvas 互動模擬**；目錄採資料驅動擴充，沒有預設的實驗或題型數量上限。純靜態網站、沒有後端、不需要帳號——打開就能用。
+
+| | |
+| --- | --- |
+| 🌐 **線上網站** | [https://senior-science.vercel.app/](https://senior-science.vercel.app/) |
+| 📋 **全部實驗索引** | [experiments.html](https://senior-science.vercel.app/experiments.html)（每個實驗都有說明頁與可列印學習單） |
+| 📜 **使用授權** | [免費教育使用與推廣授權](https://senior-science.vercel.app/licensing.html) |
 
 ---
 
-## 設計原則
+<a id="principles"></a>
+
+## 💡 設計原則
 
 這個專案有一條貫穿全部 226 個實驗的判準：
 
@@ -23,17 +61,36 @@
 
 ---
 
-## 三種使用方式
+<a id="modes"></a>
+
+## 🧭 三種使用方式
 
 首頁的三張入口卡進入的是同一批實驗、同一套模擬，差別在畫面給誰用。
 
-| | 教師演示版 | 自學完整版 | 關卡挑戰版 |
+```mermaid
+flowchart LR
+    H(["🏠 首頁<br/>index.html"]) --> T["🧑‍🏫 教師演示版<br/>一頁式實驗台"]
+    H --> S["📖 自學完整版<br/>實驗台＋教學鷹架"]
+    H --> D["🎮 關卡挑戰版<br/>duo/"]
+    T --> E[("226 個互動實驗<br/>同一套 sim-core 引擎")]
+    S --> E
+    D -->|"embed.html 嵌入"| E
+```
+
+| | 🧑‍🏫 教師演示版 | 📖 自學完整版 | 🎮 關卡挑戰版 |
 | --- | --- | --- | --- |
 | 給誰 | 老師上台投影 | 學生自己讀 | 學生闖關、課堂練習 |
-| 畫面 | 一頁式實驗台，不捲動 | 實驗台＋完整教學鷹架 | 多鄰國式地圖，一個實驗一關 |
+| 畫面 | 一頁式實驗台，整頁與右欄都不捲動 | 實驗台＋完整教學鷹架 | 多鄰國式地圖，一個實驗一關 |
 | 入口 | 首頁「教師演示版」 | 首頁「自學完整版」 | `duo/` |
 
-### 教師演示版：一頁式實驗台
+<a id="teacher"></a>
+
+### 🧑‍🏫 教師演示版：一頁式實驗台
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/teacher-dark.webp">
+  <img src="docs/images/teacher-light.webp" alt="教師演示版：左邊是實驗台畫布與下方一列量測讀數，右邊是播放控制、參數分頁、示範重點與課堂提問" width="100%">
+</picture>
 
 - **整頁、右欄都不捲動**：1280×720、1366×768、1920×1080 下，226 個實驗都用 `node tools/stage-fit-check.js` 在真的瀏覽器裡逐一確認——整頁不捲、右欄每個分頁都放得下。畫布高度由 `app.js` 的 `fitStage()` 依扣掉讀數列後的實際空間計算，而不是用 CSS 壓扁。
 - **量測讀數在畫布正下方**：橫排一列、字放大給後排看。畫布多半是寬的，下面本來就空一截。
@@ -42,7 +99,40 @@
 - **鍵盤**：`空白` 播放／暫停、`S` 單步、`R` 全部重設、`←` `→` 換實驗、`1` `2` `3` 切右欄分頁、`/` 開選單、`F` 全螢幕、`Esc` 離開。
 - 老師切換實驗時不會跳出學生用的章節檢核。
 
-### 自學完整版
+右欄怎麼決定要不要分頁（`app.js` 的 `fitStage()`）：每一步都會先試「收緊間距」、再試「收緊字級」，取第一個每個分頁都放得下的方案。
+
+```mermaid
+flowchart LR
+    A["量出可用空間<br/>畫布高度＝左欄扣掉讀數列"] --> B{"右欄全部攤開<br/>放得下？"}
+    B -- 是 --> OK(["✅ 不分頁"])
+    B -- 否 --> C{"把圖表縮小<br/>放得下？"}
+    C -- 是 --> OK
+    C -- 否 --> D{"分兩頁<br/>參數・提問｜圖表"}
+    D -- 是 --> OK2(["✅ 分頁"])
+    D -- 否 --> E{"分三頁<br/>參數｜圖表｜提問"}
+    E -- 是 --> OK2
+    E -- 否 --> F["右欄加寬<br/>參數排兩欄"] --> OK2
+```
+
+<a id="student"></a>
+
+### 📖 自學完整版
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/student-dark.webp">
+  <img src="docs/images/student-light.webp" alt="自學完整版：左側課程目錄，中間拋體運動實驗台，右側實驗操作與參數" width="100%">
+</picture>
+
+一個實驗的學習循環：
+
+```mermaid
+flowchart LR
+    P["🤔 先預測<br/>承諾一個答案"] --> O["🖐️ 動手操作<br/>拖把手、拉滑桿"]
+    O --> Q["👀 觀察題<br/>播放一段／改完參數時彈出"]
+    Q --> R["📏 量到的關係<br/>例如 T ∝ √L"]
+    R --> F["✅ 完成實驗<br/>總結題"]
+    F -.->|"下一個實驗"| P
+```
 
 保留全部鷹架：任務導讀、實驗流程（可逐步推進）、先預測、挑戰任務、量到的關係、因果面板、題目練習、課本銜接、一句話結論與學習單。首頁的學習中心負責存檔匯出／匯入、學習計劃與今日任務。
 
@@ -50,7 +140,25 @@
 - **完成實驗 · 總結題**：原本放在右側教材欄的題目練習移到實驗台下方，做完觀察再作答；教材欄改放「實驗進度」清單（播放觀察 → 改變參數 → 總結題）。
 - **版面平衡**（`sim-core.js` 的 `arrangeStage`）：因果面板一律移到實驗台正下方橫排；右欄比畫布長一大截時，自動把讀數、任務導讀、先預測或因果說明搬進畫布卡底部，取兩欄高度差最小的組合。畫布永遠維持原比例——試過讓畫布長高去填空白，場景會被拉開、重心跑掉。
 
-### 關卡挑戰版（`duo/`）
+<a id="duo"></a>
+
+### 🎮 關卡挑戰版（`duo/`）
+
+![關卡挑戰版：學習地圖、情境預測題，以及在嵌入的實驗台上把讀數調到目標值的調整實驗題](docs/images/duo.webp)
+
+```mermaid
+flowchart LR
+    L["🔬 嵌入的實驗台<br/>embed.html"] -->|"sim-insight 探測"| R["量到的關係<br/>單調・極值・冪次・不變量"]
+    R --> Q1["情境預測"]
+    R --> Q2["調整實驗"]
+    R --> Q3["數據判讀"]
+    R --> Q4["比例推理"]
+    R --> Q5["控制變因"]
+    B["📚 question-bank.js"] --> Q6["情境題・計算題"]
+    Q1 & Q2 & Q3 & Q4 & Q5 & Q6 --> K{"答對？"}
+    K -- 否 --> W["排到最後再出一次<br/>收進錯題本"] --> K
+    K -- 是 --> P(["🏆 過關・解鎖下一關"])
+```
 
 每個實驗是一關。題目不是預先寫好的樣板，而是關卡開始時由**這一關的實驗台實際量到的關係**產生（`sim-insight` 的探測結果經 `duo/embed.html` 的 `window.DuoLab` 交給外層）：
 
@@ -70,9 +178,28 @@
 
 ---
 
-## 專案特色
+<a id="gallery"></a>
 
-### 教學設計
+## 🔬 實驗一覽
+
+每個實驗都換成認得出來的器材與情境；淺色主題是白天、深色主題是夜晚（GitHub 會依你的系統主題顯示對應的版本）。
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/gallery-dark.webp">
+  <img src="docs/images/gallery-light.webp" alt="九個實驗的畫面：拋體運動、過山車圓環、打點計時器、單光子雙狹縫、水波槽、透鏡成像、電磁感應、氣體分子運動、拉塞福散射" width="100%">
+</picture>
+
+### 📱 手機也能用
+
+![手機畫面：首頁、自學版實驗頁、教師版（直式改上下排）](docs/images/mobile.webp)
+
+---
+
+<a id="features"></a>
+
+## ✨ 專案特色
+
+### 🧑‍🔬 教學設計
 
 - **每個實驗都有符合它自身內容的教學鷹架**：判定徽章（現在這個狀態代表什麼）、衍生量卡（介於參數與答案之間的中間量）、因果面板（為什麼會這樣）、實驗流程與誤差鐵律、情境預設（一鍵跳到有教學意義的設定）。不是每個實驗都套同一組——量具實驗需要的是讀數規則，力學實驗需要的是受力分析。
 - **實驗室的標準流程與誤差鐵律**：16 個實體實驗附上真實的操作動線與最容易整組報廢的那一步。例如打點計時器的「先啟動計時器、再放開小車」，單擺的「擺長要量到球心不是球頂」，槓桿的「沒先空桿調平，每一組數據都會偏向同一邊」。
@@ -80,7 +207,7 @@
 - **可驗證的挑戰任務**：自動產生具體目標（「讓條紋間距達到 4.10 mm」），即時判定達成，讓實驗有明確的「做完了」。
 - **章節檢核與隨機化計算題**：跨模組時以 3 題整理上一章；計算題每個學生、每一天拿到的數值都不同，必須實際算出來作答。
 
-### 旗艦實驗
+### 🚀 旗艦實驗
 
 - **可以瞄準的拋體**：四種發射物（保齡球到氣球，質量差 140 倍）、可移動的靶與命中回饋。打開空氣阻力後軌跡不再對稱、最遠角度從 45° 降到 40°，而且質量突然變得有影響——真空版本永遠看不到的事。
 - **打點計時器**：計時器固定在桌上，小車拉著紙帶前進，每個週期打點錘落下閃一次。下方是取下攤平的紙帶，點逐一出現並標註點距。開始前紙帶上有一排淡色的預測點。
@@ -92,7 +219,7 @@
 - **單光子的雙狹縫**：把每秒光子數調到 1，前 20 顆完全隨機；累積數百顆後干涉條紋自己浮現。在縫上裝偵測器——一旦知道光子走哪一條，條紋立刻消失。
 - **會產生音爆的都卜勒**：把速度推過 340 m/s，波前來不及散開而疊成馬赫錐——超音速時前方在它經過之前完全聽不到。
 
-### 介面與可用性
+### 🖥️ 介面與可用性
 
 - **完整實驗工作台**：實驗參數、即時量測、專題化 Canvas 場景、資料／圖表與可展開的實驗流程。
 - **可拖曳的量測工具**：碼錶、量角器與（已校準比例尺的實驗才提供的）尺。碼錶量的是模擬時間，慢動作與單步都會正確計入，學生能自己量出單擺週期再和公式對照。
@@ -105,14 +232,16 @@
 - **步進器與選項晶片也會即時重繪**：「− 數值 +」步進器與選項晶片是按鈕，原本不會觸發引擎的暫停重繪；現在數值改變時補發 `input` 事件，暫停狀態下按一下就看得到變化（`control-response-test` 同時檢查滑桿、步進器與晶片）。
 - **手機優先**：以 `pointer: coarse` 判斷觸控裝置，滑桿、按鈕與清單項目均達 WCAG 2.5.5 的 44px；量角器與尺在觸控時命中範圍加倍。實驗頁在窄螢幕改為「預測 → 播放 → 模擬台 → 讀數」，畫布前的內容高度減少 71%。
 - **螢幕報讀器可用**：每個模擬的畫布都有隨狀態更新的文字描述，另附「文字版讀數」對照表與 `aria-live` 播報。
-- **延遲載入**：實驗程式開啟時才載入。首次載入 gzip **222 KB**（原始 676 KB，上限 224 KB 由 `perf-test` 把關）；實驗程式合計 gzip 370 KB 不在其中，打開單一實驗最多再載 35 KB。
+- **延遲載入**：實驗程式開啟時才載入。首次載入 gzip 約 **236 KB**（上限 240 KB 由 `perf-test` 把關）；26 個實驗檔合計 gzip 約 560 KB 不在其中，打開單一實驗最多再載 40 KB。
 - **PWA 與離線**：可安裝到主畫面；Service Worker 只預先快取核心，實驗程式開到才快取。需要完整離線時可主動下載全部實驗，有進度回報。
 - **可被搜尋引擎索引的靜態層**：`tools/build-static.js` 由課程資料自動產生 226 個實驗說明頁、226 份可列印學習單、總索引頁、`sitemap.xml` 與 `robots.txt`，並附結構化資料（schema.org LearningResource）。
 - **給老師的可列印學習單**：每個實驗一張，含實驗目的、關鍵公式、動手前預測、資料記錄表格、方格作圖區、由圖求值與誤差欄位。
 
 ---
 
-## 課程內容
+<a id="curriculum"></a>
+
+## 📚 課程內容
 
 | 編號 | 模組 | 實驗數 | 代表實驗 |
 | --- | --- | ---: | --- |
@@ -130,7 +259,12 @@
 | 十二 | 近代物理與宇宙學 | 16 | 原子結構、波耳氫原子、物質波、X 射線管、質能守恆、連鎖反應、光電效應、半衰期、密立根油滴、拉塞福散射、黑體輻射、陰極射線、光譜、蓋革計數 |
 | | **合計** | **226** | |
 
-### 銜接式學習設計
+### 🪜 銜接式學習設計
+
+```mermaid
+flowchart LR
+    J["🌱 國中打底<br/>反應時間・超音波測距・自由落體"] --> S["🏫 高中建模<br/>等加速度運動・F = ma・力學能守恆"] --> U["🎓 大學延伸<br/>轉動動力學・物理擺・耦合振子"]
+```
 
 首頁提供五條可直接操作的主題路徑。每條都保留「國中打底 → 高中建模 → 大學延伸」三個固定階段，並在路徑中的實驗頁顯示前一步與下一步。大學內容不是額外跳關，而是建立在同一路徑的既有觀察、量測與公式之上。
 
@@ -144,7 +278,7 @@
 
 學測／分科常考與國中銜接的 23 個實驗收在 `js/exam-curriculum.js`，每筆多一個 `exam` 欄位：`tag` 是課本出處（例如「選修物理IV 實驗：等位線與電場」），顯示在實驗標題旁；`how` 是「考題怎麼問」，顯示在教材區。新實驗也同步接進上表的銜接路徑。
 
-### 內容擴充歷程
+### 🗂️ 內容擴充歷程
 
 | 批次 | 焦點 |
 | --- | --- |
@@ -163,7 +297,7 @@
 
 ---
 
-## 快速開始
+## 🚀 快速開始
 
 ### 線上使用
 
@@ -181,7 +315,7 @@ python3 -m http.server 8080   # 然後開 http://localhost:8080
 
 ---
 
-## 測試
+## 🧪 測試
 
 在**專案根目錄**執行：
 
@@ -192,7 +326,13 @@ node tools/tests/run-all.js --fast   # 略過兩支耗時稽核
 
 22 支稽核守著不同的東西：226 個實驗在兩種主題下都能建置與重繪、核心實驗對照封閉解、每根滑桿都造成看得見的改變（**動畫跑著時與暫停時分開量**）、圖表曲線與底板的對比、量具讀數規則、觸控目標尺寸、壓縮後的首次載入大小、全站版本號一致性。詳見 [`tools/tests/README.md`](tools/tests/README.md)。
 
-關卡挑戰版的出題與嵌入實驗台需要真的瀏覽器，不在上面 22 支之內。改到 `sim-insight.js`、`sim-core.js` 的滑桿／步進器，或 `duo/` 之後，至少要在瀏覽器裡打開幾關，確認「調整實驗」題的目標調得到、預測題的答案和實驗台一致。
+教師演示版的「一頁不捲動」用真的瀏覽器逐一檢查 226 個實驗（需要 Playwright，不在上面 22 支之內）：
+
+```bash
+node tools/stage-fit-check.js          # 1280×720、1366×768、1920×1080
+```
+
+關卡挑戰版的出題與嵌入實驗台同樣需要真的瀏覽器，不在上面 22 支之內。改到 `sim-insight.js`、`sim-core.js` 的滑桿／步進器，或 `duo/` 之後，至少要在瀏覽器裡打開幾關，確認「調整實驗」題的目標調得到、預測題的答案和實驗台一致。
 
 **但這些測試驗不到畫面對不對。** 它們量的是繪圖指令與程式邏輯，不是學生看到什麼。本專案至今每一個嚴重的顯示問題都是使用者截圖才發現的：深色主題的白方塊、淺色主題的黑底板、左右不等高、滑桿拉了沒反應、小車浮在半空。**發佈前請實際打開瀏覽器看過，深色與淺色各一次。**
 
@@ -202,11 +342,35 @@ node tools/tests/run-all.js --fast   # 略過兩支耗時稽核
 
 ---
 
-## 技術架構
+<a id="architecture"></a>
+
+## 🏗️ 技術架構
 
 純前端靜態網站，不使用框架。HTML / CSS / JavaScript / Canvas 2D / MathJax / Service Worker / Web App Manifest。
 
-### 檔案結構
+```mermaid
+flowchart LR
+    subgraph eager["⚡ 首次載入"]
+        direction TB
+        CUR["*-curriculum.js<br/>教材資料"]
+        APP["app.js<br/>導覽・搜尋・教師版排版"]
+        CORE["sim-core.js<br/>模擬引擎"]
+        HOOK["教學掛鉤<br/>teaching-notes・sim-insight<br/>sim-tools・sim-a11y"]
+    end
+    subgraph lazy["💤 打開實驗才載入"]
+        direction TB
+        APPA["sim-apparatus.js<br/>sim-observe.js"]
+        EXP["js/experiments/*.js<br/>26 檔・226 個實驗"]
+    end
+    CUR --> APP
+    APP -->|"ensureExperiment"| APPA --> EXP
+    EXP -->|"register"| CORE
+    CORE -->|"onBuilt"| HOOK
+```
+
+首次載入 gzip 約 236 KB；實驗程式開到才載入，Service Worker（`sw.js`）也只預先快取核心，實驗開到才快取。
+
+### 📁 檔案結構
 
 ```text
 senior-science/
@@ -221,11 +385,13 @@ senior-science/
 ├─ p/                    226 個實驗說明頁 + 226 份學習單（自動產生）
 ├─ css/style.css
 ├─ icons/
+├─ docs/images/          README 用的截圖
 ├─ .github/workflows/deploy.yml  建置與測試檢查（不部署）
 ├─ tools/
 │  ├─ build-manifest.js   產生實驗 → 檔案的對照表
 │  ├─ build-static.js     產生靜態說明頁、學習單、sitemap、robots
 │  ├─ verify-static.js    驗證靜態頁產出
+│  ├─ stage-fit-check.js  教師版一頁不捲動的瀏覽器實測
 │  └─ tests/              22 支自動化稽核
 └─ js/
    ├─ site-config.js      正式網址、版本號
@@ -238,10 +404,10 @@ senior-science/
    ├─ experiment-manifest.js       實驗 → 檔案對照（自動產生）
    ├─ *-curriculum.js     教材資料（概念、公式、學習重點）
    ├─ question-bank.js    章節檢核與隨機化計算題
-   └─ experiments/        22 個互動模擬註冊檔（226 個實驗分佈其中）
+   └─ experiments/        26 個互動模擬註冊檔（226 個實驗分佈其中）
 ```
 
-### 核心檔案說明
+### 🔑 核心檔案說明
 
 | 檔案 | 說明 |
 | --- | --- |
@@ -256,7 +422,23 @@ senior-science/
 
 ---
 
-## 模擬引擎概念
+## ⚙️ 模擬引擎概念
+
+```mermaid
+sequenceDiagram
+    participant App as app.js
+    participant Exp as 實驗檔
+    participant Core as sim-core
+    participant Hooks as 掛鉤
+    App->>Exp: 延遲載入 js/experiments/*.js
+    Exp->>Core: PhysicsLab.register(id, def)
+    App->>Core: PL.get(id).build(root)
+    Core->>Exp: def.build(root)
+    Exp-->>Core: { stop, rerender }
+    Core->>Hooks: onBuilt(context, api)
+    Note over Hooks: 判讀・情境預設・觀察題・文字替代
+    App->>App: 教師版 arrangeStage → fitStage
+```
 
 互動實驗透過 `PhysicsLab.register(id, definition)` 註冊：
 
@@ -295,7 +477,7 @@ PhysicsLab.register("your-id", {
 
 可用的教學元件：`ui.verdict`（判定徽章）、`ui.derived`（衍生量卡）、`ui.causality`（因果面板）、`ui.procedure`（實驗流程與鐵律）、`ui.presets`（情境預設）、`ui.chartTabs`、`ui.magnifier`。
 
-### 兩條容易踩的引擎規則
+### ⚠️ 兩條容易踩的引擎規則
 
 **不要自己做播放／暫停按鈕。** 引擎的時間控制列已經提供播放、單步與速度，而且它控制的就是你的 `PhysicsLab.loop`。實驗若再維護一個自己的 `running` 旗標，就變成兩個開關要同時打開——傳輸列按了毫無反應，學生完全看不出問題在哪。單向觸發（「釋放」「開始」「發射」）則沒有問題。
 
@@ -303,7 +485,16 @@ PhysicsLab.register("your-id", {
 
 ---
 
-## 新增實驗流程
+## ➕ 新增實驗流程
+
+```mermaid
+flowchart LR
+    A["📝 課程資料<br/>新增一筆"] --> B["🧩 experiments/*.js<br/>同一個 id 註冊"]
+    B --> C["🔁 build-manifest"]
+    C --> D["🔖 更新版本號"]
+    D --> E["🧪 run-all"]
+    E --> F["👀 瀏覽器實際看過<br/>深色・淺色各一次"]
+```
 
 1. 在對應的課程資料檔新增一筆實驗資料，或呼叫 `PhysicsLabCurriculum.extendCatalog("來源名稱", { 模組ID: [實驗資料] })`。
 2. 設定 `id`、`title`、`interactive`、`concept`、`formula`、`points`。
@@ -314,7 +505,13 @@ PhysicsLab.register("your-id", {
 
 ---
 
-## 部署
+## ☁️ 部署
+
+```mermaid
+flowchart LR
+    push(["git push main"]) --> V["▲ Vercel<br/>build-manifest<br/>build-static<br/>verify-static"] --> L(["🌐 上線"])
+    push --> GA["⚙️ GitHub Actions<br/>重新建置＋全部測試<br/>檢查產物已提交"]
+```
 
 正式站在 **Vercel**，push 到 `main` 即自動部署。GitHub Pages 已停用。
 
@@ -322,7 +519,9 @@ PhysicsLab.register("your-id", {
 
 ---
 
-## 使用授權
+<a id="license"></a>
+
+## 📜 使用授權
 
 原創教學內容與視覺素材採用 **CC BY-NC-SA 4.0**：可用於非商業教學、分享與改編，但須標示來源、連結授權並以相同方式分享。另提供科普推廣特別許可，老師、學生社團與創作者可以在公開文章、社群或含廣告分潤的平台中，以截圖、錄影與連結介紹本網站；不得把本站內容、鏡像站或改作包裝成付費服務。
 
@@ -330,6 +529,6 @@ PhysicsLab.register("your-id", {
 
 ---
 
-## 教學聲明
+## 🎓 教學聲明
 
 本站為配合台灣 108 課綱自製之開放教學工具。所有模擬程式與文字內容皆為原創。物理模型為教學簡化版，部分數值以概念示範為主，適合用於理解現象、探索趨勢與輔助學習，不作為精密工程或正式科學計算依據。
