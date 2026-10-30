@@ -2867,14 +2867,21 @@ body.demo-mode .finish-card, body.stage-only .finish-card { display: none; }
  * 結果圖緊接在實驗台與讀數之後。
  * 原本排在任務導讀、謎題、因果、挑戰之後，1440×900 時落在 y≈1700，
  * 學生拉滑桿時看不到曲線怎麼動，要捲兩個螢幕。
- * 窄版（flex）依序：實驗台 → 讀數 → 先預測 → 結果圖 → 任務導讀 → 其他；寬版（grid）結果圖佔實驗台下方第一整列。
+ * 寬版：實驗台 → 先預測 → 結果圖 → 任務導讀 → 其他；窄版：實驗台 → 讀數 → 任務導讀 → 先預測 → 結果圖 → 其他。
  */
 .lab-sim > * { order: 7; }
 .lab-sim > .sim-predict { order: 4; }
 .lab-sim > .sim-charts { order: 5; }
 .lab-sim > .sim-learning-brief, .lab-sim > .sim-procedure { order: 6; }
-@container lab (min-width: 760px) {
-  .lab-sim > .sim-charts { grid-row: 6; }
+/*
+ * 不要用 grid-row 指定結果圖的列：明確指定列的項目會先排，自動排版的「先預測」卡就被擠到圖表後面
+ * （1440 寬時 57 / 138 個實驗如此），遮罩卻要學生先去作答。只靠 order：先預測 → 結果圖 → 任務導讀。
+ * 窄版維持原本「實驗台 → 讀數 → 任務導讀」的承諾，結果圖接在預測之後。
+ */
+@container lab (max-width: 759px) {
+  .lab-sim > .sim-learning-brief, .lab-sim > .sim-procedure { order: 4; }
+  .lab-sim > .sim-predict { order: 5; }
+  .lab-sim > .sim-charts { order: 6; }
 }
 /* 結果圖：預測作答前先模糊（sim-insight.js 的 veilCharts） */
 .sim-charts.is-veiled { position: relative; }
@@ -2921,5 +2928,6 @@ body.stage-only .stage-chart-overlay .chart-title { font-size: 16px; margin-bott
   background: var(--tint-1); color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
 }
 .stage-chart-back:hover { border-color: var(--accent); }
+.stage-chart-back:focus-visible, .sim-charts-reveal:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #stage-chart[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 body.stage-only .stage-chart-overlay .sim-chart .cap { display: block !important; font-size: 13px; }

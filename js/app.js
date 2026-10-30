@@ -333,7 +333,10 @@
         const item = FLAT[i];
         if (!item || PL.has(item.exp.id)) return;
         const file = EXPERIMENT_FILES[item.exp.id];
-        if (file) loadScript("js/experiments/" + file).catch(() => {});
+        // 一定要帶版本號：js/ 是一年 immutable 快取，不帶版本的網址部署後會拿到舊程式，
+        // 而且和 ensureExperiment() 的網址不同，兩邊都載就會把同一支檔案執行兩次。
+        const build = (window.PhysicsLabSite && window.PhysicsLabSite.build) || "";
+        if (file) loadScript("js/experiments/" + file + (build ? "?v=" + build : "")).catch(() => {});
       });
     });
   }
@@ -1915,7 +1918,8 @@
     const stage = root.querySelector(":scope > .sim-stage");
     const charts = root.querySelector(".sim-charts");
     const was = root.classList.contains("stage-chart-big");
-    const on = !!(force == null ? !was : force) && !!stage && !!charts && document.body.classList.contains("stage-only");
+    const stacked = getComputedStyle(root).gridTemplateColumns.split(" ").length < 2;
+    const on = !!(force == null ? !was : force) && !!stage && !!charts && !stacked && document.body.classList.contains("stage-only");
     let ov = stage && stage.querySelector(":scope > .stage-chart-overlay");
     if (on) {
       if (!ov) {
@@ -1992,6 +1996,8 @@
       });
 
       if (stacked) {
+        // 直式／窄螢幕上下排列時沒有「主畫面」可放大，收回右欄
+        if (root.classList.contains("stage-chart-big")) toggleStageChart(false);
         side.classList.remove("is-compact", "is-dense", "is-wide", "is-tight", "is-overflowing", "has-tabs");
         root.classList.remove("stage-wide");
         side._stageGroups = [present];

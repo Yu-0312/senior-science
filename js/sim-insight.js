@@ -417,19 +417,36 @@
     if (body.classList.contains("stage-only") || body.classList.contains("demo-mode")) return;
     const result = predict.querySelector(".sim-predict-result");
     if (result && !result.hidden) return;
+    const wraps = Array.from(charts.querySelectorAll(":scope > .sim-chart"));
     charts.classList.add("is-veiled");
+    wraps.forEach(w => { w.inert = true; });          // 模糊中的圖表分頁鈕不該還能用 Tab 進去
     const veil = el("div", "sim-charts-veil", charts);
     const msg = el("p", null, veil);
     msg.textContent = "先在「動手前先預測」選一個答案，再看結果圖——先猜，看圖時才是在檢查。";
     const btn = el("button", "btn sim-charts-reveal", veil);
     btn.type = "button";
     btn.textContent = "直接顯示結果圖";
+    /*
+     * 遮罩只擋「第一眼就看到答案」。學生一旦開始操作（拉滑桿、按鈕、在畫布上拖曳）就揭開：
+     * 測量型實驗（例如單擺測 g）要把自己記錄的資料點畫進圖裡，蓋著反而妨礙實驗。
+     */
+    const offs = [];
+    const on = (node, type, fn) => { node.addEventListener(type, fn, true); offs.push(() => node.removeEventListener(type, fn, true)); };
     const lift = () => {
       charts.classList.remove("is-veiled");
+      wraps.forEach(w => { w.inert = false; });
       if (veil.parentNode) veil.parentNode.removeChild(veil);
+      offs.splice(0).forEach(off => off());
     };
     btn.addEventListener("click", lift);
-    predict.addEventListener("click", e => { if (e.target && e.target.closest && e.target.closest(".sim-predict-choice")) lift(); });
+    on(predict, "click", e => { if (e.target && e.target.closest && e.target.closest(".sim-predict-choice")) lift(); });
+    on(root, "input", e => { if (!charts.contains(e.target)) lift(); });
+    on(root, "click", e => {
+      const b = e.target && e.target.closest && e.target.closest("button");
+      if (b && !charts.contains(b) && !predict.contains(b)) lift();
+    });
+    const stage = root.querySelector(".sim-canvas-wrap");
+    if (stage) on(stage, "pointerdown", lift);
   }
 
   /* ---------------- 2. 可驗證的挑戰任務 ---------------- */

@@ -1571,8 +1571,9 @@
     const fs = cc.W < 480 ? 9.5 : 10, R = B.x + B.w - 6, top = B.y + 12, bottom = B.y + B.h - 5;
     const tags = series.filter(s => s.tag !== "cur").map(s => {
       const text = (cc.W < 480 ? String(other[0]).split(/\s+/).pop() : other[0]) + " = " + fmt(s.ov, 2) + (other[4] ? " " + other[4] : "");
-      cc.ctx.font = fs + "px sans-serif";
+      cc.ctx.save(); cc.ctx.font = fs + "px sans-serif";
       const left = R - ((cc.ctx.measureText(text) || {}).width || text.length * fs * 0.7) - 4;
+      cc.ctx.restore();
       const ys = s.pts.filter(p => g.X(p[0]) >= left).map(p => g.Y(p[1]));
       if (!ys.length) ys.push(g.Y(s.pts[s.pts.length - 1][1]));
       return { y: g.Y(s.pts[s.pts.length - 1][1]), hi: Math.min.apply(null, ys), lo: Math.max.apply(null, ys), text };
@@ -1600,7 +1601,7 @@
     cc._relDraw = () => relationChart(cc, o);
     if (!cc._relHooked) {
       cc._relHooked = true;
-      const at = e => { const r = cvs.getBoundingClientRect(); cc._relPx = e.clientX - r.left; cc._relDraw(); };
+      const at = e => { const r = cvs.getBoundingClientRect(); cc._relPx = (e.clientX - r.left) * (cc.W / (r.width || cc.W)); cc._relDraw(); };
       cvs.addEventListener("pointermove", at);
       cvs.addEventListener("pointerdown", at);
       cvs.addEventListener("pointerleave", () => { cc._relPx = null; cc._relDraw(); });
@@ -1612,11 +1613,24 @@
     const ctx = cc.ctx, py = g.Y(y), c = col("accent-2");
     D.line(ctx, px, B.y, px, B.y + B.h, col("text-faint"), 1, [3, 3]);
     if (py >= B.y && py <= B.y + B.h) D.disc(ctx, px, py, 4, { fill: col("m-color", c) });
-    const text = axis[0] + " = " + fmt(x, 2) + (axis[4] ? " " + axis[4] : "") + "　→　" + o.output + " = " + fmt(y, Math.abs(y) >= 100 ? 1 : 3) + (o.unit ? " " + o.unit : "");
-    ctx.save(); ctx.font = "700 11.5px sans-serif"; const w = ctx.measureText(text).width + 16; ctx.restore();
+    /*
+     * 讀值框要放得進圖框：先試完整名稱一行；太寬就只用符號（「m = 4.05 kg → vₜ = 13.2 m/s」）；
+     * 再太寬（教師版右欄、手機）就拆成兩行。
+     */
+    const sym = t => String(t).split(/\s+/).pop();
+    const xs = (n, u) => n + " = " + fmt(x, 2) + (u ? " " + u : ""), ys = n => n + " = " + fmt(y, Math.abs(y) >= 100 ? 1 : 3) + (o.unit ? " " + o.unit : "");
+    const fs = B.w < 360 ? 10.5 : 11.5;
+    ctx.save(); ctx.font = "700 " + fs + "px sans-serif";
+    const wide = t => ctx.measureText(t).width + 16;
+    let lines = [xs(axis[0], axis[4]) + "　→　" + ys(o.output)];
+    if (wide(lines[0]) > B.w - 8) lines = [xs(sym(axis[0]), axis[4]) + " → " + ys(sym(o.output))];
+    if (wide(lines[0]) > B.w - 8) lines = [xs(sym(axis[0]), axis[4]), "→ " + ys(sym(o.output))];
+    const w = Math.min(B.w - 8, Math.max.apply(null, lines.map(wide)));
+    ctx.restore();
+    const lh = fs + 5, bh = lines.length * lh + 7;
     const bx = Math.max(B.x + 4, Math.min(B.x + B.w - w - 4, px - w / 2)), by = B.y + 6;
-    D.rect(ctx, bx, by, w, 22, { fill: col("panel-solid", "#fff"), stroke: c, width: 1, r: 5 });
-    D.text(ctx, text, bx + w / 2, by + 15, { color: col("text"), size: 11.5, weight: "700", align: "center" });
+    D.rect(ctx, bx, by, w, bh, { fill: col("panel-solid", "#fff"), stroke: c, width: 1, r: 5 });
+    lines.forEach((t, i) => D.text(ctx, t, bx + w / 2, by + 4 + lh * (i + 1) - 4, { color: col("text"), size: fs, weight: "700", align: "center" }));
   }
 
   /* 取樣曲線，判斷形狀與第二個參數的作用，翻成一句中文 */
