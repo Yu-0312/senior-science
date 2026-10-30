@@ -37,9 +37,13 @@ const eagerGz = eager.reduce((s, p) => s + gzipSize(p), 0) + gzipSize("css/style
  *
  * 2026-10 再放寬到 240 KB：教師演示版的一頁式排版（讀數列、右欄分頁、自動緊湊，約 4 KB gzip）。
  * 原本右欄放不下就捲動，1366×768 有 215 / 226 個實驗要邊講邊捲；這是演示版的核心承諾。
+ *
+ * 2026-10 收緊到 215 KB：sim-tools／sim-insight／teaching-notes／sim-a11y 只掛實驗建置的鉤子，
+ * 改由 app.js 的 ensureApparatus() 在第一次開實驗前載入，首次載入由約 239 KB 降到約 199 KB。
+ * 上限收緊，免得省下來的流量又被慢慢吃回去。
  */
 R.section("首次載入（以壓縮後為準）");
-R.ok(eagerGz < 240 * 1024, "首次載入 gzip " + kb(eagerGz) + "（上限 240 KB）",
+R.ok(eagerGz < 215 * 1024, "首次載入 gzip " + kb(eagerGz) + "（上限 215 KB）",
   "原始 " + kb(eagerRaw) + "，" + eager.length + " 支腳本 + style.css + index.html");
 
 const expDir = "js/experiments";

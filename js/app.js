@@ -276,7 +276,12 @@
        * 而且一定要在第一個實驗建置「之前」掛上鉤子——器材層剛好也是建置前必等的那一步。
        */
       const v = build ? "?v=" + build : "";
-      apparatusPromise = Promise.all([loadScript("js/sim-apparatus.js" + v), loadScript("js/sim-observe.js" + v).catch(err => { console.warn(err); })])
+      /*
+       * 量測工具、洞察、教師提示、無障礙這四支也只在實驗建置時掛鉤子（PL._hooks），首頁用不到，
+       * 一起改成延遲載入：首次載入少約 42 KB gzip。順序維持原本 index.html 的順序（鉤子依註冊順序執行）。
+       */
+      const addons = ["sim-tools", "sim-insight", "teaching-notes", "sim-a11y"].map(f => loadScript("js/" + f + ".js" + v).catch(err => { console.warn(err); }));
+      apparatusPromise = Promise.all(addons.concat([loadScript("js/sim-apparatus.js" + v), loadScript("js/sim-observe.js" + v).catch(err => { console.warn(err); })]))
         .then(() => true)
         .catch(err => { console.error(err); apparatusPromise = null; return false; });
     }
