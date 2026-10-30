@@ -2905,3 +2905,21 @@ body.stage-only .sim-charts.is-veiled > .sim-chart, body.demo-mode .sim-charts.i
   .lab-sim .sim-canvas-wrap { padding: 5px 5px 4px; }
 }
 
+/* 教師演示版：圖表放大到主畫面（app.js 的 toggleStageChart，快捷鍵 G） */
+body.stage-only .stage-chart-overlay {
+  position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; gap: 8px; padding: 10px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--panel-solid);
+}
+body.stage-only .stage-chart-overlay > .sim-charts {
+  flex: 1 1 auto; min-height: 0; margin: 0; display: grid; gap: 10px; align-content: center;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+}
+body.stage-only .stage-chart-overlay .sim-chart { padding: 10px 12px; }
+body.stage-only .stage-chart-overlay .chart-title { font-size: 16px; margin-bottom: 4px; }
+.stage-chart-back {
+  flex: none; align-self: flex-end; padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--tint-1); color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.stage-chart-back:hover { border-color: var(--accent); }
+#stage-chart[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+body.stage-only .stage-chart-overlay .sim-chart .cap { display: block !important; font-size: 13px; }

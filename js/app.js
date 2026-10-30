@@ -1781,7 +1781,7 @@
     const on = showing === "exp" && stageFlag();
     const was = document.body.classList.contains("stage-only");
     document.body.classList.toggle("stage-only", on);
-    if (!on) closeStageMenu();
+    if (!on) { closeStageMenu(); toggleStageChart(false); }
     else arrangeStage();
     // 畫布高度依「是否一頁式」計算；切換時讓 sim-core 重新量一次
     if (on !== was) requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
@@ -1844,10 +1844,15 @@
       // 播放鍵「播放／暫停」換字、提示換行都會改變傳輸列高度，也要觸發重排
       if (side._stageRo) side._stageRo.observe(transport);
     }
+    // 換實驗時 #sim-root 被清空重建，放大圖表的旗標要跟著歸零
+    if (root.classList.contains("stage-chart-big") && !root.querySelector(".stage-chart-overlay")) root.classList.remove("stage-chart-big");
+    const big = root.classList.contains("stage-chart-big");
     STAGE_PANES.forEach(p => {
+      if (big && p.key === "charts") return;
       const pane = side.querySelector('.stage-pane[data-pane="' + p.key + '"]');
       p.nodes(root).forEach(node => { if (node && node.parentNode !== pane) pane.appendChild(node); });
     });
+    updateStageChartBtn();
     const dock = root.querySelector(":scope > .stage-dock");
     const readouts = root.querySelector(".sim-readout-panel");
     if (dock && readouts && readouts.parentNode !== dock) dock.appendChild(readouts);
@@ -1886,6 +1891,71 @@
     side.querySelectorAll(".stage-pane").forEach(p => { p.hidden = !p._stageHasContent || !group.includes(p.dataset.pane); });
     // 隱藏時量不到寬度、不會重算；顯示出來後依當下的上限補算一次
     if (group.includes("charts")) side.querySelectorAll(".stage-pane[data-pane='charts'] .sim-chart > canvas.sim-canvas").forEach(refitCanvas);
+  }
+
+  /*
+   * 圖表放大到主畫面（G）
+   * 右欄的圖表只有三百多像素寬，投影到教室後排看不清楚刻度。按一下把整組圖表搬到畫布的位置、
+   * 撐滿實驗台；右欄的滑桿照樣能拉，曲線即時更新。再按一次（或 Esc）搬回右欄。
+   * 搬的是同一個 DOM 節點，圖表的繪圖程式不需要知道自己被搬過。
+   */
+  function updateStageChartBtn() {
+    const btn = $("#stage-chart"), root = $("#sim-root");
+    if (!btn || !root) return;
+    const has = !!root.querySelector(".sim-charts .sim-chart");
+    const on = root.classList.contains("stage-chart-big");
+    btn.hidden = !has;
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    const label = btn.querySelector("span");
+    if (label) label.textContent = on ? "回到實驗" : "放大圖表";
+  }
+  function toggleStageChart(force) {
+    const root = $("#sim-root");
+    if (!root) return;
+    const stage = root.querySelector(":scope > .sim-stage");
+    const charts = root.querySelector(".sim-charts");
+    const was = root.classList.contains("stage-chart-big");
+    const on = !!(force == null ? !was : force) && !!stage && !!charts && document.body.classList.contains("stage-only");
+    let ov = stage && stage.querySelector(":scope > .stage-chart-overlay");
+    if (on) {
+      if (!ov) {
+        ov = el("div", "stage-chart-overlay", stage);
+        ov.setAttribute("role", "region"); ov.setAttribute("aria-label", "放大的結果圖");
+        const back = el("button", "stage-chart-back", ov); back.type = "button"; back.textContent = "回到實驗畫面（G）";
+        back.addEventListener("click", () => toggleStageChart(false));
+      }
+      ov.appendChild(charts);
+      root.classList.add("stage-chart-big");
+      scheduleStageFit();     // 右欄少了圖表分頁，重新分組；fitStage 最後會量放大後的圖表
+    } else if (was || ov) {
+      root.classList.remove("stage-chart-big");
+      if (charts) {
+        charts.querySelectorAll(".sim-chart").forEach(w => { w._stageMaxH = 0; w._stageMinH = 0; });
+        const pane = root.querySelector('.stage-pane[data-pane="charts"]');
+        if (pane && charts.parentNode !== pane) pane.appendChild(charts);
+      }
+      if (ov) ov.remove();
+      scheduleStageFit();
+    }
+    updateStageChartBtn();
+  }
+  function fitBigCharts() {
+    const root = $("#sim-root");
+    const charts = root && root.classList.contains("stage-chart-big") && root.querySelector(".stage-chart-overlay > .sim-charts");
+    if (!charts) return;
+    const wraps = Array.from(charts.querySelectorAll(":scope > .sim-chart"));
+    if (!wraps.length) return;
+    const cols = Math.max(1, getComputedStyle(charts).gridTemplateColumns.split(" ").length);
+    const rows = Math.ceil(wraps.length / cols);
+    const gap = parseFloat(getComputedStyle(charts).rowGap) || 10;
+    const per = (charts.clientHeight - gap * (rows - 1)) / rows;
+    wraps.forEach(w => {
+      const c = w.querySelector(":scope > canvas.sim-canvas");
+      if (!c) return;
+      const chrome = w.getBoundingClientRect().height - c.getBoundingClientRect().height;
+      const cap = Math.max(140, Math.floor(per - chrome - 2));
+      if (Math.abs((w._stageMaxH || 0) - cap) > 1) { w._stageMaxH = cap; w._stageMinH = 140; refitCanvas(c); }
+    });
   }
 
   function refitCanvas(canvas) {
@@ -2053,6 +2123,7 @@
       }
       fitMain();
       selectStageTab(stageTab, false);
+      fitBigCharts();
     } finally {
       requestAnimationFrame(() => {
         stageFitBusy = false;
@@ -2450,6 +2521,7 @@
     const stagePrev = $("#stage-prev"); if (stagePrev) stagePrev.addEventListener("click", () => stepStage(-1));
     const stageNext = $("#stage-next"); if (stageNext) stageNext.addEventListener("click", () => stepStage(1));
     const stageFull = $("#stage-full"); if (stageFull) stageFull.addEventListener("click", toggleStageFullscreen);
+    const stageChart = $("#stage-chart"); if (stageChart) stageChart.addEventListener("click", () => toggleStageChart());
     const stageThemeBtn = $("#stage-theme");
     if (stageThemeBtn) stageThemeBtn.addEventListener("click", () => {
       applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
@@ -2524,10 +2596,12 @@
           if (e.key === "Escape") { closeStageMenu(); $("#stage-picker").focus(); }
           return;   // 選單開著時，方向鍵與空白鍵留給搜尋框
         }
+        if (e.key === "Escape" && $("#sim-root").classList.contains("stage-chart-big")) { toggleStageChart(false); return; }
         if (e.key === "Escape" && !document.fullscreenElement) { exitStageMode(); return; }
         if (e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA" && !e.repeat) {
           if (e.key === "/") { e.preventDefault(); openStageMenu(); return; }
           if (e.key === "f" || e.key === "F") { e.preventDefault(); toggleStageFullscreen(); return; }
+          if ((e.key === "g" || e.key === "G") && $("#stage-chart") && !$("#stage-chart").hidden) { e.preventDefault(); toggleStageChart(); return; }
           if (e.key === "1" || e.key === "2" || e.key === "3") {
             const tab = document.querySelector('#sim-root .stage-tab[data-pane="' + STAGE_PANES[+e.key - 1].key + '"]');
             if (tab && !tab.hidden && !tab.parentNode.hidden) { e.preventDefault(); tab.click(); return; }
