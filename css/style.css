@@ -1158,6 +1158,12 @@ body.stage-only .stage-dock .sim-readouts { grid-template-columns: repeat(auto-f
 body.stage-only .stage-dock .readout { padding: 6px 12px 7px; min-width: 0; }
 body.stage-only .stage-dock .readout-value { font-size: clamp(18px, 1.5vw, 26px); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
 body.stage-only .stage-dock .readout-label { margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+/* 教師版讀數列：文字型讀數可換第二行，不再截成「…」 */
+body.stage-only .stage-dock .sim-readouts > .readout.is-text { grid-column: auto; }
+body.stage-only .stage-dock .readout.is-text .readout-value {
+  font-size: clamp(14px, 1.05vw, 18px); line-height: 1.3; white-space: normal; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+}
 
 /* 緊湊排版：第一級收間距，第二級收字級，加寬則參數排兩欄 */
 body.stage-only .stage-side.is-compact { gap: 8px; }
@@ -1411,6 +1417,9 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .readout:hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
 .readout-value { font-size: 18px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: 0.2px; line-height: 1.25; overflow-wrap: anywhere; }
 .readout-label { font-size: 11px; color: var(--text-faint); margin-top: 3px; overflow-wrap: anywhere; }
+/* 文字型讀數（readout() 依長度加 is-text）：整列寬、小字級 */
+.sim-readouts > .readout.is-text { grid-column: 1 / -1; }
+.readout.is-text .readout-value { font-size: 14.5px; font-weight: 700; line-height: 1.45; letter-spacing: 0; font-variant-numeric: normal; }
 
 /* 概念 / 公式指南 */
 .guide .card-body > * + * { margin-top: 18px; }

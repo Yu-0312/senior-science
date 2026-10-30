@@ -1180,6 +1180,11 @@
           { color: PL.col("text-faint"), size: 11, align: "center" });
         rN.set("—"); rMean.set("—"); rS.set("—"); rTheory.set("—"); rRel.set("—");
         rTask.set("尚未計數：按「計數一次」開始");
+        // 結果圖先畫出空座標，不要留一塊空白讓人以為壞掉
+        chart.clear();
+        PL.graph(chart, { x: 46, y: 16, w: chart.W - 62, h: chart.H - 40 }, { x0: 0, x1: 8, y0: 0, y1: 10 }).frame({ xlabel: "次序", ylabel: "N" });
+        D.text(chart.ctx, "按「計數一次」後，每一筆計數會畫在這裡", 46 + (chart.W - 62) / 2, 16 + (chart.H - 40) / 2,
+          { color: PL.col("text-faint"), size: 12, align: "center" });
         return;
       }
 

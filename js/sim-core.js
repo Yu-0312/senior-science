@@ -804,9 +804,15 @@
        */
       const embedCap = typeof window !== "undefined" ? Number(window.PhysicsLabCanvasMaxH) : 0;
       if (embedCap > 0) viewportCap = Math.min(vh ? Math.max(200, vh * 0.9) : Infinity, embedCap);
+      // 結果圖整列寬時照 0.6 比例會比實驗畫布還高（1440 寬約 1000×600），限高；教師版右欄由 _stageMaxH 控制
+      if (!wrap._stageMaxH && wrap.classList && wrap.classList.contains("sim-chart")) {
+        viewportCap = Math.min(viewportCap, Math.max(200, Math.min(340, vh ? vh * 0.42 : 340)));
+      }
       const h = Math.round(Math.min(w * aspect, viewportCap));
       // 2x 已足夠清晰，避免高 DPI 手機以 3x / 4x 重繪每個即時圖表。
       const dpr = Math.min(2, window.devicePixelRatio || 1);
+      // 尺寸沒變就不重設：canvas.width 一指定就清空，只畫一次的結果圖會因版面第一次量測而永遠空白
+      if (cv.W === w && cv.H === h && cv.dpr === dpr && canvas.width === Math.round(w * dpr) && canvas.height === Math.round(h * dpr)) return;
       cv.W = w; cv.H = h; cv.dpr = dpr;
       canvas.style.width = w + "px";
       canvas.style.height = h + "px";
@@ -853,7 +859,7 @@
       const pw = cv.W, ph = cv.H;
       fit();
       if (cv.W === pw && cv.H === ph && canvas.width === Math.round(cv.W * cv.dpr)) {
-        // fit() 已經把畫布清掉了；照樣走重畫，只是不必通知其他依賴尺寸的元件
+        // 尺寸沒變：fit() 不會清畫布，暫停中照樣補畫一格即可，不必通知其他依賴尺寸的元件
       } else cv._resizeCbs.forEach(f => f());
       repaintOwner();
     };
@@ -1145,6 +1151,9 @@
         // 小數值的相對誤差會很大，冪次律會被算歪（P ∝ V² 會變成 V^1.93）。
         record.number = typeof val === "number" && isFinite(val) ? val : null;
         v.textContent = record.value + (o.unit ? " " + o.unit : "");
+        // 長句讀數改整列寬、小字級（否則斷成四行或被截成「…」）
+        const long = typeof val !== "number" && String(record.value).length > 9;
+        if (box.classList.contains("is-text") !== long) box.classList.toggle("is-text", long);
       },
       raw: v, box
     };
@@ -1531,14 +1540,22 @@
 
     const ys = series.reduce((s, g) => s.concat(g.pts.map(p => p[1])), []);
     let lo = Math.min.apply(null, ys), hi = Math.max.apply(null, ys);
-    const span = Math.max(1e-6, hi - lo);
-    lo -= span * 0.12; hi += span * 0.12;
+    if (hi - lo <= Math.abs(hi) * 1e-3) { lo -= Math.abs(lo) * 0.1 || 1; hi += Math.abs(hi) * 0.1 || 1; }   // 水平線
+    const pad = (hi - lo) * 0.08;
+    // 留白不跨過零（全正的量不該出現「−8」刻度），再擴到整齊刻度上
+    const yticks = niceTicks(lo < 0 ? lo - pad : Math.max(0, lo - pad), hi > 0 ? hi + pad : Math.min(0, hi + pad), cc.H < 150 ? 3 : 4, true);
+    const xticks = niceTicks(axis[1], axis[2], cc.W < 360 ? 3 : cc.W < 640 ? 4 : 6);
+    lo = yticks[0]; hi = yticks[yticks.length - 1];
 
     cc.clear();
     const g = graph(cc, { x: 52, y: 18, w: cc.W - 68, h: cc.H - 48 },
       { x0: axis[1], x1: axis[2], y0: lo, y1: hi });
-    g.frame({ xlabel: axis[0] + (axis[4] ? " (" + axis[4] + ")" : ""), ylabel: o.output });
-    g.grid(5, 4);
+    g.frame({ xticks, yticks });
+    g.grid(xticks, yticks);
+    // 軸名稱放框外：框內左上／右下正是曲線常經過的地方
+    const ink2 = col("text-dim", col("text-faint")), B = g.box;
+    D.text(cc.ctx, axis[0] + (axis[4] ? " (" + axis[4] + ")" : ""), B.x + B.w, B.y + B.h + 27, { color: ink2, size: 10.5, align: "right" });
+    D.text(cc.ctx, o.output, B.x, B.y - 6, { color: ink2, size: 10.5 });
 
     const main = col("m-color", "#35e0cf");
     series.forEach(s => {
@@ -1550,14 +1567,24 @@
     const result = at(axisVal, otherVal);
     if (isFinite(result)) g.dot(axisVal, result, { color: col("accent-2"), glow: col("accent-2") });
 
-    // 標出兩條淡曲線分別對應第二個參數的哪一端
-    const lab = (s, text) => {
-      if (!s) return;
-      const last = s.pts[s.pts.length - 1];
-      g.label(axis[1] + (axis[2] - axis[1]) * 0.02, last[1], text, { color: col("text-faint"), size: 9 });
-    };
-    lab(series.find(s => s.tag === "min"), other[0] + " = " + fmt(other[1], 2) + (other[4] || ""));
-    lab(series.find(s => s.tag === "max"), other[0] + " = " + fmt(other[2], 2) + (other[4] || ""));
+    // 淡曲線標籤貼右端（原本「左緣 x、右端 y」會飄到左上角）：上面那條標在線上方、下面那條標在下方，避開標籤寬度內的曲線
+    const fs = cc.W < 480 ? 9.5 : 10, R = B.x + B.w - 6, top = B.y + 12, bottom = B.y + B.h - 5;
+    const tags = series.filter(s => s.tag !== "cur").map(s => {
+      const text = (cc.W < 480 ? String(other[0]).split(/\s+/).pop() : other[0]) + " = " + fmt(s.ov, 2) + (other[4] ? " " + other[4] : "");
+      cc.ctx.font = fs + "px sans-serif";
+      const left = R - ((cc.ctx.measureText(text) || {}).width || text.length * fs * 0.7) - 4;
+      const ys = s.pts.filter(p => g.X(p[0]) >= left).map(p => g.Y(p[1]));
+      if (!ys.length) ys.push(g.Y(s.pts[s.pts.length - 1][1]));
+      return { y: g.Y(s.pts[s.pts.length - 1][1]), hi: Math.min.apply(null, ys), lo: Math.max.apply(null, ys), text };
+    }).sort((p, q) => p.y - q.y);
+    tags.forEach((t, k) => {
+      const below = k === tags.length - 1 && (tags.length > 1 || t.hi < top + 6) && t.lo + 13 <= bottom;
+      t.ty = Math.max(top, Math.min(bottom, below ? t.lo + 13 : t.hi - 5));
+    });
+    if (tags.length === 2 && tags[1].ty - tags[0].ty < 13) {
+      tags[0].ty = Math.max(top, tags[1].ty - 13); tags[1].ty = Math.max(tags[1].ty, tags[0].ty + 13);
+    }
+    tags.forEach(t => D.text(cc.ctx, t.text, R, t.ty, { color: col("text-faint"), size: fs, align: "right" }));
 
     return describeRelation(axis, other, at, otherVal, o.output);
   }
@@ -1588,7 +1615,8 @@
       const chordMid = (y0 + y1) / 2;
       const bend = (mid - chordMid) / (range || 1);
       const curve = Math.abs(bend) < 0.06 ? "接近直線"
-        : (bend > 0 ? "往上凸（增加得越來越慢）" : "往下凹（增加得越來越快）");
+        : bend > 0 ? (rising ? "往上凸（增加得越來越慢）" : "往上凸（減少得越來越快）")
+        : (rising ? "往下凹（增加得越來越快）" : "往下凹（減少得越來越慢）");
       shape = "「" + axis[0] + "」變大時，「" + output + "」" + (rising ? "跟著變大" : "反而變小") +
         "，形狀" + curve + "。";
     }
@@ -1843,6 +1871,17 @@
   };
 
   /* ---------------------- 可重複使用的 Graph 座標系 ---------------------- */
+  // 整齊刻度：步距 1、2、2.5、5 × 10ⁿ；pad 時範圍向外擴到刻度上。回傳陣列附 digits（標示用小數位）
+  function niceTicks(lo, hi, count, pad) {
+    const raw = Math.max(1e-12, (hi - lo) / count), e = Math.floor(Math.log10(raw)), m = raw / Math.pow(10, e);
+    const k = m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10, step = k * Math.pow(10, e);
+    const a = Math[pad ? "floor" : "ceil"](lo / step - (pad ? -1e-9 : 1e-9)), b = Math[pad ? "ceil" : "floor"](hi / step + (pad ? -1e-9 : 1e-9));
+    const out = [];
+    for (let i = a; i <= Math.max(b, a + (pad ? 1 : 0)) && out.length < 40; i++) out.push(+(i * step).toPrecision(12));
+    out.digits = Math.max(0, (k === 2.5 ? 1 : 0) - (k === 10 ? e + 1 : e));
+    return out;
+  }
+
   function graph(cv, box, dom) {
     const ctx = cv.ctx;
     const X = dx => box.x + (dx - dom.x0) / (dom.x1 - dom.x0) * box.w;
@@ -1856,12 +1895,13 @@
         if (dom.y0 < 0 && dom.y1 > 0) D.line(ctx, box.x, Y(0), box.x + box.w, Y(0), col("text-faint", "#62707f"), 1);
         if (dom.x0 < 0 && dom.x1 > 0) D.line(ctx, X(0), box.y, X(0), box.y + box.h, col("text-faint", "#62707f"), 1);
         if (o.ticks !== false) {
-          const n = o.tickCount || 4;
-          for (let i = 0; i <= n; i++) {
-            const xv = lerp(dom.x0, dom.x1, i / n), yv = lerp(dom.y0, dom.y1, i / n);
-            D.text(ctx, fmt(xv, Math.abs(dom.x1 - dom.x0) < 2 ? 2 : 1), X(xv), box.y + box.h + 13, { color: col("text-faint"), size: 8.5, align: "center" });
-            D.text(ctx, fmt(yv, Math.abs(dom.y1 - dom.y0) < 2 ? 2 : 1), box.x - 5, Y(yv) + 3, { color: col("text-faint"), size: 8.5, align: "right" });
-          }
+          // 預設等分 tickCount 段；給 xticks／yticks（niceTicks）則標在整齊數值上
+          const n = o.tickCount || 4, c = col("text-faint");
+          const even = (a, b) => Array.from({ length: n + 1 }, (_, i) => lerp(a, b, i / n));
+          const xs = o.xticks || even(dom.x0, dom.x1), ys = o.yticks || even(dom.y0, dom.y1);
+          const xd = o.xticks ? xs.digits : Math.abs(dom.x1 - dom.x0) < 2 ? 2 : 1, yd = o.yticks ? ys.digits : Math.abs(dom.y1 - dom.y0) < 2 ? 2 : 1;
+          xs.forEach(v => D.text(ctx, fmt(v, xd), X(v), box.y + box.h + 13, { color: c, size: 9.5, align: "center" }));
+          ys.forEach(v => D.text(ctx, fmt(v, yd), box.x - 5, Y(v) + 3, { color: c, size: 9.5, align: "right" }));
         }
         if (o.xlabel) D.text(ctx, o.xlabel, box.x + box.w - 4, box.y + box.h - 6, { color: col("text-faint"), size: 11, align: "right" });
         if (o.ylabel) D.text(ctx, o.ylabel, box.x + 6, box.y + 12, { color: col("text-faint"), size: 11 });
@@ -1869,9 +1909,12 @@
       },
       grid(nx, ny) {
         const light = themeName() === "light";
+        // nx／ny 可以是段數，或刻度值陣列（格線對齊 niceTicks，框線上的略過）
+        const at = (v, a, b) => Array.isArray(v) ? v.map(t => (t - a) / (b - a)).filter(f => f > 1e-6 && f < 1 - 1e-6)
+          : Array.from({ length: Math.max(0, v - 1) }, (_, i) => (i + 1) / v);
         ctx.save(); ctx.strokeStyle = light ? "rgba(30,50,90,0.13)" : "rgba(255,255,255,0.055)"; ctx.lineWidth = 1; ctx.beginPath();
-        for (let i = 1; i < nx; i++) { const gx = box.x + box.w * i / nx; ctx.moveTo(gx, box.y); ctx.lineTo(gx, box.y + box.h); }
-        for (let j = 1; j < ny; j++) { const gy = box.y + box.h * j / ny; ctx.moveTo(box.x, gy); ctx.lineTo(box.x + box.w, gy); }
+        at(nx, dom.x0, dom.x1).forEach(f => { const gx = box.x + box.w * f; ctx.moveTo(gx, box.y); ctx.lineTo(gx, box.y + box.h); });
+        at(ny, dom.y0, dom.y1).forEach(f => { const gy = box.y + box.h * (1 - f); ctx.moveTo(box.x, gy); ctx.lineTo(box.x + box.w, gy); });
         ctx.stroke(); ctx.restore();
       },
       /*
