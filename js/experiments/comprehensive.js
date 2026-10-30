@@ -1099,7 +1099,7 @@
         reading.set(result, Math.abs(result) >= 100 ? 1 : 3); parameter.set(bv, decimal(config.b)); conclusion.set(config.status(av, bv, result));
         chart.setCap(PL.ui.relationChart(chart, {
           a: config.a, b: config.b, av: av, bv: bv,
-          calc: config.calc, output: config.output, sweep: config.sweep
+          calc: config.calc, output: config.output, unit: config.unit, sweep: config.sweep
         }));
       }
       animation = PL.loop(dt => { if (dt) elapsed = once.advance(elapsed, dt); render(dt); });

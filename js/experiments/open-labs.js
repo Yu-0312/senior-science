@@ -952,7 +952,7 @@
         readout.set(out, Math.abs(out) < 10 ? 3 : 2); aReadout.set(av, digits(config.a)); bReadout.set(bv, digits(config.b)); nReadout.set(records.length, 0); conclusion.set(config.status(av, bv, out));
         chart.setCap(PL.ui.relationChart(chart, {
           a: config.a, b: config.b, av: av, bv: bv,
-          calc: config.calc, output: config.output, sweep: config.sweep,
+          calc: config.calc, output: config.output, unit: config.unit, sweep: config.sweep,
           extra: function (g) { records.forEach(p => g.dot(p.a, p.out, { color: PL.col("text-dim"), r: 3 })); }
         }));
       }

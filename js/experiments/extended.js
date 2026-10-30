@@ -1698,7 +1698,7 @@
         r.set(result, Math.abs(result) < 1 ? 3 : 2); r2.set(b, cfg.b[4] === "" ? 2 : 1);
         chart.setCap(PL.ui.relationChart(chart, {
           a: cfg.a, b: cfg.b, av: a, bv: b,
-          calc: cfg.calc, output: cfg.output, sweep: cfg.sweep
+          calc: cfg.calc, output: cfg.output, unit: cfg.unit, sweep: cfg.sweep
         }));
       }
       // 可直接抓的器材：建立一次，位置由場景每格更新

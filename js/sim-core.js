@@ -1585,8 +1585,38 @@
       tags[0].ty = Math.max(top, tags[1].ty - 13); tags[1].ty = Math.max(tags[1].ty, tags[0].ty + 13);
     }
     tags.forEach(t => D.text(cc.ctx, t.text, R, t.ty, { color: col("text-faint"), size: fs, align: "right" }));
+    relationHover(cc, o, g, axis, x => at(x, otherVal));
 
     return describeRelation(axis, other, at, otherVal, o.output);
+  }
+
+  /*
+   * 關係圖的游標讀值：滑鼠移過（或手指按住）時，在曲線上標出該點與數值。
+   * 學生常問「那 m = 3 時 v 是多少？」——不必再去拉滑桿，指一下就讀得到。
+   */
+  function relationHover(cc, o, g, axis, f) {
+    const cvs = cc.canvas;
+    if (!cvs || !cvs.addEventListener) return;
+    cc._relDraw = () => relationChart(cc, o);
+    if (!cc._relHooked) {
+      cc._relHooked = true;
+      const at = e => { const r = cvs.getBoundingClientRect(); cc._relPx = e.clientX - r.left; cc._relDraw(); };
+      cvs.addEventListener("pointermove", at);
+      cvs.addEventListener("pointerdown", at);
+      cvs.addEventListener("pointerleave", () => { cc._relPx = null; cc._relDraw(); });
+    }
+    const px = cc._relPx, B = g.box;
+    if (px == null || px < B.x || px > B.x + B.w) return;
+    const x = axis[1] + (px - B.x) / B.w * (axis[2] - axis[1]), y = f(x);
+    if (!isFinite(y)) return;
+    const ctx = cc.ctx, py = g.Y(y), c = col("accent-2");
+    D.line(ctx, px, B.y, px, B.y + B.h, col("text-faint"), 1, [3, 3]);
+    if (py >= B.y && py <= B.y + B.h) D.disc(ctx, px, py, 4, { fill: col("m-color", c) });
+    const text = axis[0] + " = " + fmt(x, 2) + (axis[4] ? " " + axis[4] : "") + "　→　" + o.output + " = " + fmt(y, Math.abs(y) >= 100 ? 1 : 3) + (o.unit ? " " + o.unit : "");
+    ctx.save(); ctx.font = "700 11.5px sans-serif"; const w = ctx.measureText(text).width + 16; ctx.restore();
+    const bx = Math.max(B.x + 4, Math.min(B.x + B.w - w - 4, px - w / 2)), by = B.y + 6;
+    D.rect(ctx, bx, by, w, 22, { fill: col("panel-solid", "#fff"), stroke: c, width: 1, r: 5 });
+    D.text(ctx, text, bx + w / 2, by + 15, { color: col("text"), size: 11.5, weight: "700", align: "center" });
   }
 
   /* 取樣曲線，判斷形狀與第二個參數的作用，翻成一句中文 */

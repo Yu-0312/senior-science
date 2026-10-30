@@ -403,6 +403,35 @@
     return panel;
   }
 
+  /*
+   * 結果圖先蓋起來，等預測作答再揭開。
+   *
+   * 結果圖改排在實驗台正下方之後，學生一進來就會先看到曲線——「動手前先預測」問的答案
+   * 就攤在眼前，預測變成照抄。圖還在、只是模糊，作答（或按「直接顯示」）就揭開；
+   * 已經預測過的實驗、教師演示版都不蓋。
+   */
+  function veilCharts(root, predict) {
+    const charts = root.querySelector(":scope > .sim-charts");
+    const body = document.body;
+    if (!charts || !body || !body.classList) return;
+    if (body.classList.contains("stage-only") || body.classList.contains("demo-mode")) return;
+    const result = predict.querySelector(".sim-predict-result");
+    if (result && !result.hidden) return;
+    charts.classList.add("is-veiled");
+    const veil = el("div", "sim-charts-veil", charts);
+    const msg = el("p", null, veil);
+    msg.textContent = "先在「動手前先預測」選一個答案，再看結果圖——先猜，看圖時才是在檢查。";
+    const btn = el("button", "btn sim-charts-reveal", veil);
+    btn.type = "button";
+    btn.textContent = "直接顯示結果圖";
+    const lift = () => {
+      charts.classList.remove("is-veiled");
+      if (veil.parentNode) veil.parentNode.removeChild(veil);
+    };
+    btn.addEventListener("click", lift);
+    predict.addEventListener("click", e => { if (e.target && e.target.closest && e.target.closest(".sim-predict-choice")) lift(); });
+  }
+
   /* ---------------- 2. 可驗證的挑戰任務 ---------------- */
   function buildChallenge(context, insight) {
     const r = insight.primary;
@@ -883,6 +912,7 @@
     }
 
     refineBrief(context, insight);
+    if (predict) veilCharts(context.root, predict);
 
     // 動畫每一格也更新挑戰判定（有些讀數會隨模擬時間改變）
     const previousTick = context.onTick;

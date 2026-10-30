@@ -1239,7 +1239,7 @@
         reading.set(result, Math.abs(result) >= 100 ? 1 : 3); parameter.set(bv, config.b[4] === "" ? 2 : 2); conclusion.set(config.status(av, bv, result));
         chart.setCap(PL.ui.relationChart(chart, {
           a: config.a, b: config.b, av: av, bv: bv,
-          calc: config.calc, output: config.output, sweep: config.sweep
+          calc: config.calc, output: config.output, unit: config.unit, sweep: config.sweep
         }));
       }
       // 畫面上可以直接抓的器材（檢偏器、旋鈕…）：建立一次，位置由場景每格更新

@@ -2859,3 +2859,49 @@ body.demo-mode .finish-card, body.stage-only .finish-card { display: none; }
 @media (min-width: 1800px) {
   .content-grid > .guide { align-self: start; position: sticky; top: 16px; }
 }
+
+/* ---------------------------------------------------------------------------
+   2026-10 版面改版：操作與結果放在同一個視野
+   --------------------------------------------------------------------------- */
+/*
+ * 結果圖緊接在實驗台與讀數之後。
+ * 原本排在任務導讀、謎題、因果、挑戰之後，1440×900 時落在 y≈1700，
+ * 學生拉滑桿時看不到曲線怎麼動，要捲兩個螢幕。
+ * 窄版（flex）依序：實驗台 → 讀數 → 先預測 → 結果圖 → 任務導讀 → 其他；寬版（grid）結果圖佔實驗台下方第一整列。
+ */
+.lab-sim > * { order: 7; }
+.lab-sim > .sim-predict { order: 4; }
+.lab-sim > .sim-charts { order: 5; }
+.lab-sim > .sim-learning-brief, .lab-sim > .sim-procedure { order: 6; }
+@container lab (min-width: 760px) {
+  .lab-sim > .sim-charts { grid-row: 6; }
+}
+/* 結果圖：預測作答前先模糊（sim-insight.js 的 veilCharts） */
+.sim-charts.is-veiled { position: relative; }
+.sim-charts.is-veiled > .sim-chart { filter: blur(7px) saturate(0.5); opacity: 0.5; pointer-events: none; user-select: none; }
+.sim-charts-veil {
+  position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 16px; text-align: center;
+}
+.sim-charts-veil p {
+  margin: 0; max-width: 34em; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px;
+  background: color-mix(in srgb, var(--panel-solid) 90%, transparent); color: var(--text); font-size: 14px; font-weight: 700; line-height: 1.6;
+}
+.sim-charts-veil .sim-charts-reveal { flex: none; align-self: center; }
+body.stage-only .sim-charts-veil, body.demo-mode .sim-charts-veil { display: none; }
+body.stage-only .sim-charts.is-veiled > .sim-chart, body.demo-mode .sim-charts.is-veiled > .sim-chart { filter: none; opacity: 1; pointer-events: auto; }
+/* 畫布卡頭的「運動量測台」和上方工具列重複（寬版早就收掉，窄版也收） */
+.lab-sim .sim-visual-panel > .sim-panel-head { display: none; }
+/*
+ * 手機：畫布外面原本套了四層框（工作區卡、實驗台、畫布卡、畫布內距），左右各吃掉 45px，
+ * 390 寬的手機畫布只剩 300px。拆掉外面兩層，畫布約 356px。
+ */
+@media (max-width: 560px) {
+  .main { padding-left: 10px; padding-right: 10px; }
+  .content-grid > .card:first-child { border: 0; background: transparent; box-shadow: none; backdrop-filter: none; }
+  .content-grid > .card:first-child > .card-body { padding: 0; }
+  .lab-sim .sim-stage { padding: 0; border: 0; background: none; box-shadow: none; }
+  .lab-sim .sim-stage::before { display: none; }
+  .lab-sim .sim-canvas-wrap { padding: 5px 5px 4px; }
+}
+
