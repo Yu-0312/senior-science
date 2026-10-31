@@ -510,6 +510,7 @@ function main() {
   const urls = [
     { loc: siteUrl, priority: "1.0" },
     { loc: siteUrl + "experiments.html", priority: "0.9" },
+    { loc: siteUrl + "lab.html", priority: "0.8" },
     { loc: siteUrl + "licensing.html", priority: "0.3" }
   ].concat(flat.map(item => ({ loc: siteUrl + "p/" + item.exp.id + ".html", priority: "0.8" })))
    .concat(flat.map(item => ({ loc: siteUrl + "p/worksheet-" + item.exp.id + ".html", priority: "0.5" })));

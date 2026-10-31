@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>自訂實驗室｜物理實驗室</title>
+  <meta name="description" content="自己動手搭實驗：從器材盒拖出小球、斜面、彈簧、滑輪、電池、燈泡、電表、雷射、透鏡、稜鏡與量測工具，即時模擬力學、電路與光學。" />
+  <meta name="theme-color" content="#13171c" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
+  <meta name="color-scheme" content="dark light" />
+  <script>
+    (function () {
+      try {
+        var saved = JSON.parse(localStorage.getItem("pl-theme"));
+        if (saved !== "light" && saved !== "dark") saved = "light";
+        document.documentElement.setAttribute("data-theme", saved);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <link rel="canonical" href="https://senior-science.vercel.app/lab.html" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20261030-01" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png?v=20261030-01" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="css/style.css?v=20261030-01" />
+  <link rel="stylesheet" href="css/lab.css?v=20261030-01" />
+</head>
+
+<body class="lab-page">
+  <a class="skip-link" href="#lab-canvas">跳至實驗台</a>
+  <header class="lab-top">
+    <a class="lab-home" href="./" title="回首頁">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+      <span>物理實驗室</span>
+    </a>
+    <h1 class="lab-title">自訂實驗室</h1>
+
+    <div class="lab-transport" role="group" aria-label="模擬控制">
+      <button class="lab-btn lab-play" id="lab-play" type="button" title="播放／暫停（空白鍵）">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg><span>播放</span>
+      </button>
+      <button class="lab-btn" id="lab-step" type="button" title="前進一格（1/60 秒）">單步</button>
+      <button class="lab-btn" id="lab-reset" type="button" title="回到按下播放前的擺設">重設</button>
+      <label class="lab-speed"><span class="sr-only">速度</span>
+        <select id="lab-speed" aria-label="模擬速度">
+          <option value="0.1">0.1×</option><option value="0.25">0.25×</option><option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option><option value="2">2×</option>
+        </select>
+      </label>
+      <span class="lab-time" id="lab-time" aria-live="off">t = 0.00 s</span>
+    </div>
+
+    <div class="lab-actions">
+      <button class="lab-btn icon" id="lab-undo" type="button" title="復原（Ctrl+Z）" aria-label="復原">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+      </button>
+      <button class="lab-btn icon" id="lab-redo" type="button" title="重做（Ctrl+Shift+Z）" aria-label="重做">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg>
+      </button>
+      <div class="lab-menu">
+        <button class="lab-btn" id="lab-examples-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="lab-examples">範例</button>
+        <div class="lab-pop" id="lab-examples" role="menu" hidden></div>
+      </div>
+      <button class="lab-btn" id="lab-detail" type="button" aria-pressed="true" title="在器材旁顯示數值（k、F、n、f…）">數值</button>
+      <button class="lab-btn" id="lab-grid" type="button" aria-pressed="true" title="格線與吸附（拖曳時對齊 1 cm、旋轉每 15°）">格線</button>
+      <div class="lab-menu">
+        <button class="lab-btn" id="lab-file-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="lab-file">檔案</button>
+        <div class="lab-pop" id="lab-file" role="menu" hidden>
+          <button type="button" role="menuitem" data-act="share">複製分享連結</button>
+          <button type="button" role="menuitem" data-act="export">下載實驗檔（.json）</button>
+          <button type="button" role="menuitem" data-act="import">開啟實驗檔…</button>
+          <button type="button" role="menuitem" data-act="png">存成圖片（.png）</button>
+          <button type="button" role="menuitem" data-act="clear" class="danger">清空實驗台</button>
+        </div>
+      </div>
+      <button class="lab-btn icon" id="lab-theme" type="button" aria-label="切換深色／淺色"></button>
+    </div>
+  </header>
+
+  <main class="lab-main">
+    <aside class="lab-palette" aria-label="器材盒">
+      <div class="lab-tabs" id="lab-tabs" role="tablist" aria-label="器材分類"></div>
+      <div class="lab-tiles" id="lab-tiles" role="tabpanel"></div>
+      <p class="lab-palette-hint">拖到實驗台上，或點一下放到畫面中央</p>
+    </aside>
+
+    <section class="lab-stage" id="lab-stage">
+      <canvas id="lab-canvas" tabindex="0" aria-label="實驗台。用器材盒加入器材，Delete 刪除、R 旋轉、空白鍵播放。" aria-describedby="lab-status"></canvas>
+      <div class="lab-empty" id="lab-empty" hidden>
+        <h2>把器材拖上實驗台</h2>
+        <p>左邊的器材盒分成力學、電學、光學與量測工具。擺好之後按「播放」，東西就會照物理定律動起來。</p>
+        <ul>
+          <li><b>彈簧、細繩、測力計</b>：把兩端的圓點拖到物體或吊鉤上接住</li>
+          <li><b>電路</b>：從一個接線柱拖到另一個接線柱就是一條導線</li>
+          <li><b>光學</b>：雷射與光源一放上去就會即時算出光路</li>
+        </ul>
+        <div class="lab-empty-actions" id="lab-empty-actions"></div>
+      </div>
+      <div class="lab-zoom" role="group" aria-label="縮放">
+        <button type="button" id="lab-zoom-in" aria-label="放大">＋</button>
+        <button type="button" id="lab-fit" aria-label="整個實驗台置中">⤢</button>
+        <button type="button" id="lab-zoom-out" aria-label="縮小">－</button>
+      </div>
+      <p class="lab-status" id="lab-status" aria-live="polite"></p>
+      <div class="lab-toast" id="lab-toast" role="status" aria-live="polite" hidden></div>
+    </section>
+
+    <aside class="lab-inspector" id="lab-inspector" aria-label="器材設定與讀數"></aside>
+  </main>
+
+  <input type="file" id="lab-import" accept="application/json,.json" hidden />
+
+  <script src="js/site-config.js?v=20261030-01"></script>
+  <script src="js/sim-core.js?v=20261030-01"></script>
+  <script src="js/sim-apparatus.js?v=20261030-01"></script>
+  <script src="js/lab/lab-engine.js?v=20261030-01"></script>
+  <script src="js/lab/lab-circuit.js?v=20261030-01"></script>
+  <script src="js/lab/lab-optics.js?v=20261030-01"></script>
+  <script src="js/lab/lab-items.js?v=20261030-01"></script>
+  <script src="js/lab/lab-app.js?v=20261030-01"></script>
+</body>
+</html>

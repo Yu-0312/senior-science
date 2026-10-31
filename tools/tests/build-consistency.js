@@ -29,7 +29,7 @@ ok(BUILD === SW_BUILD, "sw.js 的 BUILD 與 site-config 相同",
   "site-config=" + BUILD + " sw=" + SW_BUILD);
 
 console.log("\n=== 所有 HTML 的 ?v= 都等於目前版本 ===");
-const htmls = ["index.html", "experiments.html", "licensing.html", "duo/index.html", "duo/embed.html"]
+const htmls = ["index.html", "experiments.html", "licensing.html", "lab.html", "duo/index.html", "duo/embed.html"]
   .concat(fs.existsSync("p") ? fs.readdirSync("p").map(f => "p/" + f).filter(f => f.endsWith(".html")) : []);
 const bad = [];
 htmls.forEach(f => {

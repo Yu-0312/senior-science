@@ -32,6 +32,7 @@ node --max-old-space-size=4096 tools/tests/meaning-audit.js   # 這支單跑要�
 | `perf-test.js` | 首次載入（壓縮後）與延遲載入沒有被抵銷 |
 | `build-consistency.js` | 全站版本號一致（含 `duo/` 的兩個頁面）、SW 快取清單與實際檔案相符 |
 | `graph-ink-test.js` | 圖表裡的曲線與陰影，在兩種主題下都與底板有足夠對比 |
+| `lab-test.js` | 自訂實驗室的力學引擎、電路求解、光線追蹤對照課本公式（31 項） |
 | `control-response-test.js` | **暫停狀態下**每一根滑桿、每一個步進器（− +）都要造成看得見的改變；選項晶片列出沒有立即反應的 |
 
 `meaning-audit` 與 `control-response-test` 看起來重疊，其實守的是不同狀態：

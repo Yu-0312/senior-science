@@ -55,7 +55,14 @@ const EXPERIMENTS = [
   "js/experiments/exam-gravity-waves.js",
   "js/experiments/exam-optics-thermal.js",
   "js/experiments/exam-electric.js",
-  "js/experiments/exam-modern.js"
+  "js/experiments/exam-modern.js",
+  // 自訂實驗室（lab.html）：只有打開那一頁才用得到，跟實驗程式一樣不在安裝時預載
+  "css/lab.css",
+  "js/lab/lab-engine.js",
+  "js/lab/lab-circuit.js",
+  "js/lab/lab-optics.js",
+  "js/lab/lab-items.js",
+  "js/lab/lab-app.js"
 ];
 
 const ICONS = ["icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png"];
