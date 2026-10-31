@@ -24,6 +24,7 @@ const VERSIONED = [
   "js/sim-tools.js",
   "js/sim-insight.js",
   "js/sim-a11y.js",
+  "js/sim-record.js",
   "js/sim-observe.js",
   "js/teaching-notes.js",
   "js/app.js",
