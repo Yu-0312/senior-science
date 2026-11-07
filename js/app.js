@@ -1246,10 +1246,15 @@
       const b = el("b", null, tx); b.textContent = s.title;
       const d = el("span", null, tx); d.textContent = s.state === "seen" ? "已觀察（答案在解說裡）" : s.desc;
       if (s.key === "finish") {
-        li.classList.add("is-link"); li.tabIndex = 0; li.setAttribute("role", "button");
-        const go = () => { const card = $("#finish-card"); if (card) card.scrollIntoView({ behavior: "smooth", block: "start" }); };
-        li.addEventListener("click", go);
-        li.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+        /*
+         * 可點的是蓋在整列上的透明按鈕，而不是把 <li> 改成 role="button"：
+         * <ol> 只能直接放 <li>，li 一變成按鈕，螢幕報讀器就讀不出「第 3 項，共 3 項」，
+         * 原生 <button> 也省掉自己處理 Enter／空白鍵。
+         */
+        li.classList.add("is-link");
+        const hit = el("button", "observe-step-hit", li); hit.type = "button";
+        hit.setAttribute("aria-label", s.title + "：" + d.textContent + "。移到頁面下方的完成實驗");
+        hit.addEventListener("click", () => { const card = $("#finish-card"); if (card) card.scrollIntoView({ behavior: "smooth", block: "start" }); });
       }
     });
   }

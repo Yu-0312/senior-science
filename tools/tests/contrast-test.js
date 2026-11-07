@@ -56,4 +56,26 @@ function check(theme, vars) {
 
 check("dark", V.dark);
 check("light", V.light);
+
+/*
+ * 模組色當文字（--m-ink）：麵包屑、學段標籤、學習輸出的小標都用它。
+ * CSS 用 color-mix 在淺色主題壓深（45% 模組色 + #06182a）、深色主題提亮（70% 模組色 + 白），
+ * 這裡用同樣的 sRGB 線性混色重算一次，逐一確認每個模組在兩種主題都達 AA。
+ * 由來：地科「太陽系與恆星」用 #8d6e63，深色底上只有 3.1:1，axe 在實驗頁抓到。
+ */
+R.section("模組色當文字");
+{
+  const hex = h => { const m = /^#([0-9a-f]{6})$/i.exec(String(h).trim()); return m ? [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16)) : null; };
+  const mix = (a, b, p) => "#" + a.map((v, i) => Math.round(v * p + b[i] * (1 - p)).toString(16).padStart(2, "0")).join("");
+  const L = c => colorMetrics(c).lum;
+  const bgs = theme => ["--bg", "--panel-solid", "--panel-2"].map(k => V[theme][k]).filter(v => hex(v));
+  const bad = [];
+  (window.PhysicsLabCurriculum.modules || []).forEach(m => {
+    const c = hex(m.color); if (!c) return;
+    const dark = mix(c, [255, 255, 255], 0.70), light = mix(c, hex("#06182a"), 0.45);
+    bgs("dark").forEach(b => { const r = contrastRatio(L(dark), L(b)); if (r < AA_TEXT) bad.push("深色 " + m.id + " " + dark + " / " + b + " = " + r.toFixed(2)); });
+    bgs("light").forEach(b => { const r = contrastRatio(L(light), L(b)); if (r < AA_TEXT) bad.push("淺色 " + m.id + " " + light + " / " + b + " = " + r.toFixed(2)); });
+  });
+  R.ok(bad.length === 0, "每個模組的 --m-ink 在兩種主題都達 " + AA_TEXT + ":1", bad.slice(0, 6).join("\n      "));
+}
 R.done();

@@ -301,10 +301,10 @@
             </div>
             <p class="hero-mode-hint">前兩種模式進入的是同一批實驗，只差畫面繁簡；「關卡挑戰版」把每個實驗做成一關；「自訂實驗室」讓你自己搭實驗。</p>
 
-            <aside class="hero-highlight" aria-label="設計理念">
+            <div class="hero-highlight" role="note" aria-label="設計理念">
               <span class="hero-highlight-k" aria-hidden="true">NOTE</span>
               <p><b>模擬會自己說出物理關係。</b>單擺會告訴你 <span class="nowrap">\(T \propto \sqrt{L}\)</span>、而且振幅完全不影響週期；雙狹縫會得出 <span class="nowrap">\(\Delta x \propto \lambda L / d\)</span>。這些不是寫死的答案，是程式實際掃描模型量出來的。</p>
-            </aside>
+            </div>
           </section>
 
           <section class="module-section" aria-labelledby="module-section-title">
@@ -432,19 +432,19 @@
         <section id="exp-view" style="display:none">
           <div class="exp-header" id="exp-header">
             <div class="exp-crumb" id="exp-crumb"></div>
-            <h2 id="exp-title"></h2>
+            <h1 id="exp-title"></h1>
             <p class="lead" id="exp-lead"></p>
             <div class="exp-learning-path" id="exp-learning-path" hidden></div>
           </div>
 
           <div class="content-grid">
             <div class="card">
-              <div class="card-title"><span class="accent-bar"></span>互動模擬工作區</div>
+              <div class="card-title" role="heading" aria-level="2"><span class="accent-bar"></span>互動模擬工作區</div>
               <div class="card-body"><div id="sim-root"></div></div>
             </div>
 
             <div class="card guide">
-              <div class="card-title"><span class="accent-bar"></span>概念 · 公式 · 重點</div>
+              <div class="card-title" role="heading" aria-level="2"><span class="accent-bar"></span>概念 · 公式 · 重點</div>
               <div class="card-body">
                 <div><h3>核心概念</h3><p id="guide-concept"></p></div>
                 <div><h3>關鍵公式</h3><div class="formula-box" id="guide-formula"></div></div>

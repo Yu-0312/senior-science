@@ -51,7 +51,7 @@
   font: inherit; font-size: 13px; cursor: pointer; line-height: 1.4;
 }
 .lab-pop button:hover { background: var(--tint-1); color: var(--accent); }
-.lab-pop button small { display: block; color: var(--text-faint); font-size: 11.5px; }
+.lab-pop button small { display: block; color: var(--text-dim); font-size: 11.5px; }
 .lab-pop .danger { color: var(--danger); }
 .lab-pop h3 { margin: 6px 10px 2px; font-size: 11px; letter-spacing: 1px; color: var(--text-faint); font-weight: 800; }
 
