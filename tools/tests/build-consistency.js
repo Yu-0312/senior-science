@@ -78,5 +78,32 @@ htmls.forEach(f => {
 ok(notCached.length === 0, "沒有「有引用卻沒快取」的資源",
   notCached.slice(0, 8).join("\n      "));
 
+console.log("\n=== MathJax 網址一致 ===");
+{
+  const app = fs.readFileSync("js/app.js", "utf8");
+  const a = (app.match(/MATHJAX_SRC\s*=\s*"([^"]+)"/) || [])[1], b = (sw.match(/const MATHJAX\s*=\s*"([^"]+)"/) || [])[1];
+  ok(!!a && a === b, "app.js 載入的 MathJax 與 sw.js「下載全部實驗」存的是同一個網址", a + " / " + b);
+}
+
+console.log("\n=== 社群分享預覽圖（og:image） ===");
+{
+  /*
+   * 分享到 LINE／Facebook 時顯示的卡片。手寫頁（首頁、lab、授權）換網域時最容易漏改，
+   * 而且漏了不會有任何畫面錯誤——只會讓分享出去的連結變回一行灰字。
+   */
+  const siteUrl = (cfg.match(/siteUrl:\s*"([^"]+)"/) || [])[1] || "";
+  ok(fs.existsSync("icons/og-card.png"), "icons/og-card.png 存在");
+  const pages = ["index.html", "lab.html", "licensing.html", "experiments.html"]
+    .concat(fs.readdirSync("p").filter(f => f.endsWith(".html")).map(f => "p/" + f));
+  const bad = pages.filter(f => {
+    const html = fs.readFileSync(f, "utf8");
+    if (!/property="og:url"/.test(html)) return false;
+    const img = (html.match(/property="og:image" content="([^"]+)"/) || [])[1];
+    return img !== siteUrl + "icons/og-card.png" || !/name="twitter:card" content="summary_large_image"/.test(html);
+  });
+  ok(bad.length === 0, "有 og:url 的頁面都有指向本站的 og:image 與 twitter:card（" + pages.length + " 頁）",
+    bad.slice(0, 6).join(", "));
+}
+
 console.log("\n通過 " + pass + " 項，失敗 " + fail + " 項");
 process.exit(fail ? 1 : 0);

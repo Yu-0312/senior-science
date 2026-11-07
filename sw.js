@@ -12,6 +12,17 @@ const CACHE = "physics-lab-" + BUILD;
  * 每次發版都清掉重抓，只是讓學生白白再下載一次 660 KB。
  */
 const CDN_CACHE = "physics-lab-cdn-v1";
+/* 與 js/app.js 的 MATHJAX_SRC 相同（build-consistency 會檢查）：「下載全部實驗」時一起存，離線也能排公式 */
+const MATHJAX = "https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js";
+/* 第三方快取的上限：中文字型切成上百個 unicode-range 檔，逛久了會一直累積，超過就從最舊的刪 */
+const CDN_MAX_ENTRIES = 160;
+async function trimCdnCache() {
+  const cache = await caches.open(CDN_CACHE);
+  const keys = await cache.keys();
+  // MathJax 本體不刪：它是唯一一個離線排公式必須的檔案
+  const extra = keys.filter(k => k.url !== MATHJAX).slice(0, Math.max(0, keys.length - CDN_MAX_ENTRIES));
+  await Promise.all(extra.map(k => cache.delete(k)));
+}
 
 const CORE = ["./", "index.html", "licensing.html", "manifest.json"];
 const VERSIONED = [
@@ -125,6 +136,17 @@ self.addEventListener("message", event => {
           type: "cache-progress", done, total: EXPERIMENT_ASSETS.length
         }));
       }
+      /*
+       * MathJax 改成需要時才載之後，沒開過任何實驗的人按「下載全部實驗」再離線，公式會全部退成純文字。
+       * 這裡一併存進第三方快取（走 CORS，存得到一般回應）；失敗不影響實驗檔。
+       */
+      try {
+        const cdn = await caches.open(CDN_CACHE);
+        if (!(await cdn.match(MATHJAX))) {
+          const res = await fetch(MATHJAX, { mode: "cors", credentials: "omit" });
+          if (res.ok) await cdn.put(MATHJAX, res);
+        }
+      } catch (e) { /* 校園網路擋 jsdelivr 時，公式會退成可讀的純文字 */ }
       const clients = await self.clients.matchAll();
       clients.forEach(c => c.postMessage({ type: "cache-complete", total: EXPERIMENT_ASSETS.length }));
     })
@@ -158,7 +180,7 @@ self.addEventListener("fetch", e => {
     const store = res => {
       if (res && res.ok && res.type !== "opaque") {
         const copy = res.clone();
-        caches.open(CDN_CACHE).then(c => c.put(req, copy)).catch(() => {});
+        caches.open(CDN_CACHE).then(c => c.put(req, copy)).then(trimCdnCache).catch(() => {});
       }
       return res;
     };

@@ -1165,10 +1165,17 @@
     const box = el("div", "readout", parent);
     const v = el("div", "readout-value", box); v.textContent = "—";
     const l = el("div", "readout-label", box); l.textContent = o.label;
-    const record = { label: o.label, unit: o.unit || "", value: "—", number: null };
+    /*
+     * 單位不一定是固定的：同一個讀值欄位換了量具，單位也要跟著換。
+     * setUnit 讓實驗在切換時同步改單位，也一併更新 record.unit，測試與無障礙朗讀才讀得到正確的單位。
+     */
+    let unit = o.unit || "";
+    const record = { label: o.label, unit, value: "—", number: null };
     const simRoot = parent.closest && parent.closest(".lab-sim");
     if (simRoot && simRoot._labReadouts) simRoot._labReadouts.push(record);
     if (buildContext) buildContext.readouts.push(record);
+    // 沒有值（「—」）時不要掛單位：「— ×」「— cm」讀起來像壞掉的數字
+    const paint = () => { v.textContent = record.value + (unit && record.value !== "—" ? " " + unit : ""); };
     return {
       set: (val, digits) => {
         // 沒有值（null／undefined）或算不出來（NaN、∞）一律顯示「—」，不要把 null、NaN 原樣印給學生看
@@ -1177,11 +1184,12 @@
         // 保留未經格式化的原始數值：探測引擎若讀四捨五入後的字串，
         // 小數值的相對誤差會很大，冪次律會被算歪（P ∝ V² 會變成 V^1.93）。
         record.number = typeof val === "number" && isFinite(val) ? val : null;
-        v.textContent = record.value + (o.unit ? " " + o.unit : "");
+        paint();
         // 長句讀數改整列寬、小字級（否則斷成四行或被截成「…」）
         const long = typeof val !== "number" && String(record.value).length > 9;
         if (box.classList.contains("is-text") !== long) box.classList.toggle("is-text", long);
       },
+      setUnit: u => { unit = u || ""; record.unit = unit; paint(); },
       raw: v, box
     };
   }
