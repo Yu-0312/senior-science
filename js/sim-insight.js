@@ -881,8 +881,11 @@
   const MUTE = ["fill", "stroke", "fillRect", "strokeRect", "fillText", "strokeText", "drawImage", "putImageData"];
   function muteCanvases(context) {
     const Ctx = window.CanvasRenderingContext2D;
-    if (typeof Ctx !== "function") return () => {};          // 測試替身的畫布是假物件，不動
+    if (typeof Ctx !== "function") return null;               // 測試替身的畫布是假物件，不動
+    // 沒有滑桿就不會探測（probe 直接回傳），也就不必靜音、不必事後重畫
+    if (!(context.sliders || []).length || !(context.readouts || []).length) return null;
     const ctxs = (context.canvases || []).map(cv => cv && cv.ctx).filter(c => c instanceof Ctx);
+    if (!ctxs.length) return null;
     const noop = function () {};
     ctxs.forEach(c => MUTE.forEach(m => { c[m] = noop; }));
     return () => ctxs.forEach(c => MUTE.forEach(m => { delete c[m]; }));
@@ -907,9 +910,11 @@
       return;
     } finally {
       PL.probing = false;
-      unmute();
-      // 探測最後的還原是在靜音時畫的；真正畫一次，暫停中的實驗才不會停在空白畫布
-      if (api && typeof api.rerender === "function") { try { api.rerender(); } catch (e) {} }
+      if (unmute) {
+        unmute();
+        // 探測最後的還原是在靜音時畫的；真正畫一次，暫停中的實驗才不會停在空白畫布
+        if (api && typeof api.rerender === "function") { try { api.rerender(); } catch (e) {} }
+      }
     }
     if (!insight) return;
     context.insight = insight;
