@@ -57,6 +57,26 @@ const biggest = expFiles.map(f => ({ f, n: gzipSize(path.join(expDir, f)) }))
 R.ok(biggest.n < 40 * 1024,
   "打開單一實驗最多再載 gzip " + kb(biggest.n) + "（" + biggest.f + "）");
 
+R.section("第三方資源不擋首屏");
+{
+  /*
+   * MathJax（tex-svg.js，gzip 約 660 KB）以前在首頁就 async 載入，首頁卻沒有任何公式。
+   * 改成 app.js 第一次要排公式時才載；這裡確保它不會被「順手」加回 index.html。
+   */
+  R.ok(!/<script[^>]+mathjax/i.test(html), "index.html 沒有直接載入 MathJax（由 app.js 需要時才載）");
+  const app = fs.readFileSync("js/app.js", "utf8");
+  const mj = (app.match(/MATHJAX_SRC\s*=\s*"([^"]+)"/) || [])[1] || "";
+  R.ok(/mathjax@\d+\.\d+\.\d+\//.test(mj), "MathJax 網址釘死完整版本號", mj || "找不到 MATHJAX_SRC");
+  // Google Fonts 的樣式表必須是非阻塞的（media="print" 載完再切換），否則第三方網域卡住就整頁白屏
+  ["index.html", "duo/index.html"].forEach(f => {
+    const page = fs.readFileSync(f, "utf8");
+    const blocking = Array.from(page.matchAll(/<link[^>]+fonts\.googleapis\.com\/css2[^>]*>/g))
+      .map(m => m[0]).filter(tag => !/media="print"/.test(tag) && !/<noscript>/.test(tag));
+    const inNoscript = (page.match(/<noscript><link[^>]+fonts\.googleapis/g) || []).length;
+    R.ok(blocking.length === inNoscript, f + " 的 Google Fonts 樣式表不擋首屏");
+  });
+}
+
 R.section("Service Worker 的預先快取不可以抵銷延遲載入");
 {
   const sw = fs.readFileSync("sw.js", "utf8");

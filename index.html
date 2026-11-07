@@ -50,9 +50,17 @@
 
   <!-- 首頁標題用宋體（Noto Serif TC）、數據與標註用等寬字（JetBrains Mono）。
        載不到時退回系統字型，版面不會壞，只是少了一點個性。 -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Serif+TC:wght@700;900&display=swap" />
+  <!--
+    字型表不擋首屏：Google Fonts 的 CSS 是第三方、而且 Noto Serif TC 的表本身就有上百個 unicode-range 區段。
+    同步載入時，校園網路若把 fonts.googleapis.com 擋成「不回應」而不是「拒絕」，
+    整個頁面會白屏到逾時為止。改成 media="print" 先下載、載完再套用：
+    首屏先用系統字型畫出來（display=swap 本來就允許），字型到了再換上。
+    crossorigin 讓回應走 CORS，Service Worker 才能把它存起來離線用。
+  -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Serif+TC:wght@700;900&display=swap" crossorigin media="print" onload="this.media='all'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Serif+TC:wght@700;900&display=swap" crossorigin /></noscript>
   <link rel="stylesheet" href="css/style.css?v=20261107-1827" />
 
   <!-- MathJax（LaTeX 公式排版） -->
@@ -70,12 +78,15 @@
     };
   </script>
   <!--
-    MathJax 來自 CDN，離線或校園網路擋掉 jsdelivr 時會載不到。
-    載不到就發事件，由 app.js 把公式退成可讀的純文字（T ∝ √L），
-    而不是把 \(T \propto \sqrt{L}\) 原樣留在畫面上。
+    MathJax 改為「第一次真的要排公式時」才由 app.js 載入（requestMathJax）。
+
+    由來：tex-svg.js 壓縮後約 660 KB、解壓後 2.1 MB，是整個首頁其他資源加起來的四倍；
+    首頁本身一條公式都沒有，卻每次都在背景下載、解析，和真正要用的 CSS／JS 搶頻寬與主執行緒。
+    版本也從 @3 釘死到 3.2.2：版本範圍網址在 CDN 上只能短期快取，釘死的網址可以長期快取，
+    Service Worker 也才能放心把它存起來離線用。
+    載不到時（離線、校園網路擋 jsdelivr）由 app.js 把公式退成可讀的純文字（T ∝ √L）。
   -->
-  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async
-          onerror="window.dispatchEvent(new Event('mathjax-failed'))"></script>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
 </head>
 
 <body>

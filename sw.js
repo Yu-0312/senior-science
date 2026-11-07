@@ -6,6 +6,12 @@
  */
 const BUILD = "20261107-1827";
 const CACHE = "physics-lab-" + BUILD;
+/*
+ * 第三方資源（釘死版本的 MathJax、Google Fonts）另放一個不隨 BUILD 清掉的快取。
+ * 它們的網址本身就帶版本（mathjax@3.2.2、gstatic 的字型檔名含雜湊），不會過期；
+ * 每次發版都清掉重抓，只是讓學生白白再下載一次 660 KB。
+ */
+const CDN_CACHE = "physics-lab-cdn-v1";
 
 const CORE = ["./", "index.html", "licensing.html", "manifest.json"];
 const VERSIONED = [
@@ -96,7 +102,7 @@ self.addEventListener("install", e => {
 self.addEventListener("activate", e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== CDN_CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -132,9 +138,35 @@ self.addEventListener("fetch", e => {
   let url;
   try { url = new URL(req.url); } catch (err) { return; }
 
-  // MathJax 等跨網域資源：網路優先，失敗再看快取
+  /*
+   * 跨網域資源
+   *
+   * 以前是「網路優先、失敗看快取」，但從來沒有任何地方把它們寫進快取，
+   * 所以離線時必定失敗：公式退成純文字、標題字型消失——主打離線可用的 PWA 一離線就變樣。
+   *
+   * 現在分兩種：
+   *   - 內容不會變的（釘死版本的 jsdelivr、gstatic 字型檔）：快取優先，第一次抓到就存起來。
+   *   - 字型 CSS（fonts.googleapis.com，同一個網址內容會依瀏覽器調整）：先給快取、背景更新。
+   * 只存「成功且非不透明」的回應：不透明回應看不到狀態碼，可能把錯誤頁存起來，
+   * 而且瀏覽器會把它當成好幾 MB 計入配額。
+   */
   if (url.origin !== location.origin) {
-    e.respondWith(fetch(req).catch(() => caches.match(req)));
+    const immutable = url.hostname === "cdn.jsdelivr.net" && /@\d+\.\d+\.\d+\//.test(url.pathname) ||
+      url.hostname === "fonts.gstatic.com";
+    const revalidate = url.hostname === "fonts.googleapis.com";
+    if (!immutable && !revalidate) return;   // 其他第三方一律交給瀏覽器，不攔截
+    const store = res => {
+      if (res && res.ok && res.type !== "opaque") {
+        const copy = res.clone();
+        caches.open(CDN_CACHE).then(c => c.put(req, copy)).catch(() => {});
+      }
+      return res;
+    };
+    e.respondWith(caches.match(req).then(cached => {
+      if (cached && immutable) return cached;
+      const network = fetch(req).then(store).catch(() => cached);
+      return cached || network;
+    }));
     return;
   }
 
