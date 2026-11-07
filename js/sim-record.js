@@ -18,7 +18,12 @@
 
   const load = key => { try { const v = JSON.parse(localStorage.getItem(key)); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
   const save = (key, rows) => { try { localStorage.setItem(key, JSON.stringify(rows)); } catch (e) {} };
-  const num = (v, d) => (isFinite(v) ? PL.fmt(v, d) : "—");
+  /*
+   * 讀數算不出來時 number 是 null（畫面顯示「—」）。isFinite(null) 會是 true（null 轉成 0），
+   * 以前因此把 null 交給 fmt 而整頁報錯；一律先確認是數字。
+   */
+  const isNum = v => typeof v === "number" && isFinite(v);
+  const num = (v, d) => (isNum(v) ? PL.fmt(v, d) : "—");
 
   function build(context) {
     const root = context.root;
@@ -68,7 +73,7 @@
     }
     function apply(row) {
       // 套用參數：逐根滑桿寫回（write 會觸發實驗自己的 onInput，畫面與讀數跟著更新）
-      sliders.forEach((s, i) => { if (isFinite(row.s[i])) s.write(row.s[i]); });
+      sliders.forEach((s, i) => { if (isNum(row.s[i])) s.write(row.s[i]); });
     }
     function commit() { save(key, rows); render(); }
     function render() {
@@ -91,7 +96,7 @@
     function download() {
       const q = v => '"' + String(v).replace(/"/g, '""') + '"';
       const lines = [["#"].concat(cols.map(c => c.label + (c.unit ? " (" + c.unit + ")" : ""))).map(q).join(",")];
-      rows.forEach((row, i) => lines.push([i + 1].concat(row.s, row.r).map(q).join(",")));
+      rows.forEach((row, i) => lines.push([i + 1].concat(row.s, row.r).map(v => q(v == null ? "" : v)).join(",")));
       const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob); a.download = "physics-lab-" + context.id + "-records.csv";

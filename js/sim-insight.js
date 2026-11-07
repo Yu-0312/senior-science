@@ -418,6 +418,11 @@
     const result = predict.querySelector(".sim-predict-result");
     if (result && !result.hidden) return;
     const wraps = Array.from(charts.querySelectorAll(":scope > .sim-chart"));
+    /*
+     * 沒有任何結果圖（下方圖表區是空的）就不蓋：
+     * 空容器高度是 0，絕對定位的遮罩會浮出來壓在下一個區塊上。
+     */
+    if (!wraps.length) return;
     charts.classList.add("is-veiled");
     wraps.forEach(w => { w.inert = true; });          // 模糊中的圖表分頁鈕不該還能用 Tab 進去
     const veil = el("div", "sim-charts-veil", charts);

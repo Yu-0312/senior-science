@@ -243,9 +243,17 @@
      --------------------------------------------------------------------- */
   const EXPERIMENT_FILES = window.PhysicsLabExperimentFiles || {};
   const loadedFiles = new Map();
+  /*
+   * 新版上線、但這個分頁還沒重新整理（見 startApp 的 controllerchange）。
+   * sw.js 用 skipWaiting＋clients.claim，新版一裝好就接管已開著的分頁；記憶體裡還是舊的引擎，
+   * 之後延遲載入的實驗檔卻會從網路拿到新版（靜態主機不看 ?v=）——舊引擎配新實驗檔可能直接壞掉。
+   * 這時要載任何新檔案，就改成整頁重新整理（網址的 #實驗 會保留，等於直接開新版的那個實驗）。
+   */
+  let updatePending = false;
 
   function loadScript(src) {
     if (loadedFiles.has(src)) return loadedFiles.get(src);
+    if (updatePending) { location.reload(); return new Promise(() => {}); }
     const promise = new Promise((resolve, reject) => {
       const tag = document.createElement("script");
       tag.src = src;
@@ -329,6 +337,7 @@
     if (net && (net.saveData || /2g/.test(net.effectiveType || ""))) return;
     const idle = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
     idle(() => {
+      if (updatePending) return;   // 預先抓檔會觸發整頁重新整理（見 loadScript），等使用者自己換頁
       [order - 1, order + 1].forEach(i => {
         const item = FLAT[i];
         if (!item || PL.has(item.exp.id)) return;
@@ -394,8 +403,10 @@
     const btn = $("#theme-toggle");
     if (btn) {
       btn.innerHTML = theme === "light" ? moonIcon + "<span>深色</span>" : sunIcon + "<span>淺色</span>";
-      btn.setAttribute("aria-pressed", String(theme === "light"));
       btn.title = theme === "light" ? "切換為深色主題" : "切換為淺色主題";
+      // 名稱要包含按鈕上看得到的「深色／淺色」（WCAG 2.5.3）；名稱已經說明動作，不再另加 aria-pressed
+      btn.setAttribute("aria-label", btn.title);
+      btn.removeAttribute("aria-pressed");
     }
     // 行動裝置的網址列顏色也要跟著換，否則淺色頁面上方會頂著一條深色。
     document.querySelectorAll('meta[name="theme-color"]').forEach(meta => meta.remove());
@@ -507,7 +518,6 @@
     const labelEl = el("span", "exp-path-label", step); labelEl.textContent = label;
     const titleEl = el("strong", "exp-path-title", step); titleEl.textContent = target.exp.title;
     if (!current) {
-      step.setAttribute("aria-label", "前往" + label + "：" + target.exp.title);
       step.addEventListener("click", () => location.hash = "#" + target.exp.id);
     }
   }
@@ -600,7 +610,11 @@
       card.dataset.mod = m.id;
       card.setAttribute("role", "link");
       card.setAttribute("tabindex", "0");
-      card.setAttribute("aria-label", "模組 " + m.no + "：" + m.title + "，" + m.experiments.length + " 個實驗");
+      /*
+       * 不另設 aria-label，名稱直接取卡片上看得到的字（序號、課綱、標題、說明、進度）。
+       * 以前是「模組 1：…，N 個實驗」，和畫面上的「01 …」對不起來（WCAG 2.5.3 Label in Name）：
+       * 語音控制的使用者照著畫面念，叫不到這張卡。
+       */
       const top = el("div", "mcard-top", card);
       const no = el("div", "mcard-no", top); no.textContent = String(index + 1).padStart(2, "0");
       const tr = el("div", "mcard-track", top); tr.textContent = m.track;
@@ -648,15 +662,22 @@
   const GREEK = {
     pi: "π", theta: "θ", lambda: "λ", mu: "μ", rho: "ρ", alpha: "α", beta: "β",
     gamma: "γ", Delta: "Δ", delta: "δ", omega: "ω", Omega: "Ω", sigma: "σ",
-    varepsilon: "ε", epsilon: "ε", phi: "φ", tau: "τ", nu: "ν", eta: "η"
+    varepsilon: "ε", epsilon: "ε", phi: "φ", tau: "τ", nu: "ν", eta: "η",
+    kappa: "κ", psi: "ψ", varphi: "φ", xi: "ξ", zeta: "ζ", chi: "χ",
+    Gamma: "Γ", Lambda: "Λ", Phi: "Φ", Psi: "Ψ", Sigma: "Σ", Theta: "Θ", Pi: "Π"
   };
   const SYM = {
     propto: "∝", times: "×", cdot: "·", pm: "±", approx: "≈", neq: "≠",
     leq: "≤", geq: "≥", ll: "≪", gg: "≫", to: "→", Rightarrow: "⇒",
     infty: "∞", quad: " ", qquad: "  ", left: "", right: "", displaystyle: "",
-    mathrm: "", text: "", ldots: "…", cdots: "⋯"
+    mathrm: "", text: "", ldots: "…", cdots: "⋯", dots: "…",
+    // 2026-11 補齊：以前沒有的指令直接被吃掉，⇌、↑↓ 這些箭頭在離線時整個消失
+    leftarrow: "←", leftrightarrow: "↔", rightleftharpoons: "⇌", leftrightarrows: "⇄",
+    uparrow: "↑", downarrow: "↓", mp: "∓", equiv: "≡", sim: "∼", supset: "⊃", perp: "⊥",
+    parallel: "∥", mid: "|", oplus: "⊕", nabla: "∇", oint: "∮", langle: "⟨", rangle: "⟩"
   };
-  const OPERATOR = new Set(["∝", "×", "·", "±", "≈", "≠", "≤", "≥", "≪", "≫", "→", "⇒"]);
+  const ACCENT = { vec: "\u20d7", bar: "\u0304", tilde: "\u0303", dot: "\u0307", hat: "\u0302", overline: "\u0305" };
+  const OPERATOR = new Set(["∝", "×", "·", "±", "≈", "≠", "≤", "≥", "≪", "≫", "→", "⇒", "←", "↔", "⇌", "⇄", "≡", "⊃", "⊥", "|"]);
   const SUP = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "+": "⁺", "-": "⁻", n: "ⁿ", i: "ⁱ" };
   const SUB = { "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄", "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉", "+": "₊", "-": "₋" };
   const isAtomic = s => /^[A-Za-z0-9ℏℓπθλμρσταβγδεφωνηΔΩ]+$/.test(s);
@@ -703,7 +724,28 @@
         }
         if (name === "mathrm" || name === "text") {
           const a = readGroup(src, j);
-          if (a) { out += a.body; i = a.end; continue; }
+          if (a) { out += a.body.replace(/\\[,;: ]/g, " ").replace(/\\!/g, "").replace(/\\([A-Za-z]+) ?/g, (m, n) => SYM[n] != null ? SYM[n] : GREEK[n] || m); i = a.end; continue; }
+        }
+        // \xrightarrow[下]{上} → 「 →(上／下) 」；\overset、\underset → 「符號(上／下)」
+        if (name === "xrightarrow") {
+          let below = "";
+          if (src[j] === "[") { const close = src.indexOf("]", j); below = plainFormula(src.slice(j + 1, close)); j = close + 1; while (src[j] === " ") j++; }
+          const a = readGroup(src, j);
+          const label = [a ? plainFormula(a.body) : "", below].filter(Boolean).join("／");
+          out += " →" + (label ? "(" + label + ")" : "") + " "; i = a ? a.end : j; continue;
+        }
+        if (name === "overset" || name === "underset") {
+          const a = readGroup(src, j), b = a ? readGroup(src, a.end) : null;
+          if (a && b) {
+            const base = plainFormula(b.body), note = plainFormula(a.body);
+            out += base.endsWith(")") && name === "underset" ? base.slice(0, -1) + "／" + note + ")" : base + "(" + note + ")";
+            i = b.end; continue;
+          }
+        }
+        if (ACCENT[name]) {
+          const a = readGroup(src, j);
+          if (a) { out += plainFormula(a.body) + ACCENT[name]; i = a.end; continue; }
+          if (/[A-Za-z]/.test(src[j] || "")) { out += src[j] + ACCENT[name]; i = j + 1; continue; }   // \vec B
         }
         // 希臘字母是變數，\Delta P 要黏成 ΔP；運算子則要留空白，∝ √L 才讀得順
         if (GREEK[name]) { out += GREEK[name]; i = j; continue; }
@@ -715,6 +757,7 @@
         }
         out += name; i = j; continue;
       }
+      if (ch === "^" && src[i + 1] === "\\") { i += 1; continue; }   // ^\circ：上標的是符號本身
       if (ch === "^" || ch === "_") {
         const table = ch === "^" ? SUP : SUB;
         const g = readGroup(src, i + 1);
@@ -1074,7 +1117,6 @@
         const option = el("button", "practice-option", choices); option.type = "button";
         option.setAttribute("role", "radio");
         option.setAttribute("aria-checked", String(selectedAnswer === choiceIndex));
-        option.setAttribute("aria-label", String.fromCharCode(65 + choiceIndex) + "：" + choice);
         if (solved) {
           option.disabled = true;
           if (choiceIndex === q.correct) option.classList.add("is-correct");
@@ -2615,12 +2657,19 @@
         }
       }
       if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
+      /*
+       * 焦點在按鈕、連結、選項晶片上時，空白鍵與方向鍵屬於那個元件：
+       * 以前空白鍵一律被攔下來切換播放（preventDefault 讓按鈕按不下去），
+       * 鍵盤使用者在實驗頁裡沒辦法用空白鍵按任何按鈕；在晶片上按方向鍵還會直接跳到別的實驗。
+       * 元件自己已經處理掉的按鍵（例如記錄表的列按空白鍵＝套用），也不再搶。
+       */
+      const onWidget = e.defaultPrevented || !!(e.target.closest && e.target.closest('button, a[href], summary, tr[tabindex], [role="button"], [role="radio"], [role="tab"], [role="checkbox"], [role="switch"], [role="slider"], [role="link"], [contenteditable="true"]'));
       if (currentId && $("#exp-view").style.display !== "none") {
         const f = byId[currentId];
-        if (e.key === "ArrowRight" && FLAT[f.order + 1]) { location.hash = "#" + FLAT[f.order + 1].exp.id; }
-        if (e.key === "ArrowLeft" && FLAT[f.order - 1]) { location.hash = "#" + FLAT[f.order - 1].exp.id; }
+        if (!onWidget && e.key === "ArrowRight" && FLAT[f.order + 1]) { location.hash = "#" + FLAT[f.order + 1].exp.id; }
+        if (!onWidget && e.key === "ArrowLeft" && FLAT[f.order - 1]) { location.hash = "#" + FLAT[f.order - 1].exp.id; }
         // 空白鍵＝播放／暫停（PhET 慣例）：雙手留在鍵盤上就能推進 demo
-        if (e.key === " " && !e.repeat) {
+        if (!onWidget && e.key === " " && !e.repeat) {
           const playBtn = document.querySelector(".sim-transport-play");
           if (playBtn && !playBtn.hidden) { e.preventDefault(); playBtn.click(); }
         }
@@ -2663,8 +2712,33 @@
     // PWA
     if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
       window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+      /*
+       * 新版接管這個分頁時提示一聲。第一次安裝（原本沒有 controller）不算更新，不提示。
+       * 不自動重新整理：學生可能正在填預測、記數據；按「重新整理」或換到還沒載過的實驗時才換新版。
+       */
+      let hadController = !!navigator.serviceWorker.controller;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (!hadController) { hadController = true; return; }
+        updatePending = true;
+        showUpdateNotice();
+      });
     }
     initOfflineCard();
+  }
+
+  /* 新版上線提示：右下角一條，不擋操作；手機版貼底、左右留 16px */
+  function showUpdateNotice() {
+    if (document.querySelector(".update-toast")) return;
+    const box = el("div", "update-toast", document.body);
+    box.setAttribute("role", "status");
+    const msg = el("span", "update-toast-msg", box);
+    msg.textContent = "網站已更新到新版本，重新整理後套用（換到新的實驗時也會自動套用）。";
+    const go = el("button", "update-toast-btn primary", box);
+    go.type = "button"; go.textContent = "重新整理";
+    go.addEventListener("click", () => location.reload());
+    const later = el("button", "update-toast-btn", box);
+    later.type = "button"; later.textContent = "稍後";
+    later.addEventListener("click", () => box.remove());
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startApp);
