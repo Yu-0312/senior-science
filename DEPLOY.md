@@ -68,3 +68,16 @@ node tools/tests/run-all.js
 
 測試全綠不代表畫面是對的。這個專案至今每一個嚴重的顯示問題都是靠截圖發現的，
 **發佈前請實際打開瀏覽器看過**，深色與淺色主題各看一次。
+
+## 網址與 canonical
+
+`tools/build-static.js` 的 `resolveSiteUrl()` 依序採用：
+
+1. `SITE_URL` 環境變數
+2. `js/site-config.js` 的 `siteUrl`
+
+換網域時兩者擇一更新，並重新建置靜態頁；首頁、lab.html、licensing.html 的 canonical／og:url／og:image 是手寫的，也要一起改。
+
+## 快取與版本號
+
+`js/`、`css/` 的引用都帶 `?v=<build>`。**改了 `js/` 或 `css/` 就要更新版本號**，版本號同時寫在 `js/site-config.js` 與 `sw.js`，`build-consistency` 測試會擋住兩邊不一致的情況。

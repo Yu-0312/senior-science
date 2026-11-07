@@ -11,6 +11,11 @@
 <meta property="og:description" content="原子核的質量比組成它的質子與中子加起來還小，少掉的質量（質量虧損）就是把核子綁在一起的結合能。重核分裂成中等大小的核、或輕核融合成較重的核時，平均每個核子的結合能變大，多出來的能量就以 E = Δmc² 放出。" />
 <meta property="og:locale" content="zh_TW" />
 <meta property="og:url" content="https://senior-science.vercel.app/p/mass-energy.html" />
+<meta property="og:site_name" content="物理實驗室" />
+<meta property="og:image" content="https://senior-science.vercel.app/icons/og-card.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
 <meta name="theme-color" content="#13171c" media="(prefers-color-scheme: dark)" />
 <meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
 <meta name="color-scheme" content="dark light" />
@@ -21,9 +26,9 @@
 (function () {
   try {
     var saved = JSON.parse(localStorage.getItem("pl-theme"));
-    if (saved !== "light" && saved !== "dark") {
-      saved = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-    }
+    // 與首頁一致：第一次造訪預設亮色（以前這裡跟作業系統走，深色系統的人
+    // 從搜尋結果進說明頁是深色、點進互動版又變亮色，像是兩個不同的網站）
+    if (saved !== "light" && saved !== "dark") saved = "light";
     document.documentElement.setAttribute("data-theme", saved);
   } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
 })();

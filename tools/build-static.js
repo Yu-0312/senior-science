@@ -246,6 +246,12 @@ function plainFormula(latex) {
   return out.replace(/\s+/g, " ").trim();
 }
 
+/*
+ * 社群分享預覽圖（og:image）。LINE、Facebook、Discord 分享連結時顯示的那張卡片；
+ * 以前全站沒有，分享出去只有一行灰字。網址必須是絕對網址，所以在 main() 依 siteUrl 設定。
+ */
+let OG_IMAGE = "";
+
 function layout(o) {
   return `<!DOCTYPE html>
 <html lang="zh-Hant">
@@ -260,7 +266,12 @@ function layout(o) {
 <meta property="og:description" content="${escapeHtml(o.description)}" />
 <meta property="og:locale" content="zh_TW" />
 <meta property="og:url" content="${escapeHtml(o.canonical)}" />
-<meta name="theme-color" content="#13171c" media="(prefers-color-scheme: dark)" />
+<meta property="og:site_name" content="物理實驗室" />
+${OG_IMAGE ? `<meta property="og:image" content="${escapeHtml(OG_IMAGE)}" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+` : ""}<meta name="theme-color" content="#13171c" media="(prefers-color-scheme: dark)" />
 <meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
 <meta name="color-scheme" content="dark light" />
 <link rel="icon" type="image/svg+xml" href="${o.base}icons/icon.svg?v=${o.build}" />
@@ -270,9 +281,9 @@ function layout(o) {
 (function () {
   try {
     var saved = JSON.parse(localStorage.getItem("pl-theme"));
-    if (saved !== "light" && saved !== "dark") {
-      saved = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-    }
+    // 與首頁一致：第一次造訪預設亮色（以前這裡跟作業系統走，深色系統的人
+    // 從搜尋結果進說明頁是深色、點進互動版又變亮色，像是兩個不同的網站）
+    if (saved !== "light" && saved !== "dark") saved = "light";
     document.documentElement.setAttribute("data-theme", saved);
   } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
 })();
@@ -548,6 +559,7 @@ function main() {
     process.exit(1);
   }
   const siteUrl = resolveSiteUrl(site);
+  OG_IMAGE = siteUrl + "icons/og-card.png";
   const conf = { siteUrl, build: site.build || "dev" };
 
   /*
