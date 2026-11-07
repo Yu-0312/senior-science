@@ -5,38 +5,38 @@
   const AP = PL.apparatus;                    // 器材層（各 kind 場景共用）
   const color = () => PL.col("m-color", "#35e0cf");
 
-  function topic(kind, a, b, output, calc) {
-    return { kind, a, b, output, calc };
+  function topic(kind, a, b, output, calc, unit) {
+    return { kind, a, b, output, calc, unit: unit || "" };
   }
   const T = {
-    "apparent-weight": topic("elevator", ["乘客質量 m", 20, 100, 60, "kg"], ["加速度 a", -8, 8, 2, "m/s²"], "體重計讀數 N", (a, b) => a * (9.8 + b)),
-    "spring-series-parallel": topic("spring", ["彈簧 k₁", 10, 80, 35, "N/m"], ["彈簧 k₂", 10, 80, 50, "N/m"], "串聯等效勁度", (a, b) => a * b / (a + b)),
-    "center-of-mass": topic("momentum", ["左側質量", 1, 10, 3, "kg"], ["右側質量", 1, 10, 7, "kg"], "質心位置", (a, b) => 10 * b / (a + b)),
-    "force-time-profile": topic("impulse", ["衝量 J", 5, 80, 30, "N·s"], ["作用時間 Δt", 0.1, 4, 1, "s"], "平均力", (a, b) => a / b),
-    "rocket-equation": topic("rocket", ["噴氣速度 vₑ", 500, 5000, 2400, "m/s"], ["質量比 m₀/m_f", 1.1, 8, 3, ""], "速度改變 Δv", (a, b) => a * Math.log(b)),
-    "work-angle": topic("work", ["外力 F", 5, 100, 48, "N"], ["夾角 θ", 0, 180, 35, "°"], "單位位移做功", (a, b) => a * Math.cos(b * Math.PI / 180)),
-    "power-lab": topic("power", ["做功 W", 100, 3000, 1200, "J"], ["完成時間 t", 1, 30, 8, "s"], "平均功率", (a, b) => a / b),
-    "friction-thermal": topic("energy", ["摩擦係數 μ", 0.05, 1, 0.32, ""], ["滑行距離 d", 1, 20, 8, "m"], "轉化熱量 Q", (a, b) => a * 9.8 * b),
-    "banked-curve": topic("orbit", ["彎道半徑 r", 20, 200, 85, "m"], ["傾角 θ", 2, 45, 18, "°"], "設計速率", (a, b) => Math.sqrt(a * 9.8 * Math.tan(b * Math.PI / 180))),
+    "apparent-weight": topic("elevator", ["乘客質量 m", 20, 100, 60, "kg"], ["加速度 a", -8, 8, 2, "m/s²"], "體重計讀數 N", (a, b) => a * (9.8 + b), "N"),
+    "spring-series-parallel": topic("spring", ["彈簧 k₁", 10, 80, 35, "N/m"], ["彈簧 k₂", 10, 80, 50, "N/m"], "串聯等效勁度", (a, b) => a * b / (a + b), "N/m"),
+    "center-of-mass": topic("momentum", ["左側質量", 1, 10, 3, "kg"], ["右側質量", 1, 10, 7, "kg"], "質心位置", (a, b) => 10 * b / (a + b), "m"),
+    "force-time-profile": topic("impulse", ["衝量 J", 5, 80, 30, "N·s"], ["作用時間 Δt", 0.1, 4, 1, "s"], "平均力", (a, b) => a / b, "N"),
+    "rocket-equation": topic("rocket", ["噴氣速度 vₑ", 500, 5000, 2400, "m/s"], ["質量比 m₀/m_f", 1.1, 8, 3, ""], "速度改變 Δv", (a, b) => a * Math.log(b), "m/s"),
+    "work-angle": topic("work", ["外力 F", 5, 100, 48, "N"], ["夾角 θ", 0, 180, 35, "°"], "單位位移做功", (a, b) => a * Math.cos(b * Math.PI / 180), "J/m"),
+    "power-lab": topic("power", ["做功 W", 100, 3000, 1200, "J"], ["完成時間 t", 1, 30, 8, "s"], "平均功率", (a, b) => a / b, "W"),
+    "friction-thermal": topic("energy", ["摩擦係數 μ", 0.05, 1, 0.32, ""], ["滑行距離 d", 1, 20, 8, "m"], "轉化熱量 Q", (a, b) => a * 9.8 * b, "J"),
+    "banked-curve": topic("orbit", ["彎道半徑 r", 20, 200, 85, "m"], ["傾角 θ", 2, 45, 18, "°"], "設計速率", (a, b) => Math.sqrt(a * 9.8 * Math.tan(b * Math.PI / 180)), "m/s"),
     // β 上限 6 s⁻¹：要能超過 ω₀ ≈ 2.8，才看得到臨界與過阻尼
-    "damped-oscillation": topic("oscillation", ["初始振幅 A₀", 1, 12, 7, "cm"], ["阻尼 β", 0.05, 6, 0.3, "s⁻¹"], "5 秒後振幅", (a, b) => a * Math.exp(-5 * b)),
+    "damped-oscillation": topic("oscillation", ["初始振幅 A₀", 1, 12, 7, "cm"], ["阻尼 β", 0.05, 6, 0.3, "s⁻¹"], "5 秒後振幅", (a, b) => a * Math.exp(-5 * b), "cm"),
     // 交換頻率＝模態差 (ω₂ − ω₁)/2π，不是 √(κ/m)/2π（見 SC 的耦合振子）
-    "coupled-oscillators": topic("oscillation", ["耦合勁度", 1, 30, 12, "N/m"], ["質量 m", 0.2, 5, 1, "kg"], "交換頻率", (a, b) => (Math.sqrt(3) - 1) * Math.sqrt(a / b) / TAU),
-    "hydrostatic-pressure": topic("thermal", ["深度 h", 0, 30, 12, "m"], ["液體密度 ρ", 600, 1400, 1000, "kg/m³"], "表壓", (a, b) => a * b * 9.8 / 1000),
-    "phase-change": topic("thermal", ["質量 m", 0.1, 4, 1, "kg"], ["加熱功率", 100, 2000, 800, "W"], "熔化時間", (a, b) => a * 334000 / b),
-    "reflection-boundary": topic("wave", ["脈衝振幅", 1, 12, 7, "cm"], ["反射端（0 固定／1 自由）", 0, 1, 0, ""], "反射相位", (a, b) => b < 0.5 ? 180 : 0),
+    "coupled-oscillators": topic("oscillation", ["耦合勁度", 1, 30, 12, "N/m"], ["質量 m", 0.2, 5, 1, "kg"], "交換頻率", (a, b) => (Math.sqrt(3) - 1) * Math.sqrt(a / b) / TAU, "Hz"),
+    "hydrostatic-pressure": topic("thermal", ["深度 h", 0, 30, 12, "m"], ["液體密度 ρ", 600, 1400, 1000, "kg/m³"], "表壓", (a, b) => a * b * 9.8 / 1000, "kPa"),
+    "phase-change": topic("thermal", ["質量 m", 0.1, 4, 1, "kg"], ["加熱功率", 100, 2000, 800, "W"], "熔化時間", (a, b) => a * 334000 / b, "s"),
+    "reflection-boundary": topic("wave", ["脈衝振幅", 1, 12, 7, "cm"], ["反射端（0 固定／1 自由）", 0, 1, 0, ""], "反射相位", (a, b) => b < 0.5 ? 180 : 0, "°"),
     "sound-intensity": topic("wave", ["距離 r", 1, 30, 8, "m"], ["聲源振幅", 1, 10, 5, ""], "相對聲強", (a, b) => b * b / (a * a)),
-    "air-column-resonance": topic("wave", ["空氣柱長度 L", 5, 120, 42, "cm"], ["音叉頻率 f", 100, 800, 440, "Hz"], "基頻聲速", (a, b) => 4 * a / 100 * b),
-    "critical-angle": topic("optics", ["介質折射率 n₁", 1.1, 2.4, 1.5, ""], ["入射角 θ", 0, 90, 48, "°"], "臨界角", (a) => Math.asin(1 / a) * 180 / Math.PI),
-    "refraction-slab": topic("optics", ["玻璃厚度", 1, 30, 12, "mm"], ["入射角 θ", 0, 75, 42, "°"], "側向位移", (a, b) => { const th = b * Math.PI / 180, r = Math.asin(Math.sin(th) / 1.5); return a * Math.sin(th - r) / Math.cos(r); }),
-    "optical-instruments": topic("optics", ["物鏡焦距 fₒ", 100, 1600, 800, "mm"], ["目鏡焦距 fₑ", 5, 80, 25, "mm"], "角放大率", (a, b) => a / b),
-    "kirchhoff": topic("circuit", ["電源電壓 V", 1, 24, 12, "V"], ["支路電阻 R", 1, 100, 24, "Ω"], "支路電流", (a, b) => a / b),
-    "meter-loading": topic("circuit", ["待測電阻 R", 10, 10000, 1200, "Ω"], ["電壓表內阻", 1000, 100000, 10000, "Ω"], "並聯量測誤差", (a, b) => 100 * a / (a + b)),
-    "electrostatic-shield": topic("field", ["外加場強 E", 1, 100, 45, "V/m"], ["屏蔽厚度", 1, 12, 5, "mm"], "殼內場強", () => 0),
+    "air-column-resonance": topic("wave", ["空氣柱長度 L", 5, 120, 19.5, "cm"], ["音叉頻率 f", 100, 800, 440, "Hz"], "基頻聲速", (a, b) => 4 * a / 100 * b, "m/s"),
+    "critical-angle": topic("optics", ["介質折射率 n₁", 1.1, 2.4, 1.5, ""], ["入射角 θ", 0, 90, 48, "°"], "臨界角", (a) => Math.asin(1 / a) * 180 / Math.PI, "°"),
+    "refraction-slab": topic("optics", ["玻璃厚度", 1, 30, 12, "mm"], ["入射角 θ", 0, 75, 42, "°"], "側向位移", (a, b) => { const th = b * Math.PI / 180, r = Math.asin(Math.sin(th) / 1.5); return a * Math.sin(th - r) / Math.cos(r); }, "mm"),
+    "optical-instruments": topic("optics", ["物鏡焦距 fₒ", 100, 1600, 800, "mm"], ["目鏡焦距 fₑ", 5, 80, 25, "mm"], "角放大率", (a, b) => a / b, "×"),
+    "kirchhoff": topic("circuit", ["電源電壓 V", 1, 24, 12, "V"], ["支路電阻 R", 1, 100, 24, "Ω"], "支路電流", (a, b) => a / b, "A"),
+    "meter-loading": topic("circuit", ["待測電阻 R", 10, 10000, 1200, "Ω"], ["電壓表內阻", 1000, 100000, 10000, "Ω"], "並聯量測誤差", (a, b) => 100 * a / (a + b), "%"),
+    "electrostatic-shield": topic("field", ["外加場強 E", 1, 100, 45, "V/m"], ["屏蔽厚度", 1, 12, 5, "mm"], "殼內場強", () => 0, "V/m"),
     "ampere-force": topic("magnetic", ["電流 I", 0.1, 10, 3, "A"], ["夾角 θ", 0, 180, 90, "°"], "相對安培力", (a, b) => a * Math.sin(b * Math.PI / 180)),
     "motional-emf": topic("magnetic", ["導體速度 v", 0.1, 12, 4, "m/s"], ["磁場 B", 0.05, 2, 0.8, "T"], "相對感應電壓", (a, b) => a * b),
     "coil-torque": topic("magnetic", ["線圈電流 I", 0.1, 8, 3, "A"], ["轉角 θ", 0, 180, 70, "°"], "相對力矩", (a, b) => a * Math.sin(b * Math.PI / 180)),
-    "blackbody": topic("cosmos", ["表面溫度 T", 2000, 14000, 5800, "K"], ["半徑比例", 0.2, 8, 1, "R☉"], "峰值波長", (a) => 2898000 / a)
+    "blackbody": topic("cosmos", ["表面溫度 T", 2000, 14000, 5800, "K"], ["半徑比例", 0.2, 8, 1, "R☉"], "峰值波長", (a) => 2898000 / a, "nm")
   };
 
   function fillPill(ctx, x, y, label, value, w, tint) {
@@ -220,7 +220,6 @@
     const xS = W * 0.34, xP = W * 0.72;
     [xS, xP].forEach(x => { AP.standRod(ctx, x - 80 * s, benchY, topY - 28 * s); AP.crossArm(ctx, x - 80 * s, topY - 16 * s, x); });
     const pale = PL.theme.pale(0.7);
-    // 串聯
     const e1 = F / k1 * pxPerM * wob, e2 = F / k2 * pxPerM * wob;
     let y = topY - 8 * s;
     D.spring(ctx, xS, y, xS, y + L0 + e1, 9, R1, col1); y += L0 + e1;
@@ -239,7 +238,6 @@
     D.text(ctx, "x = " + PL.fmt((e1 + e2) / wob / pxPerM * 100, 1) + " cm", xS + 56 * s, y - 4 * s, { color: c, size: 11, weight: "700" });
     D.text(ctx, "k₁", xS - R1 - 14 * s, topY + (L0 + e1) / 2, { color: col1, size: 11, weight: "700" });
     D.text(ctx, "k₂", xS - R2 - 14 * s, topY + L0 + e1 + (L0 + e2) / 2, { color: col2, size: 11, weight: "700" });
-    // 並聯
     const eP = F / (k1 + k2) * pxPerM * wob;
     AP.steel(ctx, xP - 28 * s, topY - 6 * s, 56 * s, 6 * s, 8);
     D.spring(ctx, xP - 16 * s, topY, xP - 16 * s, topY + L0 + eP, 9, R1, col1);
@@ -316,7 +314,6 @@
     const side = m => (16 + 30 * Math.sqrt(m / 10)) * s;
     AP.massBlock(ctx, x0, plankY, side(m1), side(m1), { color: "#d0643a", label: PL.fmt(m1, 1) + "kg" });
     AP.massBlock(ctx, x0 + Lp, plankY, side(m2), side(m2), { color: "#3f7fcf", label: PL.fmt(m2, 1) + "kg" });
-    // 質心記號
     const xcp = x0 + xc / 10 * Lp, r = 7 * s, my = plankY + plankH / 2;
     [0, 1, 2, 3].forEach(q => { ctx.fillStyle = q % 2 ? "#1d232c" : "#f4f4f0"; ctx.beginPath(); ctx.moveTo(xcp, my); ctx.arc(xcp, my, r, q * Math.PI / 2, (q + 1) * Math.PI / 2); ctx.closePath(); ctx.fill(); });
     ctx.strokeStyle = "#1d232c"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(xcp, my, r, 0, PL.TAU); ctx.stroke();
@@ -392,7 +389,6 @@
       D.text(ctx, "面積 = 衝量 J = " + PL.fmt(J, 0) + " N·s", (gx0 + gx1) / 2 + 20 * s, gy0 + 4 * s, { color: "rgb(130,226,255)", size: 10.5, align: "center", weight: "700" });
       if (Fpk > F0) D.text(ctx, "↑ 峰值 " + PL.fmt(Fpk, 0) + " N", X(dt / 2) + 8, gy0 + 20 * s, { color: "rgb(255,150,120)", size: 10, weight: "700" });
     }
-    // 軌道、感測器與小車
     const xT0 = 20 * s + lw + 34 * s, xT1 = W - 18 * s, railY = benchY - 9 * s;
     AP.steel(ctx, xT0, railY, xT1 - xT0, 7 * s, 2);
     const senW = 34 * s, senH = 44 * s, senX = xT1 - senW - 4 * s;
@@ -427,7 +423,6 @@
     const baseY = gy - 16 * s, rocketBase = baseY - alt * 0.04 * s;
     const shift = Math.max(0, H * 0.42 - (rocketBase - hr * 0.5));
     AP.outdoor(ctx, W, H, gy + shift, { t, hills: true, sunX: W * 0.84 });
-    // 發射塔與發射台
     const tx = padX - wr - 34 * s, tTop = gy + shift - hr * 1.12;
     if (tTop < H) {
       AP.steel(ctx, tx - 7 * s, tTop, 14 * s, gy + shift - tTop, -8);
@@ -437,7 +432,6 @@
       ctx.fillStyle = isL() ? "#9a9ea6" : "#3a3e46"; ctx.fillRect(padX - 70 * s, gy + shift - 14 * s, 140 * s, 14 * s);
     }
     if (on && alt * 0.04 * s < 120 * s) AP.smokePuff(ctx, padX, gy + shift - 10 * s, ((tau - t0) % 1.4), { scale: 1.8 * s, dir: Math.PI / 2, seed: 9, life: 1.4 });
-    // 火箭
     const ry = rocketBase + shift, bodyTop = ry - hr * 0.8;
     if (on) {
       const fl = (26 + 84 * fr(ve, k.cfg.a)) * s * (0.9 + 0.1 * Math.sin(t * 40));
@@ -1683,7 +1677,7 @@
       let anim;
       /* 播放／暫停由傳輸列提供 */
       PL.ui.button(row, "重設", () => { sa.set(cfg.a[3]); sb.set(cfg.b[3]); once.reset(); render(); });
-      const r = PL.ui.readout(L.readouts, { label: cfg.output });
+      const r = PL.ui.readout(L.readouts, { label: cfg.output, unit: cfg.unit });
       const r2 = PL.ui.readout(L.readouts, { label: cfg.b[0], unit: cfg.b[4] });
       const chart = PL.ui.chart(PL.ui.charts(root), { title: cfg.output + "關係圖", cap: "曲線以目前第二個條件為固定值；滑動任一參數可比較趨勢與當前量測點。" });
       let time = 0;

@@ -26,7 +26,7 @@
     PL.ui.chipGroup(L.controls, { value: 2.3, options: [{ value: 2.3, label: "鈉 2.3" }, { value: 2.9, label: "鈣 2.9" }, { value: 4.3, label: "鎢 4.3" }], onChange: v => { Wf = v; electrons = []; } });
     PL.ui.note(L.controls, "頻率須高於底限頻率 f₀ 才有光電子；增加光強只增加電子數、不改變 Kmax。");
     const rK = PL.ui.readout(L.readouts, { label: "最大動能 Kmax", unit: "eV" });
-    const rF0 = PL.ui.readout(L.readouts, { label: "底限頻率 f₀", unit: "×10¹⁴" });
+    const rF0 = PL.ui.readout(L.readouts, { label: "底限頻率 f₀", unit: "×10¹⁴ Hz" });
     const rVs = PL.ui.readout(L.readouts, { label: "遏止電壓 Vₛ", unit: "V" });
     const rW = PL.ui.readout(L.readouts, { label: "逸出功 W", unit: "eV" });
     const charts = PL.el("div", "sim-charts", root);

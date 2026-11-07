@@ -154,4 +154,32 @@ R.section("軌道力學能守恆：無摩擦時總能量不變");
   s.stop();
 }
 
+R.section("庫侖定律：讀數是真的牛頓，F = kq₁q₂/r²");
+{
+  const s = open("coulomb");
+  [[3, -2, 5], [5, 5, 2], [1, -1, 10]].forEach(([q1, q2, r]) => {
+    s.set("電荷 q₁", q1); s.set("電荷 q₂", q2); s.set("距離 r", r);
+    const want = 9e9 * Math.abs(q1 * q2) * 1e-12 / Math.pow(r / 100, 2);
+    R.ok(close(s.get("靜電力 F"), want), "q₁=" + q1 + " μC、q₂=" + q2 + " μC、r=" + r + " cm",
+      "得 " + PL.fmt(s.get("靜電力 F"), 3) + " N，理論 " + PL.fmt(want, 3) + " N");
+  });
+  const rf = s.ctx.readouts.find(r => r.label === "靜電力 F");
+  R.ok(rf && rf.unit === "N", "單位是 N（以前是「（相對）」，數字其實是牛頓的十分之一）", rf && rf.unit);
+  s.stop();
+}
+
+R.section("模板量測台：輸出讀數都有單位");
+{
+  const ids = ["apparent-weight", "spring-series-parallel", "center-of-mass", "force-time-profile", "rocket-equation",
+    "work-angle", "power-lab", "friction-thermal", "banked-curve", "damped-oscillation", "coupled-oscillators",
+    "hydrostatic-pressure", "phase-change", "air-column-resonance", "critical-angle", "refraction-slab",
+    "optical-instruments", "kirchhoff", "meter-loading", "electrostatic-shield", "blackbody"];
+  const missing = ids.filter(id => { const s = open(id); const u = s.ctx.readouts[0] && s.ctx.readouts[0].unit; s.stop(); return !u; });
+  R.ok(!missing.length, ids.length + " 個模板實驗的輸出都有單位", missing.join("、"));
+  const a = open("air-column-resonance");
+  R.ok(close(a.get("基頻聲速"), 343, 0.01), "空氣柱共鳴的預設值就在共鳴點（440 Hz、19.5 cm → 約 343 m/s）",
+    "得 " + PL.fmt(a.get("基頻聲速"), 1) + " m/s");
+  a.stop();
+}
+
 R.done();

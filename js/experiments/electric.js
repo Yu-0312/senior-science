@@ -25,7 +25,11 @@
     const sQ2 = PL.ui.slider(L.controls, { label: "電荷 q₂", min: -5, max: 5, step: 0.5, value: -2, unit: "μC", digits: 1, onInput: () => draw() });
     const sR = PL.ui.slider(L.controls, { label: "距離 r", min: 2, max: 10, step: 0.5, value: 5, unit: "cm", digits: 1, onInput: () => draw() });
     PL.ui.note(L.controls, "可直接抓住 q₂ 的絕緣架左右移動改變 r。播放時，電力線上的小亮點是放在油裡的「試探正電荷」：受力沿電場方向漂移，場越強漂得越快——靠近球面最快、離遠了幾乎停住。");
-    const rF = PL.ui.readout(L.readouts, { label: "靜電力 F", unit: "（相對）" });
+    /*
+     * 靜電力用真的牛頓顯示：電荷以 μC、距離以 cm 計，F = kq₁q₂/r² = 9×10⁹ × 10⁻¹² / 10⁻⁴ × q₁q₂/r² = 90 q₁q₂/r² N。
+     * 以前顯示「2.16（相對）」，其實就是 21.6 N 除以 10，學生拿課本公式驗算永遠對不上。
+     */
+    const rF = PL.ui.readout(L.readouts, { label: "靜電力 F", unit: "N" });
     const rDir = PL.ui.readout(L.readouts, { label: "方向" });
     // 把手抓 q₂ 的絕緣架：水平位置直接換算成桌前公分尺上的 r
     let geo = { ox: 90, sc: 1 };
@@ -131,11 +135,11 @@
       D.text(ctx, (attract ? "異性相吸" : q1 * q2 > 0 ? "同性相斥" : "有一顆不帶電：沒有靜電力") + "　r = " + r + " cm", W - 16, 20, { color: PL.col("text"), size: 11.5, align: "right", weight: "700" });
       // 下方：靜電力大小對距離（平方反比）
       const bx = 44, by = sh + 22, bw = W - 80, bh = H - by - 18;
-      const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 2, x1: 10, y0: 0, y1: 9 * Math.abs(q1 * q2) / 4 * 1.1 + 1 });
-      g.frame({ title: "靜電力大小對距離（平方反比）", xlabel: "r (cm)", ylabel: "|F|" }); g.grid(4, 4);
-      g.fn(rr => 9 * Math.abs(q1 * q2) / (rr * rr), { color: MC(), width: 2.2 });
-      g.dot(r, Math.abs(F), { color: PL.col("warn"), glow: PL.col("warn") });
-      rF.set(Math.abs(F), 2); rDir.set(attract ? "相吸" : q1 * q2 > 0 ? "相斥" : "無");
+      const g = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 2, x1: 10, y0: 0, y1: 90 * Math.abs(q1 * q2) / 4 * 1.1 + 10 });
+      g.frame({ title: "靜電力大小對距離（平方反比）", xlabel: "r (cm)", ylabel: "|F| (N)" }); g.grid(4, 4);
+      g.fn(rr => 90 * Math.abs(q1 * q2) / (rr * rr), { color: MC(), width: 2.2 });
+      g.dot(r, 10 * Math.abs(F), { color: PL.col("warn"), glow: PL.col("warn") });
+      rF.set(10 * Math.abs(F), 2); rDir.set(attract ? "相吸" : q1 * q2 > 0 ? "相斥" : "無");
     }
     cv.onResize(() => draw()); draw();
     return { stop() { clock.stop(); cv.destroy(); }, rerender: () => draw() };

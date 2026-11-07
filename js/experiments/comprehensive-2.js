@@ -28,7 +28,16 @@
     "compass-field": lab("compass", ["外加磁場", 0, 120, 48, "μT", 1, 0], ["外場方向", -90, 90, 28, "°", 1, 0], "磁針偏角", "°", (field, angle) => Math.atan2(field * Math.sin(rad(angle)), 48 + field * Math.cos(rad(angle))) * 180 / Math.PI, (field, angle, deflect) => "地磁場與外場疊加，磁針偏轉 " + PL.fmt(deflect, 1) + "°", (x, angle) => Math.atan2(x * Math.sin(rad(angle)), 48 + x * Math.cos(rad(angle))) * 180 / Math.PI),
     "electromagnet": lab("electromagnet", ["線圈匝數 N", 10, 800, 240, "匝", 1, 0], ["電流 I", 0.1, 5, 1.7, "A", 0.1, 1], "相對磁場", "mT", (turns, current) => turns * current * 0.03, (turns, current, field) => "鐵芯可集中磁場；相對強度 " + PL.fmt(field, 1) + " mT", (x, current) => x * current * 0.03),
     "dc-motor": lab("motor", ["線圈電流 I", 0.1, 8, 2.6, "A", 0.1, 1], ["負載力矩", 0, 4, 1.2, "N·m", 0.1, 1], "相對轉速", "rpm", (current, load) => Math.max(0, 520 * current - 260 * load), (current, load, speed) => speed > 0 ? "換向器維持力矩方向；轉速 " + PL.fmt(speed, 0) + " rpm" : "負載超過馬達可提供的力矩", (x, load) => Math.max(0, 520 * x - 260 * load)),
-    "cathode-ray-em": lab("cathode", ["加速電壓 V", 20, 450, 180, "V", 1, 0], ["磁場 B", 0.2, 5, 1.4, "mT", 0.1, 1], "估測 e/m", "×10¹¹ C/kg", (voltage, field) => 2 * voltage / Math.pow(field * 1e-3, 2) / Math.pow(0.075, 2) / 1e11, (voltage, field, ratio) => "電子軌跡半徑固定 7.5 cm；e/m 約 " + PL.fmt(ratio, 2) + " ×10¹¹", (x, field) => 2 * x / Math.pow(field * 1e-3, 2) / Math.pow(0.075, 2) / 1e11),
+    "cathode-ray-em": lab("cathode", ["加速電壓 V", 20, 450, 180, "V", 1, 0], ["磁場 B", 0.2, 5, 1.4, "mT", 0.1, 1], "估測 e/m", "×10¹¹ C/kg", (voltage, field) => 2 * voltage / Math.pow(field * 1e-3, 2) / Math.pow(0.075, 2) / 1e11, (voltage, field, ratio) => {
+      /*
+       * 以前寫「電子軌跡半徑固定 7.5 cm」——那是參考環，不是電子束。電子束半徑 r = √(2V·m/e)/B 會隨 V、B 改變，
+       * 只有光圈疊上 7.5 cm 環時，用 r = 7.5 cm 代入才算得出正確的 e/m；沒疊上時算出來的數字沒有意義。
+       */
+      const beam = 0.337 * Math.sqrt(voltage) / field;
+      return Math.abs(beam - 7.5) < 0.4
+        ? "光圈疊上 7.5 cm 參考環：e/m ≈ " + PL.fmt(ratio, 2) + " ×10¹¹ C/kg（公認值 1.76）"
+        : "電子束半徑 " + PL.fmt(beam, 1) + " cm，還沒疊上 7.5 cm 參考環；先調 V 或 B，算出的 e/m 才有意義";
+    }, (x, field) => 2 * x / Math.pow(field * 1e-3, 2) / Math.pow(0.075, 2) / 1e11),
     "spectroscopy": lab("spectrum", ["能階差 ΔE", 1.2, 5.4, 2.4, "eV", 0.01, 2], ["譜線強度", 0.1, 1, 0.68, "", 0.01, 2], "發射波長", "nm", (energy) => 1240 / energy, (energy, intensity, wavelength) => "能階躍遷發出 " + PL.fmt(wavelength, 0) + " nm 譜線", (x) => 1240 / x),
     "solar-cell": lab("solar", ["照度", 100, 1200, 780, "W/m²", 10, 0], ["面板面積", 0.05, 20, 1.8, "m²", 0.05, 2], "電力輸出", "W", (irradiance, area) => irradiance * area * 0.21, (irradiance, area, power) => "光伏效率取 21%；輸出 " + PL.fmt(power, 1) + " W", (x, area) => x * area * 0.21)
   };
