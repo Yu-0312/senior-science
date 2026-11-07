@@ -4,6 +4,8 @@
  */
 (function () {
   "use strict";
+  /* 讀數的朗讀文字：單位只接在數字後面（「不適用」「至少 2 筆」後面不掛單位），與畫面上的讀數一致 */
+  const valueText = r => (r.value || "—") + (r.unit && /^[-−+≈~<>≤≥]?\s?\.?\d/.test(String(r.value)) ? " " + r.unit : "");
   const PL = window.PhysicsLab;
   if (!PL || !PL._hooks) return;
 
@@ -12,7 +14,7 @@
   function readoutSentence(readouts) {
     const parts = readouts
       .filter(r => r.value && r.value !== "—")
-      .map(r => r.label + " " + r.value + (r.unit ? " " + r.unit : ""));
+      .map(r => r.label + " " + valueText(r));
     return parts.length ? parts.join("，") : "尚無讀數";
   }
 
@@ -208,7 +210,7 @@
         const row = el("div", "sim-a11y-row is-readout", list);
         const dt = el("dt", null, row); dt.textContent = r.label;
         const dd = el("dd", null, row);
-        dd.textContent = (r.value || "—") + (r.unit ? " " + r.unit : "");
+        dd.textContent = valueText(r);
       });
     }
     paintList();
