@@ -20,7 +20,13 @@
 
   const state = { items: [], wires: [], seq: 1 };
   const view = { s: 2.5, ox: 0, oy: 0 };
-  const ui = { sel: null, selWire: null, hover: null, detail: true, grid: true, cat: "mech", drag: null, pointers: new Map(), pinch: null };
+  /*
+   * place：「點一下拿起、再點一下放下」的端點或導線（不必一直按住滑鼠拖，手不穩也畫得直）
+   * draw：從器材盒點了細繩、彈簧之類，正在一個節點一個節點地畫
+   * snap：目前這一步吸附到哪裡（畫參考線與角度標籤用）；selEnd：方向鍵要微調的端點
+   */
+  const ui = { sel: null, selWire: null, hover: null, detail: true, grid: true, cat: "mech", drag: null, pointers: new Map(), pinch: null,
+    place: null, draw: null, snap: null, selEnd: null, pointer: null };
   const sim = { status: "edit", t: 0, speed: 1, world: null, map: new Map(), snapshot: null, acc: 0, dirty: true, sampleAcc: 0 };
   const undoStack = [], redoStack = [];
   const wirePhase = new Map();
@@ -74,6 +80,7 @@
     const ids = new Set(items.map(it => it.id));
     items.forEach(it => (it.ends || []).forEach(e => { if (e.at && !ids.has(e.at.id)) e.at = null; }));
     const termOk = k => typeof k === "string" && ids.has(k.split(":")[0]);
+    ui.place = null; ui.draw = null; ui.snap = null; ui.selEnd = null;
     state.items = items;
     state.wires = (Array.isArray(o.wires) ? o.wires : []).filter(w => w && termOk(w.a) && termOk(w.b) && w.a !== w.b)
       .map((w, i) => ({ id: typeof w.id === "string" ? w.id : "w" + i, a: w.a, b: w.b }));
@@ -533,6 +540,42 @@
     });
   }
 
+  /* 吸附參考線、目標圈與角度標籤：拖曳、拿起端點、畫線、搬器材時都看得到 */
+  function drawSnapGuides() {
+    const sn = ui.snap, accent = isLight() ? "#0f766e" : "#35e0cf";
+    // 接線：起點到游標的橡皮筋
+    if (ui.place && ui.place.kind === "wire" && ui.pointer) {
+      const a = termPos(ui.place.from);
+      if (a) { ctx.save(); ctx.strokeStyle = accent; ctx.lineWidth = 2.5; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(X(a.x), Y(a.y)); ctx.lineTo(ui.pointer.sx, ui.pointer.sy); ctx.stroke(); ctx.restore(); }
+    }
+    if (!sn) return;
+    ctx.save();
+    ctx.strokeStyle = accent; ctx.lineWidth = 1.2; ctx.setLineDash([5, 5]); ctx.globalAlpha = 0.85;
+    (sn.guides || []).forEach(g => {
+      if (g.axis === "y") { ctx.beginPath(); ctx.moveTo(0, Y(g.y1) + 0.5); ctx.lineTo(W, Y(g.y1) + 0.5); ctx.stroke(); }
+      else if (g.axis === "x") { ctx.beginPath(); ctx.moveTo(X(g.x1) + 0.5, 0); ctx.lineTo(X(g.x1) + 0.5, Y(WORLD.floor)); ctx.stroke(); }
+      else { ctx.beginPath(); ctx.moveTo(X(g.x1), Y(g.y1)); ctx.lineTo(X(g.x2), Y(g.y2)); ctx.stroke(); }
+    });
+    ctx.restore();
+    if (!sn.it) return;
+    const it = sn.it, i = sn.i, p = endPos(it, i), ref = endRefPoint(it, i);
+    // 會接到的目標：綠圈
+    if (sn.target) {
+      const t = byId(sn.target.id);
+      if (t) { const q = U.local(t, sn.target.lx, sn.target.ly); ctx.save(); ctx.strokeStyle = "#1f9d6b"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(X(q.x), Y(q.y), 10, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
+    }
+    // 拿起中的端點：外圈脈動
+    ctx.save(); ctx.strokeStyle = accent; ctx.lineWidth = 2; ctx.globalAlpha = 0.5 + 0.3 * Math.sin(performance.now() / 160);
+    ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), 11, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    if (ref) {
+      // 接上目標時，最後的位置可能被吸到物體中心：標籤用最後的位置算
+      let q = { x: p.x, y: p.y };
+      if (sn.target) { const t = byId(sn.target.id); if (t) q = U.local(t, sn.target.lx, sn.target.ly); }
+      const ang = Math.atan2(-(q.y - ref.y), q.x - ref.x) / DEG, L = Math.hypot(q.x - ref.x, q.y - ref.y);
+      const exact = sn.kind === "angle" && Math.abs(((ang - sn.angle) % 360 + 540) % 360 - 180) < 0.05;
+      U.chip(ctx, angleText(ang) + " · " + U.fmt(L, 1) + " cm" + (exact ? " ✓" : ""), X(q.x) + 18, Y(q.y) - 18, { size: 11 });
+    }
+  }
   function render() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     drawBackground();
@@ -550,12 +593,7 @@
     if (raysDrawn !== "r") drawRays();
     drawEndHandles();
     const sel = byId(ui.sel); if (sel) drawSelection(sel);
-    // 拖曳中的吸附提示
-    const d = ui.drag;
-    if (d && d.mode === "end" && d.target) {
-      const t = byId(d.target.id);
-      if (t) { ctx.save(); ctx.strokeStyle = "#1f9d6b"; ctx.lineWidth = 2.5; const p = U.local(t, d.target.lx, d.target.ly); ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), 10, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
-    }
+    drawSnapGuides();
   }
 
   /* ============================== 點選 ============================== */
@@ -611,8 +649,41 @@
     }
     return null;
   }
+  /* ---------- 擺放吸附：角度、對齊、格點（計算在 LAB.snapPoint） ---------- */
+  // 對齊用的參考點：器材中心、連接件端點；正在動的那一個自己不算
+  function alignPoints(skipId) {
+    const pts = [];
+    state.items.forEach(it => {
+      if (it.id === skipId) return;
+      const d = T[it.type];
+      if (d.card) return;
+      if (!d.connector || d.size) pts.push({ x: it.x, y: it.y });
+      if (it.ends) endsOf(it).forEach(p => pts.push({ x: p.x, y: p.y }));
+    });
+    return pts;
+  }
+  // 端點 i 的基準點：角度吸附量的是「從基準點看過去」的方向
+  function endRefPoint(it, i) {
+    if (it.type === "pulley") return { x: it.x + (i ? 1 : -1) * it.p.r, y: it.y };   // 繩從輪緣垂下
+    if (it.type === "protractor") return { x: it.x, y: it.y };
+    if (it.ends && it.ends.length === 2) return endPos(it, 1 - i);
+    return null;
+  }
+  function snapEnd(it, i, wx, wy, free) {
+    return LAB.snapPoint({ x: wx, y: wy }, { ref: endRefPoint(it, i), points: alignPoints(it.id), scale: view.s, grid: ui.grid ? SNAP : 0, free });
+  }
+  // 把端點放到 (wx, wy)，順便找可以接上的目標；拖曳、點一下放下、方向鍵都走這裡
+  function moveEndTo(it, i, wx, wy, free) {
+    const sn = snapEnd(it, i, wx, wy, free), e0 = it.ends[i];
+    e0.at = null; e0.x = sn.x; e0.y = sn.y;
+    // 已經吸到某個角度時，接上物體就接在這一點，不要再吸到中心——否則剛對好的水平又歪掉
+    const target = attachTarget(it, i, sn.x, sn.y, X(sn.x), Y(sn.y), sn.kind === "angle");
+    ui.snap = Object.assign(sn, { it, i, target });
+    sim.dirty = true;
+    return target;
+  }
   // 端點放開時可以接上的目標：可動物體（任意位置）、吊鉤、固定器材
-  function attachTarget(it, i, wx, wy, sx, sy) {
+  function attachTarget(it, i, wx, wy, sx, sy, exact) {
     const d = T[it.type];
     if (d.freeEnds) return null;
     const onlyDynamic = it.type === "force" || it.type === "sensor";
@@ -631,7 +702,7 @@
       const l = U.toLocal(t, wx, wy);
       // 接在物體中心附近就吸到中心：力和繩通過質心，不會莫名其妙地轉
       const s = td.size ? td.size(t) : { w: 10, h: 10 };
-      const centered = Math.hypot(l.x, l.y) < Math.min(s.w, s.h) * 0.3 || it.type === "sensor";
+      const centered = it.type === "sensor" || (!exact && Math.hypot(l.x, l.y) < Math.min(s.w, s.h) * 0.3);
       return { id: t.id, lx: centered ? 0 : l.x, ly: centered ? 0 : l.y };
     }
     return null;
@@ -709,8 +780,25 @@
     }
     canvas.setPointerCapture(e.pointerId);
     closeMenus();
-    const hit = pick(sx, sy);
     const base = { sx0: sx, sy0: sy, sx, sy, moved: false, before: serialize() };
+    // 畫線模式：這一下是一個節點（起點）
+    if (ui.draw && e.button === 0) { drawStart(sx, sy, e.shiftKey); return; }
+    // 已經拿起一個端點：這一下就是放下的位置（按住拖也可以，放開時才定案，觸控好用）
+    if (ui.place && ui.place.kind === "end" && e.button === 0) {
+      const P = ui.place;
+      ui.drag = Object.assign(base, { mode: "end", it: P.it, i: P.i, before: P.before, moved: true, fromPlace: true });
+      ui.drag.target = moveEndTo(P.it, P.i, WX(sx), WY(sy), e.shiftKey);
+      return;
+    }
+    if (ui.place && ui.place.kind === "wire" && e.button === 0) {
+      const t = termAt(sx, sy), from = ui.place.from;
+      ui.place = null;
+      if (t && t.key !== from) connectWire(from, t.key, base.before);
+      else status("已取消接線。");
+      return;
+    }
+    const hit = pick(sx, sy);
+    ui.selEnd = null;
     if (e.button === 1 || !hit) {
       if (!hit && e.button !== 1) setSel(null);
       ui.drag = Object.assign(base, { mode: "pan", ox: view.ox, oy: view.oy });
@@ -723,7 +811,7 @@
       setSel(hit.it.id); return;
     }
     if (hit.kind === "rotate") { ui.drag = Object.assign(base, { mode: "rotate", it: hit.it }); return; }
-    if (hit.kind === "end") { setSel(hit.it.id); ui.drag = Object.assign(base, { mode: "end", it: hit.it, i: hit.i }); return; }
+    if (hit.kind === "end") { setSel(hit.it.id); ui.selEnd = { id: hit.it.id, i: hit.i }; ui.drag = Object.assign(base, { mode: "end", it: hit.it, i: hit.i }); return; }
     if (hit.kind === "term") { setSel(hit.t.it.id); ui.drag = Object.assign(base, { mode: "wire", from: hit.t.key }); return; }
     if (hit.kind === "wire") { setSel(null, hit.w.id); ui.drag = null; return; }
     const it = hit.it; setSel(it.id);
@@ -748,8 +836,13 @@
       view.ox = wx - mx / view.s; view.oy = wy - my / view.s;
       return;
     }
+    ui.pointer = { sx, sy };
     const d = ui.drag;
-    if (!d) { hover(sx, sy); return; }
+    if (!d) {
+      if (ui.place && ui.place.kind === "end") { ui.place.target = moveEndTo(ui.place.it, ui.place.i, WX(sx), WY(sy), e.shiftKey); canvas.style.cursor = "crosshair"; return; }
+      if (ui.place || ui.draw) { canvas.style.cursor = "crosshair"; ui.snap = ui.draw ? LAB.snapPoint({ x: WX(sx), y: WY(sy) }, { points: alignPoints(null), scale: view.s, grid: ui.grid ? SNAP : 0, free: e.shiftKey }) : null; return; }
+      hover(sx, sy); return;
+    }
     d.sx = sx; d.sy = sy;
     if (!d.moved && Math.hypot(sx - d.sx0, sy - d.sy0) > 4) d.moved = true;
     if (!d.moved) return;
@@ -762,14 +855,12 @@
       if (step) a = Math.round(a / step) * step;
       it.a = a * DEG; normAngle(it); sim.dirty = true; inspectorKey = ""; return;
     }
-    if (d.mode === "end") {
-      const e0 = d.it.ends[d.i];
-      e0.at = null; e0.x = snapV(wx); e0.y = snapV(wy);
-      d.target = attachTarget(d.it, d.i, wx, wy, sx, sy);
-      sim.dirty = true; return;
-    }
+    if (d.mode === "end") { d.target = moveEndTo(d.it, d.i, wx, wy, e.shiftKey); return; }
     if (d.mode === "move") {
-      const it = d.it, nx = snapV(wx - d.dx), ny = snapV(wy - d.dy);
+      // 器材中心對齊其他器材的中心與端點（例如把吊鉤拉到和木塊中心同高，繩子才會水平）
+      const sn = LAB.snapPoint({ x: wx - d.dx, y: wy - d.dy }, { points: alignPoints(d.it.id), scale: view.s, grid: ui.grid ? SNAP : 0, free: e.shiftKey });
+      ui.snap = sn.kind ? sn : null;
+      const it = d.it, nx = sn.x, ny = sn.y;
       const ddx = nx - d.x0, ddy = ny - d.y0;
       it.x = nx; it.y = ny;
       if (it.ends && d.ends0) {
@@ -787,6 +878,7 @@
     ui.pointers.delete(e.pointerId);
     if (ui.pinch) { if (ui.pointers.size < 2) ui.pinch = null; return; }
     const d = ui.drag; ui.drag = null;
+    if (d && d.mode !== "end" && d.mode !== "wire") ui.snap = null;
     if (!d) return;
     const r = canvas.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top;
     if (d.mode === "grab") { if (sim.world) sim.world.grab = null; return; }
@@ -796,11 +888,22 @@
         const dup = state.wires.some(w => (w.a === d.from && w.b === t.key) || (w.b === d.from && w.a === t.key));
         if (!dup) { pushUndo(d.before); state.wires.push({ id: "w" + state.seq++, a: d.from, b: t.key }); changed(); status("已接上導線。點導線可選取、按 Delete 刪除。"); }
       } else if (d.moved) status("導線要從一個接線柱拖到另一個接線柱。");
+      else { ui.place = { kind: "wire", from: d.from }; status("已選起點：點另一個接線柱接上導線（Esc 取消）。"); }
+      return;
+    }
+    if (d.mode === "end" && !d.moved) {
+      if (d.fromPlace) return;   // 剛點下畫線的起點：繼續等下一下（終點）
+      // 點一下端點＝拿起來：之後跟著滑鼠走，再點一下放下。不用一直按住，手不穩也拉得直
+      const it = d.it;
+      ui.place = { kind: "end", it, i: d.i, before: d.before, orig: Object.assign({}, it.ends[d.i]) };
+      ui.place.target = moveEndTo(it, d.i, WX(sx), WY(sy), e.shiftKey);
+      status("已拿起端點：移到要放的位置再點一下。靠近水平、鉛直會自動吸附（按住 Shift 不吸附），Esc 或「取消擺放」可以取消。");
       return;
     }
     if (d.mode === "end" && d.moved) {
-      if (d.target) { d.it.ends[d.i].at = d.target; const t = byId(d.target.id); status("已接到「" + (t ? T[t.type].name : "") + "」"); }
-      pushUndo(d.before); changed(); return;
+      d.target = moveEndTo(d.it, d.i, WX(sx), WY(sy), e.shiftKey);
+      finishEnd(d.it, d.i, d.target, d.before);
+      return;
     }
     if (d.mode === "move" && !d.moved) {
       const it = d.it, dd = T[it.type];
@@ -810,6 +913,119 @@
     if ((d.mode === "move" || d.mode === "rotate") && d.moved) { pushUndo(d.before); changed(); }
   }
   function cancelDrag() { if (ui.drag && ui.drag.mode === "grab" && sim.world) sim.world.grab = null; ui.drag = null; }
+  // 端點定案：接上目標、記一筆復原、離開放置模式；之後方向鍵還能微調這個端點
+  function finishEnd(it, i, target, before) {
+    const P = ui.place;
+    ui.place = null; ui.snap = null;
+    if (target) it.ends[i].at = target;
+    if (P && P.drawing) {
+      const E = endsOf(it);
+      if (Math.hypot(E[1].x - E[0].x, E[1].y - E[0].y) < 2) { removeItem(it.id); setSel(null); ui.selEnd = null; changed(); status("太短了，已取消。"); return; }
+    }
+    ui.selEnd = { id: it.id, i };
+    pushUndo(before); changed();
+    const E = endsOf(it), ref = endRefPoint(it, i);
+    let msg = target ? "已接到「" + (byId(target.id) ? T[byId(target.id).type].name : "") + "」。" : "已放下。";
+    if (ref) msg += "角度 " + angleText(Math.atan2(-(E[i].y - ref.y), E[i].x - ref.x) / DEG) + "，方向鍵可以再微調（Alt 0.1 cm）。";
+    status(msg);
+  }
+  // 放置模式取消：端點回到拿起前的位置
+  function cancelPlace() {
+    const P = ui.place, D = ui.draw;
+    ui.place = null; ui.draw = null; ui.snap = null;
+    if (P && P.kind === "end") {
+      if (P.drawing) { removeItem(P.it.id); setSel(null); ui.selEnd = null; }
+      else Object.assign(P.it.ends[P.i], P.orig);
+      sim.dirty = true; status("已取消。"); return true;
+    }
+    if (P || D) { status("已取消。"); return true; }
+    return false;
+  }
+  function connectWire(a, b, before) {
+    const dup = state.wires.some(w => (w.a === a && w.b === b) || (w.b === a && w.a === b));
+    if (dup) { status("這兩個接線柱已經接過了。"); return; }
+    pushUndo(before); state.wires.push({ id: "w" + state.seq++, a, b }); changed(); status("已接上導線。點導線可選取、按 Delete 刪除。");
+  }
+  // 角度的說法：0° 叫水平、90° 叫鉛直，其餘直接給度數
+  function angleText(a) {
+    let d = ((a % 360) + 360) % 360; if (d > 180) d -= 360;
+    const r = Math.round(d * 10) / 10, abs = Math.abs(r);
+    if (abs < 0.05 || Math.abs(abs - 180) < 0.05) return "0°（水平）";
+    if (Math.abs(abs - 90) < 0.05) return "90°（鉛直）";
+    return r.toFixed(1) + "°";
+  }
+
+  function nudgeEnd(it, i, key, st) {
+    const dx = key === "ArrowLeft" ? -st : key === "ArrowRight" ? st : 0, dy = key === "ArrowUp" ? -st : key === "ArrowDown" ? st : 0;
+    const e0 = it.ends[i];
+    if (!ui.place) pushUndo();
+    if (e0.at) {
+      // 接在物體上：移動的是接點在物體上的位置（物體轉了也照著物體自己的座標走）
+      const t = byId(e0.at.id), a = t ? (t.a || 0) : 0, c = Math.cos(a), s = Math.sin(a);
+      e0.at.lx += dx * c + dy * s; e0.at.ly += -dx * s + dy * c;
+    } else { e0.x += dx; e0.y += dy; }
+    endPos(it, i);
+    if (!ui.place) changed(); else sim.dirty = true;
+    const ref = endRefPoint(it, i), p = endPos(it, i);
+    status("微調端點" + (ref ? "：角度 " + angleText(Math.atan2(-(p.y - ref.y), p.x - ref.x) / DEG) + "、長度 " + U.fmt(Math.hypot(p.x - ref.x, p.y - ref.y), 1) + " cm" : "") + "。");
+  }
+  /*
+   * 設定連接件的長度與方向（從端點 1 看端點 2，數學角度：右 0°、上 90°）。只移動一端：
+   * 優先移沒接東西的端點；兩端都接上了，就移接著的固定器材（吊鉤）；再不行才移接著的物體。
+   */
+  function setGeometry(it, angDeg, len) {
+    const E = endsOf(it);
+    if (E.length !== 2 || !(len > 0.5)) return false;
+    if (sim.status === "running") { status("模擬中不能移動；先暫停。"); return false; }
+    const u = { x: Math.cos(angDeg * DEG), y: -Math.sin(angDeg * DEG) };
+    const before = serialize();
+    let k = [1, 0].find(i => !it.ends[i].at);
+    if (k == null) k = [1, 0].find(i => { const t = byId(it.ends[i].at.id); return t && T[t.type].fixed; });
+    if (k == null) k = 1;
+    const target = k === 1 ? { x: E[0].x + u.x * len, y: E[0].y + u.y * len } : { x: E[1].x - u.x * len, y: E[1].y - u.y * len };
+    if (!it.ends[k].at) { it.ends[k].x = target.x; it.ends[k].y = target.y; }
+    else {
+      const t = byId(it.ends[k].at.id); if (!t) return false;
+      t.x += target.x - E[k].x; t.y += target.y - E[k].y;
+      if (t.rt) { t.rt.vx = 0; t.rt.vy = 0; t.rt.w = 0; }
+    }
+    pushUndo(before); changed();
+    return true;
+  }
+  function connectorGeom(it) {
+    const E = endsOf(it);
+    return { ang: Math.atan2(-(E[1].y - E[0].y), E[1].x - E[0].x) / DEG, len: Math.hypot(E[1].x - E[0].x, E[1].y - E[0].y) };
+  }
+  // 拉成水平／鉛直：保持長度、保持原本朝左或朝右（朝上或朝下）
+  function alignConnector(it, dir) {
+    const g = connectorGeom(it), E = endsOf(it);
+    const ang = dir === "h" ? (E[1].x >= E[0].x ? 0 : 180) : (E[1].y >= E[0].y ? -90 : 90);
+    if (setGeometry(it, ang, g.len)) status("已拉成" + (dir === "h" ? "水平（0°）" : "鉛直（90°）") + "，長度維持 " + U.fmt(g.len, 1) + " cm。");
+  }
+
+  /* ---------- 從器材盒「畫」連接件：點一下起點、點一下終點 ---------- */
+  const DRAWABLE = ["rope", "spring", "gauge", "ruler"];
+  function startDraw(type) {
+    cancelPlace();
+    ui.draw = { type };
+    setSel(null); ui.selEnd = null;
+    showStage(); canvas.focus({ preventScroll: true });
+    status("畫「" + T[type].name + "」：在實驗台上點一下放起點（點在吊鉤或物體上就會接住），再點一下放終點。Esc 或「取消擺放」可以取消。");
+  }
+  function drawStart(sx, sy, free) {
+    const type = ui.draw.type, before = serialize();
+    const sn = LAB.snapPoint({ x: WX(sx), y: WY(sy) }, { points: alignPoints(null), scale: view.s, grid: ui.grid ? SNAP : 0, free });
+    const it = addItem(type, sn.x, sn.y, { raw: true, silent: true });
+    it.ends.forEach(e => { e.x = sn.x; e.y = sn.y; e.at = null; });
+    const t0 = T[type].freeEnds ? null : attachTarget(it, 0, sn.x, sn.y, X(sn.x), Y(sn.y));
+    if (t0) it.ends[0].at = t0;
+    ui.draw = null; setSel(it.id);
+    ui.place = { kind: "end", it, i: 1, before, orig: Object.assign({}, it.ends[1]), drawing: true };
+    ui.place.target = moveEndTo(it, 1, WX(sx), WY(sy), free);
+    // 按著直接拖到終點放開也可以（一筆畫完）；只點一下就等下一下
+    ui.drag = { mode: "end", it, i: 1, before, moved: false, fromPlace: true, sx0: sx, sy0: sy, sx, sy };
+    status("起點" + (t0 ? "已接到「" + T[byId(t0.id).type].name + "」" : "已放下") + "：移到終點再點一下。靠近水平、鉛直會自動吸附（Shift 不吸附）。");
+  }
   function hover(sx, sy) {
     const h = pick(sx, sy);
     ui.hover = h ? { id: h.it && h.it.id, term: h.kind === "term" ? h.t.key : null } : null;
@@ -899,7 +1115,15 @@
     });
   }
   let centerBump = 0;
+  // 手機版器材盒在實驗台下方：點了器材之後把實驗台捲回畫面裡，才看得到放上去的東西
+  // （手機版頂列是 sticky，要捲到頂列下面，不然實驗台上緣會被蓋住）
+  function showStage() {
+    const r = $("#lab-stage").getBoundingClientRect(), top = $(".lab-top");
+    const hh = top && getComputedStyle(top).position === "sticky" ? top.getBoundingClientRect().height : 0;
+    if (r.top < hh - 1 || r.bottom > innerHeight + 1) window.scrollBy(0, r.top - hh);
+  }
   function addAtCenter(type) {
+    showStage();
     centerBump = (centerBump + 1) % 6;
     const wx = WX(W / 2) + (centerBump - 3) * 8, wy = Math.min(WORLD.floor - 20, WY(H / 2) + (centerBump - 3) * 4);
     addItem(type, wx, wy);
@@ -929,7 +1153,7 @@
           const r = canvas.getBoundingClientRect();
           addItem(type, WX(ev.clientX - r.left), Math.min(WORLD.floor + 30, WY(ev.clientY - r.top)));
         }
-      } else if (ev.type === "pointerup") addAtCenter(type);
+      } else if (ev.type === "pointerup") { if (DRAWABLE.includes(type)) startDraw(type); else addAtCenter(type); }
     };
     window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up);
   }
@@ -950,6 +1174,8 @@
       out.push(["長度", f(L, 1) + " cm"], ["伸長量 x", f(L - it.p.L0, 1) + " cm"], ["彈力 F", f(F, 3) + " N"], ["彈性位能", f(0.5 * it.p.k * Math.pow((L - it.p.L0) / 100, 2), 4) + " J"]);
     }
     if (it.type === "rope") { const E = endsOf(it); out.push(["長度", f(rt.L || Math.hypot(E[1].x - E[0].x, E[1].y - E[0].y), 1) + " cm"], ["張力 T", running && rt.tension != null ? f(rt.tension / 100, 3) + " N" : "—"]); }
+    // 連接件的方向：看得到是不是真的水平；歪 2° 拉力的方向就跟著歪
+    if (DRAWABLE.includes(it.type)) { const E = endsOf(it); out.push(["方向（與水平）", angleText(Math.atan2(-(E[1].y - E[0].y), E[1].x - E[0].x) / DEG)]); }
     if (it.type === "pulley") out.push(["繩張力 T", running && rt.tension != null ? f(rt.tension / 100, 3) + " N" : "—"]);
     if (d.circuit) {
       out.push(["電流 I", f(rt.I || 0, 4) + " A"], ["電壓 V", f(Math.abs(rt.V || 0), 3) + " V"]);
@@ -1025,7 +1251,9 @@
         PRESETS.forEach(p => { const li = el("li", null, null, ul); const b = el("button", null, p.name, li); b.type = "button"; b.addEventListener("click", () => loadPreset(p)); });
       }
       const k = el("div", "keys", null, root);
-      k.innerHTML = "<kbd>空白</kbd> 播放／暫停　<kbd>Delete</kbd> 刪除<br><kbd>R</kbd> 旋轉　<kbd>Ctrl</kbd>+<kbd>D</kbd> 複製<br><kbd>Ctrl</kbd>+<kbd>Z</kbd> 復原　滾輪／兩指 縮放<br>拖空白處平移；播放時可以直接抓住物體甩動";
+      k.innerHTML = "<kbd>空白</kbd> 播放／暫停　<kbd>Delete</kbd> 刪除<br><kbd>R</kbd> 旋轉　<kbd>Ctrl</kbd>+<kbd>D</kbd> 複製<br><kbd>Ctrl</kbd>+<kbd>Z</kbd> 復原　滾輪／兩指 縮放<br>" +
+        "細繩、彈簧：在器材盒點一下，再到實驗台點起點、點終點<br>點一下端點＝拿起，再點一下放下；靠近水平、鉛直會自動吸附（<kbd>Shift</kbd> 不吸附）<br>" +
+        "方向鍵微調 1 cm（<kbd>Shift</kbd> 10、<kbd>Alt</kbd> 0.1）<br>拖空白處平移；播放時可以直接抓住物體甩動";
     } else {
       const d = T[it.type];
       const h = el("h2", null, d.name, root); el("span", "cat", LAB.cats.find(c => c.key === d.cat).name, h);
@@ -1037,6 +1265,10 @@
       const acts = el("div", "lab-insp-actions", null, root);
       const btn = (t, fn, cls) => { const b = el("button", cls || null, t, acts); b.type = "button"; b.addEventListener("click", fn); return b; };
       if (canRotate(it)) btn(rot90Type(it) ? "轉 90°" : "轉 15°", () => rotateSel(1));
+      if (DRAWABLE.includes(it.type) && sim.status !== "running") {
+        btn("拉成水平", () => alignConnector(it, "h")); btn("拉成鉛直", () => alignConnector(it, "v"));
+        root.insertBefore(geomForm(it, el), acts);
+      }
       if (it.type === "bulb" && it.rt && it.rt.burnt) btn("換新燈泡", () => { it.rt.burnt = false; inspectorKey = ""; });
       if (it.ends && it.ends.some(e => e.at)) btn("解除連接", () => { pushUndo(); it.ends.forEach(e => { e.at = null; }); changed(); });
       if (it.type === "sensor") btn("清除紀錄", () => { if (it.rt) it.rt.samples = []; });
@@ -1046,6 +1278,28 @@
     }
     box.innerHTML = ""; box.appendChild(root);
     updateReadouts();
+  }
+  // 直接輸入長度與方向：要剛好 50 cm 長、剛好 30° 的繩子，用打的比用拖的快
+  function geomForm(it, el) {
+    const g = connectorGeom(it), f = el("form", "lab-geom");
+    f.setAttribute("aria-label", "設定長度與方向");
+    const num = (label, val, step, unit, id) => {
+      const w = el("label", null, null, f); w.htmlFor = id;
+      el("span", null, label, w);
+      const inp = el("input", null, null, w); inp.type = "number"; inp.id = id; inp.step = step; inp.value = String(Math.round(val * 10) / 10);
+      el("span", "u", unit, w);
+      return inp;
+    };
+    const L = num("長度", g.len, "0.5", "cm", "geom-len-" + it.id), A = num("方向", g.ang, "1", "°", "geom-ang-" + it.id);
+    const go = el("button", null, "套用", f); go.type = "submit";
+    el("p", "hint", "方向從端點 1 量到端點 2：右 0°、上 90°、下 −90°。", f);
+    f.addEventListener("submit", ev => {
+      ev.preventDefault();
+      const len = Number(L.value), ang = Number(A.value);
+      if (!isFinite(len) || len <= 0.5 || !isFinite(ang)) { status("長度要大於 0.5 cm，方向要是數字。"); return; }
+      if (setGeometry(it, ang, len)) status("已設成長度 " + U.fmt(len, 1) + " cm、方向 " + angleText(ang) + "。");
+    });
+    return f;
   }
   function field(it, p) {
     const wrap = document.createElement("div");
@@ -1104,6 +1358,14 @@
       rows.forEach(r => { const d = document.createElement("div"); const t = document.createElement("dt"); const v = document.createElement("dd"); d.appendChild(t); d.appendChild(v); dl.appendChild(d); });
     }
     rows.forEach((r, i) => { const d = dl.children[i]; if (d.children[0].textContent !== r[0]) d.children[0].textContent = r[0]; if (d.children[1].textContent !== r[1]) d.children[1].textContent = r[1]; });
+    // 長度、方向的輸入框跟著拖曳更新；正在打字時不要蓋掉
+    const form = document.querySelector("#lab-inspector .lab-geom"), it = byId(ui.sel);
+    if (form && it && !form.contains(document.activeElement) && DRAWABLE.includes(it.type)) {
+      const g = connectorGeom(it), [L, A] = form.querySelectorAll("input");
+      const lv = String(Math.round(g.len * 10) / 10), av = String(Math.round(g.ang * 10) / 10);
+      if (L.value !== lv) L.value = lv;
+      if (A.value !== av) A.value = av;
+    }
   }
 
   /* ============================== 範例 ============================== */
@@ -1183,6 +1445,7 @@
   function loadPreset(p) {
     const before = serialize();
     if (sim.status !== "edit") reset();
+    ui.place = null; ui.draw = null; ui.snap = null; ui.selEnd = null;
     state.items = []; state.wires = []; state.seq = 1;
     p.build();
     pushUndo(before); setSel(null); changed();
@@ -1270,6 +1533,7 @@
   }
 
   /* ============================== 啟動 ============================== */
+  let lastPlacing = false;
   function loop(now) {
     const dt = Math.min(0.05, Math.max(0, (now - (lastFrame || now)) / 1000)); lastFrame = now;
     if (sim.status === "running") advance(dt * sim.speed);
@@ -1279,6 +1543,8 @@
     render();
     $("#lab-time").textContent = "t = " + sim.t.toFixed(2) + " s";
     renderInspector();
+    const placing = !!(ui.place || ui.draw);
+    if (placing !== lastPlacing) { lastPlacing = placing; $("#lab-cancel").hidden = !placing; }
     requestAnimationFrame(loop);
   }
   function init() {
@@ -1301,6 +1567,7 @@
     $("#lab-detail").addEventListener("click", e => { ui.detail = !ui.detail; e.currentTarget.setAttribute("aria-pressed", String(ui.detail)); });
     $("#lab-grid").addEventListener("click", e => { ui.grid = !ui.grid; e.currentTarget.setAttribute("aria-pressed", String(ui.grid)); });
     $("#lab-fit").addEventListener("click", fit);
+    $("#lab-cancel").addEventListener("click", () => { cancelPlace(); canvas.focus({ preventScroll: true }); });
     $("#lab-zoom-in").addEventListener("click", () => zoomAt(1.25, W / 2, H / 2));
     $("#lab-zoom-out").addEventListener("click", () => zoomAt(0.8, W / 2, H / 2));
     $("#lab-examples-btn").addEventListener("click", e => toggleMenu(e.currentTarget, $("#lab-examples")));
@@ -1323,7 +1590,7 @@
       const tag = (e.target.tagName || "").toLowerCase();
       if (tag === "input" || tag === "select" || tag === "textarea") { if (e.key === "Escape") e.target.blur(); return; }
       const mod = e.ctrlKey || e.metaKey;
-      if (e.key === "Escape") { closeMenus(); cancelDrag(); setSel(null); return; }
+      if (e.key === "Escape") { closeMenus(); cancelDrag(); if (!cancelPlace()) { setSel(null); ui.selEnd = null; } return; }
       if (mod && (e.key === "z" || e.key === "Z")) { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); return; }
       if (mod && (e.key === "y" || e.key === "Y")) { e.preventDefault(); doRedo(); return; }
       if (mod && (e.key === "d" || e.key === "D")) { e.preventDefault(); duplicate(); return; }
@@ -1331,10 +1598,17 @@
       if (e.key === " ") { e.preventDefault(); play(); return; }
       if (e.key === "Delete" || e.key === "Backspace") { if (ui.sel || ui.selWire) { e.preventDefault(); deleteSelection(); } return; }
       if (e.key === "r" || e.key === "R") { rotateSel(e.shiftKey ? -1 : 1); return; }
+      // 方向鍵微調端點：選到（點過、剛放下）的端點優先，每次 1 cm（Shift 10、Alt 0.1）
+      const se = ui.selEnd && byId(ui.selEnd.id);
+      if (se && se.id === ui.sel && e.key.startsWith("Arrow")) {
+        e.preventDefault();
+        nudgeEnd(se, ui.selEnd.i, e.key, e.altKey ? 0.1 : e.shiftKey ? 10 : 1);
+        return;
+      }
       const it = byId(ui.sel);
       if (it && e.key.startsWith("Arrow")) {
         e.preventDefault();
-        const st = e.shiftKey ? 10 : 1;
+        const st = e.altKey ? 0.1 : e.shiftKey ? 10 : 1;
         pushUndo();
         const dx = e.key === "ArrowLeft" ? -st : e.key === "ArrowRight" ? st : 0, dy = e.key === "ArrowUp" ? -st : e.key === "ArrowDown" ? st : 0;
         it.x += dx; it.y += dy; (it.ends || []).forEach(en => { if (!en.at) { en.x += dx; en.y += dy; } });

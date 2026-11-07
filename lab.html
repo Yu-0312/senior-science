@@ -93,7 +93,7 @@
     <aside class="lab-palette" aria-label="器材盒">
       <div class="lab-tabs" id="lab-tabs" role="tablist" aria-label="器材分類"></div>
       <div class="lab-tiles" id="lab-tiles" role="tabpanel"></div>
-      <p class="lab-palette-hint">拖到實驗台上，或點一下放到畫面中央</p>
+      <p class="lab-palette-hint">拖到實驗台上，或點一下放到畫面中央；細繩、彈簧這類點一下後，再依序點兩端</p>
     </aside>
 
     <section class="lab-stage" id="lab-stage">
@@ -102,7 +102,7 @@
         <h2>把器材拖上實驗台</h2>
         <p>左邊的器材盒分成力學、電學、光學與量測工具。擺好之後按「播放」，東西就會照物理定律動起來。</p>
         <ul>
-          <li><b>彈簧、細繩、測力計</b>：把兩端的圓點拖到物體或吊鉤上接住</li>
+          <li><b>彈簧、細繩、測力計</b>：點一下器材，再依序點起點、終點（點在物體或吊鉤上就會接住）；靠近水平、鉛直會自動對齊</li>
           <li><b>電路</b>：從一個接線柱拖到另一個接線柱就是一條導線</li>
           <li><b>光學</b>：雷射與光源一放上去就會即時算出光路</li>
         </ul>
@@ -113,6 +113,7 @@
         <button type="button" id="lab-fit" aria-label="整個實驗台置中">⤢</button>
         <button type="button" id="lab-zoom-out" aria-label="縮小">－</button>
       </div>
+      <button type="button" class="lab-cancel" id="lab-cancel" hidden>取消擺放</button>
       <p class="lab-status" id="lab-status" aria-live="polite"></p>
       <div class="lab-toast" id="lab-toast" role="status" aria-live="polite" hidden></div>
     </section>

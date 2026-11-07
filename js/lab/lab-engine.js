@@ -380,4 +380,59 @@
   };
 
   LAB.mech = { World, makeBody, collide, worldPoly, G };
+
+  /* ------------------------------ 擺放吸附 ------------------------------
+   * 學生用手拖繩子、彈簧的端點，很難拖出剛好水平的線；差 2° 拉力的方向就跟著歪。
+   * 這裡決定「手指／滑鼠在 cand 時，端點實際該放在哪裡」：
+   *   1. 角度：相對於另一端（ref），接近 0°、90°、45°、15° 的倍數就吸過去，長度取到 0.5 cm
+   *   2. 對齊：x 或 y 接近其他器材的中心、端點（points）就對齊，畫出參考線
+   *   3. 都沒有就對齊 1 cm 格點（grid）
+   * 容許範圍用螢幕像素算（scale = 每 cm 幾 px），縮放後手感一致。free = true（按住 Shift）時完全不吸附。
+   * 純計算、不碰 DOM：tools/tests/lab-test.js 直接測。
+   */
+  function snapPoint(cand, o) {
+    o = o || {};
+    const scale = o.scale || 1, out = { x: cand.x, y: cand.y, kind: null, guides: [] };
+    if (o.free) return out;
+    const ref = o.ref;
+    if (ref) {
+      const dx = cand.x - ref.x, dy = cand.y - ref.y, dist = Math.hypot(dx, dy);
+      if (dist * scale > 12) {
+        const ang = Math.atan2(-dy, dx) / (Math.PI / 180);          // 數學角度：右 0°、上 90°
+        let best = null;
+        for (let k = -180; k <= 180; k += 15) {
+          const diff = Math.abs(((ang - k + 540) % 360) - 180);
+          const tolPx = k % 90 === 0 ? 10 : k % 45 === 0 ? 7 : 4;     // 水平、鉛直最好吸
+          const offPx = Math.sin(diff * Math.PI / 180) * dist * scale;
+          if (diff < 20 && offPx <= tolPx && (!best || offPx < best.offPx)) best = { k, offPx };
+        }
+        if (best) {
+          const L = Math.max(0.5, Math.round(dist * 2) / 2), a = best.k * Math.PI / 180;
+          out.x = ref.x + Math.cos(a) * L; out.y = ref.y - Math.sin(a) * L;
+          // 0°／90° 的倍數消掉浮點殘差，讓「水平」真的是同一個 y
+          if (best.k % 90 === 0) { if (best.k % 180 === 0) out.y = ref.y; else out.x = ref.x; }
+          out.kind = "angle"; out.angle = best.k; out.len = L;
+          out.guides.push({ x1: ref.x, y1: ref.y, x2: ref.x + Math.cos(a) * L * 1.6, y2: ref.y - Math.sin(a) * L * 1.6 });
+          return out;
+        }
+      }
+    }
+    const tol = 6 / scale;
+    let bx = null, by = null;
+    (o.points || []).forEach(q => {
+      const ex = Math.abs(q.x - cand.x), ey = Math.abs(q.y - cand.y);
+      if (ex <= tol && (!bx || ex < bx.e)) bx = { e: ex, q };
+      if (ey <= tol && (!by || ey < by.e)) by = { e: ey, q };
+    });
+    if (bx) { out.x = bx.q.x; out.guides.push({ x1: bx.q.x, y1: Math.min(bx.q.y, cand.y) - 30, x2: bx.q.x, y2: Math.max(bx.q.y, cand.y) + 30, axis: "x" }); }
+    if (by) { out.y = by.q.y; out.guides.push({ x1: Math.min(by.q.x, cand.x) - 30, y1: by.q.y, x2: Math.max(by.q.x, cand.x) + 30, y2: by.q.y, axis: "y" }); }
+    if (bx || by) out.kind = "align";
+    if (o.grid) { if (!bx) out.x = Math.round(out.x / o.grid) * o.grid; if (!by) out.y = Math.round(out.y / o.grid) * o.grid; }
+    if (ref) {
+      const dx = out.x - ref.x, dy = out.y - ref.y;
+      out.angle = Math.atan2(-dy, dx) / (Math.PI / 180); out.len = Math.hypot(dx, dy);
+    }
+    return out;
+  }
+  LAB.snapPoint = snapPoint;
 })(typeof window !== "undefined" ? window : globalThis);

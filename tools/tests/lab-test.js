@@ -197,4 +197,28 @@ R.section("光學：透鏡、面鏡、折射、全反射、色散");
     "紅 " + (exitDir(660) / DEG).toFixed(2) + "°、紫 " + (exitDir(410) / DEG).toFixed(2) + "°");
 }
 
+/* ------------------------------ 擺放吸附 ------------------------------ */
+R.section("擺放吸附：拖不準也能拉出水平、鉛直的繩子");
+{
+  const snap = LAB.snapPoint, ref = { x: 100, y: 80 };
+  // scale = 每 cm 幾 px；2.5 是實驗台預設縮放
+  let r = snap({ x: 160, y: 81.2 }, { ref, scale: 2.5 });
+  R.ok(r.kind === "angle" && r.y === 80 && r.angle === 0, "偏 1.2 cm（3 px）放開：吸成水平，y 和另一端完全相同", JSON.stringify(r));
+  R.ok(Math.abs(r.len - 60) < 0.26, "長度取到 0.5 cm", r.len);
+  r = snap({ x: 101.5, y: 140 }, { ref, scale: 2.5 });
+  R.ok(r.kind === "angle" && r.x === 100 && r.angle === -90, "接近鉛直往下：吸成鉛直", JSON.stringify(r));
+  r = snap({ x: 100 + 40 * Math.cos(Math.PI / 6) + 0.6, y: 80 - 40 * Math.sin(Math.PI / 6) }, { ref, scale: 2.5 });
+  R.ok(r.kind === "angle" && r.angle === 30, "接近 30°：吸成 30°", JSON.stringify({ kind: r.kind, angle: r.angle }));
+  r = snap({ x: 160, y: 88 }, { ref, scale: 2.5 });
+  R.ok(r.kind !== "angle", "偏 8 cm（20 px）就是學生要的斜線，不吸", JSON.stringify({ kind: r.kind, angle: r.angle }));
+  r = snap({ x: 160, y: 81.2 }, { ref, scale: 2.5, free: true });
+  R.ok(r.kind === null && r.y === 81.2, "按住 Shift（free）完全不吸附");
+  r = snap({ x: 30.8, y: 52 }, { points: [{ x: 30, y: 120 }], scale: 2.5, grid: 1 });
+  R.ok(r.kind === "align" && r.x === 30 && r.y === 52, "沒有基準點時：x 對齊其他器材，y 對到 1 cm 格點", JSON.stringify(r));
+  r = snap({ x: 103, y: 80.5 }, { ref, scale: 2.5 });
+  R.ok(r.kind !== "angle", "太短（12 px 以內）不做角度吸附，避免在起點附近亂跳", JSON.stringify({ kind: r.kind }));
+  r = snap({ x: 160, y: 81.5 }, { ref, scale: 8 });
+  R.ok(r.kind !== "angle", "放大到 8 倍時偏 1.5 cm 已經是 12 px：吸附範圍跟著螢幕像素走，放大後可以拉出小角度", JSON.stringify({ kind: r.kind }));
+}
+
 R.done();
