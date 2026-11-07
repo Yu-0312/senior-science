@@ -2764,6 +2764,9 @@ body.stage-only .content-grid > .card:first-child { background: transparent; bor
   box-shadow: 0 4px 14px rgba(0,0,0,.18);
   opacity: 0; pointer-events: none; transition: opacity .15s;
 }
+/* 靠近畫布邊緣時貼齊那一側（sim-apparatus 的 handle.place 判斷），不要被畫布邊界裁掉 */
+.sim-handle-tip.at-end { left: auto; right: -8px; transform: none; }
+.sim-handle-tip.at-start { left: -8px; transform: none; }
 .sim-handle:hover .sim-handle-tip, .sim-handle.is-near .sim-handle-tip, .sim-handle:focus-visible .sim-handle-tip, .sim-handle.is-dragging .sim-handle-tip { opacity: 1; }
 .sim-handle-hint {
   position: absolute; left: 18px; bottom: 14px; pointer-events: none;

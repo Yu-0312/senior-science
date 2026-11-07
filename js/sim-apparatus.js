@@ -4580,6 +4580,8 @@
     h.title = "拖曳：" + name;
     h.hidden = true;
     const tip = PL.el("span", "sim-handle-tip", h); tip.textContent = name;
+    // 提示框大約的半寬（中文一字約 12 px）：靠近畫布左右邊緣時改成貼齊那一側，不要被裁掉（手機上最明顯）
+    const tipHalf = (String(name).length * 12 + 18) / 2;
     const input = o.slider && o.slider.el;
     let px = 0, py = 0, dragging = false;
 
@@ -4650,7 +4652,13 @@
         const r = cv.canvas.getBoundingClientRect ? cv.canvas.getBoundingClientRect() : {}, hr = host.getBoundingClientRect ? host.getBoundingClientRect() : {};
         const sx = (r.width || cv.W) / cv.W, sy = (r.height || cv.H) / cv.H;
         const ox = r.width ? r.left - hr.left : cv.canvas.offsetLeft, oy = r.height ? r.top - hr.top : cv.canvas.offsetTop;
-        h.style.transform = "translate(" + (ox + px * sx) + "px," + (oy + py * sy) + "px)";
+        const hx = ox + px * sx, hw = hr.width || 0;
+        h.style.transform = "translate(" + hx + "px," + (oy + py * sy) + "px)";
+        if (hw > 0) {
+          const end = hx + tipHalf > hw - 4, start = !end && hx - tipHalf < 4;
+          if (tip.classList.contains("at-end") !== end) tip.classList.toggle("at-end", end);
+          if (tip.classList.contains("at-start") !== start) tip.classList.toggle("at-start", start);
+        }
         h.hidden = false;
         return api;
       },
