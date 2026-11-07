@@ -872,12 +872,23 @@
   }
 
   PL._hooks.onBuilt((context, api) => {
+    // 測試用：關掉探測，量「沒被探測過」的初始狀態（tools/tests/probe-pollution-test.js）
+    if (window.PhysicsLabNoProbe) return;
     let insight = null;
+    /*
+     * PL.probing：探測期間為 true。
+     * 探測會把每根滑桿從最小掃到最大，實驗裡「一旦發生就記住」的狀態（酵素變性、保險絲燒斷、
+     * 物種滅絕…）會在學生什麼都還沒碰之前就被觸發，打開實驗看到的是一個已經壞掉的初始畫面。
+     * 這類狀態在記住之前先檢查 PL.probing，探測時只算當下的值、不要記住。
+     */
+    PL.probing = true;
     try {
       insight = probe(context, api);
     } catch (e) {
       console.warn("學習鷹架建立失敗", e);
       return;
+    } finally {
+      PL.probing = false;
     }
     if (!insight) return;
     context.insight = insight;
