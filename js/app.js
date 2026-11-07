@@ -1581,6 +1581,12 @@
     renderTodayTasks(plan, currentIndex);
   }
 
+  /*
+   * booted：初始化時的第一次 route() 跑完才設為 true。
+   * 剛載入網址就直接開實驗時，頁面本來就在頁首、也不需要淡入；
+   * 之後任何換頁（包括從首頁捲到一半點模組卡）都要回頁首與淡入。
+   */
+  let booted = false;
   function openExp(id) {
     const f = byId[id];
     if (!f) { location.hash = ""; return; }
@@ -1597,7 +1603,12 @@
     view.style.setProperty("--m-color", mod.color);
     document.documentElement.style.setProperty("--m-color", mod.color); // 讓 canvas 也能取用模組色
 
-    view.classList.remove("fade-in"); void view.offsetWidth; view.classList.add("fade-in");
+    /*
+     * 換實驗時淡入。剛載入網址直接開實驗時不淡入：動畫從透明開始，
+     * 標題與說明要等淡入跑完才算「畫出來」，最大內容繪製（LCP）平白慢了 0.3–0.4 秒。
+     */
+    const firstOpen = !booted;
+    if (!firstOpen) { view.classList.remove("fade-in"); void view.offsetWidth; view.classList.add("fade-in"); }
 
     // 頁首
     $("#exp-crumb").innerHTML = '<b>模組' + mod.no + " · " + mod.title + '</b><span class="sep">/</span>' +
@@ -1700,7 +1711,8 @@
     markVisited(id);
     highlightSidebar(id, mod.id);
     updateStageBar(id);
-    $(".main").scrollTop = 0; window.scrollTo(0, 0);
+    // 回到頁首。剛載入網址時本來就在頁首；設 scrollTop 會強制整頁同步排版，省下這一次
+    if (!firstOpen) { $(".main").scrollTop = 0; window.scrollTo(0, 0); }
     document.title = exp.title + "｜物理實驗室";
   }
 
@@ -1719,7 +1731,18 @@
       item.classList.add("active");
       const mod = item.closest(".module");
       if (mod && !mod.classList.contains("open")) mod.classList.add("open");
-      item.scrollIntoView({ block: "nearest" });
+      /*
+       * 側欄捲到目前的實驗。以前直接 scrollIntoView：開實驗的同一個工作裡整頁新內容還沒排版，
+       * 它會強制同步排版一次（CPU 節流 4 倍時約 160 ms，是開實驗最貴的一步），
+       * 側欄收起時還可能把主頁面捲走。改成畫面先畫出來再捲，而且只捲側欄自己。
+       */
+      const side = $("#sidebar");
+      requestAnimationFrame(() => setTimeout(() => {
+        if (!item.isConnected || !side || getComputedStyle(side).display === "none") return;
+        const box = side.getBoundingClientRect(), r = item.getBoundingClientRect();
+        if (r.top < box.top + 60) side.scrollTop -= box.top + 60 - r.top;
+        else if (r.bottom > box.bottom - 8) side.scrollTop += r.bottom - box.bottom + 8;
+      }, 0));
     }
     closeSidebarMobile();
   }
@@ -1843,6 +1866,7 @@
 
   /* ------------------------------- 視圖切換 ------------------------------- */
   function showView(name) {
+    document.documentElement.removeAttribute("data-boot");
     $("#home-view").style.display = name === "home" ? "" : "none";
     $("#exp-view").style.display = name === "exp" ? "" : "none";
     $("#search-results").style.display = name === "search" ? "" : "none";
@@ -1998,8 +2022,12 @@
     const stage = root.querySelector(":scope > .sim-stage");
     const charts = root.querySelector(".sim-charts");
     const was = root.classList.contains("stage-chart-big");
-    const stacked = getComputedStyle(root).gridTemplateColumns.split(" ").length < 2;
-    const on = !!(force == null ? !was : force) && !!stage && !!charts && !stacked && document.body.classList.contains("stage-only");
+    /*
+     * 只有教師版才需要量欄數。getComputedStyle(...).gridTemplateColumns 會強制整頁排版，
+     * 以前每次換頁（showView → 關掉放大圖）都量一次，開實驗時白白多一次同步排版。
+     */
+    const want = !!(force == null ? !was : force) && !!stage && !!charts && document.body.classList.contains("stage-only");
+    const on = want && getComputedStyle(root).gridTemplateColumns.split(" ").length >= 2;
     let ov = stage && stage.querySelector(":scope > .stage-chart-overlay");
     if (on) {
       if (!ov) {
@@ -2747,14 +2775,23 @@
       clearTimeout(stageResizeTimer);
       stageResizeTimer = setTimeout(scheduleStageFit, 120);
     });
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => scheduleStageFit()).catch(() => {});
+    /*
+     * 字型載完再排一次教師版版面。document.fonts.ready 一取用就會強制整份文件重算樣式，
+     * 放在初始化裡等於讓第一個畫面多等一次（節流時約 50 ms）；延到畫面畫出來之後。
+     */
+    requestAnimationFrame(() => setTimeout(() => {
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => scheduleStageFit()).catch(() => {});
+    }, 0));
     window.addEventListener("hashchange", route);
     route();
+    booted = true;
 
     // 版本連線時間
     const clock = $("#clock");
     if (clock) {
-      const tick = () => { const d = new Date(); clock.textContent = d.toLocaleTimeString("zh-TW", { hour12: false }); };
+      // 分頁在背景、或手機版（頂列的時鐘藥丸本來就隱藏）時不更新：每秒格式化時間也是一筆開銷
+      const narrow = window.matchMedia ? window.matchMedia("(max-width: 600px)") : { matches: false };
+      const tick = () => { if (document.hidden || narrow.matches) return; const d = new Date(); clock.textContent = d.toLocaleTimeString("zh-TW", { hour12: false }); };
       tick(); setInterval(tick, 1000);
     }
 
@@ -2789,6 +2826,16 @@
     later.type = "button"; later.textContent = "稍後";
     later.addEventListener("click", () => box.remove());
   }
+
+  /*
+   * 直接開實驗的網址（#實驗 id）：腳本一執行完就先開始下載引擎外掛與實驗檔，
+   * 和初始化首頁、側欄並行。以前要等 init() 跑完、route() 呼叫 openExp() 才開始抓，
+   * 慢速網路下實驗台多等將近一秒。loadScript 有去重，之後 openExp 用的是同一批下載。
+   */
+  (function () {
+    const early = decodeURIComponent(location.hash.replace(/^#/, ""));
+    if (early && byId[early]) ensureExperiment(early).catch(() => {});
+  })();
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startApp);
   else startApp();

@@ -22,6 +22,9 @@
       } catch (e) {
         document.documentElement.setAttribute("data-theme", "dark");
       }
+      // 直接開實驗的網址：先別畫首頁，否則初始化完成前會閃一下首頁才換成實驗頁（app.js 的 showView 會拿掉）
+      var h = location.hash.replace(/^#/, "");
+      if (h && h !== "home") document.documentElement.setAttribute("data-boot", "exp");
     })();
   </script>
 

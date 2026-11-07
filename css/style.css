@@ -2423,6 +2423,8 @@ body.stage-only .content-grid > .card:first-child { background: transparent; bor
 .pill { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.02em; }
 
 #home-view { max-width: 1140px; margin: 0 auto; container-type: inline-size; }
+/* 直接開實驗的網址在初始化完成前不畫首頁（index.html 的開機腳本設定、app.js 的 showView 拿掉） */
+html[data-boot="exp"] #home-view { display: none; }
 
 /* ---------------------------- 英雄區 ---------------------------- */
 .hero {
