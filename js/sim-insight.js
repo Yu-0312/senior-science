@@ -871,6 +871,23 @@
     return wrap;
   }
 
+  /*
+   * 探測期間不必真的上色。
+   * 探測把每根滑桿從頭掃到尾、每一步都整張重畫（一個實驗數十次），這些畫面學生從來看不到，
+   * 最後還原時還會再畫一次。把實驗自己的畫布「上色」動作暫時換成空函式：路徑、量字、漸層照常，
+   * 讀數照算。只動這個實驗登記過的畫布（離屏快取的畫布照常畫，快取才不會存成空白）。
+   * 物理版「色光三原色」的發光光點（shadowBlur）光探測就要 3 秒，整頁 load 事件拖到 20 秒。
+   */
+  const MUTE = ["fill", "stroke", "fillRect", "strokeRect", "fillText", "strokeText", "drawImage", "putImageData"];
+  function muteCanvases(context) {
+    const Ctx = window.CanvasRenderingContext2D;
+    if (typeof Ctx !== "function") return () => {};          // 測試替身的畫布是假物件，不動
+    const ctxs = (context.canvases || []).map(cv => cv && cv.ctx).filter(c => c instanceof Ctx);
+    const noop = function () {};
+    ctxs.forEach(c => MUTE.forEach(m => { c[m] = noop; }));
+    return () => ctxs.forEach(c => MUTE.forEach(m => { delete c[m]; }));
+  }
+
   PL._hooks.onBuilt((context, api) => {
     // 測試用：關掉探測，量「沒被探測過」的初始狀態（tools/tests/probe-pollution-test.js）
     if (window.PhysicsLabNoProbe) return;
@@ -882,6 +899,7 @@
      * 這類狀態在記住之前先檢查 PL.probing，探測時只算當下的值、不要記住。
      */
     PL.probing = true;
+    const unmute = muteCanvases(context);
     try {
       insight = probe(context, api);
     } catch (e) {
@@ -889,6 +907,9 @@
       return;
     } finally {
       PL.probing = false;
+      unmute();
+      // 探測最後的還原是在靜音時畫的；真正畫一次，暫停中的實驗才不會停在空白畫布
+      if (api && typeof api.rerender === "function") { try { api.rerender(); } catch (e) {} }
     }
     if (!insight) return;
     context.insight = insight;
