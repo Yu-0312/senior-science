@@ -418,7 +418,7 @@
     const held = (sweepB ? cfg.a : cfg.b)[0];
     out.push("怎麼操作：先固定「" + held + "」，只拉「" + main + "」，" +
       "看「" + cfg.output + "」往哪個方向走；接著把「" + held + "」換一個值再拉一次，" +
-      "比較下方關係圖裡兩條虛線的高低差——那就是「" + held + "」在這個關係裡的角色。");
+      "比較下方關係圖裡兩條虛線的高低，差距就是「" + held + "」造成的影響。");
     if (info && Array.isArray(info.points) && info.points.length) {
       out.push("該看出來的重點：" + info.points.slice(0, 3).join("；") + "。");
     }
@@ -1689,7 +1689,7 @@
 
     let shape;
     if (range / scale < 0.01) {
-      shape = "「" + output + "」幾乎不隨「" + axis[0] + "」改變——這本身就是結論：這兩個量無關。";
+      shape = "「" + output + "」幾乎不隨「" + axis[0] + "」改變，表示這兩個量沒有關係。";
     } else {
       const rising = y1 > y0;
       // 用中點與兩端的連線比較，判斷是直線、還是往上／往下彎
@@ -1711,8 +1711,8 @@
       const d = avg(hiS) - avg(loS);
       const rel = Math.abs(d) / Math.max(1e-9, Math.abs(avg(loS)));
       if (rel < 0.01) effect = "另一根滑桿「" + other[0] + "」不影響這條關係。";
-      else effect = "虛線是「" + other[0] + "」拉到兩端時的同一條關係——" +
-        "把它調大會讓整條曲線往" + (d > 0 ? "上" : "下") + "搬。";
+      else effect = "虛線是「" + other[0] + "」拉到兩端時的同一條關係；" +
+        "把它調大，整條曲線就往" + (d > 0 ? "上" : "下") + "搬。";
     }
     return shape + effect;
   }

@@ -52,7 +52,7 @@
     return {
       kind: "senior",
       label: "高中課綱",
-      hint: "以課綱核心概念為主；路徑中若有大學延伸步驟會另外標示。"
+      hint: "以課綱概念為主；路徑裡有大學延伸的步驟會另外標出來。"
     };
   }
 
@@ -114,7 +114,7 @@
       { prompt: "若只受保守力作用，物體從高處滑下時通常是？", choices: ["位能增加、動能減少", "位能減少、動能增加，總機械能不變", "總機械能一定增加", "速度保持不變"], correct: 1, explanation: "重力位能會轉成動能；只要沒有非保守力做功，兩者的總和維持不變。" }
     ],
     gravity: [
-      { prompt: "「向心力」在圓周運動中最正確的意思是？", choices: ["一種額外的新力", "所有指向圓心的真實力合力", "永遠等於重力", "永遠與速度同方向"], correct: 1, explanation: "向心力不是新力的名稱，而是提供向心加速度的合力角色，例如張力、摩擦力或重力。" },
+      { prompt: "「向心力」在圓周運動中最正確的意思是？", choices: ["一種額外的新力", "所有指向圓心的真實力合力", "永遠等於重力", "永遠與速度同方向"], correct: 1, explanation: "向心力不是另外一種力，是「提供向心加速度的那個合力」的稱呼，可能是張力、摩擦力或重力。" },
       { prompt: "衛星繞行地球時，主要提供向心力的是？", choices: ["引擎推力", "地球萬有引力", "離心力", "空氣阻力"], correct: 1, explanation: "衛星持續自由落向地球，萬有引力改變其速度方向，形成軌道。" },
       { prompt: "兩物體距離加倍時，萬有引力大小變成原本的？", choices: ["2 倍", "1/2", "1/4", "4 倍"], correct: 2, explanation: "萬有引力與距離平方成反比：F ∝ 1/r²，距離加倍會讓力降為四分之一。" }
     ],
@@ -555,7 +555,7 @@
     const heading = el("div", "learning-output-heading", root);
     const eyebrow = el("span", "learning-output-eyebrow", heading); eyebrow.textContent = "學習閉環 · 本次實驗";
     const title = el("h3", "learning-output-title", heading); title.textContent = "玩完後，你要能帶走什麼？";
-    const intro = el("p", "learning-output-intro", heading); intro.textContent = "不是只看到現象，而是把操作、課本概念與解題方法連成一條線。";
+    const intro = el("p", "learning-output-intro", heading); intro.textContent = "把剛才的操作、課本概念和解題方法串在一起。";
 
     /*
      * 學習閉環只留「其他地方沒有」的內容（2026-10 整理）：
@@ -975,16 +975,16 @@
     );
     return [
       {
-        type: "單選題 · 核心觀念",
-        prompt: "下列何者最能說明「" + exp.title + "」的核心觀念？",
+        type: "單選題 · 觀念",
+        prompt: "下列何者最能說明「" + exp.title + "」的主要觀念？",
         options: conceptChoices.options,
         correct: conceptChoices.correct,
         hint: "操作模擬時一次只動一個滑桿，先看讀數，再看圖形的斜率、面積或峰值是否同步改變。",
-        answer: "重點是把參數變化連回核心概念：" + core + "。若觀察結果不同，通常代表還有另一個條件沒有固定。"
+        answer: "把參數的變化連回這個概念：" + core + "。若觀察結果不同，通常代表還有另一個條件沒有固定。"
       },
       {
         type: "單選題 · 結論歸屬",
-        prompt: "四位同學各自寫下一句「看完模擬後的結論」，其中只有一句是「" + exp.title + "」真正支持的。是哪一句？",
+        prompt: "四位同學各自寫下一句「看完模擬後的結論」，其中只有一句是「" + exp.title + "」的結果撐得住的。是哪一句？",
         options: claimChoices.options,
         correct: claimChoices.correct,
         hint: "先把每句話裡的「因為什麼、所以什麼」圈出來，再回頭對照模擬裡實際量到的關係。",
@@ -1267,7 +1267,7 @@
     const t = el("div", "finish-nudge", document.body);
     t.setAttribute("role", "status");
     const tx = el("div", null, t);
-    const b = el("b", null, tx); b.textContent = "觀察完成！";
+    const b = el("b", null, tx); b.textContent = "觀察完成";
     const sp = el("span", null, tx); sp.textContent = "最後做「完成實驗」的總結題，確認你真的看懂了。";
     const go = el("button", "finish-nudge-go", t); go.type = "button"; go.textContent = "去做總結題";
     const x = el("button", "finish-nudge-x", t); x.type = "button"; x.setAttribute("aria-label", "關閉"); x.textContent = "×";
@@ -2370,7 +2370,7 @@
     }
 
     const intro = el("p", "checkpoint-intro", root);
-    intro.textContent = "切換到「" + state.nextMod.title + "」前，用 3 題關鍵概念確認這一章已經能帶著走。";
+    intro.textContent = "切換到「" + state.nextMod.title + "」前，先用 3 題確認這一章的重點都懂了。";
     const progress = el("div", "checkpoint-progress", root);
     const progressLabel = el("span", null, progress); progressLabel.textContent = "第 " + (state.index + 1) + " / " + state.questions.length + " 題";
     const progressBar = el("div", "checkpoint-progress-bar", progress);
@@ -2400,7 +2400,7 @@
     if (selected !== undefined) {
       const feedback = el("p", "checkpoint-feedback", root);
       const correct = selected === question.correct;
-      feedback.innerHTML = "<strong>" + (correct ? "答對了。" : "先別急，這題的關鍵是：") + "</strong>" + question.explanation;
+      feedback.innerHTML = "<strong>" + (correct ? "答對了。" : "再想一下，這題要看的是：") + "</strong>" + question.explanation;
     }
 
     const actions = el("div", "checkpoint-actions", root);
@@ -2428,7 +2428,7 @@
     const total = el("span", null, result); total.textContent = " / " + state.questions.length;
     const note = el("p", "checkpoint-result-note", root);
     note.textContent = score === state.questions.length
-      ? "三個關鍵判斷都掌握了。帶著這組概念進入下一章吧。"
+      ? "三題都對，可以往下一章了。"
       : "已記錄本次結果。下面的題目可作為回到這一章時優先複習的起點。";
     const review = el("div", "checkpoint-review", root);
     state.questions.forEach((question, index) => {

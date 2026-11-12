@@ -427,7 +427,7 @@
     wraps.forEach(w => { w.inert = true; });          // 模糊中的圖表分頁鈕不該還能用 Tab 進去
     const veil = el("div", "sim-charts-veil", charts);
     const msg = el("p", null, veil);
-    msg.textContent = "先在「動手前先預測」選一個答案，再看結果圖——先猜，看圖時才是在檢查。";
+    msg.textContent = "先在「動手前先預測」選一個答案，再看結果圖。先猜過，看圖時才是在對答案。";
     const btn = el("button", "btn sim-charts-reveal", veil);
     btn.type = "button";
     btn.textContent = "直接顯示結果圖";
@@ -513,7 +513,7 @@
     hintBody.hidden = true;
     let hintLevel = 0;
     const hints = [
-      "先只動「" + r.slider.label + "」這一根，其他滑桿先不要碰——控制變因。",
+      "先只動「" + r.slider.label + "」這一根，其他滑桿先不要碰（控制變因）。",
       "往" + (r.direction === "up" ? "大" : r.direction === "peak" ? "中間偏大" : "小") +
         "的方向推「" + r.slider.label + "」，盯著「" + r.readout.label + "」的讀數。",
       "目標大約是 " + fmtValue(target) + unit + "。目前讀數見上方；差太多就繼續微調。"
@@ -605,7 +605,7 @@
         .slice(0, 2)
         .map(r => "「" + r.slider.label + "」");
       return others.length
-        ? "同一個讀數對 " + others.join("、") + " 有明顯反應，唯獨對它沒有——這代表它不在這個物理關係裡。"
+        ? "同一個讀數對 " + others.join("、") + " 都有明顯反應，只對它沒有，表示它不在這個關係裡。"
         : "在這個模型裡，它與該讀數沒有關係。";
     }
 
@@ -637,7 +637,7 @@
         } else {
           b.classList.add("is-wrong");
           b.disabled = true;
-          result.textContent = "「" + slider.label + "」其實會影響「" + invariant.readout.label +
+          result.textContent = "「" + slider.label + "」會影響「" + invariant.readout.label +
             "」。動手把它從最小拉到最大，看讀數有沒有變，再回來選一次。";
         }
       });
@@ -675,7 +675,7 @@
       const li = el("li", "sim-relation" + (r.direction === "flat" ? " is-flat" : r.direction === "clamped" ? " is-clamped" : ""), list);
       if (secret && r === secret && !(context.puzzleSolved && context.puzzleSolved())) {
         li.classList.add("is-hidden-answer");
-        li.textContent = "（有一個變因對「" + r.readout.label + "」沒有影響——先自己找找看，解開上面的小謎題就會顯示）";
+        li.textContent = "（有一個變因對「" + r.readout.label + "」沒有影響，先自己找找看；解開上面的小謎題就會顯示）";
       } else {
         li.textContent = describeRelation(r);
       }
@@ -692,7 +692,7 @@
 
     if (insight.invariants.length) {
       const foot = el("p", "sim-relations-foot", head);
-      foot.textContent = "「幾乎不受影響」的組合特別值得注意——它告訴你哪些變因在這個模型裡是無關的。";
+      foot.textContent = "留意標成「幾乎不受影響」的組合：那些變因在這個模型裡跟讀數無關。";
     }
     return panel;
   }
@@ -774,8 +774,8 @@
       rows.push({
         name: r.slider.label,
         tone: "c",
-        note: "非單調：「" + primary.label + "」在中間出現極值，不是一路變大或變小——" +
-          "這種變因要找的是極值位置，不是趨勢。"
+        note: "非單調：「" + primary.label + "」在中間有極值，不是一路變大或變小；" +
+          "這種變因要找的是極值出現的位置。"
       });
     });
     flats.slice(0, 2).forEach(r => {
@@ -855,7 +855,7 @@
     if (inv && inv.slider) {
       opts.push({
         label: "驗證「" + inv.slider.label + "」無關",
-        hint: "把它推到上限——「" + inv.readout.label + "」應該完全不動",
+        hint: "把它推到上限，「" + inv.readout.label + "」應該完全不動",
         apply: setOnly(inv.slider, inv.slider.max)
       });
     }

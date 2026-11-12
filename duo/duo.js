@@ -333,7 +333,7 @@
         title: exp.title,
         scenario: firstSentence(exp.concept),
         prompt: "先猜猜看：把「" + x.label + "」從 " + withUnit(pr.xs[0], x.unit) + " 調到 " + withUnit(pr.xs[pr.xs.length - 1], x.unit) + "，「" + y.label + "」會怎麼變？",
-        note: "猜錯不扣分。下一步你會在實驗台上親手驗證。",
+        note: "猜錯不扣分，下一步會在實驗台上驗證。",
         options: ["變大", "變小", "幾乎不變"], fixedOrder: true, correct, prediction
       });
     }
@@ -439,7 +439,7 @@
         if (order.indexOf(inv.s) < 0) order[0] = inv.s;
         const opts = shuffle(order);
         quiz.push({ kind: "scenario", title: "控制變因",
-          prompt: "同學說：「只要改任何一個參數，「" + y.label + "」都會跟著變。」其實有一個參數不管怎麼調，「" + y.label + "」幾乎都不會變。是哪一個？",
+          prompt: "同學說：「只要改任何一個參數，「" + y.label + "」都會跟著變。」但有一個參數不管怎麼調，「" + y.label + "」幾乎都不會變。是哪一個？",
           options: opts.map(i => S.sliders[i].label), correct: opts.indexOf(inv.s), canPeek: true,
           explain: "實驗台實測：「" + S.sliders[inv.s].label + "」從最小調到最大，「" + y.label + "」都維持在 " + withUnit(inv.first, y.unit) + " 左右。" });
       } else {
@@ -787,7 +787,7 @@
     // 分層提示：先告訴你動哪一根，再給方向，最後給大約位置
     let level = 0;
     const lines = [
-      "這題只要動「" + x.label + "」——其他參數先不要碰（控制變因）。",
+      "這題只要動「" + x.label + "」，其他參數先不要碰（控制變因）。",
       item.mode === "peak" ? "從最小往最大慢慢推「" + x.label + "」，讀數先升後降，最高點就是答案。"
         : "「" + x.label + "」調大時「" + y.label + "」會" + (rel.direction === "up" ? "變大" : "變小") + "。現在要" + ((L.lab.read(rel.r) || 0) < item.targetValue ? "往大的方向調" : "往小的方向調") + "。",
       "「" + x.label + "」大約在 " + withUnit(estimateX(rel, item.targetValue), x.unit) + " 附近。"
@@ -859,7 +859,7 @@
 
     if (item.kind === "predict") {
       L.predictionPick = L.selected;
-      setFoot("info", "記下來了：「" + item.options[L.selected] + "」", "下一步到實驗台上親手驗證。");
+      setFoot("info", "記下來了：「" + item.options[L.selected] + "」", "下一步到實驗台上驗證。");
       return;
     }
     if (item.kind === "lab") {
@@ -873,7 +873,7 @@
         const p = item.prediction, S = L.lab.summary;
         const truth = ["變大", "變小", "幾乎不變"][p.correct];
         text += " 剛才的預測：你選「" + ["變大", "變小", "幾乎不變"][L.predictionPick] + "」，實驗結果是「" + S.readouts[p.rel.r].label + "」" + truth +
-          (L.predictionPick === p.correct ? "——猜對了。" : "——和你想的不一樣，記住這個結果。");
+          (L.predictionPick === p.correct ? "，猜對了。" : "，跟你想的不一樣，記住這個結果。");
       }
       setFoot("good", item.mode === "explore" ? "做得好！" : "達成目標！", text);
       return;
