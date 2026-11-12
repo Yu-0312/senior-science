@@ -14,7 +14,7 @@
       { id: "rolling-motion", title: "滾動不滑動與能量分配", interactive: I, concept: "物體無滑動地滾下斜面時，同時具有平動與轉動動能；轉動慣量不同會改變加速度。", formula: R`\( mgh=\frac12mv^2+\frac12I\omega^2,\quad v=\omega R \)`, points: ["實心球通常比圓環先到終點", "無滑動條件 v=ωR", "能量分到平動與轉動", "靜摩擦不做淨功"] }
     ],
     momentum: [
-      { id: "multistage-rocket", title: "多級火箭與分離推進", interactive: I, concept: "火箭丟棄用盡燃料的級段後，剩餘系統質量下降，能更有效地把燃料轉換成速度改變。", formula: R`\( \Delta v=\sum v_{e,i}\ln\frac{m_{0,i}}{m_{f,i}} \)`, points: ["每次分離降低後續需加速的質量", "分級可累加速度增益", "推進本質是動量守恆", "需要考慮結構質量"] }
+      { id: "multistage-rocket", title: "多級火箭與分離推進", interactive: I, concept: "火箭丟棄用盡燃料的級段後，剩餘系統質量下降，能更有效地把燃料轉換成速度改變。", formula: R`\( \Delta v=\sum v_{e,i}\ln\frac{m_{0,i}}{m_{f,i}} \)`, points: ["每次分離降低後續需加速的質量", "分級可累加速度增益", "推進靠的是動量守恆", "需要考慮結構質量"] }
     ],
     gravity: [
       { id: "rotation-dynamics", title: "轉動動力學與角加速度", interactive: I, concept: "對固定軸剛體施加力矩會造成角加速度；同一力矩下，轉動慣量越大越難改變轉速。", formula: R`\( \tau=I\alpha,\quad \omega=\omega_0+\alpha t \)`, points: ["力矩是轉動的驅動量", "I 類似直線運動中的質量", "力臂越長力矩越大", "角加速度方向依右手定則"] }

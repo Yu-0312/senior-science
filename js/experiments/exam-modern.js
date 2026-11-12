@@ -94,7 +94,7 @@
     const rR = PL.ui.readout(L.readouts, { label: "核半徑 ≈ 1.2∛A", unit: "fm" });
     const cz = PL.ui.causality(L.canvasWrap.parentNode, { title: "改哪一種粒子，改變的是什麼", rows: [
       { name: "質子數 Z", tone: "a", note: "決定是哪一種元素：Z 一變，元素符號就換了。" },
-      { name: "中子數 N", tone: "b", note: "元素不變，只改質量數 A——同位素（化學性質幾乎相同）。" },
+      { name: "中子數 N", tone: "b", note: "元素不變，只改質量數 A，這是同位素（化學性質幾乎相同）。" },
       { name: "電子數", tone: "c", note: "元素與 A 都不變，只改帶電：電子比質子少是陽離子，多是陰離子。" }] });
     const gP = PL.ui.handle(cv, relGrip(sZ, 1 / 14, "質子盒（上下拖增減質子）"));
     const gN = PL.ui.handle(cv, relGrip(sN, 1 / 14, "中子盒（上下拖增減中子）"));
@@ -1021,7 +1021,7 @@
       rK.set(K, 3); rSt.set(state); rG.set(started ? done : 0, 0); rN.set(started ? Math.round(gen[done] || 0) : 0, 0); rF.set(Math.round(fis), 0); rE.set(Math.round(fis) * 200, 0);
       dv.set(0, pFis(), 3); dv.set(1, NU, 1); dv.set(2, K, 3);
       const ended = started && !ns.length;
-      vd.set(!started ? "k = " + K.toFixed(2) + "（" + state + "）——按「射入一個中子」看看會怎樣"
+      vd.set(!started ? "k = " + K.toFixed(2) + "（" + state + "）。按「射入一個中子」看看會怎樣"
         : ended ? "連鎖反應在第 " + last + " 代熄滅，共分裂 " + Math.round(fis) + " 次" + (K >= 0.97 ? "（k ≈ 1 也可能因隨機起伏熄滅，再射一次）" : "")
         : "第 " + done + " 代 N = " + Math.round(gen[done] || 0) + (obs ? "，實測 N_g/N_(g−1) = " + obs.toFixed(2) : "") + "；理論 k = " + K.toFixed(2),
         K > 1.03 ? "bad" : K < 0.97 ? "info" : "ok", PL.clamp(K / 2, 0, 1));

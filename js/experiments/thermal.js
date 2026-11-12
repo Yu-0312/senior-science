@@ -72,7 +72,7 @@
     const sVol = PL.ui.slider(L.controls, { label: "物體體積 V", min: 100, max: 800, step: 25, value: 300, unit: "cm³", digits: 0, onInput: () => draw() });
     const sSub = PL.ui.slider(L.controls, { label: "浸入比例", min: 0, max: 100, step: 5, value: 0, unit: "%", digits: 0, onInput: () => draw() });
     const sFluid = PL.ui.select(L.controls, { label: "液體", value: "1000", options: [{ value: "1000", label: "水（1000 kg/m³）" }, { value: "800", label: "酒精（800 kg/m³）" }, { value: "1260", label: "鹽水（1260 kg/m³）" }], onChange: () => draw() });
-    PL.ui.note(L.controls, "先讀取空氣中的示數，再逐漸浸入液體；兩次彈簧秤示數之差就是浮力。按播放放手後，金屬塊在彈簧上晃幾下才停住——浸在液體裡晃得少、停得快；也可以直接抓著金屬塊上下拖，改變浸入比例。");
+    PL.ui.note(L.controls, "先讀取空氣中的示數，再逐漸浸入液體；兩次彈簧秤示數之差就是浮力。按播放放手後，金屬塊在彈簧上晃幾下才停住，浸在液體裡晃得少、停得快；也可以直接抓著金屬塊上下拖，改變浸入比例。");
     const rW = PL.ui.readout(L.readouts, { label: "空氣中重量 W", unit: "N" });
     const rT = PL.ui.readout(L.readouts, { label: "彈簧秤示數 T", unit: "N" });
     const rFb = PL.ui.readout(L.readouts, { label: "示數差／浮力 F_b", unit: "N" });
@@ -248,7 +248,7 @@
     PL.ui.button(row, "重新灑點", rebuild, { primary: true });
 
     PL.ui.note(L.controls,
-      "壓力讀數不是用 PV=nRT 算出來的，而是統計分子真的撞在右側活塞上的動量變化。" +
+      "壓力讀數不是用 PV=nRT 算的，是統計分子真的撞在右側活塞上的動量變化。" +
       "固定溫度、慢慢把活塞往左推：體積變小、壓力變大，但 P×V 幾乎不變（波以耳定律）。" +
       "接著把溫度從 100 K 拉到 900 K，看分子變快、速率分布整個往右移。");
 
@@ -415,7 +415,7 @@
       rKE.set(s.ke, 4);
 
       PL.ui.caption(cv,
-        "壓力讀數由分子實際撞擊活塞的動量變化統計而來——把活塞往左推，撞擊變頻繁，壓力就上升。");
+        "壓力讀數是統計分子實際撞擊活塞的動量變化得到的。把活塞往左推，撞擊變頻繁，壓力就上升。");
     }
 
     function chart() {
@@ -770,7 +770,7 @@
     PL.ui.causality(L.canvasWrap.parentNode, {
       title: "熱機原理：能量怎麼走",
       rows: [
-        { name: "火焰 → 內能", tone: "a", note: "化學能先變成熱；熱傳遞使水與管氣內能上升——這是吸熱，不是做功。" },
+        { name: "火焰 → 內能", tone: "a", note: "化學能先變成熱；熱傳遞使水與管氣內能上升，這是吸熱，不是做功。" },
         { name: "內能 → 機械能", tone: "b", note: "壓力剛好克服塞子阻力時，氣體膨脹推塞子：對外做功，自身內能下降。" },
         { name: "白霧 ≠ 水蒸氣", tone: "c", note: "水蒸氣看不見。白霧是做功後溫度下降，水蒸氣遇冷液化成的小液滴。" },
         { name: "不是連續熱機", tone: "d", note: "噴一次就結束；完整熱機需要循環、排熱與持續供熱，這只是做功原理演示。" }
@@ -782,11 +782,11 @@
       steps: [
         "先看<strong>火焰與水量</strong>，預測：加熱越強、塞子越緊，噴出會更早還是更晚？",
         "盯著<strong>壓力條</strong>：要累積到超過塞子阻力線才會噴，不是瞬間滿。",
-        "塞子<strong>射出的同一瞬間</strong>管口出現白霧——內能正在變成機械能。",
+        "塞子<strong>射出的同一瞬間</strong>管口出現白霧，表示內能正在變成機械能。",
         "白霧幾秒內消散：液滴散開／蒸發，不是「蒸氣變回水」一句話能帶過。",
         "按重設換一組參數，比較壓力爬升速度與噴出時機。"
       ],
-      rule: "常見迷思：①把白霧當成水蒸氣；②以為內能全部變成塞子動能——" +
+      rule: "常見迷思：①把白霧當成水蒸氣；②以為內能全部變成塞子動能。" +
         "器壁吸熱、散熱與聲響都會分走能量，轉換效率永遠小於 100%。"
     });
 
@@ -903,7 +903,7 @@
       const tip = stage <= 1 ? "熱傳遞增加內能；氣泡表示水接近沸騰、蒸氣變多。"
         : stage === 2 ? "壓力逼近塞子阻力：塞子開始微震，即將噴出。"
         : stage === 3 ? "氣體膨脹對塞子做功：內能 ↓、塞子機械能 ↑，管口出現白霧。"
-        : "白霧消散；演示結束——要再看請按重設，這不是連續循環熱機。";
+        : "白霧消散，演示結束。要再看一次請按重設，這不是連續循環的熱機。";
       D.text(ctx, tip, px + 12, noteY + 46, { color: PL.col("text-dim"), size: 10.5 });
       D.text(ctx, "108：國中內能／熱機 → 高中熱力學銜接點", px + 12, noteY + 66,
         { color: PL.col("text-faint"), size: 9.5 });

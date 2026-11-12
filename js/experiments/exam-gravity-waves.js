@@ -403,7 +403,7 @@
       rTc.set(xx < 2 && kd[0] !== "crash" ? TAU * Math.sqrt(Math.pow(R0 / (2 - xx), 3) / GM) / 60 : "—", 1);
       rVA.set(oA.v, 3); rTA.set(oA.T / 3600, 3); rEA.set(oA.E, 2); rVB.set(oB.v, 3); rTB.set(oB.T / 3600, 3);
       if (mode === "cannon") {
-        const msg = { crash: "v₀ 太小：落下的同時地面彎得不夠快，砲彈撞回地面", circle: "v₀ ≈ √(GM/r)：每一刻落下的量剛好等於地面彎下去的量——圓軌道",
+        const msg = { crash: "v₀ 太小：落下的同時地面彎得不夠快，砲彈撞回地面", circle: "v₀ ≈ √(GM/r)：每一刻落下的量剛好等於地面彎下去的量，就成了圓軌道",
           apo: "介於中間：橢圓軌道，發射點是最遠點（遠地點）", peri: "超過圓軌道速率：橢圓軌道，發射點是近地點，會飛得更遠再繞回來", escape: "v₀ ≥ √(2GM/r)：總力學能 ≥ 0，飛離地球不再回來" };
         vd.set(msg[kd[0]], kd[0] === "crash" ? "bad" : kd[0] === "escape" ? "warn" : "ok");
       } else {

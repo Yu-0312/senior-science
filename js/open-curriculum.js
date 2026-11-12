@@ -29,7 +29,7 @@
     magnetism: [
       { id: "tangent-galvanometer", title: "正切電流計與地磁場", interactive: I, concept: "圓形線圈磁場與地磁場疊加，磁針偏角的正切可用來連結線圈電流與地磁場。", formula: R`\( \tan\theta=\dfrac{\mu_0NI}{2rB_E} \)`, points: ["磁針沿合磁場方向", "電流越大偏角越大", "線圈半徑會影響磁場", "可估測地磁場量級"] },
       { id: "cyclotron-frequency", title: "迴旋加速器與迴旋頻率", interactive: I, concept: "帶電粒子在垂直磁場中繞圓運動，非相對論近似下迴旋頻率與速率、半徑無關。", formula: R`\( f=\dfrac{qB}{2\pi m} \)`, points: ["磁力提供向心力", "頻率與磁場成正比", "頻率與粒子質量成反比", "高速時需考慮相對論修正"] },
-      { id: "mutual-induction", title: "互感與變壓器耦合", interactive: I, concept: "原線圈電流改變會使副線圈磁通量改變，因而感應出電動勢；改變越快，感應電壓越大。", formula: R`\( \varepsilon=-M\dfrac{\Delta I}{\Delta t} \)`, points: ["只有變動電流才會感應", "互感量取決於線圈耦合", "方向遵守楞次定律", "是變壓器工作的核心"] }
+      { id: "mutual-induction", title: "互感與變壓器耦合", interactive: I, concept: "原線圈電流改變會使副線圈磁通量改變，因而感應出電動勢；改變越快，感應電壓越大。", formula: R`\( \varepsilon=-M\dfrac{\Delta I}{\Delta t} \)`, points: ["只有變動電流才會感應", "互感量取決於線圈耦合", "方向遵守楞次定律", "是變壓器運作的原理"] }
     ],
     modern: [
       { id: "geiger-statistics", title: "蓋革計數與隨機誤差", interactive: I, concept: "放射性衰變是隨機事件；固定時間內的計數會上下波動，標準差約為計數平方根。", formula: R`\( \sigma_N\approx\sqrt{N} \)`, points: ["衰變無法預測單一原子何時發生", "計數越多相對誤差越小", "背景計數要扣除", "可用重複量測判讀統計波動"] }

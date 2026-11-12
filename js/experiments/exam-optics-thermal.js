@@ -235,7 +235,7 @@
       } else {
         rD.set(g.d, 1); rK.set(g.h / g.d, 2);
         if (g.coin) vd.set(g.a2 < 0.06 ? "近法線觀察：視深 h′ ≈ h ÷ n = " + fmt(g.h / g.n, 1) + " cm，池底看起來變淺"
-          : "斜著看：視深 " + fmt(g.d, 1) + " cm，比 h ÷ n = " + fmt(g.h / g.n, 1) + " cm 更淺——越斜看池底越淺", g.a2 < 0.06 ? "ok" : "warn");
+          : "斜著看：視深 " + fmt(g.d, 1) + " cm，比 h ÷ n = " + fmt(g.h / g.n, 1) + " cm 更淺，越斜看池底越淺", g.a2 < 0.06 ? "ok" : "warn");
         else vd.set("從水中往上看：燈看起來在水面上 " + fmt(g.d, 1) + " cm，比實際的 " + fmt(g.h, 1) + " cm 高（虛像偏高）", "ok");
       }
       hObj.place(O.x, O.y);
@@ -606,7 +606,7 @@
       hPol.place(pc.x + Math.sin(phi - Math.PI / 2) * 30, pc.y - Math.cos(phi - Math.PI / 2) * 30);
       const pol = (F.Rs - F.Rp) / (F.Rs + F.Rp);
       rB.set(tB / DEG, 1); rT.set(tt / DEG, 1); rAng.set(between, 1); rR.set(R * 100, 2); rPol.set(pol * 100, 1); rI.set(Iout * 100, 2);
-      if (atB) vd.set("布魯斯特角：反射光只剩垂直入射面（平行水面）的振動——完全偏振，而且反射光 ⟂ 折射光" + (Iout < 0.002 ? "；偏光片透光軸鉛直，眩光被完全擋掉" : ""), "ok");
+      if (atB) vd.set("布魯斯特角：反射光只剩垂直入射面（平行水面）的振動，是完全偏振，而且反射光 ⟂ 折射光" + (Iout < 0.002 ? "；偏光片透光軸鉛直，眩光被完全擋掉" : ""), "ok");
       else vd.set("反射光部分偏振（偏振度 " + fmt(pol * 100, 0) + "%）：入射角" + (th < tB ? "再加大" : "再減小") + "到 θB = " + fmt(tB / DEG, 1) + "° 時才完全偏振", "info");
     }
     cv.onResize(draw); draw();
@@ -644,7 +644,7 @@
   const STROKES = [
     ["① 進氣行程", "進氣門開，活塞下行，吸入汽油＋空氣", "#42a5f5"],
     ["② 壓縮行程", "兩門關閉，活塞上行壓縮混合氣（靠飛輪慣性）", "#ffa726"],
-    ["③ 動力行程", "火星塞點火，高溫高壓氣體推活塞下行——對外做功", "#ef5350"],
+    ["③ 動力行程", "火星塞點火，高溫高壓氣體推活塞往下，對外做功", "#ef5350"],
     ["④ 排氣行程", "排氣門開，活塞上行把廢氣推出（帶走 Q出）", "#9e9e9e"]
   ];
 
@@ -839,7 +839,7 @@
       const kw = c.W * rpm / 120 / 1000;
       rS.set(STROKES[st.k][0].slice(2)); rA.set(phi, 0); rP.set(st.P, 0); rE.set(c.eta * 100, 1); rW.set(kw, 2);
       dv.set(0, QIN, 0); dv.set(1, c.W, 0); dv.set(2, QIN - c.W, 0); dv.set(3, c.eta * 100, 1);
-      vd.set(st.k === 2 ? "動力行程：燃氣推動活塞——四個行程中唯一對外做功的行程（內能 → 機械能）"
+      vd.set(st.k === 2 ? "動力行程：燃氣推動活塞，是四個行程中唯一對外做功的行程（內能 → 機械能）"
         : st.k === 1 ? "壓縮行程：飛輪的慣性推活塞上行，外界對氣體做功，混合氣溫度升高"
           : st.k === 0 ? "進氣行程：活塞下行吸入混合氣，靠飛輪慣性帶動" : "排氣行程：廢氣帶著無法利用的熱 Q出 離開，所以 η 不可能 100%",
         st.k === 2 ? "ok" : st.k === 3 ? "warn" : "info");
@@ -1004,7 +1004,7 @@
       rKE.set(ke * 1e21, 2); rV.set(Math.sqrt(3 * KB * TK / M_H2O), 0); rD.set(Dg, 3); rX.set(Math.sqrt(2 * Dg * 10), 2); rDi.set(Di * 1e10, 2);
       cz.set(0, "T = " + sT.get() + " °C → 平均動能 " + fmt(ke * 1e21, 2) + "×10⁻²¹ J");
       cz.set(1, "a = " + fmt(a, 1) + " μm → D = " + fmt(Dg, 3) + " μm²/s（D ∝ T / ηa）");
-      vd.set("顆粒 10 秒內約亂跳 " + fmt(Math.sqrt(2 * Dg * 10), 2) + " μm：溫度越高、顆粒越小，跳得越劇烈——這是水分子不停撞擊的證據", "info");
+      vd.set("顆粒 10 秒內約亂跳 " + fmt(Math.sqrt(2 * Dg * 10), 2) + " μm：溫度越高、顆粒越小，跳得越厲害，這是水分子一直在撞它的證據", "info");
     }
     cv.onResize(draw); draw();
     return { stop() { clock.stop(); cv.destroy(); }, rerender: draw };

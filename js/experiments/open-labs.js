@@ -1040,7 +1040,7 @@
     PL.ui.button(row, "清除紀錄", () => clearTrials());
     PL.ui.note(L.controls,
       "每一次「計數一次」都是一段真實時間窗內的隨機衰變。" +
-      "次數越多，相對標準差 ≈ 1/√N 越小——這是統計漲落，不是儀器壞掉。");
+      "次數越多，相對標準差 ≈ 1/√N 越小。這是統計漲落，不是儀器壞了。");
 
     const rN = PL.ui.readout(L.readouts, { label: "本次計數 N", unit: "次" });
     const rMean = PL.ui.readout(L.readouts, { label: "多次平均 N̄", unit: "次" });
@@ -1225,7 +1225,7 @@
       rRel.set(st.mean > 0 ? st.s / st.mean * 100 : 0, 1);
       rTask.set(trials.length < 4
         ? "已計數 " + trials.length + " 次，再多做幾次比較 s 與 √N"
-        : "s ≈ " + PL.fmt(st.s, 1) + "，√N̄ ≈ " + PL.fmt(st.theory, 1) + "——統計漲落的量級");
+        : "s ≈ " + PL.fmt(st.s, 1) + "，√N̄ ≈ " + PL.fmt(st.theory, 1) + "，這就是統計漲落的大小");
     }
 
     resetLive();

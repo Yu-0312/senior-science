@@ -38,11 +38,11 @@
     const sH = PL.ui.slider(L.controls, { label: "釋放高度 h", min: 0, max: 3, step: 0.01, value: 1.2, unit: "m", digits: 2, onInput: reset });
 
     PL.ui.presets(L.controls, {
-      label: "關鍵位置",
+      label: "重要位置",
       options: [
         { label: "設為臨界 h_min", hint: "剛好能過環的最小高度 2.5R",
           apply: () => { sH.set(hMin()); reset(); } },
-        { label: "只夠爬到環頂 2R", hint: "能量剛好把物體舉到環頂，但速率為零——過不去",
+        { label: "只夠爬到環頂 2R", hint: "能量剛好把物體舉到環頂，但速率為零，過不去",
           apply: () => { sH.set(2 * sR.get()); reset(); } },
         { label: "裕度充足 3R", hint: "明顯高於臨界值，順利通過",
           apply: () => { sH.set(Math.min(3, 3 * sR.get())); reset(); } }
@@ -69,7 +69,7 @@
     function reset() { s = 0; detached = null; flightT = 0; anim.stop(); if (rp) rp.clear(); update(); }
 
     PL.ui.note(L.controls,
-      "先把釋放高度拉到剛好 2R：能量足夠把小球舉到環頂，但到了那裡速率是零——它過不去。" +
+      "先把釋放高度拉到剛好 2R：能量足夠把小球舉到環頂，但到了那裡速率是零，所以過不去。" +
       "再按「設為臨界 h_min」，高度只多了 0.5R，小球就過得去了。" +
       "那 0.5R 買到的不是高度，是環頂維持圓周運動所需的最小速率 √(gR)。");
 
@@ -178,7 +178,7 @@
       rows: [
         { name: "爬得上去", tone: "a", note: "能量足以把物體舉到環頂高度 2R。這只保證「到得了」，不保證「過得去」。" },
         { name: "過得去", tone: "b", note: "到了環頂還要有速率 √(gR)，否則軌道給不出向下的力。兩者相加才是 h ≥ 2.5R。" },
-        { name: "與質量無關", tone: "c", note: "m 在不等式兩邊同時出現而消掉——換更重的車，臨界高度完全一樣。" }
+        { name: "與質量無關", tone: "c", note: "m 在不等式兩邊同時出現，消掉了，所以換更重的車，臨界高度也一樣。" }
       ]
     });
 
@@ -448,7 +448,7 @@
         vd.set("順利通過圓環（裕度 " + PL.fmt(E.margin, 2) + " J）", "ok",
           Math.min(1, sH.get() / Math.max(1e-9, hMin())));
       } else if (sH.get() >= 2 * sR.get()) {
-        vd.set("爬得上去，但過不去——環頂速率不足 √(gR)", "warn",
+        vd.set("爬得上去，但過不去：環頂速率不到 √(gR)", "warn",
           Math.min(1, sH.get() / Math.max(1e-9, hMin())));
       } else {
         vd.set("能量不足以爬到環頂 2R", "bad",

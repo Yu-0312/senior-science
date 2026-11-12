@@ -194,7 +194,7 @@
     const mag = PL.ui.magnifier(L.canvasWrap.parentNode, {
       title: "讀數放大窗",
       mode: "講解模式 · 已標出對齊",
-      note: "整尺看不出 0.02 mm 的錯位（不足半個像素）——真卡尺也得湊近瞇眼，讀數靠這扇窗。",
+      note: "整尺看不出 0.02 mm 的錯位（不到半個像素），真的卡尺也要湊近看，讀數就靠這個放大窗。",
       aspect: 0.30
     });
 
@@ -212,17 +212,17 @@
               "<strong>相加</strong>：L = M + k × " + PL.fmt(precision(), 2) + " mm，寫到 " +
                 (divisions === 10 ? "1" : "2") + " 位小數為止。"
             ],
-            rule: "游標卡尺<strong>不估讀</strong> —— 讀到分度值為止，多寫一位反而錯" +
+            rule: "游標卡尺<strong>不估讀</strong>：讀到分度值為止，多寫一位反而錯" +
               "（12.34 不能寫成 12.340）。"
           })
         : PL.ui.procedure(host, {
             title: "讀數三步（螺旋測微器）",
             steps: [
-              "<strong>讀套管</strong>：數出露出的整毫米，再專門看一眼下排——<strong>半毫米線露出來沒有</strong>。",
+              "<strong>讀套管</strong>：數出露出的整毫米，再特別看一下下排，<strong>半毫米線有沒有露出來</strong>。",
               "<strong>讀微分筒</strong>：看基準線卡在第幾格，格數 N 乘 0.01 mm。",
               "<strong>相加並估讀一位</strong>：結果寫滿 3 位小數，末位是估的。"
             ],
-            rule: "螺旋測微器<strong>必須估讀</strong> —— 少寫一位同樣錯（2.35 要寫成 2.350）。"
+            rule: "螺旋測微器<strong>一定要估讀</strong>：少寫一位一樣是錯（2.35 要寫成 2.350）。"
           });
     }
 
@@ -311,7 +311,7 @@
       }
       const diff = Number(picked) - truth;
       if (tool === "micrometer" && Math.abs(diff + 0.5) < 1e-6) {
-        return "少了 0.5 mm——套管下排的半毫米線已經露出來了，這一格最容易漏看。";
+        return "少了 0.5 mm，套管下排的半毫米線已經露出來了，這一格最容易漏看。";
       }
       if (Math.abs(Math.abs(diff) - precision()) < 1e-9) {
         return "差了剛好一格。共線的格號數錯了，回放大窗再數一次。";
@@ -621,7 +621,7 @@
       if (act) {
         const msg = tool === "vernier"
           ? (act.phase === "open" ? "推開活動爪，放入待測物…" : act.phase === "close" ? "合上量爪：看放大窗裡對齊的那一格一路跑動" : "夾緊了，現在才讀數")
-          : (act.phase === "open" ? "先退開螺桿…" : act.phase === "close" ? "轉棘輪旋進：每轉一圈前進 0.5 mm" : "喀、喀——棘輪打滑，接觸力剛好，讀數");
+          : (act.phase === "open" ? "先退開螺桿…" : act.phase === "close" ? "轉棘輪旋進：每轉一圈前進 0.5 mm" : "喀、喀，棘輪打滑了，接觸力剛好，讀數");
         D.text(ctx, msg, 16, 24, { color: PL.col("text"), size: 12, weight: "700" });
       } else if (!clock.running && clock.t === 0) {
         D.text(ctx, "按播放，看一次完整的量測動作", 16, 24, { color: PL.col("text-dim"), size: 11 });
@@ -630,8 +630,8 @@
       PL.ui.caption(cv, tool === "vernier"
         ? "游標的 " + divisions + " 格恰好等於主尺的 " + (divisions - 1) + " mm，所以每格差 " +
           PL.fmt(precision(), 2) + " mm；只有一格會與主尺共線，那一格的格號就是答案的小數部分。"
-        : "螺距 0.5 mm、圓周 50 格，所以一格 0.01 mm。先確認套管下排的半毫米線露出來沒有——" +
-          "漏看這一排就會整整少 0.5 mm。");
+        : "螺距 0.5 mm、圓周 50 格，所以一格 0.01 mm。先確認套管下排的半毫米線有沒有露出來，" +
+          "漏看這一排就會少 0.5 mm。");
     }
 
     syncDivisionVisibility();
@@ -682,7 +682,7 @@
     PL.ui.presets(L.controls, {
       label: "量測情境",
       options: [
-        { label: "理想尺 r=1mm", hint: "解析度中等、零點已校正——對照基準",
+        { label: "理想尺 r=1mm", hint: "解析度中等、零點已校正，當作對照",
           apply: () => { sResolution.set(1); sBias.set(0); sTarget.set(5); clearRecords(); } },
         { label: "精密尺 r=0.1mm", hint: "解析度極細：讀值幾乎不散開，但系統誤差仍在",
           apply: () => { sResolution.set(0.1); sBias.set(0); sTarget.set(5); clearRecords(); } },
@@ -764,7 +764,7 @@
       const n = readings.length;
       if (n === 0) return "尚未量測：按「量測一次」開始";
       if (n < target) return "已量 " + n + " 筆，建議至少 " + target + " 筆再報告";
-      if (Math.abs(sBias.get()) > 0.05) return "筆數足夠，但零點未校正——平均值會整體偏移";
+      if (Math.abs(sBias.get()) > 0.05) return "筆數夠，但零點沒校正，平均值會整個偏掉";
       return "筆數足夠：可寫成 x̄ ± u 交作業";
     }
 
@@ -801,7 +801,7 @@
       if (!readings.length) {
         AP.labRoom(ctx, W, H, H * 0.74, {});
         D.text(ctx, "同一支金屬棒：用尺讀長度", W / 2, H * 0.34, { color: PL.col("text"), size: 16, align: "center", weight: "700" });
-        D.text(ctx, "按「量測一次」——每一次都當作你真的讀了一格刻度", W / 2, H * 0.34 + 26,
+        D.text(ctx, "按「量測一次」，每一次都當作你真的讀了一次刻度", W / 2, H * 0.34 + 26,
           { color: PL.col("text-faint"), size: 12, align: "center" });
         D.text(ctx, "目前設定：解析度 " + PL.fmt(resolution, 1) + " mm · 零點偏移 " + PL.fmt(bias, 1) +
           " mm · 建議至少 " + target + " 筆", W / 2, H * 0.34 + 48,

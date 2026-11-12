@@ -33,9 +33,9 @@ repo 首頁側邊欄就出現了 License 與 License-2 兩個分頁。
 
 `tools/build-static.js` 的 `resolveSiteUrl()` 依序找：
 
-1. `SITE_URL` 環境變數 —— 接自訂網域時在 Vercel 後台設一個變數就好，不必改程式
-2. `VERCEL_PROJECT_PRODUCTION_URL` —— Vercel 自動注入的正式站網址
-3. `js/site-config.js` 的 `siteUrl` —— 本機建置的預設值
+1. `SITE_URL` 環境變數：接自訂網域時在 Vercel 後台設一個變數就好，不必改程式
+2. `VERCEL_PROJECT_PRODUCTION_URL`：Vercel 自動注入的正式站網址
+3. `js/site-config.js` 的 `siteUrl`：本機建置的預設值
 
 用 `VERCEL_PROJECT_PRODUCTION_URL` 而不是 `VERCEL_URL` 是刻意的：
 `VERCEL_URL` 每次部署都不一樣，預覽部署會把 canonical 指向那個一次性網址，

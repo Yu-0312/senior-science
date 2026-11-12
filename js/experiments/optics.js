@@ -587,7 +587,7 @@
     PL.ui.button(row, "一次打 500 顆", () => { for (let i = 0; i < 500; i += 1) land(); });
 
     PL.ui.note(L.controls,
-      "把「每秒光子數」設成 1，耐心看前 20 顆——完全看不出規律。" +
+      "把「每秒光子數」設成 1，耐心看前 20 顆，完全看不出規律。" +
       "接著按「一次打 500 顆」，條紋會自己長出來：干涉不是光子之間互相作用，單一光子就會。" +
       "然後打開偵測器，條紋立刻消失；關掉又回來。最後比較「雙縫」與「兩單縫相加」，差的就是干涉項。");
 
@@ -598,7 +598,7 @@
 
     const cc = PL.ui.chart(PL.ui.charts(root), {
       title: "螢幕上的光強分布",
-      cap: "曲線是理論強度，長條是實際累積到的光子數。光子越多，長條越貼近曲線——機率分布是這樣被「打」出來的。"
+      cap: "曲線是理論強度，長條是實際累積到的光子數。光子越多，長條越貼近曲線，機率分布就是這樣一顆一顆打出來的。"
     });
 
     function clear() { hits = []; flying = []; }
@@ -793,7 +793,7 @@
       PL.ui.caption(cv, cDetect.get() && mode === "double"
         ? "偵測器開啟：一旦知道光子走哪一條縫，干涉項消失，螢幕上只剩兩個單縫圖樣相加。"
         : mode === "sum"
-          ? "這是兩條單縫各自圖樣的「相加」——沒有干涉。把它和雙縫比較，差的那一項就是干涉。"
+          ? "這是兩條單縫各自圖樣直接相加，沒有干涉。拿它跟雙縫比，多出來的那一項就是干涉。"
           : mode === "single"
             ? "單縫只有繞射包絡，沒有細條紋。"
             : "每一顆光子落在哪裡是隨機的，但累積起來就是干涉圖樣。");
@@ -887,7 +887,7 @@
     const cv = PL.canvas.create(L.canvasWrap, 0.66);
     const sA = PL.ui.slider(L.controls, { label: "狹縫寬 a", min: 20, max: 120, step: 5, value: 60, unit: "", digits: 0, onInput: () => draw() });
     const sLam = PL.ui.slider(L.controls, { label: "波長 λ", min: 400, max: 700, step: 10, value: 550, unit: "nm", digits: 0, onInput: () => draw() });
-    PL.ui.note(L.controls, "狹縫越窄、波長越長，中央亮紋越寬——繞射越明顯。第一暗紋在 a sinθ = λ 的位置。");
+    PL.ui.note(L.controls, "狹縫越窄、波長越長，中央亮紋越寬，繞射越明顯。第一暗紋在 a sinθ = λ 的位置。");
     const rW = PL.ui.readout(L.readouts, { label: "中央亮紋半寬（相對）", unit: "" });
     const UM = 1.2;                                   // 光屏位置的顯示範圍（相對單位）
     /*

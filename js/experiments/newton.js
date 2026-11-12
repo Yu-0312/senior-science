@@ -21,7 +21,7 @@
     const row = PL.ui.buttonRow(L.controls);
     PL.ui.button(row, "推一下", () => { x = 0; v = sV.get(); if (rp) rp.clear(); anim.start(); }, { primary: true });
     PL.ui.button(row, "重設", () => { x = 0; v = 0; if (rp) rp.clear(); draw(); });
-    PL.ui.note(L.controls, "μ = 0 時滑塊永遠等速前進——這就是慣性。");
+    PL.ui.note(L.controls, "μ = 0 時滑塊會一直等速前進，這就是慣性。");
     const rV = PL.ui.readout(L.readouts, { label: "速度 v", unit: "m/s" });
     const rX = PL.ui.readout(L.readouts, { label: "滑行距離", unit: "m" });
     // 推之前可以直接拖初速箭頭的尖端（4 px 代表 1 m/s）；滑行中箭頭是實際速度，就把把手收起來
@@ -77,7 +77,7 @@
         }
       }
       PL.ui.caption(cv, mu <= 0
-        ? "把摩擦係數放在 0：滑塊不需要任何力就保持等速——物體本來就會維持原本的運動狀態。"
+        ? "把摩擦係數放在 0：滑塊不需要任何力就保持等速，物體本來就會維持原本的運動狀態。"
         : "摩擦力箭頭與虛線標記會隨兩根滑桿改變。先預測它會停在哪裡，再按「推一下」驗證。");
       rV.set(v, 2); rX.set(x, 1);
     }
@@ -449,7 +449,7 @@
       }
       PL.ui.caption(cv, Math.abs(m1 - m2) < 0.05
         ? "兩車質量相同：受力相等，加速度也相等，畫面完全對稱。"
-        : "兩支紅／藍箭頭一樣長——作用力與反作用力大小永遠相等。" +
+        : "紅、藍兩支箭頭一樣長，作用力和反作用力大小一定相等。" +
           "但上面兩支加速度箭頭不一樣長：" + (m1 < m2 ? "左" : "右") + "車比較輕，所以加速度比較大。");
       rA1.set(a1, 2); rA2.set(a2, 2); rF.set(F, 0);
     }
@@ -496,7 +496,7 @@
     const tau2 = () => sM2.get() * G * sD2.get();
 
     PL.ui.presets(L.controls, {
-      label: "關鍵設定",
+      label: "常用設定",
       options: [
         { label: "調到剛好平衡", hint: "在目前的 m₁、d₁、m₂ 之下，把 d₂ 移到合平衡的位置",
           apply: () => {
@@ -504,16 +504,16 @@
             sD2.set(PL.clamp(Math.round(need * 2) / 2, 1, 5));
             settle();
           } },
-        { label: "省力槓桿", hint: "施力臂比阻力臂長，用比較小的力就抬得動——代價是要移動比較長的距離",
+        { label: "省力槓桿", hint: "施力臂比阻力臂長，用比較小的力就抬得動，代價是要移動比較長的距離",
           apply: () => { sM1.set(6); sD1.set(1.5); sM2.set(2); sD2.set(4.5); settle(); } },
-        { label: "等臂天平", hint: "兩邊力臂一樣長，此時平衡等於「兩邊一樣重」——這是天平能量質量的原因",
+        { label: "等臂天平", hint: "兩邊力臂一樣長，這時平衡就表示兩邊一樣重，天平就是這樣量質量的",
           apply: () => { sD1.set(3); sD2.set(3); sM1.set(4); sM2.set(4); settle(); } }
       ]
     });
 
     PL.ui.note(L.controls,
       "力矩 τ = 力 × 力臂，力臂是支點到作用線的垂直距離。左右力矩相等時橫桿保持水平。" +
-      "先按「省力槓桿」：右邊只掛 2 kg，卻壓得動左邊的 6 kg——多出來的不是力，是力臂。");
+      "先按「省力槓桿」：右邊只掛 2 kg，卻壓得動左邊的 6 kg，多出來的不是力，是力臂。");
 
     const vd = PL.ui.verdict(L.readouts.parentNode || L.readouts, { label: "—", meter: true });
     const rL = PL.ui.readout(L.readouts, { label: "左力矩 τ₁", unit: "N·m" });
@@ -545,7 +545,7 @@
         "至少做五組，把 m₂ 對 1/d₂ 作圖。若得到通過原點的直線，就驗證了 τ₁ = τ₂。"
       ],
       rule: "力臂要從<strong>支點</strong>量到<strong>懸掛點</strong>，不是量到砝碼的邊緣；而且橫桿自己有重量，" +
-            "沒有先空桿調平的話，每一組數據都會系統性偏向同一邊——這種誤差多做幾次也消不掉。"
+            "沒有先空桿調平的話，每一組數據都會偏向同一邊，這種誤差做再多次也消不掉。"
     });
 
     /* 抓砝碼沿橫桿左右滑：位置就是力臂（只看水平投影，桿子傾斜時一樣準） */
@@ -667,7 +667,7 @@
     PL.ui.section(L.controls, "第三個砝碼（由你來找平衡）");
     const sF3 = PL.ui.slider(L.controls, { label: "F₃ 大小", min: 1, max: 16, step: 0.5, value: 6, unit: "N", digits: 1, onInput: () => draw() });
     const sA3 = PL.ui.slider(L.controls, { label: "F₃ 方向", min: 0, max: 360, step: 5, value: 240, unit: "°", digits: 0, onInput: () => draw() });
-    PL.ui.note(L.controls, "按播放放開中心環：三力不平衡時，環會被拉向合力方向、靠在中心銷上。調整 F₃（或直接拖盤緣的滑輪）直到環停在正中央、不碰中心銷——此時 F₃ 就是 F₁、F₂ 合力的平衡力。");
+    PL.ui.note(L.controls, "按播放放開中心環：三力不平衡時，環會被拉向合力方向、靠在中心銷上。調整 F₃（或直接拖盤緣的滑輪）直到環停在正中央、不碰中心銷，這時 F₃ 就是 F₁、F₂ 合力的平衡力。");
     const rMag = PL.ui.readout(L.readouts, { label: "合力大小", unit: "N" });
     const rAng = PL.ui.readout(L.readouts, { label: "合力方向", unit: "°" });
     const rEq = PL.ui.readout(L.readouts, { label: "平衡力方向", unit: "°" });

@@ -32,7 +32,7 @@
       { id: "wind-turbine", title: "風力發電與葉片掃掠面積", interactive: I, concept: "風機擷取流過葉片掃掠面積的動能；風速對功率的影響接近三次方。", formula: R`\( P\approx\tfrac12\rho Av^3\eta \)`, points: ["風速稍增可大幅提高功率", "葉片越長掃掠面積越大", "理論效率存在上限", "實際輸出需考量切入與停機風速"] }
     ],
     gravity: [
-      { id: "cavendish-balance", title: "卡文迪西扭秤與萬有引力常數", interactive: I, concept: "兩個鉛球間極微弱的萬有引力會扭轉細線；量測角位移可反推重力常數的量級。", formula: R`\( F=G\frac{Mm}{r^2},\quad \tau=\kappa\theta \)`, points: ["實驗量到的是極微弱作用力", "距離平方反比很關鍵", "扭絲提供回復力矩", "G 可連結地球與天體尺度"] }
+      { id: "cavendish-balance", title: "卡文迪西扭秤與萬有引力常數", interactive: I, concept: "兩個鉛球間極微弱的萬有引力會扭轉細線；量測角位移可反推重力常數的量級。", formula: R`\( F=G\frac{Mm}{r^2},\quad \tau=\kappa\theta \)`, points: ["實驗量到的是極微弱作用力", "注意距離平方反比", "扭絲提供回復力矩", "G 可連結地球與天體尺度"] }
     ],
     shm: [
       { id: "physical-pendulum", title: "物理擺與轉動慣量", interactive: I, concept: "剛體繞固定軸小角度擺動時，週期同時取決於轉動慣量、質量與質心到支點距離。", formula: R`\( T=2\pi\sqrt{\frac{I}{mgd}} \)`, points: ["質量分布影響週期", "不是所有擺都等同單擺", "小角度近似簡諧運動", "可用週期研究轉動慣量"] },
@@ -57,7 +57,7 @@
         ]
       },
       { id: "density-lab", title: "密度量測與沉浮判斷", interactive: I, concept: "密度是質量除以體積；比較物體與液體密度即可預測下沉、懸浮或漂浮。", formula: R`\( \rho=\frac{m}{V} \)`, points: ["同體積時密度大者質量較大", "密度小於液體會漂浮", "密度相同可懸浮", "可用排水量測不規則體積"] },
-      { id: "atmospheric-pressure", title: "大氣壓力與馬德堡半球", interactive: I, concept: "抽出兩半球間的空氣後，外界大氣壓力造成很大的合力，顯示空氣雖看不見仍有壓力。", formula: R`\( F=\Delta P\,A \)`, points: ["大氣壓隨高度上升而降低", "壓差作用於整個面積", "真空不是吸力而是壓差結果", "吸盤與注射器是應用"] },
+      { id: "atmospheric-pressure", title: "大氣壓力與馬德堡半球", interactive: I, concept: "抽出兩半球間的空氣後，外界大氣壓力造成很大的合力，顯示空氣雖看不見仍有壓力。", formula: R`\( F=\Delta P\,A \)`, points: ["大氣壓隨高度上升而降低", "壓差作用於整個面積", "真空沒有吸力，是壓力差造成的", "吸盤與注射器是應用"] },
       { id: "surface-tension", title: "液面張力與毛細現象", interactive: I, concept: "液體表面分子受力不均而像拉緊的薄膜；細管中液面上升或下降由表面張力與潤濕性決定。", formula: R`\( h=\frac{2\gamma\cos\theta}{\rho gr} \)`, points: ["細管越細毛細高度越大", "水潤濕玻璃會上升", "表面張力可支撐小物", "清潔劑會降低表面張力"] },
       { id: "calorimetry-mixing", title: "熱量計與混合水溫", interactive: I, concept: "熱水放熱與冷水吸熱在理想情況下相等；由平衡溫度可比較熱量與質量的關係。", formula: R`\( m_hc(T_h-T_f)=m_cc(T_f-T_c) \)`, points: ["熱水放出的熱等於冷水吸收的熱", "平衡時溫度相同", "質量大的一方影響較明顯", "容器吸熱會造成誤差"] }
     ],
@@ -70,7 +70,7 @@
     optics: [
       { id: "shadow-pinhole", title: "光的直線傳播與針孔成像", interactive: I, concept: "光沿直線前進會形成影子；針孔讓不同方向的光在光屏上交叉，形成倒立的實像。", formula: R`\( \frac{h_i}{h_o}=\frac{d_i}{d_o} \)`, points: ["影子的邊界反映光直線傳播", "針孔像倒立", "螢幕距離影響像大小", "孔太大會模糊、太小會變暗"] },
       { id: "rgb-color-mixing", title: "色光三原色與顯示器混色", interactive: I, concept: "紅、綠、藍三色光以加法混色產生其他顏色；手機與螢幕以微小 RGB 子像素調出色彩。", formula: R`\( \vec C=R\vec r+G\vec g+B\vec b \)`, points: ["紅加綠接近黃光", "三色全強接近白光", "色光混色不同於顏料", "顯示器以 RGB 控制像素"] },
-      { id: "fiber-optics", title: "光纖傳輸與彎曲損耗", interactive: I, concept: "光纖靠核心與包層間的全反射導光；彎曲太急會讓部分光漏出，降低傳輸強度。", formula: R`\( I=I_0e^{-\alpha L} \)`, points: ["核心折射率高於包層", "全反射限制光路", "彎曲半徑太小會增加損耗", "光纖可高速傳遞資訊"] },
+      { id: "fiber-optics", title: "光纖傳輸與彎曲損耗", interactive: I, concept: "光纖靠纖芯與包層之間的全反射導光；彎曲太急會讓部分光漏出，降低傳輸強度。", formula: R`\( I=I_0e^{-\alpha L} \)`, points: ["纖芯折射率比包層高", "全反射限制光路", "彎曲半徑太小會增加損耗", "光纖可高速傳遞資訊"] },
       { id: "human-eye", title: "眼睛調焦與視力矯正", interactive: I, concept: "眼睛藉由水晶體改變焦距，讓物體成像在視網膜；近視以凹透鏡、遠視以凸透鏡矯正。", formula: R`\( \frac{1}{f}=\frac{1}{d_o}+\frac{1}{d_i} \)`, points: ["正常眼像落在視網膜", "近視焦點在視網膜前", "遠視焦點在視網膜後", "配鏡改變等效焦距"] },
       { id: "camera-exposure", title: "相機曝光、光圈與快門", interactive: I, concept: "相機以光圈控制通光量、以快門控制曝光時間；兩者組合決定感光面的總曝光量。", formula: R`\( E\propto\frac{t}{N^2} \)`, points: ["光圈數越小開口越大", "快門越久曝光越多", "高快門可凝結動作", "曝光需兼顧亮度與景深"] }
     ],

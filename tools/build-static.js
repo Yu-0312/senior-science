@@ -327,7 +327,7 @@ function experimentPage(exp, mod, moduleIndex, site, prev, next) {
   </div>
 
   <section class="license-section">
-    <h2>關鍵公式</h2>
+    <h2>會用到的公式</h2>
     <p class="static-formula">${escapeHtml(formula)}</p>
   </section>
 
@@ -340,7 +340,7 @@ ${points}
 
   <section class="license-section">
     <h2>動手操作</h2>
-    <p>這個主題有可即時操作的模擬：調整參數、用碼錶與量角器量測、記錄資料並自動作圖求出物理量。</p>
+    <p>這個實驗有可以直接操作的模擬：調參數、用碼錶和量角器量測、記錄資料，並自動作圖求出物理量。</p>
     <div class="license-cta">
       <a class="static-cta" href="${escapeHtml(appUrl)}">開啟「${escapeHtml(exp.title)}」互動模擬</a>
       <a href="worksheet-${escapeHtml(exp.id)}.html">列印學習單</a>
@@ -387,7 +387,7 @@ function worksheetPage(exp, mod, site, qbank) {
   const q1 = qs.length ? qs[0] : null;
   const q1Opts = q1 ? q1.options.map((o, i) =>
     `        <label class="ws-pick"><input type="checkbox" disabled><span class="ws-pick-key">${"ABCD"[i] || "?"}</span>${escapeHtml(o)}</label>`).join("\n") : "";
-  const trapText = q1 ? escapeHtml(q1.hint) : "先寫下一個你覺得「大部份的人都會搞錯」的地方，做完實驗回來看看自己有沒有猜對。";
+  const trapText = q1 ? escapeHtml(q1.hint) : "先寫下一個你覺得大部分人都會搞錯的地方，做完實驗回來看看自己有沒有猜對。";
   const num = n => `<h2><span class="ws-num">${n}</span>${""}</h2>`;
 
   const body = `  <div class="worksheet">
@@ -405,18 +405,18 @@ function worksheetPage(exp, mod, site, qbank) {
 
     <section class="worksheet-block ws-mission">
       <h2><span class="ws-num">1</span>本次任務</h2>
-      <p class="ws-hook">打開模擬，操作、量測、作圖，然後用數據說服別人。以下三件事全部做體會到，任務就算過關：</p>
+      <p class="ws-hook">打開模擬，操作、量測、作圖，最後用數據說明你的結論。下面三件事都做到，任務就完成了：</p>
       <ul class="ws-goals">
 ${points}
       </ul>
     </section>
 
     <section class="worksheet-block">
-      <h2><span class="ws-num">2</span>⚠ 大部份的人第一次都會栽在這裡</h2>
+      <h2><span class="ws-num">2</span>大部分的人第一次都會在這裡出錯</h2>
       <div class="ws-trap">
         <p>${trapText}</p>
       </div>
-      <p class="ws-trap-note">先記住這個陷阱，做完實驗回來看看自己有沒有中招。</p>
+      <p class="ws-trap-note">先記住這一點，做完實驗回來看看自己有沒有犯這個錯。</p>
     </section>
 
     <section class="worksheet-block">
@@ -509,7 +509,7 @@ ${items}
 
   const body = `  <p class="license-kicker">全部實驗一覽</p>
   <h1>${total} 個互動物理實驗</h1>
-  <p class="license-lead">從國中自然銜接到高中 108 課綱，每個主題都有可即時操作的模擬、可拖曳的量測工具，以及可列印的學習單。全部免費、繁體中文原創。</p>
+  <p class="license-lead">從國中自然銜接到高中 108 課綱，每個實驗都有可以操作的模擬、可以拖曳的量測工具和可以印的學習單。全部免費、繁體中文原創。</p>
 ${sections}`;
 
   return layout({

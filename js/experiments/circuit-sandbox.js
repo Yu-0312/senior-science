@@ -287,9 +287,9 @@
 
       // 狀態訊息
       let msg = null, tint = null;
-      if (sol.short) { msg = "短路！" + PL.fmt(sol.batI, 1) + " A 流過電池——電池會發燙甚至損壞，快把這條線拆掉"; tint = PL.col("danger"); }
+      if (sol.short) { msg = "短路！" + PL.fmt(sol.batI, 1) + " A 流過電池，電池會發燙甚至損壞，快把這條線拆掉"; tint = PL.col("danger"); }
       else if (burnt) { msg = "燈泡燒毀了，按「換新燈泡」再玩"; tint = PL.col("danger"); }
-      else if (sol.bulbP > BULB_P_MAX) { msg = "功率 " + PL.fmt(sol.bulbP, 1) + " W 超過額定 " + BULB_P_MAX + " W——燈絲燒斷了"; tint = PL.col("danger"); }
+      else if (sol.bulbP > BULB_P_MAX) { msg = "功率 " + PL.fmt(sol.bulbP, 1) + " W 超過額定 " + BULB_P_MAX + " W，燈絲燒斷了"; tint = PL.col("danger"); }
       else if (!wires.length) { msg = "點擊兩個接線柱（銅色小圓點）開始接線"; tint = PL.col("text-dim"); }
       if (msg) D.text(ctx, W / 2, 22, msg, { color: tint, size: 12, align: "center", weight: "700" });
       if (sol.short) shortFlash = 1;

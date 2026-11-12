@@ -115,7 +115,7 @@
       "伏特計黑棒（COM）夾在<b>負電極</b>當作 0 V，紅棒當探針在紙上移動。",
       "找出讀數相同的點，按「記錄這一點」；連起來就是一條等位線。",
       "換一個電壓值重複；再畫出處處與等位線垂直的電場線（高電位 → 低電位）。"],
-      rule: "伏特計讀的是「探針與負電極的電位差」。探針沿等位線移動時讀數不變——電荷沿等位線移動，電力不做功。", ruleTag: "關鍵" });
+      rule: "伏特計讀的是「探針與負電極的電位差」。探針沿等位線移動時讀數不變，表示電荷沿等位線移動時電力不做功。", ruleTag: "重點" });
 
     const vd = PL.ui.verdict(L.readouts.parentNode || L.readouts, { label: "—" });
     const rV = PL.ui.readout(L.readouts, { label: "探針電位 V", unit: "V" });
@@ -317,7 +317,7 @@
       if (pv >= 0.996) vd.set("探針碰到正電極：V = V₀ = " + V0 + " V（整塊電極是等位體）", "warn");
       else if (pv <= 0.004) vd.set("探針碰到負電極：V = 0（伏特計黑棒就接在這裡）", "warn");
       else if (Math.abs(V - near) < 0.06 && near > 0 && near < V0) vd.set("探針在 " + near + " V 等位線上：沿這條線移動電荷，電力不做功", "ok");
-      else vd.set("探針電位 " + V.toFixed(2) + " V，電場 " + Em.toFixed(2) + " V/cm" + (mode === "plates" && Math.abs(tx - 12) < d / 2 - 1 && Math.abs(ty - 8) < 3.5 ? "——板間等位線等距，是均勻電場" : "——指向電位較低處"), "info");
+      else vd.set("探針電位 " + V.toFixed(2) + " V，電場 " + Em.toFixed(2) + " V/cm" + (mode === "plates" && Math.abs(tx - 12) < d / 2 - 1 && Math.abs(ty - 8) < 3.5 ? "；板間等位線等距，是均勻電場" : "，方向指向電位較低處"), "info");
     }
     cv.onResize(() => draw()); draw();
     return { stop() { clock.stop(); cv.destroy(); }, rerender: () => draw() };

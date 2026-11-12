@@ -365,7 +365,7 @@
     PL.ui.button(row, "清除資料", () => { panel.clear(); refresh(); });
     PL.ui.note(L.controls,
       "把質量從 0.2 調到 2.0 kg 再各記錄一筆：資料點會排成一條水平線。" +
-      "這條「平的線」正是實驗要證明的結論——靜摩擦係數與物體重量無關。");
+      "這條平的線就是實驗要證明的結論：靜摩擦係數跟物體重量無關。");
 
     /*
      * 把手抓斜面木板的上端：學生自己用手慢慢抬，超過臨界角木塊就開始滑（播放時才會滑下去）；
@@ -610,7 +610,7 @@
     PL.ui.button(row, "清除資料", () => { metalPanel.records.length = 0; ntcPanel.records.length = 0; refresh(); });
     PL.ui.note(L.controls,
       "從 0 °C 每 10 °C 記錄一筆到 100 °C。金屬的點會排成直線（電阻隨溫度上升），" +
-      "熱敏電阻卻是一條急速下彎的曲線——這正是它能當溫度感測器的原因：同樣溫差下變化大得多。");
+      "熱敏電阻卻是一條急速下彎的曲線，所以它能當溫度感測器：同樣的溫差，電阻變化大得多。");
 
     let tg = null;
     const grip = PL.ui.handle(cv, { slider: sT, label: "溫度計（上下拖設定水溫）", toValue: (x, y) => tg ? 100 * thF(tg[0], tg[1], 16, y) : sT.get() });
@@ -902,7 +902,7 @@
     PL.ui.button(row, "對焦並記錄", () => record(), { primary: true });
     PL.ui.button(row, "清除資料", () => { panel.clear(); refresh(); });
     PL.ui.note(L.controls,
-      "物距越靠近焦距，像距衝得越遠、像也越大——這就是投影機要把布幕拉遠的原因。" +
+      "物距越靠近焦距，像距衝得越遠、像也越大，所以投影機要把布幕拉遠。" +
       "把 1/u 與 1/v 畫成圖後會得到一條斜率 −1 的直線，兩軸截距都是 1/f。");
 
     const rV = PL.ui.readout(L.readouts, { label: "像距 v", unit: "m" });
@@ -1065,7 +1065,7 @@
     PL.ui.button(row, "清除資料", () => { panel.clear(); refresh(); });
     PL.ui.note(L.controls,
       "慢慢調水位，聲音最大的位置就是共鳴點。換 5 種音叉各記錄一次，" +
-      "L 對 1/f 會連成直線，斜率乘以 4 就是聲速——不必真的去追一個跑掉的聲波。");
+      "L 對 1/f 會連成直線，斜率乘以 4 就是聲速，不用真的去追一個跑掉的聲波。");
 
     // 把手抓管內水面：上下拖就是升降水位、改變空氣柱長度
     let rq = { top: 0, k: 1 };

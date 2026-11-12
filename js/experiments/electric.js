@@ -24,7 +24,7 @@
     const sQ1 = PL.ui.slider(L.controls, { label: "電荷 q₁", min: -5, max: 5, step: 0.5, value: 3, unit: "μC", digits: 1, onInput: () => draw() });
     const sQ2 = PL.ui.slider(L.controls, { label: "電荷 q₂", min: -5, max: 5, step: 0.5, value: -2, unit: "μC", digits: 1, onInput: () => draw() });
     const sR = PL.ui.slider(L.controls, { label: "距離 r", min: 2, max: 10, step: 0.5, value: 5, unit: "cm", digits: 1, onInput: () => draw() });
-    PL.ui.note(L.controls, "可直接抓住 q₂ 的絕緣架左右移動改變 r。播放時，電力線上的小亮點是放在油裡的「試探正電荷」：受力沿電場方向漂移，場越強漂得越快——靠近球面最快、離遠了幾乎停住。");
+    PL.ui.note(L.controls, "可直接抓住 q₂ 的絕緣架左右移動改變 r。播放時，電力線上的小亮點是放在油裡的「試探正電荷」：受力沿電場方向漂移，電場越強漂得越快：靠近球面最快，離遠了幾乎不動。");
     /*
      * 靜電力用真的牛頓顯示：電荷以 μC、距離以 cm 計，F = kq₁q₂/r² = 9×10⁹ × 10⁻¹² / 10⁻⁴ × q₁q₂/r² = 90 q₁q₂/r² N。
      * 以前顯示「2.16（相對）」，其實就是 21.6 N 除以 10，學生拿課本公式驗算永遠對不上。
@@ -209,7 +209,7 @@
     PL.ui.button(row, "換新燈泡／保險絲", () => { burnt = false; fuseBlown = false; burnFlash = 0; }, { primary: true });
 
     PL.ui.note(L.controls,
-      "把電壓一路調高，看看會先發生什麼事——這顆燈泡的額定功率是 " + BULB_MAX_POWER + " W。" +
+      "把電壓一路調高，看看會先發生什麼事。這顆燈泡的額定功率是 " + BULB_MAX_POWER + " W。" +
       "拿掉保險絲再試一次，比較兩者的差別。接著切換串聯與並聯，注意總電阻與燈泡亮度怎麼變。");
 
     const rI = PL.ui.readout(L.readouts, { label: "電流 I", unit: "A" });
@@ -438,7 +438,7 @@
       }
 
       PL.ui.caption(cv,
-        fuseBlown ? "電流超過 " + FUSE_LIMIT + " A，保險絲先斷開，燈泡被保住了——這就是保險絲存在的理由。"
+        fuseBlown ? "電流超過 " + FUSE_LIMIT + " A，保險絲先斷開，燈泡保住了，裝保險絲就是為了這個。"
           : burnt ? "功率超過額定 " + BULB_MAX_POWER + " W，燈絲燒斷。若剛才裝了保險絲，斷的會是保險絲而不是燈泡。"
             : view === "schematic" ? "同一個迴路的課本畫法：切回實物圖對照，每個符號的位置就是桌上那顆器材。"
               : "電子的流動速度正比於電流；燈泡亮度正比於它消耗的功率 P = I²R。");
@@ -583,7 +583,7 @@
         AP.symJunction(ctx, rx - 36, bot, ink); AP.symJunction(ctx, rx + 36, bot, ink);
         AP.symMeter(ctx, vx, vy, "V", PL.fmt(s.U, 2) + " V", ink, PL.col("accent-2"));
         PL.motion.flow(ctx, [[left, bot], [left, top], [right, top], [right, bot], [left, bot]], sMain, { gap: 24, r: 2.2, color: PL.theme.isLight() ? "#c2410c" : dotCol, glow: 4 });
-        D.text(ctx, "A 串聯、V 並聯——與實物圖位置一一對應", W / 2, 20, { color: PL.col("text-faint"), size: 10, align: "center" });
+        D.text(ctx, "A 串聯、V 並聯，跟實物圖的位置一一對應", W / 2, 20, { color: PL.col("text-faint"), size: 10, align: "center" });
         grip.hide();
       } else {
         // 實物圖：編織導線＋電池盒＋圓形電表；右上角是課堂用的滑動變阻器
@@ -977,7 +977,7 @@
         });
         gR1.place(startX + w1, top); gR2.place(startX + w1 + 30 + w2, top);
         rBranch.set(Itot, 2);
-        PL.ui.caption(cv, "串聯：兩顆電阻的電流點速度一模一樣——電流處處相同。電壓按電阻比例分配，兩顆伏特計的讀數加起來就是電池電壓。");
+        PL.ui.caption(cv, "串聯：兩顆電阻的電流點速度一模一樣，表示電流處處相同。電壓按電阻比例分配，兩顆伏特計的讀數加起來就是電池電壓。");
       } else {
         // 並聯：兩條支路電壓相同；電阻小的那條電流點跑得明顯比較快
         const i1 = V / R1, i2 = V / R2, w1 = 26 + R1 * 3.4, w2 = 26 + R2 * 3.4;
@@ -1180,7 +1180,7 @@
     const sR2 = PL.ui.slider(L.controls, { label: "R₂", min: 1, max: 20, step: 1, value: 4, unit: "Ω", digits: 0, onInput: () => draw() });
     const sR3 = PL.ui.slider(L.controls, { label: "R₃", min: 1, max: 20, step: 1, value: 9, unit: "Ω", digits: 0, onInput: () => draw() });
     const sRx = PL.ui.slider(L.controls, { label: "Rₓ（未知）", min: 1, max: 20, step: 1, value: 6, unit: "Ω", digits: 0, onInput: () => draw() });
-    PL.ui.note(L.controls, "調到檢流計歸零即平衡：R₁Rₓ = R₂R₃。可直接拖曳 R₃ 上的滑片；播放時看檢流計那條藍線上的電荷——平衡時它們停住不動。");
+    PL.ui.note(L.controls, "調到檢流計歸零即平衡：R₁Rₓ = R₂R₃。可直接拖曳 R₃ 上的滑片；播放時看檢流計那條藍線上的電荷，平衡時它們會停住不動。");
     const rG = PL.ui.readout(L.readouts, { label: "檢流計", unit: "" });
     const rBal = PL.ui.readout(L.readouts, { label: "狀態" });
     const rRx = PL.ui.readout(L.readouts, { label: "平衡時 Rₓ", unit: "Ω" });
@@ -1269,7 +1269,7 @@
     let t = 0;
     const sV = PL.ui.slider(L.controls, { label: "入射速度 v", min: 2, max: 10, step: 0.5, value: 6, unit: "", digits: 1 });
     const sE = PL.ui.slider(L.controls, { label: "偏轉電壓 V", min: -10, max: 10, step: 0.5, value: 6, unit: "", digits: 1 });
-    PL.ui.note(L.controls, "板內水平等速、鉛直等加速，軌跡為拋物線——與拋體運動一模一樣。");
+    PL.ui.note(L.controls, "板內水平等速、鉛直等加速，軌跡是拋物線，跟拋體運動一樣。");
     const rY = PL.ui.readout(L.readouts, { label: "板內偏轉量", unit: "" });
     const rAng = PL.ui.readout(L.readouts, { label: "出射角", unit: "°" });
     // 螢光屏上的亮點上下拖＝調偏轉電壓讓電子打到那裡；電子槍左右拖改加速（入射速度）

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>物理實驗室｜台灣中學互動物理</title>
-  <meta name="description" content="從台灣國中自然到高中 108 課綱的互動物理實驗室：12 個學習模組，實驗與題型持續擴充，全部附即時 Canvas 模擬、實驗流程、即時讀數與圖表。" />
+  <meta name="description" content="國中自然到高中 108 課綱的互動物理實驗：12 個模組，每個實驗都有即時模擬、操作步驟、讀數和圖表。" />
   <meta name="theme-color" content="#13171c" media="(prefers-color-scheme: dark)" />
   <meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
   <meta name="color-scheme" content="dark light" />
@@ -39,14 +39,14 @@
   <link rel="canonical" href="https://senior-science.vercel.app/" />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="物理實驗室｜台灣中學互動物理" />
-  <meta property="og:description" content="從國中自然到高中 108 課綱的互動物理實驗室；實驗與題型持續擴充，全部可即時操作模擬。" />
+  <meta property="og:description" content="國中自然到高中 108 課綱的互動物理實驗，每個都能直接操作模擬。" />
   <meta property="og:locale" content="zh_TW" />
   <meta property="og:url" content="https://senior-science.vercel.app/" />
   <meta property="og:site_name" content="物理實驗室" />
   <meta property="og:image" content="https://senior-science.vercel.app/icons/og-card.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="物理實驗室：看得見的物理，可以動手玩的實驗室" />
+  <meta property="og:image:alt" content="物理實驗室：課本上的物理，自己動手做一次" />
   <meta name="twitter:card" content="summary_large_image" />
 
   <!-- PWA -->
@@ -190,8 +190,8 @@
           <div class="hero">
             <div class="hero-copy">
               <div class="hero-badge"><span class="hero-badge-mark" aria-hidden="true"></span>依教育部 108 課綱設計 · 全繁體原創</div>
-              <h1 class="hero-title"><span class="hero-line">看得見的物理，</span><span class="hero-line">可以<em>動手玩</em>的實驗室</span></h1>
-              <p class="hero-sub">12 個學習模組、<span id="hero-exp-count">0</span> 個持續擴充的國中到高中物理實驗，並提供大學入門延伸。每一個都附即時互動模擬、可拖曳的碼錶與量角器，以及可列印的學習單。</p>
+              <h1 class="hero-title"><span class="hero-line">課本上的物理，</span><span class="hero-line">自己<em>動手</em>做一次</span></h1>
+              <p class="hero-sub">12 個模組、<span id="hero-exp-count">0</span> 個實驗，從國中自然一路做到高中物理，有些還延伸到大學。每個實驗都能直接調參數看結果，也附碼錶、量角器和可以印的學習單。</p>
               <div class="hero-actions">
                 <a class="btn-hero" id="hero-resume" href="#" hidden><span class="btn-hero-k">繼續上次</span><span class="btn-hero-v" id="hero-resume-title">—</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
                 <button class="btn-hero ghost" id="hero-browse" type="button">瀏覽全部模組<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
@@ -262,7 +262,7 @@
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
                 </span>
                 <span class="hero-mode-name">教師演示版</span>
-                <span class="hero-mode-desc">精簡畫面，打開就能拖、直接投影演示</span>
+                <span class="hero-mode-desc">畫面精簡，打開就能操作，適合直接投影</span>
                 <span class="hero-mode-go" aria-hidden="true"><span>開始演示</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
               </button>
               <button class="hero-mode student" id="enter-student" type="button">
@@ -274,7 +274,7 @@
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z"/></svg>
                 </span>
                 <span class="hero-mode-name">自學完整版</span>
-                <span class="hero-mode-desc">保留任務導讀、判讀與逐步引導鷹架</span>
+                <span class="hero-mode-desc">有任務說明、讀圖提示和一步步的引導</span>
                 <span class="hero-mode-go" aria-hidden="true"><span>開始自學</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
               </button>
               <a class="hero-mode duo" id="enter-duo" href="duo/">
@@ -298,21 +298,21 @@
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6L4.5 18.5A1.6 1.6 0 0 0 5.9 21h12.2a1.6 1.6 0 0 0 1.4-2.5L14 9V3"/><path d="M7 15h10"/></svg>
                 </span>
                 <span class="hero-mode-name">自訂實驗室</span>
-                <span class="hero-mode-desc">從器材盒拖出器材自己搭實驗：力學、電路、光學即時模擬</span>
+                <span class="hero-mode-desc">從器材盒拖器材出來自己搭：力學、電路、光學都會即時模擬</span>
                 <span class="hero-mode-go" aria-hidden="true"><span>開始動手</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
               </a>
             </div>
-            <p class="hero-mode-hint">前兩種模式進入的是同一批實驗，只差畫面繁簡；「關卡挑戰版」把每個實驗做成一關；「自訂實驗室」讓你自己搭實驗。</p>
+            <p class="hero-mode-hint">前兩種模式用的是同一批實驗，只差在畫面上放多少東西；「關卡挑戰版」把每個實驗做成一關；「自訂實驗室」可以自己搭實驗。</p>
 
             <div class="hero-highlight" role="note" aria-label="設計理念">
               <span class="hero-highlight-k" aria-hidden="true">NOTE</span>
-              <p><b>模擬會自己說出物理關係。</b>單擺會告訴你 <span class="nowrap">\(T \propto \sqrt{L}\)</span>、而且振幅完全不影響週期；雙狹縫會得出 <span class="nowrap">\(\Delta x \propto \lambda L / d\)</span>。這些不是寫死的答案，是程式實際掃描模型量出來的。</p>
+              <p><b>結論是量出來的，不是寫死的。</b>單擺的 <span class="nowrap">\(T \propto \sqrt{L}\)</span>、振幅不影響週期，雙狹縫的 <span class="nowrap">\(\Delta x \propto \lambda L / d\)</span>，都是程式實際調參數、跑模型量出來的。</p>
             </div>
           </section>
 
           <section class="module-section" aria-labelledby="module-section-title">
             <div class="section-label" id="module-section-title" data-sec="01">課程模組</div>
-            <p class="section-intro">從運動學到近代物理，每個模組都是一組可以直接操作的實驗；點進去就從第一個實驗開始。</p>
+            <p class="section-intro">從運動學到近代物理，每個模組是一組實驗，點進去會從第一個開始。</p>
             <div class="module-grid" id="module-grid"></div>
           </section>
 
@@ -320,15 +320,15 @@
             <div class="study-center-head">
               <div>
                 <div class="section-label compact" id="study-center-title" data-sec="02">學習中心</div>
-                <p class="study-center-intro">建立自己的讀書節奏，保存進度、安排每日實驗，回來時接著上次的位置繼續。</p>
+                <p class="study-center-intro">進度存在這台裝置上，可以排每天要做的實驗，下次打開從上次停的地方繼續。</p>
               </div>
               <div class="save-status" id="save-status" aria-live="polite">存檔在這台裝置</div>
             </div>
             <div class="study-grid">
               <article class="study-card save-card">
                 <div class="study-card-kicker">學習存檔</div>
-                <h3>備份與恢復你的進度</h3>
-                <p>包含已看實驗、題目練習、章節檢核、學習反思與計劃設定。</p>
+                <h3>備份、還原進度</h3>
+                <p>包含看過的實驗、練習題、章節檢核、學習反思和計劃設定。</p>
                 <div class="study-card-actions">
                   <button class="study-btn primary" id="home-export-save" type="button">匯出存檔</button>
                   <button class="study-btn" id="home-import-save" type="button">匯入存檔</button>
@@ -364,7 +364,7 @@
               </article>
               <article class="study-card offline-card">
                 <div class="study-card-kicker">離線與安裝</div>
-                <h3 id="offline-title">帶著走，沒網路也能用</h3>
+                <h3 id="offline-title">沒有網路也能用</h3>
                 <p id="offline-status">正在檢查離線狀態…</p>
                 <div class="study-card-actions">
                   <button class="study-btn primary" id="btn-install" type="button" hidden>安裝到主畫面</button>
@@ -379,7 +379,7 @@
               <article class="study-card today-card" id="today-plan-card">
                 <div class="study-card-kicker">今日任務</div>
                 <h3 id="today-plan-title">尚未建立計劃</h3>
-                <p id="today-plan-summary">選擇天數後，系統會把尚未完成的實驗平均分配到每日任務。</p>
+                <p id="today-plan-summary">選好天數，就會把還沒做的實驗平均排進每天的任務。</p>
                 <div class="today-progress">
                   <div class="today-progress-label"><span id="today-progress-text">0 / 0</span><span id="today-progress-percent">0%</span></div>
                   <div class="today-progress-bar"><div id="today-progress-fill"></div></div>
@@ -398,7 +398,7 @@
 
           <section class="learning-ladder" id="learning-ladder" aria-labelledby="learning-ladder-title">
             <div class="section-label" id="learning-ladder-title" data-sec="03">銜接學習路徑</div>
-            <p class="learning-ladder-intro">選一個主題，從國中現象出發，經過高中模型與量測，再進入大學延伸；每一步都能直接開啟對應實驗。</p>
+            <p class="learning-ladder-intro">選一個主題，從國中看得到的現象開始，接著是高中的模型和量測，最後到大學延伸；每一步都能直接打開對應的實驗。</p>
             <div class="path-tabs" id="path-tabs" role="tablist" aria-label="選擇銜接主題"></div>
             <div class="path-timeline" id="path-timeline"></div>
           </section>
@@ -407,12 +407,12 @@
             <div class="section-label" id="openness-title" data-sec="04">關於這個專案</div>
             <div class="openness-grid">
               <article class="openness-card">
-                <h3>完全免費，而且會一直是</h3>
-                <p>採 CC BY-NC-SA 4.0 授權，教學、社團、自學與非營利推廣都可以自由使用、分享與改編，只要標示來源即可。</p>
+                <h3>免費，以後也不會收費</h3>
+                <p>用 CC BY-NC-SA 4.0 授權。上課、社團、自學和非營利推廣都可以自由使用、分享和改編，只要標示來源。</p>
               </article>
               <article class="openness-card">
-                <h3>原始碼公開，不會因為我消失而消失</h3>
-                <p>全部程式碼在 GitHub 上公開。這是一個純靜態網站，沒有後端也沒有資料庫，任何人都可以下載後自行架設，或直接接手維護。</p>
+                <h3>原始碼公開，就算我不維護了也還能用</h3>
+                <p>程式碼都放在 GitHub 上。網站是純靜態的，沒有後端也沒有資料庫，任何人都能下載下來自己架，或接手維護。</p>
                 <p class="openness-links">
                   <a href="https://github.com/Yu-0312/senior-science" target="_blank" rel="noopener">GitHub 原始碼</a>
                   <a href="licensing.html">授權條款</a>
@@ -421,13 +421,13 @@
               </article>
               <article class="openness-card">
                 <h3>給老師的資源</h3>
-                <p>每個實驗都有可列印的學習單，含實驗目的、資料記錄表格、作圖區與由圖求值欄位，可以直接印出來發給學生。歡迎回報教學使用情境與需求。</p>
+                <p>每個實驗都有學習單，包含實驗目的、記錄表格、作圖區和由圖求值的欄位，可以直接印給學生用。上課用起來有什麼問題或需求，歡迎回報。</p>
               </article>
             </div>
           </section>
 
           <div class="disclaimer">
-            本站為配合台灣 108 課綱自製之開放教學工具，所有模擬程式與文字內容皆為原創。物理模型為教學簡化版，數值以概念示範為主，僅供教學與學習用途。
+            這是配合 108 課綱自己做的教學工具，模擬程式和文字都是原創。物理模型有經過簡化，數值主要用來說明概念，請當作教學與學習用。
           </div>
         </section>
 
@@ -449,8 +449,8 @@
             <div class="card guide">
               <div class="card-title" role="heading" aria-level="2"><span class="accent-bar"></span>概念 · 公式 · 重點</div>
               <div class="card-body">
-                <div><h3>核心概念</h3><p id="guide-concept"></p></div>
-                <div><h3>關鍵公式</h3><div class="formula-box" id="guide-formula"></div></div>
+                <div><h3>這個實驗在講什麼</h3><p id="guide-concept"></p></div>
+                <div><h3>會用到的公式</h3><div class="formula-box" id="guide-formula"></div></div>
                 <div><h3>學習重點</h3><ul class="points" id="guide-points"></ul></div>
                 <div class="guide-exam" id="guide-exam" hidden><h3>考題怎麼問</h3><p id="guide-exam-how"></p></div>
                 <div class="observe-track" id="observe-track" aria-label="實驗進度">
@@ -471,7 +471,7 @@
               <div>
                 <p class="finish-kicker">最後一步</p>
                 <h3 id="finish-title">完成實驗 · 總結題</h3>
-                <p class="finish-lead" id="finish-lead">實驗中的觀察題做完了嗎？用這幾題確認你真的看懂了。</p>
+                <p class="finish-lead" id="finish-lead">實驗裡的觀察題做完了嗎？用這幾題檢查自己有沒有看懂。</p>
               </div>
               <div class="finish-meter" id="finish-meter" aria-live="polite"><b id="finish-count">0 / 0</b><span>題答對</span></div>
             </div>

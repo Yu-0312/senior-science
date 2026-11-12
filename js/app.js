@@ -30,7 +30,7 @@
       (path.stages || []).forEach(stage => {
         if (!(stage.ids || []).includes(id)) return;
         if (stage.kind === "university") universityNote = stage.note || "大學普通物理先修直覺";
-        if (stage.kind === "senior") seniorNote = stage.note || "高中課綱核心";
+        if (stage.kind === "senior") seniorNote = stage.note || "高中課綱";
         if (stage.kind === "junior") juniorNote = stage.note || "國中打底";
       });
     });
