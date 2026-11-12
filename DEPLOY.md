@@ -78,6 +78,12 @@ node tools/tests/run-all.js
 
 換網域時兩者擇一更新，並重新建置靜態頁；首頁、lab.html、licensing.html 的 canonical／og:url／og:image 是手寫的，也要一起改。
 
+## 日文版
+
+`ja/` 由 `tools/build-ja.js` 產生並一起提交；Vercel 建置時也會重跑一次（`vercel.json` 的 buildCommand）。
+`/ja/sw.js` 和 `/sw.js` 一樣不快取，`/ja/js`、`/ja/css` 和中文版一樣帶 `?v=` 快取一年。
+首頁、lab.html、licensing.html 有 `hreflang` 對照連結，`robots.txt` 同時列出兩份 sitemap。
+
 ## 快取與版本號
 
 `js/`、`css/` 的引用都帶 `?v=<build>`。**改了 `js/` 或 `css/` 就要更新版本號**，版本號同時寫在 `js/site-config.js` 與 `sw.js`，`build-consistency` 測試會擋住兩邊不一致的情況。

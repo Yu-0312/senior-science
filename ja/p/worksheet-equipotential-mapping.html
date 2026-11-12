@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>等電位線と電場（導電紙で描く） ワークシート｜物理実験室</title>
+<meta name="description" content="印刷できる「等電位線と電場（導電紙で描く）」のワークシートです。データの記録表、グラフ用紙、グラフから値を求める欄があります。" />
+<link rel="canonical" href="https://senior-science.vercel.app/ja/p/worksheet-equipotential-mapping.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="等電位線と電場（導電紙で描く） ワークシート｜物理実験室" />
+<meta property="og:description" content="印刷できる「等電位線と電場（導電紙で描く）」のワークシートです。データの記録表、グラフ用紙、グラフから値を求める欄があります。" />
+<meta property="og:locale" content="zh_TW" />
+<meta property="og:url" content="https://senior-science.vercel.app/ja/p/worksheet-equipotential-mapping.html" />
+<meta property="og:site_name" content="物理実験室" />
+<meta property="og:image" content="https://senior-science.vercel.app/ja/icons/og-card.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="theme-color" content="#13171c" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<link rel="icon" type="image/svg+xml" href="../icons/icon.svg?v=20261112-2027" />
+<link rel="apple-touch-icon" href="../icons/icon-192.png?v=20261112-2027" />
+<link rel="stylesheet" href="../css/style.css?v=20261112-2027" />
+<script>
+(function () {
+  try {
+    var saved = JSON.parse(localStorage.getItem("pl-theme"));
+    // トップページと同じく、初めて来た人にはライトテーマを使う
+    if (saved !== "light" && saved !== "dark") saved = "light";
+    document.documentElement.setAttribute("data-theme", saved);
+  } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+})();
+</script>
+</head>
+<body class="static-page">
+<header class="license-topbar">
+  <a class="license-home" href="../index.html"><span class="license-home-mark" aria-hidden="true">PH</span>物理実験室</a>
+  <div class="license-topbar-actions">
+    <a class="license-toplink" href="../experiments.html">すべての実験</a>
+    <a class="license-toplink" href="../licensing.html">利用条件</a>
+  </div>
+</header>
+<main class="license-page">
+  <div class="worksheet">
+    <div class="worksheet-head">
+      <div>
+        <p class="license-kicker">単元10 · 電場と電気回路</p>
+        <h1>等電位線と電場（導電紙で描く）　ワークシート</h1>
+      </div>
+      <div class="worksheet-meta">
+        <span>クラス ____________</span>
+        <span>番号 ______</span>
+        <span>名前 ____________</span>
+      </div>
+    </div>
+
+    <section class="worksheet-block ws-mission">
+      <h2><span class="ws-num">1</span>今回の課題</h2>
+      <p class="ws-hook">シミュレーションを開いて、操作し、測定し、グラフを描き、最後にデータを使って結論を説明します。次の 3 つができたら課題は完了です。</p>
+      <ul class="ws-goals">
+        <li><span class="ws-box"></span>等電位線上の 2 点のあいだで電荷を動かしても、仕事は 0</li>
+        <li><span class="ws-box"></span>電気力線は等電位線と垂直</li>
+        <li><span class="ws-box"></span>等電位線が密なほど電場は強い</li>
+      </ul>
+    </section>
+
+    <section class="worksheet-block">
+      <h2><span class="ws-num">2</span>初めてのときに多くの人がまちがえるところ</h2>
+      <div class="ws-trap">
+        <p>読みが変わらないのは、何が変わらないということ？ W = q(V_A − V_B)。</p>
+      </div>
+      <p class="ws-trap-note">ここを覚えておいて、実験が終わったら同じまちがいをしていないか見てみます。</p>
+    </section>
+
+    <section class="worksheet-block">
+      <h2><span class="ws-num">3</span>やる前に予想する（答えに○をつける）</h2>
+      <p>導電紙の等電位線の実験で、電圧計の黒い棒を負の電極に、赤い棒を探針にしています。探針を、読みがどこでも 3.0 V の曲線にそって動かすとき、正しいのはどれですか？</p>
+      <div class="ws-predict">
+        <label class="ws-pick"><input type="checkbox" disabled><span class="ws-pick-key">A</span>探針の位置の電場の向きは、この曲線の接線の向き</label>
+        <label class="ws-pick"><input type="checkbox" disabled><span class="ws-pick-key">B</span>正電荷をこの曲線にそって動かしても、静電気力は仕事をしない</label>
+        <label class="ws-pick"><input type="checkbox" disabled><span class="ws-pick-key">C</span>この曲線上の各点で、電場の大きさは必ず同じ</label>
+        <label class="ws-pick"><input type="checkbox" disabled><span class="ws-pick-key">D</span>この曲線上には電流が流れていないので、電場は 0</label>
+      </div>
+      <p class="worksheet-lines">理由：_______________________________________________________</p>
+    </section>
+
+    <section class="worksheet-block">
+      <h2><span class="ws-num">4</span>手順のチェック（できたら ✓）</h2>
+      <div class="ws-step"><span class="ws-box"></span>シミュレーションを開き、まず<strong>1 つ</strong>の条件だけを変えて、ほかのスライダーは固定する。</div>
+      <div class="ws-step"><span class="ws-box"></span>変える前の値を記録してから少しずつ変え、どの量がいっしょに変わるか見る。</div>
+      <div class="ws-step"><span class="ws-box"></span>別の条件でもう一度やり、2 回の違いを比べる。</div>
+      <div class="ws-step"><span class="ws-box"></span>データを下の表に書きこみ、グラフを描いて傾きを計算する。</div>
+    </section>
+
+    <section class="worksheet-block">
+      <h2><span class="ws-num">5</span>データの記録</h2>
+      <p>1 回に変える条件は 1 つだけで、ほかは固定します。変えた量と測った量を表に書きます（先に単位を書いておきます）。</p>
+      <div class="worksheet-table-wrap">
+      <table class="worksheet-table">
+        <thead>
+          <tr><th>回</th><th>変えた量（　　　　）</th><th>測った量（　　　　）</th><th>メモ</th></tr>
+        </thead>
+        <tbody>
+        <tr><td>1</td><td></td><td></td><td></td></tr>
+        <tr><td>2</td><td></td><td></td><td></td></tr>
+        <tr><td>3</td><td></td><td></td><td></td></tr>
+        <tr><td>4</td><td></td><td></td><td></td></tr>
+        <tr><td>5</td><td></td><td></td><td></td></tr>
+        <tr><td>6</td><td></td><td></td><td></td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="worksheet-block worksheet-grid-block">
+      <h2><span class="ws-num">6</span>グラフ</h2>
+      <p>データの点を描きます。直線にならなければ、どちらかの軸を 2 乗、平方根、逆数のどれにすればまっすぐになるか考えます。</p>
+      <div class="worksheet-grid" aria-hidden="true"></div>
+    </section>
+
+    <section class="worksheet-block">
+      <h2><span class="ws-num">7</span>グラフから値を求める</h2>
+      <p class="worksheet-lines">直線の傾き = ________________　　切片 = ________________</p>
+      <p class="worksheet-lines">傾きから求めた物理量 = ________________</p>
+      <p class="worksheet-lines">理論値とのずれ = ____________ %　　考えられる誤差の原因：____________________</p>
+    </section>
+
+    <section class="worksheet-block">
+      <h2><span class="ws-num">8</span>ひとことでまとめる</h2>
+      <p class="ws-hook">ひとことだけで説明するとしたら、この実験をしたことがない人に、わかったことをどう伝えますか？</p>
+      <p class="worksheet-lines">_______________________________________________________________</p>
+      <p class="worksheet-lines">_______________________________________________________________</p>
+    </section>
+
+    <p class="worksheet-foot">物理実験室（https://senior-science.vercel.app/ja/）· CC BY-NC-SA 4.0。授業での利用や改変は自由です</p>
+  </div>
+
+  <div class="worksheet-actions">
+    <button type="button" onclick="window.print()">このワークシートを印刷</button>
+    <a href="equipotential-mapping.html">実験の説明にもどる</a>
+  </div>
+</main>
+</body>
+</html>

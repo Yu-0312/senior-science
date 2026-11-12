@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>チャレンジ版 · 物理実験室</title>
+  <meta name="description" content="物理実験室のチャレンジ版：実験 1 つが 1 ステージです。まず予想し、実験を目標の値に合わせ、データを読み、場面の問題を解きます。まちがえた問題は正解するまでもう一度出ます。" />
+  <meta property="og:title" content="物理 Duo · 実験 1 つが 1 ステージ" />
+  <meta property="og:description" content="予想して、実験を動かして、データを読んで、場面の問題を解く。中学から高校までの物理を、その場で操作しながら学べます。" />
+  <meta name="theme-color" content="#58cc02" />
+  <link rel="icon" type="image/svg+xml" href="../icons/icon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Noto+Sans+TC:wght@500;700;900&display=swap" crossorigin media="print" onload="this.media='all'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Noto+Sans+TC:wght@500;700;900&display=swap" crossorigin /></noscript>
+  <link rel="stylesheet" href="duo.css?v=20261112-2027" />
+</head>
+<body>
+  <header class="top">
+    <div class="top-in">
+      <a class="logo" href="../" title="物理実験室に戻る">
+        <span class="logo-mark" aria-hidden="true">物理</span><span class="logo-word">Duo</span>
+      </a>
+      <nav class="tabs" aria-label="メインメニュー">
+        <button class="tab active" data-view="map" type="button">学習マップ</button>
+        <button class="tab" data-view="review" type="button">まちがえた問題 <span class="tab-badge" id="review-count" hidden>0</span></button>
+      </nav>
+      <div class="stats" aria-label="学習の状況">
+        <span class="stat streak" id="stat-streak" title="連続学習日数"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1 3.5 5 5.6 5 10.4A5 5 0 0 1 12 22a5 5 0 0 1-5-5c0-2.6 1.5-4.1 2.6-5.3.3 1.6 1 2.6 2 3.1C11 12 10.4 7 12 2z"/></svg><b id="streak-n">0</b><span class="stat-u">日</span></span>
+        <span class="stat xp" id="stat-xp" title="経験値"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg><b id="xp-n">0</b><span class="stat-u">XP</span></span>
+        <span class="stat crown" id="stat-crown" title="クリアしたステージ"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 12H5z"/></svg><b id="done-n">0</b></span>
+      </div>
+    </div>
+  </header>
+
+  <main id="app">
+    <section class="view" id="view-map" aria-label="学習マップ">
+      <h1 class="sr-only">物理 Duo チャレンジ版：学習マップ</h1>
+      <nav class="units-nav" id="units-nav" aria-label="単元"></nav>
+      <div class="continue-card" id="continue-card"></div>
+      <div id="units"></div>
+    </section>
+
+    <section class="view" id="view-review" aria-label="まちがえた問題" hidden>
+      <div class="review-head">
+        <h1>まちがえた問題</h1>
+        <p>まちがえた問題はここに集まります。そのステージをやり直して正解すると、ここから消えます。</p>
+      </div>
+      <div id="review-list"></div>
+    </section>
+
+    <aside class="side" aria-label="ステージの説明">
+      <div class="side-card">
+        <h2>ステージの進め方</h2>
+        <ol class="howto">
+          <li><b class="k predict">場面の予想</b>まず結果を予想。外れても減点はありません</li>
+          <li><b class="k lab">実験の調整</b>実験台で測定値を目標の値に合わせます</li>
+          <li><b class="k data">データの読み取り</b>実験台で測ったデータから関係を見つけます</li>
+          <li><b class="k scenario">場面の問題</b>物理の関係を使って、実際の場面で判断します</li>
+          <li><b class="k calc">計算問題</b>ステージによっては毎回数値が変わります</li>
+        </ol>
+        <p class="side-note">まちがえた問題は最後にもう一度出て、正解するとクリアです。「まちがえた問題」にも記録されます。</p>
+      </div>
+      <div class="side-card">
+        <h2>先生へ</h2>
+        <p class="side-note">ステージごとに URL があります。ステージを開いてアドレスバーのリンクを生徒に送れば、同じステージに直接入れます。進み具合は生徒の端末に保存されます。</p>
+        <a class="btn small" href="../">物理実験室に戻る</a>
+      </div>
+    </aside>
+  </main>
+
+  <section class="lesson" id="lesson" role="dialog" aria-modal="true" aria-labelledby="lesson-title" hidden>
+    <div class="lesson-top">
+      <button class="icon-x" id="lesson-close" type="button" aria-label="このステージを出る"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <div class="lesson-progress" aria-hidden="true"><i id="lesson-bar"></i></div>
+      <span class="combo" id="lesson-combo" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1 3.5 5 5.6 5 10.4A5 5 0 0 1 12 22a5 5 0 0 1-5-5c0-2.6 1.5-4.1 2.6-5.3.3 1.6 1 2.6 2 3.1C11 12 10.4 7 12 2z"/></svg><span id="combo-n">0</span></span>
+      <span class="lesson-step" id="lesson-step">準備中</span>
+    </div>
+    <div class="lesson-body" id="lesson-body">
+      <div class="lesson-main" id="lesson-main"></div>
+      <div class="lesson-lab" id="lesson-lab" hidden>
+        <div class="lab-frame-wrap"><iframe id="lab-frame" title="インタラクティブな実験台" loading="eager"></iframe></div>
+      </div>
+    </div>
+    <footer class="lesson-foot" id="lesson-foot">
+      <div class="foot-in">
+        <div class="feedback" id="feedback" aria-live="polite"></div>
+        <div class="foot-actions">
+          <button class="btn ghost" id="btn-skip" type="button" hidden>スキップ</button>
+          <button class="btn" id="btn-again" type="button" hidden>もう一度</button>
+          <button class="btn primary" id="btn-check" type="button" disabled>答え合わせ</button>
+        </div>
+      </div>
+    </footer>
+  </section>
+
+  <script src="../js/site-config.js?v=20261112-2027"></script>
+  <script src="../js/curriculum.js?v=20261112-2027"></script>
+  <script src="../js/advanced-curriculum.js?v=20261112-2027"></script>
+  <script src="../js/comprehensive-curriculum.js?v=20261112-2027"></script>
+  <script src="../js/extension-registry.js?v=20261112-2027"></script>
+  <script src="../js/open-curriculum.js?v=20261112-2027"></script>
+  <script src="../js/school-curriculum.js?v=20261112-2027"></script>
+  <script src="../js/exam-curriculum.js?v=20261112-2027"></script>
+  <script src="../js/question-bank.js?v=20261112-2027"></script>
+  <script src="duo.js?v=20261112-2027"></script>
+</body>
+</html>

@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>実験一覧｜物理実験室 · 動かして学ぶ中高の物理</title>
+<meta name="description" content="226 の実験を 108 課綱（台湾）にそって用意しました。運動、力学、波、光、電磁気、原子まで、すべて無料で使えます。" />
+<link rel="canonical" href="https://senior-science.vercel.app/ja/experiments.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="実験一覧｜物理実験室 · 動かして学ぶ中高の物理" />
+<meta property="og:description" content="226 の実験を 108 課綱（台湾）にそって用意しました。運動、力学、波、光、電磁気、原子まで、すべて無料で使えます。" />
+<meta property="og:locale" content="zh_TW" />
+<meta property="og:url" content="https://senior-science.vercel.app/ja/experiments.html" />
+<meta property="og:site_name" content="物理実験室" />
+<meta property="og:image" content="https://senior-science.vercel.app/ja/icons/og-card.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="theme-color" content="#13171c" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20261112-2027" />
+<link rel="apple-touch-icon" href="icons/icon-192.png?v=20261112-2027" />
+<link rel="stylesheet" href="css/style.css?v=20261112-2027" />
+<script>
+(function () {
+  try {
+    var saved = JSON.parse(localStorage.getItem("pl-theme"));
+    // トップページと同じく、初めて来た人にはライトテーマを使う
+    if (saved !== "light" && saved !== "dark") saved = "light";
+    document.documentElement.setAttribute("data-theme", saved);
+  } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+})();
+</script>
+</head>
+<body class="static-page">
+<header class="license-topbar">
+  <a class="license-home" href="index.html"><span class="license-home-mark" aria-hidden="true">PH</span>物理実験室</a>
+  <div class="license-topbar-actions">
+    <a class="license-toplink" href="experiments.html">すべての実験</a>
+    <a class="license-toplink" href="licensing.html">利用条件</a>
+  </div>
+</header>
+<main class="license-page">
+  <p class="license-kicker">実験一覧</p>
+  <h1>226 の物理シミュレーション</h1>
+  <p class="license-lead">中学理科から高校物理まで、台湾の 108 課綱にそって作っています。どの実験にも、操作できるシミュレーション、ドラッグして使える測定器具、印刷できるワークシートがあります。すべて無料です。</p>
+  <section class="license-section">
+    <h2>単元1　運動の表し方<small>（11 実験）</small></h2>
+    <ul class="static-list">
+      <li><a href="p/uniform-accel.html">等加速度直線運動</a><span>加速度が一定のとき、速度は時間とともに一定の割合で変わり、変位は v–t グラフの下の面積になります。初速度と加速度を変…</span></li>
+      <li><a href="p/freefall.html">自由落下</a><span>重力だけを受けて落ちる運動は、等加速度運動の特別な場合（a = g）です。落ちるまでの時間と着地の速さは高さと g だけ…</span></li>
+      <li><a href="p/projectile.html">放物運動</a><span>投げた物体は、水平方向の等速度運動と鉛直方向の等加速度運動を同時にしています。2 つの方向はそれぞれ独立です。投げる角度…</span></li>
+      <li><a href="p/relative-motion.html">相対運動と座標系</a><span>速度は、観測する人がどの座標系にいるかで変わり、ベクトルの和や差で相対速度を求められます。川を渡る船を例に、船の速さと川…</span></li>
+      <li><a href="p/ticker-tape.html">記録タイマー（速度と加速度を測る）</a><span>記録タイマーは一定時間ごとにテープに点を打ちます。点の間隔がだんだん広がるのは加速しているからです。となりの点との間隔を…</span></li>
+      <li><a href="p/measurement-error.html">測定、不確かさ、有効数字</a><span>同じものさしで決まった長さを何度も測ります。読み取りのばらつき、器具の目盛りの細かさ、ゼロ点のずれのせいで、読みは少しず…</span></li>
+      <li><a href="p/terminal-velocity.html">空気抵抗と終端速度</a><span>落ちる速さが大きくなると空気抵抗も大きくなります。抵抗が重力とつり合うと合力が 0 になり、物体は終端速度で等速で落ちま…</span></li>
+      <li><a href="p/motion-sensor.html">超音波距離センサーと位置－時間グラフ</a><span>距離センサーは一定時間ごとに人や台車の位置を記録します。そのまま位置－時間グラフが得られ、傾きから速度を読み取れます。…</span></li>
+      <li><a href="p/reaction-time.html">反応時間と平均の速さ</a><span>車を運転するときや落ちるものさしをつかむとき、反応するまでのあいだも物体は進みます。速さに反応時間をかければ、反応するま…</span></li>
+      <li><a href="p/chase-and-meet.html">追いつきと出会い</a><span>同じ直線上を同じ向きに進む 2 台の車がいつ出会うかは、「後ろの車が進んだ距離で、はじめの間隔をうめられるか」で決まりま…</span></li>
+      <li><a href="p/vernier-micrometer.html">長さの測定と測定器具の読み方</a><span>ノギスとマイクロメーターは、中学・高校で「読み方そのものが問題になる」ただ 2 つの器具です。ノギスの副尺の n 目盛り…</span></li>
+    </ul>
+  </section>
+  <section class="license-section">
+    <h2>単元2　運動の法則と力<small>（24 実験）</small></h2>
+    <ul class="static-list">
+      <li><a href="p/inertia.html">慣性と運動の第 1 法則</a><span>力を受けない（または合力が 0 の）物体は、それまでの運動を続けます。摩擦係数を変えて、すべる物体が慣性でどこまで進むか…</span></li>
+      <li><a href="p/newton2.html">運動の第 2 法則 F = ma</a><span>物体の加速度は合力に比例し、質量に反比例します。向きは合力と同じです。いろいろな力と質量で、加速度の変化を見ます。…</span></li>
+      <li><a href="p/incline.html">斜面上の物体にはたらく力</a><span>斜面上の物体には重力、垂直抗力、摩擦力がはたらきます。重力を斜面に平行な成分と垂直な成分に分ければ、加速度が求められます…</span></li>
+      <li><a href="p/incline-applied-force.html">斜面上で加える力と摩擦力の向き</a><span>斜面上の物体を斜面にそって押したり引いたりするとき、摩擦力は「すべろうとする向き」と逆向きにはたらきます。加える力の大き…</span></li>
+      <li><a href="p/table-hanger.html">机の上の物体とつり下げたおもり</a><span>机の上の物体を糸と滑車でつり下げたおもりとつないだとき、まず 2 つをひとまとめにして止まっているかを判断し、次に 1 …</span></li>
+      <li><a href="p/rope-over-edge.html">机の端から垂れ下がる鎖の加速度</a><span>一様な鎖の一部がなめらかな机の上に、残りが机の端から垂れ下がっているとき、引っぱる力になるのは垂れた部分の重力だけで、鎖…</span></li>
+      <li><a href="p/friction.html">静止摩擦と動摩擦</a><span>接している面が相対的な動きをさまたげる力です。静止摩擦力は大きさが変わり、最大値があります。すべり始めると、ほぼ一定の動…</span></li>
+      <li><a href="p/wall-friction.html">壁にはたらく静止摩擦力</a><span>水平な力で物体を粗い鉛直の壁に押しつけると、垂直抗力は押す力に等しくなります。物体が止まっていれば静止摩擦力は重力とちょ…</span></li>
+      <li><a href="p/stacked-block-friction.html">重ねた物体の静止摩擦力</a><span>下の物体を押すと、上の物体は静止摩擦力によって一緒に加速します。摩擦力の向きはすべろうとする向きで決まり、大きさは上の物…</span></li>
+      <li><a href="p/two-rope-equilibrium.html">2 本の糸でつるす：3 力のつり合い</a><span>おもりを 2 本の糸でつるすと、張力の水平成分どうしがつり合い、鉛直成分の和が重力とつり合います。糸の角度を変えて、糸が…</span></li>
+      <li><a href="p/conveyor-friction.html">ベルトコンベア上の摩擦力の向き</a><span>動いているベルトコンベアに物体を置くと、摩擦力はいつも両者の相対的なすべりに逆らいます。ベルトと物体の速さを比べて、摩擦…</span></li>
+      <li><a href="p/atwood.html">連結された物体と張力（アトウッドの器械）</a><span>糸でつないだ 2 つの物体は、ひとまとめにして加速度を求め、次に 1 つずつ張力を求めます。両方の質量を変えて、全体の動…</span></li>
+      <li><a href="p/newton3.html">運動の第 3 法則（作用・反作用）</a><span>作用と反作用は大きさが等しく向きが反対で、別々の物体にはたらくので打ち消し合いません。2 人で壁を押す例やロケットで、作…</span></li>
+      <li><a href="p/torque-equilibrium.html">力のモーメントとつり合い</a><span>力のモーメントは、力が物体を回転させるはたらきの大きさで、力 × うでの長さです。時計回りと反時計回りのモーメントが等し…</span></li>
+      <li><a href="p/force-table.html">力の合成と分解（力のテーブル）</a><span>力のテーブルの上で、糸とおもりを使っていくつかの力を 1 点に加えます。大きさと向きを変えて、合力（ベクトル和）と、つり…</span></li>
+      <li><a href="p/hookes-law.html">フックの法則とばね</a><span>弾性限界の範囲では、ばねの伸びは引く力に比例し、比例定数がばね定数 k です。いろいろなおもりで伸びを測ると、F–x グ…</span></li>
+      <li><a href="p/apparent-weight.html">エレベーターの中の見かけの重さ</a><span>エレベーターが加速しているとき、体重計の値は垂直抗力 N=m(g+a) で、いつも mg とは限りません。…</span></li>
+      <li><a href="p/spring-series-parallel.html">ばねの直列接続と並列接続</a><span>2 本のばねを直列につなぐとやわらかく、並列につなぐと硬くなります。合成ばね定数を使って、同じ力を加えたときの伸びを比べ…</span></li>
+      <li><a href="p/rolling-motion.html">すべらずに転がる運動とエネルギーの分かれ方</a><span>物体がすべらずに斜面を転がり下りるとき、並進の運動エネルギーと回転の運動エネルギーを同時にもちます。慣性モーメントが違う…</span></li>
+      <li><a href="p/lever-machine.html">てこ、支点と小さな力</a><span>てこがつり合うとき、両側の力のモーメントは等しくなります。力を加える側のうでを長くすると小さな力で重い物を持ち上げられま…</span></li>
+      <li><a href="p/pulley-system.html">定滑車と動滑車で力はどれだけ小さくなるか</a><span>定滑車は力の向きを変え、動滑車は何本もの糸で物体を支えることで力を小さくします。摩擦があると実際の効率は下がります。…</span></li>
+      <li><a href="p/contact-pressure.html">力、面積と圧力</a><span>同じ力でも、小さい面積にはたらくと圧力は大きくなります。針の先、スノーシュー、キャタピラーのつくりはこれで説明できます。…</span></li>
+      <li><a href="p/truss-bridge.html">トラス橋と構造にはたらく力</a><span>橋は三角形を組んだトラスで重さを分散させます。荷重の位置と支点の間隔を変えて、部材にかかる引っぱりと圧縮を見ます。…</span></li>
+      <li><a href="p/incline-friction-coefficient.html">斜面を使った静止摩擦係数の測定</a><span>斜面をゆっくり持ち上げていくと、物体がすべり出す直前に、最大摩擦力が重力の斜面方向の成分とちょうど等しくなります。このと…</span></li>
+    </ul>
+  </section>
+  <section class="license-section">
+    <h2>単元3　運動量と衝突<small>（13 実験）</small></h2>
+    <ul class="static-list">
+      <li><a href="p/collision.html">一直線上の衝突</a><span>2 つの物体が衝突するとき、系全体の運動量は保存されます。弾性衝突では運動エネルギーも保存され、非弾性衝突では運動エネル…</span></li>
+      <li><a href="p/momentum-cons.html">運動量保存則</a><span>系が外力を受けない（または外力の和が 0 の）とき、運動量の和は変わりません。これは作用・反作用の法則から導かれます。衝…</span></li>
+      <li><a href="p/impulse.html">力積と運動量の関係</a><span>力を時間でたし合わせたもの（力積）は運動量の変化に等しくなります。力がはたらく時間を変えて、同じ運動量の変化に必要な力が…</span></li>
+      <li><a href="p/collision2d.html">平面上の衝突</a><span>平面上の衝突では、x 方向と y 方向の運動量がそれぞれ保存されます。入射角とねらいのずれを変えて、2 つの球が衝突後に…</span></li>
+      <li><a href="p/recoil.html">反動と分裂</a><span>静止していた系が分かれると、各部分の運動量は大きさが等しく向きが反対で、合計は 0 のままです。銃の反動やロケットの推進…</span></li>
+      <li><a href="p/ballistic-pendulum.html">弾動振り子</a><span>弾丸がつり下げた木片に打ちこまれて一体になり、一緒に振れ上がります。衝突の瞬間は運動量保存から一体になった速さを求め、そ…</span></li>
+      <li><a href="p/center-of-mass.html">重心と物体系の運動</a><span>物体系の中の物体どうしは動き合えますが、外力が 0 なら、重心は等速直線運動を続けます。…</span></li>
+      <li><a href="p/force-time-profile.html">力－時間グラフと衝撃をやわらげるしくみ</a><span>衝突のときの力の時間変化をいくつか選び、グラフの面積が同じとき、最大の力が作用時間でどう変わるかを比べます。…</span></li>
+      <li><a href="p/rocket-equation.html">ロケットの推進と質量の減少</a><span>ロケットは燃焼ガスを後ろへ噴き出して前へ加速します。噴き出す速さと燃料の使い方が、加速にどう影響するかを見ます。…</span></li>
+      <li><a href="p/multistage-rocket.html">多段ロケットと切り離し</a><span>燃料を使い切った段を切り離すと、残りの質量が小さくなり、燃料をより効率よく速度の変化に変えられます。…</span></li>
+      <li><a href="p/water-rocket.html">水ロケットと反作用</a><span>圧縮した空気が水を下向きに勢いよく押し出し、ロケットはその反作用で上向きに加速します。水の量と圧力によって、推力と飛び方…</span></li>
+      <li><a href="p/crumple-zone.html">衝撃をやわらげる構造と衝突の安全</a><span>衝突で運動量を変えるのに必要な力積は決まっています。エアバッグ、ヘルメット、車のクラッシャブルゾーンは止まるまでの時間を…</span></li>
+      <li><a href="p/skateboard-push.html">スケートボードの押し合いと重心</a><span>スケートボードに乗った 2 人が押し合うと、系の運動量の合計は保存されます。質量の小さいほうが速くなり、重心の位置は内力…</span></li>
+    </ul>
+  </section>
+  <section class="license-section">
+    <h2>単元4　仕事とエネルギー<small>（13 実験）</small></h2>
+    <ul class="static-list">
+      <li><a href="p/work-power.html">仕事と仕事率</a><span>力が移動の向きにする仕事と、仕事をする速さ（仕事率）。力の大きさと向きの角度を変えて、実際にする仕事と仕事率を見ます。…</span></li>
+      <li><a href="p/work-energy.html">仕事と運動エネルギーの関係</a><span>合力が物体にした仕事は、運動エネルギーの変化に等しくなります。物体に力を加えて一定の距離を動かし、仕事が増えるにつれて速…</span></li>
+      <li><a href="p/energy-track.html">レール上の力学的エネルギー保存</a><span>摩擦のないレールでは運動エネルギーと重力による位置エネルギーが入れかわりますが、力学的エネルギーの和は変わりません。摩擦…</span></li>
+      <li><a href="p/potential.html">重力と弾性力による位置エネルギー</a><span>物体が位置や変形によってたくわえるエネルギーです。ばねを縮めてはなし、弾性エネルギーが運動エネルギーに、さらに重力による…</span></li>
+      <li><a href="p/conservative.html">保存力と保存力でない力</a><span>保存力がする仕事は道すじによりません。保存力でない力（摩擦など）は力学的エネルギーを減らします。同じ物体がちがう道すじを…</span></li>
+      <li><a href="p/work-angle.html">仕事と力の向き</a><span>仕事をするのは、力のうち移動の向きの成分だけです。力の向きをドラッグして、正の仕事、仕事 0、負の仕事を見ます。…</span></li>
+      <li><a href="p/power-lab.html">仕事率と効率</a><span>同じ仕事なら、短い時間でするほど仕事率は大きくなります。損失を入れると、入力と役に立つ出力を比べられます。…</span></li>
+      <li><a href="p/friction-thermal.html">摩擦による損失と熱</a><span>物体が摩擦を受けると、力学的エネルギーが減って内部エネルギーに変わります。動摩擦係数を変えて、止まるまでの距離と発生する…</span></li>
+      <li><a href="p/energy-forms.html">エネルギーの種類と変換効率</a><span>装置は化学エネルギー、位置エネルギー、運動エネルギー、電気エネルギー、熱をたがいに変換できます。役に立つ出力と入力の比が…</span></li>
+      <li><a href="p/simple-machine-efficiency.html">簡単な道具の仕事と効率</a><span>斜面、てこ、滑車は力の大きさや向きを変えられますが、した仕事は、役に立つ仕事と少なくとも同じだけ必要です。…</span></li>
+      <li><a href="p/hydroelectric-power.html">水力発電と仕事率</a><span>水の落差が重力による位置エネルギーとなり、タービンを通って電気エネルギーに変わります。流量と落差が大きいほど、理論上得ら…</span></li>
+      <li><a href="p/wind-turbine.html">風力発電と羽根が回る面積</a><span>風車は、羽根が回ってできる円を通る風の運動エネルギーを取り出します。風速が電力にあたえる影響は、ほぼ 3 乗です。…</span></li>
+      <li><a href="p/loop-track.html">力学的エネルギー保存とループのレール</a><span>ジェットコースターが鉛直のループを通りぬけるには、少なくとも 2.5R の高さからはなす必要があります。でも、なぜ 2R…</span></li>
+    </ul>
+  </section>
+  <section class="license-section">
+    <h2>単元5　円運動と万有引力<small>（11 実験）</small></h2>
+    <ul class="static-list">
+      <li><a href="p/circular.html">等速円運動</a><span>円周上を一定の速さで回るとき、加速度は円の中心を向きます。速さは変わりませんが、速度の向きは変わり続けます。半径と角速度…</span></li>
+      <li><a href="p/centripetal.html">向心力</a><span>円運動を続けるのに必要な、中心向きの合力です。糸につけた小球を回す例で、張力が速さと半径でどう変わるかを見ます。糸が切れ…</span></li>
+      <li><a href="p/angular-momentum.html">角運動量保存</a><span>外からの力のモーメントがなければ、系の角運動量は変わりません。惑星の面積速度一定の法則や、フィギュアスケートで腕を縮める…</span></li>
+      <li><a href="p/rotation.html">剛体の回転と慣性モーメント</a><span>剛体に力のモーメントがはたらくと角加速度が生じます。F = ma の回転版です。慣性モーメント I は回転の「慣性」で、…</span></li>
+      <li><a href="p/vertical-circle.html">鉛直面内の円運動</a><span>糸につけた小球（またはバケツ）を鉛直な面内で回すと、高さによって速さと張力が変わります。いちばん上を通るには、そこで少な…</span></li>
+      <li><a href="p/banked-curve.html">傾いたカーブと向心力</a><span>傾いたカーブでは、垂直抗力の水平成分が向心力になります。速さと傾きの角度を変えて、すべるかどうかを判断します。…</span></li>
+      <li><a href="p/rotation-dynamics.html">回転の運動方程式と角加速度</a><span>固定軸のある剛体に力のモーメントを加えると、角加速度が生じます。同じ力のモーメントなら、慣性モーメントが大きいほど回転の…</span></li>
+      <li><a href="p/cavendish-balance.html">キャベンディッシュのねじればかりと万有引力定数</a><span>2 組の鉛の球のあいだのとても弱い万有引力が、細い線をねじります。回転した角度を測ると、万有引力定数の大きさの見当がつき…</span></li>
+      <li><a href="p/kepler-orbits.html">ケプラーの 3 法則と楕円軌道</a><span>惑星は太陽のまわりを楕円をえがいて回り、太陽は楕円の焦点の 1 つにあります。太陽に近いときは速く、遠いときは遅く動きま…</span></li>
+      <li><a href="p/satellite-orbit.html">人工衛星：軌道の速さ、周期と脱出速度</a><span>高い山の上から砲弾を水平に撃つと、速いほど遠くに落ちます。地面が丸く曲がっていく速さに落ちる速さが追いつかないほど速いと…</span></li>
+      <li><a href="p/conical-pendulum.html">円すい振り子</a><span>おもりが水平面内で等速円運動をし、糸が円すいをえがきます。張力の鉛直成分が重力とつり合い、水平成分が向心力になります。速…</span></li>
+    </ul>
+  </section>
+  <section class="license-section">
+    <h2>単元6　単振動<small>（11 実験）</small></h2>
+    <ul class="static-list">
+      <li><a href="p/spring.html">ばね振り子</a><span>ばねの復元力は変位に比例し向きが反対なので、物体は単振動をします。運動エネルギーと弾性エネルギーが周期的に入れかわります…</span></li>
+      <li><a href="p/pendulum.html">単振り子</a><span>振れが小さいとき、単振り子はほぼ単振動になり、周期は振り子の長さと重力加速度だけで決まります。質量や振幅には関係しません…</span></li>
+      <li><a href="p/shm-energy.html">単振動のエネルギー</a><span>単振動では力学的エネルギーの和が保存され、位置によって運動エネルギーと位置エネルギーが入れかわります。変位にそってエネル…</span></li>
+      <li><a href="p/damped-oscillation.html">減衰振動</a><span>摩擦や抵抗があると振幅はだんだん小さくなります。減衰の大きさを変えて、減衰が小さい場合、臨界減衰、過減衰を比べます。…</span></li>
+      <li><a href="p/resonance.html">共振</a><span>外から加える力の振動数が系の固有振動数に近いと、振幅が急に大きくなります。外から加える振動数を変えていき、共振点の近くで…</span></li>
+      <li><a href="p/coupled-oscillators.html">連成振動とエネルギーのやりとり</a><span>ばねでつないだ 2 つの振動子は、周期的にエネルギーをやりとりし、うなりや基準振動が現れます。…</span></li>
+      <li><a href="p/physical-pendulum.html">実体振り子と慣性モーメント</a><span>剛体が固定軸のまわりに小さく振れるとき、周期は慣性モーメント、質量、重心から支点までの距離のすべてで決まります。…</span></li>
+      <li><a href="p/torsion-pendulum.html">ねじれ振り子とねじれ定数</a><span>物体が細い線をねじると、元にもどろうとする力のモーメントは回転角に比例し、角度についての単振動になります。…</span></li>
+      <li><a href="p/resonance-phase-lag.html">強制振動の位相のずれ</a><span>外から加える振動数が系の固有振動数に近づくと、振幅が大きくなり、加える力に対する変位の位相が急に変わります。…</span></li>
+      <li><a href="p/pendulum-measure-g.html">単振り子で重力加速度 g を測る</a><span>振れが小さい単振り子の周期は、糸の長さと重力加速度だけで決まります。糸の長さを変えて周期を記録し、T² を L に対して…</span></li>
+      <li><a href="p/spring-measure-k.html">ばね振り子でばね定数 k を測る</a><span>同じばねのばね定数は 2 つの方法で求められます。おもりをつるして伸びを測る静的な方法と、振動の周期を測る動的な方法です…</span></li>
+    </ul>
+  </section>
+  <section class="license-section">
+    <h2>単元7　流体と熱<small>（24 実験）</small></h2>
+    <ul class="static-list">
+      <li><a href="p/buoyancy.html">浮力とアルキメデスの原理</a><span>流体の中の物体は上向きの浮力を受け、その大きさは押しのけた流体の重さに等しくなります。物体の密度が流体より小さいと浮きま…</span></li>
+      <li><a href="p/spring-scale-buoyancy.html">ばねばかりで浮力を測る</a><span>物体をばねばかりにつるして少しずつ水に沈めると、浮力の分だけばねばかりの値が小さくなります。空気中と液体中の値の差から、…</span></li>
+      <li><a href="p/bernoulli.html">ベルヌーイの定理</a><span>理想的な流体では、流れの速い所ほど圧力が小さくなります。これはエネルギー保存から導かれます。管の太さを変えて、流速と圧力…</span></li>
+      <li><a href="p/gas.html">理想気体と気体の分子運動</a><span>気体はでたらめに動くたくさんの分子でできています。温度は分子の平均の運動エネルギーを表し、分子が容器の壁にぶつかることで…</span></li>
+      <li><a href="p/gas-laws.html">気体の法則（ボイル／シャルル）</a><span>理想気体の圧力、体積、温度は互いに関係しています。温度が一定なら PV は一定、圧力が一定なら V∝T です。過程を切り…</span></li>
+      <li><a href="p/heat.html">熱平衡と比熱</a><span>2 つの物体がふれ合うと、熱は高温の側から低温の側へ移り、やがて熱平衡になります。比熱が大きいほど温度は変わりにくくなり…</span></li>
+      <li><a href="p/thermo1.html">熱力学第一法則</a><span>内部エネルギーの変化は、吸収した熱量から外へした仕事を引いたものに等しくなります。これもエネルギー保存の一つの形です。等…</span></li>
+      <li><a href="p/hydrostatic-pressure.html">液体の圧力と深さ</a><span>静止した液体の中の圧力は、深さに比例して大きくなり、容器の形には関係しません。…</span></li>
+      <li><a href="p/phase-change.html">状態変化と加熱曲線</a><span>物質がとけたり沸騰したりしているあいだは、熱を吸収しても温度は変わりません。加熱の強さを変えて、グラフの平らな部分を見ま…</span></li>
+      <li><a href="p/heat-transfer.html">伝導、対流、放射</a><span>熱は、伝導、流体の対流、電磁波の放射で伝わります。材料、表面、温度差が冷える速さにどう影響するかを比べます。…</span></li>
+      <li><a href="p/thermal-expansion.html">熱膨張とバイメタル</a><span>温度が上がると、固体、液体、気体の大きさは増えます。膨張率の違う 2 種類の金属をはり合わせた板は、熱すると曲がります。…</span></li>
+      <li><a href="p/viscosity-reynolds.html">粘性抵抗とレイノルズ数</a><span>流体の粘性は相対的な動きをさまたげます。レイノルズ数を使うと、流れが層流に近いか乱流に近いかを判断できます。…</span></li>
+      <li><a href="p/continuity-hydraulic.html">連続の式と水圧機</a><span>圧縮されない流体が管の中を流れるとき、流量は保存されます。閉じこめた液体は、パスカルの原理で圧力を伝え、力を大きくできま…</span></li>
+      <li><a href="p/heat-engine-principle.html">熱機関のしくみ：試験管の栓が飛ぶ実験</a><span>中学校でおなじみの熱機関の演示です。アルコールランプで試験管の中の少しの水を熱すると、水が蒸発して管の中の気体の圧力が上…</span></li>
+      <li><a href="p/density-lab.html">密度の測定と浮き沈み</a><span>密度は質量を体積でわったものです。物体と液体の密度を比べれば、沈むか、液体中で止まるか、浮くかを予想できます。…</span></li>
+      <li><a href="p/atmospheric-pressure.html">大気圧とマクデブルクの半球</a><span>2 つの半球のあいだの空気をぬくと、外の大気圧によって大きな力がかかります。空気は目に見えなくても圧力があることがわかり…</span></li>
+      <li><a href="p/surface-tension.html">表面張力と毛細管現象</a><span>液体の表面の分子は受ける力がかたよっていて、表面がぴんと張った膜のようになります。細い管の中で液面が上がるか下がるかは、…</span></li>
+      <li><a href="p/calorimetry-mixing.html">熱量計と混ぜた水の温度</a><span>理想的な場合、湯が出した熱と水が受け取った熱は等しくなります。最後の温度から、熱量と質量の関係を比べられます。…</span></li>
+      <li><a href="p/u-tube-manometer.html">U 字管圧力計</a><span>両側の液面の高さの差は圧力の差を表します。加える圧力と液体の密度を変えて、高さの差が圧力の値にどう換算されるかを見ます。…</span></li>
+      <li><a href="p/metal-specific-heat.html">混合法による金属の比熱の測定</a><span>熱した金属を水に入れると、金属が出した熱と水が受け取った熱は等しくなります。最後の温度から金属の比熱が求められます。…</span></li>
+      <li><a href="p/heat-conduction.html">棒を伝わる熱と熱伝導率</a><span>熱が伝わる速さは、材料、断面積、長さ、両端の温度差で変わります。金属の棒と断熱材で、一定になったときの熱の流れを比べます…</span></li>
+      <li><a href="p/newton-cooling.html">ニュートンの冷却の法則</a><span>湯が熱を失う速さはまわりとの温度差に比例するので、温度は一定の割合で下がるのではなく、指数関数のグラフにそって室温に近づ…</span></li>
+      <li><a href="p/four-stroke-engine.html">4 サイクルエンジンと熱機関の効率</a><span>ガソリンエンジンは、吸気、圧縮、燃焼（膨張）、排気の 4 つの行程で、燃料の化学エネルギーを力学的エネルギーに変えます。…</span></li>
+      <li><a href="p/brownian-diffusion.html">ブラウン運動と拡散</a><span>水の中の花粉を顕微鏡で見ると、小さな粒子がたえず不規則に動いています。まわりの水分子に四方八方からぶつかられ続け、その当…</span></li>
+    </ul>
+  </section>
+  <section class="license-section">
+    <h2>単元8　波と音<small>（20 実験）</small></h2>
+    <ul class="static-list">
+      <li><a href="p/wave-types.html">横波と縦波</a><span>媒質の振動の向きが、波の進む向きに垂直なものが横波、平行なものが縦波です。振動数と振幅を変えて、媒質の点の振動と波形の進…</span></li>
+      <li><a href="p/superposition.html">波の重ね合わせと干渉</a><span>2 つの波が出会うと、変位がたし合わされます。位相がそろうと強め合い、逆になると弱め合います。2 つの波の位相差を変えて…</span></li>
+      <li><a href="p/standing-wave.html">弦の定常波</a><span>振動数が同じで逆向きに進む 2 つの波が重なると定常波ができます。弦には決まった振動数（倍振動）の定常波しかできません。…</span></li>
+      <li><a href="p/doppler.html">ドップラー効果</a><span>音源と観測者が近づいたり遠ざかったりすると、聞こえる振動数が変わります。近づくときは高く、遠ざかるときは低くなります。音…</span></li>
+      <li><a href="p/beats.html">うなり</a><span>振動数が近い 2 つの波が重なると、合成波の振幅が周期的に大きくなったり小さくなったりします。これがうなりで、うなりの振…</span></li>
+      <li><a href="p/resonance-tube.html">音の共鳴（気柱の共鳴）</a><span>空気の柱は、ある決まった長さのときに音さと共鳴します。これを使うと音の速さが測れます。管の長さを変えて、開管と閉管で共鳴…</span></li>
+      <li><a href="p/reflection-boundary.html">波の反射と境界</a><span>固定端で反射した波は位相が逆になり、自由端で反射した波は位相がそのままです。境界の条件を切りかえて、パルスがもどってくる…</span></li>
+      <li><a href="p/sound-intensity.html">音の強さとデシベル</a><span>音の強さは振幅の 2 乗に比例し、デシベルは対数の目盛りです。距離と振幅を変えて、聞こえ方の変化を比べます。…</span></li>
+      <li><a href="p/air-column-resonance.html">気柱の共鳴</a><span>空気の柱の長さを変えて、音がいちばん大きく聞こえる共鳴の位置を探し、となり合う共鳴の長さから波長を求めます。…</span></li>
+      <li><a href="p/string-wave-speed.html">弦を伝わる波の速さ、張力と線密度</a><span>弦を伝わる横波の速さは、張力と単位長さあたりの質量で決まります。張力が大きいほど波は速く進みます。…</span></li>
+      <li><a href="p/sound-properties.html">音の高さ、大きさ、音色</a><span>振動数で音の高さが決まり、振幅で音の大きさが決まり、波形にふくまれる倍音の成分で音色が違ってきます。…</span></li>
+      <li><a href="p/echo-ultrasound.html">反響定位と超音波による距離の測定</a><span>パルスを出して反射が返ってくるまでの時間を測り、音の速さを使えば障害物までの距離がわかります。超音波は距離の測定や画像診…</span></li>
+      <li><a href="p/seismic-waves.html">地震波と免震</a><span>地震のゆれは地面から建物へ伝わります。免震構造は建物の固有振動数を低くして、建物が共振するのをおさえます。…</span></li>
+      <li><a href="p/seismic-triangulation.html">地震の P 波と S 波の到着時刻の差で震源を求める</a><span>P 波は速く、S 波は遅く伝わります。1 つの観測点での到着時刻の差（初期微動継続時間）から震源までの距離が見積もれ、い…</span></li>
+      <li><a href="p/string-harmonic-spectrum.html">弦の倍振動と音の高さ</a><span>両端を固定した弦には、整数倍の倍振動しかできません。長さ、張力、線密度を変えて、基本振動と倍音がどう変わるかを見ます。…</span></li>
+      <li><a href="p/noise-barrier.html">防音壁と音の弱まり方</a><span>音は広がりながら進むので、距離が離れるほど弱くなります。さらに防音壁があると、聞く人に届く音の強さが下がります。…</span></li>
+      <li><a href="p/resonance-tube-sound-speed.html">気柱の共鳴で音の速さを測る</a><span>一方が開いた空気の柱は、ある決まった長さのときに音さと共鳴し、音が急に大きくなります。開いた端が腹、水面が節で、最初の共…</span></li>
+      <li><a href="p/ripple-tank.html">水波投影装置：反射、屈折、回折と干渉</a><span>水波投影装置（リップルタンク）は、目に見えにくい波を明暗のしまで映し出します。直線の波は斜めに置いた板で反射し、浅い所に…</span></li>
+      <li><a href="p/sound-interference.html">2 つのスピーカーによる音の干渉</a><span>2 つのスピーカーを同じ信号源につなぎ、振動数も位相も同じ音を出します。マイクを持って前を歩くと、音が大きくなったり小さ…</span></li>
+      <li><a href="p/sound-vacuum.html">音には媒質が必要：真空鐘</a><span>鳴っているベルをガラスの鐘の中に入れ、空気をぬきながら聞くと、音はどんどん小さくなりますが、ベルの打ち子が動いているのは…</span></li>
+    </ul>
+  </section>
+  <section class="license-section">
+    <h2>単元9　光<small>（28 実験）</small></h2>
+    <ul class="static-list">
+      <li><a href="p/snell.html">反射と屈折（屈折の法則）</a><span>光がある媒質から別の媒質に入ると曲がります。入射角と屈折角はスネルの法則（屈折の法則）にしたがいます。屈折率の大きい側か…</span></li>
+      <li><a href="p/mirror.html">球面鏡による像</a><span>凹面鏡と凸面鏡では、物体の位置によって性質の違う像ができます。代表的な光線を作図して像を求めます。物体を動かして、像が正…</span></li>
+      <li><a href="p/lens.html">レンズによる像</a><span>凸レンズと凹レンズでは、物体の位置によって違う像ができます。3 本の代表的な光線を作図して像を求めます。物体を動かして、…</span></li>
+      <li><a href="p/lens-displacement.html">凸レンズを動かして焦点距離を測る</a><span>物体とスクリーンの距離を固定して凸レンズを動かすと、スクリーンにはっきりした像ができる位置が 2 か所見つかります。その…</span></li>
+      <li><a href="p/double-slit.html">ヤングの実験（二重スリット）</a><span>コヒーレントな光が 2 つのスリットを通ると、スクリーンに明暗のしま（干渉じま）ができます。これは光が波である証拠です。…</span></li>
+      <li><a href="p/diffraction.html">単スリットによる回折</a><span>光は 1 つのスリットを通ると回折して広がり、中央がいちばん広くて明るく、両側がだんだん暗くなる模様ができます。スリット…</span></li>
+      <li><a href="p/polarization.html">偏光</a><span>偏光は光が横波であることを示しています。自然光は偏光板を通ると 1 つの振動方向だけになり、2 枚目の偏光板を通るときの…</span></li>
+      <li><a href="p/dispersion.html">分散とプリズム</a><span>媒質の屈折率は波長によって違うので、白色光はプリズムで色の帯（スペクトル）に分かれます。紫の光がいちばん大きく曲がり、赤…</span></li>
+      <li><a href="p/grating.html">回折格子</a><span>回折格子には等間隔のスリットがたくさんあります。各スリットからの光が干渉して、決まった角度だけに明るく細い明線ができます…</span></li>
+      <li><a href="p/critical-angle.html">全反射と臨界角</a><span>光が屈折率の大きい媒質から小さい媒質へ進むとき、入射角が臨界角をこえるとすべて反射します。…</span></li>
+      <li><a href="p/refraction-slab.html">平行なガラス板による横のずれ</a><span>光が平行なガラス板を通りぬけると、出ていく光は入る光と平行ですが、横にずれます。このずれは測ることができます。…</span></li>
+      <li><a href="p/optical-instruments.html">顕微鏡と望遠鏡</a><span>顕微鏡では、対物レンズが拡大した実像をつくり、それを接眼レンズでさらに拡大します。望遠鏡では、遠くの物体の像が焦点面にで…</span></li>
+      <li><a href="p/malus-law.html">マリュスの法則と偏光板</a><span>直線偏光が検光子を通るとき、通りぬける光の強さは 2 つの偏光の向きのなす角で決まります。…</span></li>
+      <li><a href="p/thin-film.html">薄膜の干渉と構造色</a><span>シャボン玉や油の膜の上の面と下の面で反射した光には光路差があり、膜の厚さによって、波長ごとに強め合ったり弱め合ったりしま…</span></li>
+      <li><a href="p/fizeau-light-speed.html">フィゾーの歯車と光の速さの測定</a><span>光を回転する歯車のすき間から遠くの鏡まで送って反射させ、もどってきた光が次の歯でさえぎられるように回転の速さを調節すると…</span></li>
+      <li><a href="p/shadow-pinhole.html">光の直進とピンホールカメラ</a><span>光はまっすぐ進むので影ができます。ピンホールを通ると、いろいろな方向から来た光がスクリーンの上で交差して、倒立の実像がで…</span></li>
+      <li><a href="p/rgb-color-mixing.html">光の三原色とディスプレイの色</a><span>赤、緑、青の 3 色の光をたし合わせると、ほかの色ができます。スマートフォンや画面は、小さな RGB のサブピクセルで色…</span></li>
+      <li><a href="p/fiber-optics.html">光ファイバーの伝送と曲げによる損失</a><span>光ファイバーは、コアとクラッドの境目での全反射で光を導きます。急に曲げすぎると光の一部がもれて、伝わる光が弱くなります。…</span></li>
+      <li><a href="p/human-eye.html">目のピント調節と視力の矯正</a><span>目は水晶体の焦点距離を変えて、物体の像を網膜の上につくります。近視は凹レンズ、遠視は凸レンズで矯正します。…</span></li>
+      <li><a href="p/camera-exposure.html">カメラの露出、絞りとシャッター</a><span>カメラは絞りで入る光の量を、シャッターで露光時間を調節します。この 2 つの組み合わせで、撮像面が受ける光の総量が決まり…</span></li>
+      <li><a href="p/lens-combination.html">薄いレンズの組み合わせと合成焦点距離</a><span>2 枚の薄いレンズを近づけて置くと、光を集める能力はたし合わせられます。凸レンズと凹レンズを組み合わせると、全体の焦点距…</span></li>
+      <li><a href="p/photometry-inverse-square.html">照度と逆 2 乗の法則</a><span>点光源から出た光は、離れるほど大きな球面に広がるので、受ける面の照度は距離の 2 乗に反比例して下がります。…</span></li>
+      <li><a href="p/prism-spectrometer.html">プリズムの最小偏角で屈折率を測る</a><span>光がプリズムの中を対称に通るとき、偏角が最小になります。頂角と最小偏角を測れば、材料の屈折率が計算できます。…</span></li>
+      <li><a href="p/fresnel-diffraction.html">フレネル回折とフレネル数</a><span>スクリーンがあまり遠くないとき、回折の模様は近い場のフレネル領域で決まります。穴の大きさと伝わる距離を変えて、近い場から…</span></li>
+      <li><a href="p/lens-focal-measurement.html">凸レンズによる像のでき方と焦点距離の測定</a><span>光学台の上で物体を動かし、紙のスクリーンをいちばんはっきり映る位置に合わせると、物体までの距離と像までの距離が 1 組得…</span></li>
+      <li><a href="p/apparent-depth.html">見かけの深さと実際の深さ：水の中の硬貨</a><span>水面の上から見下ろすと、プールの底は実際より浅く見えます。硬貨から来た光は水面を出るとき法線から離れる向きに曲がり、目は…</span></li>
+      <li><a href="p/plane-mirror.html">平面鏡による像</a><span>平面鏡の像は、鏡面について物体と対称です。大きさは同じで、正立、左右が逆、そして虚像です。光が実際に鏡の後ろへ回っている…</span></li>
+      <li><a href="p/brewster-angle.html">反射光の偏光（ブリュースター角）</a><span>水面や黒板に日光が当たってまぶしく反射しているとき、偏光サングラスを通して回すと、まぶしさが弱くなります。反射光はすでに…</span></li>
+    </ul>
+  </section>
+  <section class="license-section">
+    <h2>単元10　電場と電気回路<small>（30 実験）</small></h2>
+    <ul class="static-list">
+      <li><a href="p/coulomb.html">クーロンの法則</a><span>2 つの点電荷のあいだにはたらく静電気力は、電気量の積に比例し、距離の 2 乗に反比例します。同じ符号ならしりぞけ合い、…</span></li>
+      <li><a href="p/ohms.html">オームの法則と回路</a><span>導体の両端の電圧と電流は比例し、その比が抵抗です。電圧と抵抗を変えて、電流と電力がどう変わるかを見ます。…</span></li>
+      <li><a href="p/iv-measurement.html">電流計・電圧計による抵抗の測定と U-I グラフ</a><span>電流計は直列に、電圧計は測る抵抗の両端に並列につなぎます。可変抵抗を変えながら U と I を記録し、U-I グラフの傾…</span></li>
+      <li><a href="p/closed-circuit-emf.html">閉回路：起電力と内部抵抗の測定</a><span>実際の電池は、理想的な起電力 E に内部抵抗 r が直列につながったものと考えられます。外部抵抗を変えて端子電圧と電流を…</span></li>
+      <li><a href="p/resistors.html">抵抗の直列接続と並列接続</a><span>直列では抵抗の値を足し、電流はどこも同じです。並列では抵抗の逆数を足し、電圧はどこも同じです。つなぎ方を切りかえて、合成…</span></li>
+      <li><a href="p/capacitor.html">コンデンサーの充電と放電</a><span>コンデンサーを抵抗を通して充電・放電すると、電圧と電流は指数関数的に変わり、その速さは時定数 τ = RC で決まります…</span></li>
+      <li><a href="p/wheatstone.html">ホイートストンブリッジ</a><span>4 つの抵抗でブリッジ回路をつくり、まん中に検流計をつなぎます。向かい合う抵抗の積が等しい（R₁Rx = R₂R₃）とブ…</span></li>
+      <li><a href="p/e-deflection.html">電場の中での荷電粒子の曲がり方</a><span>荷電粒子が平行板のあいだの一様な電場に水平に入ると、水平方向は等速度、鉛直方向は電気力で等加速度になり、軌道は放物線にな…</span></li>
+      <li><a href="p/circuit-sandbox.html">回路工房：自由に配線できる実験室</a><span>机の上に電池、ナイフスイッチ、豆電球、すべり抵抗器、2 つのメーターがあります。端子をクリックして自由につなぐと、回路が…</span></li>
+      <li><a href="p/kirchhoff.html">キルヒホッフの法則</a><span>分かれ目では電流が保存され、1 周する閉回路では電位の上がり下がりの合計が 0 になります。枝の抵抗を変えて、それぞれの…</span></li>
+      <li><a href="p/meter-loading.html">メーターの内部抵抗と測定への影響</a><span>実際の電圧計や電流計には内部抵抗があり、回路につなぐと元の状態が変わってしまいます。内部抵抗を変えて、測定誤差を比べます…</span></li>
+      <li><a href="p/electrostatic-shield.html">静電遮へいとファラデーケージ</a><span>静電気的につり合った導体の内部では電場が 0 で、電荷は表面に分布します。外の電荷の影響が金属の殻でさえぎられる様子を見…</span></li>
+      <li><a href="p/rl-transient.html">RL 回路の過渡現象と逆起電力</a><span>コイルに電流を流しはじめても、自己誘導が電流の変化をさまたげるので、電流はすぐには一定の値になりません。電源を切ったとき…</span></li>
+      <li><a href="p/diode-rectifier.html">ダイオードによる整流と平滑</a><span>ダイオードはおもに一方向の電流しか通さないので、交流を脈流に変えられます。コンデンサーを加えると、電圧の波打ち（リプル）…</span></li>
+      <li><a href="p/semiconductor-led.html">pn 接合と LED の発光</a><span>順方向の電圧をかけると pn 接合の障壁が低くなり、電子とホールが再結合するときにエネルギーを光として出せます。LED …</span></li>
+      <li><a href="p/oscilloscope.html">オシロスコープと信号の測定</a><span>オシロスコープは電圧の時間変化を波形として表示し、振幅、周期、周波数、2 つの信号の位相差を測れます。…</span></li>
+      <li><a href="p/electrostatic-induction.html">静電誘導と箔検電器</a><span>帯電した物体を導体に近づけると、導体の中の自由電子が移動します。ふれなくても電荷が分かれ、箔検電器の箔が開きます。…</span></li>
+      <li><a href="p/electric-heating.html">ジュール熱と電気器具の消費電力</a><span>電流が抵抗を流れると、電気エネルギーが内部エネルギーに変わります。電圧と抵抗を変えて、電気器具の発熱の電力を読み取ります…</span></li>
+      <li><a href="p/household-circuit.html">家庭の配線、ヒューズ、漏電遮断器</a><span>家庭の電気器具は並列につないで、それぞれが独立して動くようにしています。全体の電流が保護装置の定格をこえると、ヒューズや…</span></li>
+      <li><a href="p/rlc-resonance.html">RLC 直列回路の共振と位相</a><span>交流回路では、ある振動数でコイルとコンデンサーのリアクタンスが打ち消し合い、電流が最大になります。その振動数の前後で、電…</span></li>
+      <li><a href="p/voltage-divider.html">分圧回路とセンサーの読み取り</a><span>直列につないだ 2 つの抵抗が電源の電圧を分け合います。可変抵抗や光センサー（CdS）を使うと、まわりの変化を測れる出力…</span></li>
+      <li><a href="p/rc-timer.html">RC 回路によるタイマーと遅延</a><span>コンデンサーを抵抗を通して充電すると、電圧は指数関数的に上がります。R と C を変えれば、いろいろな遅延時間やタイマー…</span></li>
+      <li><a href="p/electrolysis.html">電気分解とファラデーの法則</a><span>電流が電解液を流れると、電極に物質が析出します。流れた電気量が多いほど、析出する質量も大きくなります。…</span></li>
+      <li><a href="p/bode-low-pass.html">RC ローパスフィルターの周波数特性</a><span>RC ローパスフィルターは低い周波数を通し、高い周波数を弱めます。入力の周波数を変えていって利得のグラフを見て、回路の設…</span></li>
+      <li><a href="p/wire-resistivity.html">導線の抵抗と長さ、断面積（抵抗率）</a><span>導線は長いほど抵抗が大きく、太いほど抵抗が小さくなります。横軸を ℓ/A にとると、長さを変えたデータも太さを変えたデー…</span></li>
+      <li><a href="p/resistance-vs-temperature.html">温度による抵抗の変化（金属とサーミスター）</a><span>同じ湯せん、同じ温度でも、金属と半導体の反応はまったく逆です。金属は温度が上がると結晶の格子の振動がはげしくなり、電子が…</span></li>
+      <li><a href="p/equipotential-mapping.html">等電位線と電場（導電紙で描く）</a><span>導電紙に 2 つの電極をつなぎ、電圧計の探針で電位の等しい点を探してつなぐと、等電位線になります。電気力線はどこでも等電…</span></li>
+      <li><a href="p/electric-potential.html">電位と静電気力による位置エネルギー：点電荷の電位の地形</a><span>電位を地形の高さと考えてみます。正電荷は山、負電荷はくぼみです。正の試験電荷は低い方へ転がり、位置エネルギーが運動エネル…</span></li>
+      <li><a href="p/parallel-plate-capacitor.html">平行板コンデンサー：面積、間隔と誘電体</a><span>2 枚の平行な金属板を電池につなぐと、電荷をたくわえられます。板が大きく、間隔がせまいほど、たくわえられる電荷は多くなり…</span></li>
+      <li><a href="p/triboelectric.html">摩擦電気と電荷の保存</a><span>プラスチックの定規と毛皮をこすり合わせると、電子が毛皮から定規へ移ります。定規は負に、毛皮は同じ量の正に帯電します。電荷…</span></li>
+    </ul>
+  </section>
+  <section class="license-section">
+    <h2>単元11　磁場と電磁誘導<small>（25 実験）</small></h2>
+    <ul class="static-list">
+      <li><a href="p/current-field.html">電流がつくる磁場</a><span>電流が流れると、まわりに磁場ができます。向きは右ねじの法則で決まり、まっすぐな導線のつくる磁場は距離に反比例します。電流…</span></li>
+      <li><a href="p/lorentz.html">磁場とローレンツ力</a><span>磁場の中を動く電荷は力を受け、その向きはフレミングの左手の法則で決まります。力はいつも速度に垂直なので、荷電粒子は等速円…</span></li>
+      <li><a href="p/induction.html">電磁誘導（ファラデーの法則）</a><span>磁束が変わると、コイルに誘導起電力が生じます。変化が速いほど起電力は大きくなります。磁石をコイルに出し入れして、誘導電流…</span></li>
+      <li><a href="p/lenz.html">レンツの法則</a><span>誘導電流がつくる磁場は、いつも元の磁束の変化をさまたげる向きになります。これはエネルギー保存の表れです。磁石を近づけると…</span></li>
+      <li><a href="p/ac-generator.html">交流発電機</a><span>一様な磁場の中でコイルを回すと、磁束が周期的に変わり、正弦波の交流起電力が生じます。回転の速さを変えて、誘導起電力の波形…</span></li>
+      <li><a href="p/transformer.html">変圧器</a><span>電磁誘導を使って交流の電圧を変えます。電圧の比は巻き数の比に等しく、理想的な変圧器では電力が保存されます。巻き数の比を変…</span></li>
+      <li><a href="p/mass-spec.html">質量分析器（速度選別器）</a><span>まず、たがいに垂直な電場と磁場で速度選別器をつくり、v = E/B のイオンだけがまっすぐ通れるようにします。次に磁場の…</span></li>
+      <li><a href="p/ampere-force.html">電流が磁場から受ける力の向きと大きさ</a><span>電流が流れるまっすぐな導線を磁場の中に置くと、力を受けます。電流の向き、磁場の向き、その間の角度を変えて、受ける力を見ま…</span></li>
+      <li><a href="p/motional-emf.html">動く導体に生じる誘導起電力</a><span>導体棒が磁力線を横切ると、中の電荷がローレンツ力を受けて、棒の両端に電位差が生じます。…</span></li>
+      <li><a href="p/rail-rods.html">2 本の導体棒とレール：電磁ブレーキと運動量のやりとり</a><span>なめらかな平行レールの上に 2 本の導体棒を置き、磁場は紙面に垂直です。棒 1 が初速度をもって動くと磁力線を横切り、回…</span></li>
+      <li><a href="p/coil-torque.html">電流が流れるコイルが受ける力のモーメント</a><span>磁場の中のコイルは、両側が逆向きの力を受けて偶力となり、回転子を回します。角度を変えて、力のモーメントを見ます。…</span></li>
+      <li><a href="p/hall-effect.html">ホール効果とキャリアの向き</a><span>電流が流れている半導体を垂直な磁場に置くと、キャリアがローレンツ力で片側に寄ってホール電圧が生じます。これで、おもなキャ…</span></li>
+      <li><a href="p/current-balance.html">電流てんびんと、電流が磁場から受ける力の測定</a><span>電流が流れる導線を一様な磁場の中に置き、てんびんで小さな力を測って、力と I、B、L の関係を確かめます。…</span></li>
+      <li><a href="p/eddy-current.html">渦電流と磁気ブレーキ</a><span>磁石を導体に近づけると、導体の中に渦電流が生じ、レンツの法則にしたがって相対的な動きをさまたげます。ふれずにブレーキをか…</span></li>
+      <li><a href="p/em-polarization.html">電磁波の偏光</a><span>電磁波の電場と磁場は、どちらも進む向きに垂直です。偏光子は、決まった向きに振動する電場だけを選びます。…</span></li>
+      <li><a href="p/antenna-resonance.html">アンテナの共振と波長</a><span>アンテナの長さが電磁波の波長の決まった割合に近いと、電流の分布が共振して、送受信の効率が上がります。…</span></li>
+      <li><a href="p/compass-field.html">方位磁針と地磁気</a><span>方位磁針の針は、合成された磁場の向きにそろいます。近くに磁石や電流が流れる導線があると、向きが変わります。…</span></li>
+      <li><a href="p/electromagnet.html">電磁石とコイルの磁場</a><span>電流が流れるコイルの磁場は、電流と巻き数が増えるほど強くなります。鉄心を入れると磁場が大きく集中します。…</span></li>
+      <li><a href="p/dc-motor.html">直流モーターと整流子</a><span>電流が流れるコイルは磁場の中で力のモーメントを受けて回ります。整流子が半回転ごとに電流を逆にするので、同じ向きに回り続け…</span></li>
+      <li><a href="p/tangent-galvanometer.html">正接検流計と地磁気</a><span>円形コイルの磁場が地磁気と重なり合います。磁針の振れの角の正接を使うと、コイルの電流と地磁気を結びつけられます。…</span></li>
+      <li><a href="p/cyclotron-frequency.html">サイクロトロンとサイクロトロン振動数</a><span>荷電粒子は垂直な磁場の中で円運動をします。相対性理論を考えなくてよい範囲では、回る振動数は速さにも半径にも関係しません。…</span></li>
+      <li><a href="p/mutual-induction.html">相互誘導と変圧器の結合</a><span>一次コイルの電流が変わると二次コイルを通る磁束が変わり、誘導起電力が生じます。変化が速いほど誘導電圧は大きくなります。…</span></li>
+      <li><a href="p/biot-savart-axis.html">ビオ・サバールの法則と円形コイルの軸上の磁場</a><span>円形コイルの小さな部分の電流が、それぞれ軸上の点に磁場をつくります。それをたし合わせると、軸にそった磁場の分布が得られま…</span></li>
+      <li><a href="p/solenoid-field.html">ソレノイドの磁場：中は一様？</a><span>導線を長いソレノイドに巻いて電流を流すと、中の磁力線はほぼ平行で等間隔になり、中ほどの磁場は一様です。強さは 1 m あ…</span></li>
+      <li><a href="p/em-spectrum.html">電磁波のスペクトル：電波から γ 線まで</a><span>電波、マイクロ波、赤外線、可視光線、紫外線、X 線、γ 線はどれも電磁波で、真空中ではみな光の速さで進みます。違うのは振…</span></li>
+    </ul>
+  </section>
+  <section class="license-section">
+    <h2>単元12　原子と宇宙<small>（16 実験）</small></h2>
+    <ul class="static-list">
+      <li><a href="p/photoelectric.html">光電効果</a><span>金属に光を当てると、振動数が十分高ければ電子が飛び出します。光は光子としてエネルギーを運んでいて、これは光が粒子の性質を…</span></li>
+      <li><a href="p/halflife.html">原子核と放射線の半減期</a><span>不安定な原子核は α 線、β 線、γ 線を出して崩壊し、半減期がたつごとに数が半分になります。半減期を変えて、崩壊のグラ…</span></li>
+      <li><a href="p/millikan.html">ミリカンの油滴実験</a><span>電荷をもった油滴を平行板のあいだの電場に入れ、上向きの電気力と下向きの重力がつり合うと油滴は止まります。電圧を変えて油滴…</span></li>
+      <li><a href="p/rutherford.html">ラザフォードの散乱実験（金箔の実験）</a><span>α 粒子を金箔に当てると、ほとんどはほぼまっすぐ通りぬけますが、ごく一部は大きく曲がったり、はね返ったりします。これは、…</span></li>
+      <li><a href="p/blackbody.html">黒体放射と恒星の色</a><span>温度が高くなると、黒体のスペクトルのピークは短い波長のほうへ移ります。恒星の色から表面温度がわかります。…</span></li>
+      <li><a href="p/radiation-shielding.html">α 線、β 線、γ 線とさえぎり方</a><span>放射線の種類によって、透過力と電離作用が違います。紙、アルミニウム、鉛などでさえぎって、検出器のカウント数を測ります。…</span></li>
+      <li><a href="p/cathode-ray-em.html">陰極線管と電子の比電荷</a><span>電子は電圧で加速されたあと、磁場で曲げられて円弧をえがきます。半径、磁場、加速電圧から電子の比電荷を見積もれます。…</span></li>
+      <li><a href="p/spectroscopy.html">輝線スペクトルと元素の指紋</a><span>原子の中の電子がエネルギー準位のあいだを移るとき、決まった波長の光しか出さないので、元素ごとに独自の輝線スペクトルができ…</span></li>
+      <li><a href="p/solar-cell.html">太陽電池と光発電</a><span>半導体が光子を吸収すると電子とホールができ、内部の電場がそれらを分けて電気エネルギーを取り出します。光の強さと面積で出力…</span></li>
+      <li><a href="p/geiger-statistics.html">ガイガーカウンターと偶然誤差</a><span>放射性崩壊はでたらめに起こる現象です。決まった時間のカウント数は上下にばらつき、標準偏差はおよそカウント数の平方根です。…</span></li>
+      <li><a href="p/atom-structure.html">原子の構造：陽子、中性子と電子</a><span>原子は正の電荷をもつ原子核と、そのまわりの電子でできています。原子核はさらに陽子と中性子でできています。陽子の数で元素の…</span></li>
+      <li><a href="p/bohr-hydrogen.html">ボーアの水素原子モデルとスペクトル系列</a><span>ボーアは、電子は決まった軌道にしかいられず、軌道ごとにエネルギーが決まっていると考えました。電子が高いエネルギー準位から…</span></li>
+      <li><a href="p/matter-wave.html">物質波：電子も回折する</a><span>ド・ブロイは、電子にも波長があり、運動量が大きいほど波長が短いと考えました。電子線を結晶や二重スリットに当てると、スクリ…</span></li>
+      <li><a href="p/x-ray-tube.html">X 線管：連続 X 線と特性 X 線</a><span>速い電子が金属のターゲットに当たって急に減速すると、連続 X 線（制動放射）が出ます。いちばんエネルギーの大きい光子は、…</span></li>
+      <li><a href="p/mass-energy.html">質量とエネルギーの等価性：核分裂と核融合</a><span>原子核の質量は、それをつくる陽子と中性子の質量の合計より小さく、その差（質量欠損）が核子を結びつける結合エネルギーです。…</span></li>
+      <li><a href="p/nuclear-chain-reaction.html">核分裂の連鎖反応と制御棒</a><span>ウラン 235 は中性子を 1 個吸収すると分裂し、同時に新しい中性子を 2〜3 個出します。1 回の分裂で出た中性子の…</span></li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

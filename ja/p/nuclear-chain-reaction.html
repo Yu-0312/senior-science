@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>核分裂の連鎖反応と制御棒｜物理実験室 · 原子と宇宙</title>
+<meta name="description" content="ウラン 235 は中性子を 1 個吸収すると分裂し、同時に新しい中性子を 2〜3 個出します。1 回の分裂で出た中性子のうち、平均してちょうど 1 個が次の分裂を起こせば、反応は一定の割合で続きます（臨界）。1 個より多ければ、どんどん速くなります（超臨界）。原子力発電所では、制御棒で中性子を吸収し" />
+<link rel="canonical" href="https://senior-science.vercel.app/ja/p/nuclear-chain-reaction.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="核分裂の連鎖反応と制御棒｜物理実験室 · 原子と宇宙" />
+<meta property="og:description" content="ウラン 235 は中性子を 1 個吸収すると分裂し、同時に新しい中性子を 2〜3 個出します。1 回の分裂で出た中性子のうち、平均してちょうど 1 個が次の分裂を起こせば、反応は一定の割合で続きます（臨界）。1 個より多ければ、どんどん速くなります（超臨界）。原子力発電所では、制御棒で中性子を吸収し" />
+<meta property="og:locale" content="zh_TW" />
+<meta property="og:url" content="https://senior-science.vercel.app/ja/p/nuclear-chain-reaction.html" />
+<meta property="og:site_name" content="物理実験室" />
+<meta property="og:image" content="https://senior-science.vercel.app/ja/icons/og-card.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="theme-color" content="#13171c" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<link rel="icon" type="image/svg+xml" href="../icons/icon.svg?v=20261112-2027" />
+<link rel="apple-touch-icon" href="../icons/icon-192.png?v=20261112-2027" />
+<link rel="stylesheet" href="../css/style.css?v=20261112-2027" />
+<script>
+(function () {
+  try {
+    var saved = JSON.parse(localStorage.getItem("pl-theme"));
+    // トップページと同じく、初めて来た人にはライトテーマを使う
+    if (saved !== "light" && saved !== "dark") saved = "light";
+    document.documentElement.setAttribute("data-theme", saved);
+  } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+})();
+</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"LearningResource","name":"核分裂の連鎖反応と制御棒","description":"ウラン 235 は中性子を 1 個吸収すると分裂し、同時に新しい中性子を 2〜3 個出します。1 回の分裂で出た中性子のうち、平均してちょうど 1 個が次の分裂を起こせば、反応は一定の割合で続きます（臨界）。1 個より多ければ、どんどん速くなります（超臨界）。原子力発電所では、制御棒で中性子を吸収し、減速材で中性子を遅くして、反応を臨界に保ちます。","inLanguage":"zh-Hant","learningResourceType":"シミュレーション","educationalLevel":"物理基礎 · 物理（原子）","isAccessibleForFree":true,"license":"https://creativecommons.org/licenses/by-nc-sa/4.0/","url":"https://senior-science.vercel.app/ja/p/nuclear-chain-reaction.html"}</script>
+</head>
+<body class="static-page">
+<header class="license-topbar">
+  <a class="license-home" href="../index.html"><span class="license-home-mark" aria-hidden="true">PH</span>物理実験室</a>
+  <div class="license-topbar-actions">
+    <a class="license-toplink" href="../experiments.html">すべての実験</a>
+    <a class="license-toplink" href="../licensing.html">利用条件</a>
+  </div>
+</header>
+<main class="license-page">
+  <p class="license-kicker">単元 12 · 原子と宇宙</p>
+  <h1>核分裂の連鎖反応と制御棒</h1>
+  <p class="license-lead">ウラン 235 は中性子を 1 個吸収すると分裂し、同時に新しい中性子を 2〜3 個出します。1 回の分裂で出た中性子のうち、平均してちょうど 1 個が次の分裂を起こせば、反応は一定の割合で続きます（臨界）。1 個より多ければ、どんどん速くなります（超臨界）。原子力発電所では、制御棒で中性子を吸収し、減速材で中性子を遅くして、反応を臨界に保ちます。</p>
+  <div class="license-meta">
+    <span>物理基礎 · 物理（原子）</span>
+    <span>シミュレーション</span>
+    <span>日本語</span>
+  </div>
+
+  <section class="license-section">
+    <h2>使う公式</h2>
+    <p class="static-formula">²³⁵U+n → ¹⁴¹Ba+⁹²Kr+3n+≈200MeV, N_k+1=kN_k</p>
+  </section>
+
+  <section class="license-section">
+    <h2>学習のポイント</h2>
+    <ul>
+      <li>1 回の分裂で中性子が 2〜3 個出る</li>
+      <li>増倍率 k = 1 が臨界、k &gt; 1 が超臨界</li>
+      <li>制御棒は中性子を吸収して k を下げる</li>
+      <li>減速材は速い中性子を遅くして、ウラン 235 に吸収されやすくする</li>
+    </ul>
+  </section>
+
+  <section class="license-section">
+    <h2>やってみる</h2>
+    <p>この実験には、そのまま操作できるシミュレーションがあります。パラメータを変え、ストップウォッチや分度器で測り、データを記録すると、自動でグラフを描いて物理量を求めます。</p>
+    <div class="license-cta">
+      <a class="static-cta" href="../index.html#nuclear-chain-reaction">「核分裂の連鎖反応と制御棒」のシミュレーションを開く</a>
+      <a href="worksheet-nuclear-chain-reaction.html">ワークシートを印刷</a>
+    </div>
+  </section>
+
+  <nav class="license-section static-nav">
+    <a href="mass-energy.html">← 質量とエネルギーの等価性：核分裂と核融合</a>
+    <span></span>
+  </nav>
+</main>
+</body>
+</html>

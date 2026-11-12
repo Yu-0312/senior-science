@@ -2,3 +2,4 @@ User-agent: *
 Allow: /
 
 Sitemap: https://senior-science.vercel.app/sitemap.xml
+Sitemap: https://senior-science.vercel.app/ja/sitemap.xml

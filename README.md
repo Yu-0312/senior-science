@@ -403,6 +403,8 @@ senior-science/
 ├─ manifest.json
 ├─ sitemap.xml / robots.txt      （自動產生）
 ├─ p/                    226 個實驗說明頁 + 226 份學習單（自動產生）
+├─ ja/                   日文版（由 tools/build-ja.js 自動產生，不要手改）
+├─ i18n/ja.json          日文對照表：中文字串 → 日文
 ├─ css/style.css
 ├─ icons/
 ├─ docs/images/          README 用的截圖
@@ -411,8 +413,9 @@ senior-science/
 │  ├─ build-manifest.js   產生實驗 → 檔案的對照表
 │  ├─ build-static.js     產生靜態說明頁、學習單、sitemap、robots
 │  ├─ verify-static.js    驗證靜態頁產出
+│  ├─ build-ja.js         依 i18n/ja.json 產生日文版 ja/
 │  ├─ stage-fit-check.js  教師版一頁不捲動的瀏覽器實測
-│  └─ tests/              23 支自動化稽核
+│  └─ tests/              29 支自動化稽核
 └─ js/
    ├─ site-config.js      正式網址、版本號
    ├─ app.js              導覽、搜尋、進度、主題、PWA
@@ -438,6 +441,7 @@ senior-science/
 | `js/teaching-notes.js` | 各實驗的判讀文字、實體實驗流程與注意事項 |
 | `js/experiments/*.js` | 互動模擬註冊檔。以 `PhysicsLab.register(id, def)` 註冊，id 必須與教材資料一致 |
 | `tools/build-static.js` | 由課程資料產生靜態說明頁、學習單、sitemap 與 robots |
+| `tools/build-ja.js` | 產生日文版 `ja/`。原始碼維持中文，依 `i18n/ja.json` 把看得到的字串換成日文 |
 | `vercel.json` | 建置指令與快取標頭。`sw.js` 不快取、帶版本號的 js/css 快取一年 |
 | `.github/workflows/deploy.yml` | 建置與測試檢查。**部署由 Vercel 負責，這裡不部署** |
 
@@ -527,11 +531,30 @@ flowchart LR
 
 ---
 
+## 日文版（`ja/`）
+
+網站右上角的「日本語」連到 `/ja/`。日文版不是另一份程式，而是 `tools/build-ja.js` 從中文原始碼產生的：
+JS 的字串、HTML 的文字與 title／aria-label 等屬性，依 `i18n/ja.json` 換成日文，程式邏輯完全不動。
+用語照日本高中教科書（物理基礎／物理），章節架構維持 108 課綱。
+
+改了中文之後：
+
+```bash
+node tools/build-ja.js --todo    # 列出還沒翻的字串（含檔名、行號、那一行原始碼）→ i18n/ja-todo.json
+# 把翻譯補進 i18n/ja.json（鍵是中文字串本身）
+node tools/build-ja.js           # 重新產生 ja/
+```
+
+一句話被拆成好幾段接起來時（`"「" + label + "」調大"`），每一段各自翻，翻的時候要看那一行原始碼，讓接起來的日文語序是通的。
+`ja-test.js` 會擋住三件事：有字串沒翻、`ja/` 沒有重新產生、日文寫成機器味（「〜しましょう」「ぜひ」「——」等）。
+
+---
+
 ## 部署
 
 ```mermaid
 flowchart LR
-    push(["git push main"]) --> V["▲ Vercel<br/>build-manifest<br/>build-static<br/>verify-static"] --> L(["上線"])
+    push(["git push main"]) --> V["▲ Vercel<br/>build-manifest<br/>build-static<br/>build-ja<br/>verify-static"] --> L(["上線"])
     push --> GA["GitHub Actions<br/>重新建置＋全部測試<br/>檢查產物已提交"]
 ```
 

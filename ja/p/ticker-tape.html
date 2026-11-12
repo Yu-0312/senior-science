@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>記録タイマー（速度と加速度を測る）｜物理実験室 · 運動の表し方</title>
+<meta name="description" content="記録タイマーは一定時間ごとにテープに点を打ちます。点の間隔がだんだん広がるのは加速しているからです。となりの点との間隔を時間でわると瞬間の速さ、間隔の変化から加速度がわかります。いちばんよく行う運動の実験です。" />
+<link rel="canonical" href="https://senior-science.vercel.app/ja/p/ticker-tape.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="記録タイマー（速度と加速度を測る）｜物理実験室 · 運動の表し方" />
+<meta property="og:description" content="記録タイマーは一定時間ごとにテープに点を打ちます。点の間隔がだんだん広がるのは加速しているからです。となりの点との間隔を時間でわると瞬間の速さ、間隔の変化から加速度がわかります。いちばんよく行う運動の実験です。" />
+<meta property="og:locale" content="zh_TW" />
+<meta property="og:url" content="https://senior-science.vercel.app/ja/p/ticker-tape.html" />
+<meta property="og:site_name" content="物理実験室" />
+<meta property="og:image" content="https://senior-science.vercel.app/ja/icons/og-card.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="theme-color" content="#13171c" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<link rel="icon" type="image/svg+xml" href="../icons/icon.svg?v=20261112-2027" />
+<link rel="apple-touch-icon" href="../icons/icon-192.png?v=20261112-2027" />
+<link rel="stylesheet" href="../css/style.css?v=20261112-2027" />
+<script>
+(function () {
+  try {
+    var saved = JSON.parse(localStorage.getItem("pl-theme"));
+    // トップページと同じく、初めて来た人にはライトテーマを使う
+    if (saved !== "light" && saved !== "dark") saved = "light";
+    document.documentElement.setAttribute("data-theme", saved);
+  } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+})();
+</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"LearningResource","name":"記録タイマー（速度と加速度を測る）","description":"記録タイマーは一定時間ごとにテープに点を打ちます。点の間隔がだんだん広がるのは加速しているからです。となりの点との間隔を時間でわると瞬間の速さ、間隔の変化から加速度がわかります。いちばんよく行う運動の実験です。","inLanguage":"zh-Hant","learningResourceType":"シミュレーション","educationalLevel":"物理基礎 · 物理（力学）","isAccessibleForFree":true,"license":"https://creativecommons.org/licenses/by-nc-sa/4.0/","url":"https://senior-science.vercel.app/ja/p/ticker-tape.html"}</script>
+</head>
+<body class="static-page">
+<header class="license-topbar">
+  <a class="license-home" href="../index.html"><span class="license-home-mark" aria-hidden="true">PH</span>物理実験室</a>
+  <div class="license-topbar-actions">
+    <a class="license-toplink" href="../experiments.html">すべての実験</a>
+    <a class="license-toplink" href="../licensing.html">利用条件</a>
+  </div>
+</header>
+<main class="license-page">
+  <p class="license-kicker">単元 1 · 運動の表し方</p>
+  <h1>記録タイマー（速度と加速度を測る）</h1>
+  <p class="license-lead">記録タイマーは一定時間ごとにテープに点を打ちます。点の間隔がだんだん広がるのは加速しているからです。となりの点との間隔を時間でわると瞬間の速さ、間隔の変化から加速度がわかります。いちばんよく行う運動の実験です。</p>
+  <div class="license-meta">
+    <span>物理基礎 · 物理（力学）</span>
+    <span>シミュレーション</span>
+    <span>日本語</span>
+  </div>
+
+  <section class="license-section">
+    <h2>使う公式</h2>
+    <p class="static-formula">v̄_n = ((x_n+1-x_n-1)/2T), a = ((Δ(Δx))/(T²))</p>
+  </section>
+
+  <section class="license-section">
+    <h2>学習のポイント</h2>
+    <ul>
+      <li>点を打つ時間の間隔 T は一定</li>
+      <li>点の間隔 = 平均の速さ × T</li>
+      <li>点の間隔が等差で増えれば等加速度</li>
+      <li>テープから v–t グラフを作れる</li>
+    </ul>
+  </section>
+
+  <section class="license-section">
+    <h2>やってみる</h2>
+    <p>この実験には、そのまま操作できるシミュレーションがあります。パラメータを変え、ストップウォッチや分度器で測り、データを記録すると、自動でグラフを描いて物理量を求めます。</p>
+    <div class="license-cta">
+      <a class="static-cta" href="../index.html#ticker-tape">「記録タイマー（速度と加速度を測る）」のシミュレーションを開く</a>
+      <a href="worksheet-ticker-tape.html">ワークシートを印刷</a>
+    </div>
+  </section>
+
+  <nav class="license-section static-nav">
+    <a href="relative-motion.html">← 相対運動と座標系</a>
+    <a href="measurement-error.html">測定、不確かさ、有効数字 →</a>
+  </nav>
+</main>
+</body>
+</html>

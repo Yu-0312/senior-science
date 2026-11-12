@@ -1,0 +1,1066 @@
+/* 模組一 · 運動學 */
+(function () {
+  "use strict";
+  const PL = window.PhysicsLab, D = PL.draw;
+  const MC = () => PL.col("m-color", "#4dd0e1");
+  /* 把手用：照滑桿的範圍與步距寫入、發 input，走原本的更新路徑（一個把手改兩根滑桿時用） */
+  function slTo(sl, v) {
+    const e = sl.el, mn = +e.min, mx = +e.max, st = +e.step || 0;
+    v = PL.clamp(v, mn, mx); if (st) v = PL.clamp(Math.round((v - mn) / st) * st + mn, mn, mx);
+    v = +v.toFixed(6);
+    if (isFinite(v) && +e.value !== v) { e.value = v; e.dispatchEvent(new Event("input", { bubbles: true })); }
+  }
+  /* 步進器沒有 input 元素：自己跑回呼，再補發 input 讓暫停重畫與探測引擎同步 */
+  function stepTo(sp, v, cb) {
+    const p = sp.get(); sp.set(v);
+    if (sp.get() !== p) { if (cb) cb(sp.get()); sp.el.dispatchEvent(new Event("input", { bubbles: true })); }
+  }
+
+  /* 等加速度直線運動 */
+  PL.register("uniform-accel", { build(root) {
+    const L = PL.ui.layout(root, { chrome: "quiet" });
+    /*
+     * 軌道背景固定不動：車從左開到右。
+     * 比例尺由本組 v₀、a 的全程軌跡決定一次，不跟著車平移／縮放。
+     * 車用教學示意尺寸（刻意不按公尺比例），才不會在長軌道上被壓成小點。
+     */
+    const cv = PL.canvas.create(L.canvasWrap, 0.78, 960);
+    const TMAX = 8;
+    const AP = PL.apparatus;
+    // 位置與速度是逐格積分出來的：播放中改加速度 a，車從當下的 x、v 接著加速／減速（v₀ 是起始條件，改它才會重來）
+    let t = 0, hist = [], cur = { x: 0, v: 6 };
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const v0 = sV.get(), a = sA.get(), m = MC();
+      let xs = []; for (let i = 0; i <= 40; i++) { const tt = TMAX * i / 40; xs.push(v0 * tt + 0.5 * a * tt * tt); }
+      // 播放中改過 a 時，實際走過的位置可能超出原本的理論範圍，一併納入才不會跑出畫面
+      hist.forEach(h => xs.push(h[1]));
+      const vHist = hist.map(h => h[2]);
+      const s = cur;
+
+      /* 上半實驗台 / 下半兩張圖 */
+      // 場景至少 200px 是桌機的設定；手機畫布只有 270px 高時，固定 200 會把下方兩張圖擠出畫布外。
+      // 改成至少替圖留 120px。
+      const sceneH = Math.floor(Math.max(H * 0.46, Math.min(200, H - 120)));
+      const graphTop = sceneH + 8;
+      const trackY = Math.floor(sceneH * 0.62);
+      const tX0 = 40, tX1 = W - 32;
+
+      /*
+       * 固定軌道：以整段軌跡的最小／最大位置決定比例，背景刻度不動。
+       * 車沿 x 增加方向由左往右走；視角不跟車。
+       */
+      const rawMin = Math.min(0, ...xs), rawMax = Math.max(0, ...xs);
+      const pad = Math.max(2, (rawMax - rawMin) * 0.06);
+      const viewMin = rawMin - pad, viewMax = rawMax + pad;
+      const mapX = x => tX0 + (x - viewMin) / (viewMax - viewMin) * (tX1 - tX0);
+      // 車很大：中心夾在軌道內，讓整台車留在畫面上
+      const cartW = Math.min(168, Math.max(108, W * 0.17));
+      const half = cartW * 0.55;
+      const cx = PL.clamp(mapX(s.x), tX0 + half, tX1 - half);
+
+      /* 場景：一條筆直的道路。路面固定不動，車由左往右開 */
+      const AP2 = PL.apparatus;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, 0, W, sceneH); ctx.clip();
+      AP2.outdoor(ctx, W, sceneH, trackY - 16, { ground: "grass", city: true, sunX: W * 0.9, sunY: 30, t: t });
+      AP2.road(ctx, 0, W, trackY - 12, 22, { laneAt: 0.42 });
+      ctx.restore();
+      D.line(ctx, 0, sceneH, W, sceneH, PL.col("border"), 1);
+      const span = viewMax - viewMin;
+      const step = span > 40 ? 10 : span > 16 ? 5 : span > 8 ? 2 : 1;
+      for (let gx = Math.ceil(viewMin / step) * step; gx <= viewMax; gx += step) {
+        const px = mapX(gx);
+        if (px < tX0 - 4 || px > tX1 + 4) continue;
+        // 路邊的里程樁
+        ctx.fillStyle = "rgba(245,245,240,0.95)"; ctx.fillRect(px - 2, trackY + 10, 4, 9);
+        ctx.fillStyle = "rgba(220,60,50,0.9)"; ctx.fillRect(px - 2, trackY + 10, 4, 2.5);
+        D.text(ctx, PL.fmt(gx, step < 1 ? 1 : 0), px, trackY + 31,
+          { color: PL.col("text"), size: 9.5, align: "center", weight: "700" });
+      }
+      D.text(ctx, "始点", mapX(rawMin < 0 ? rawMin : 0), trackY + 44,
+        { color: PL.col("text-dim"), size: 9.5, align: "center" });
+      D.text(ctx, "車は左から右へ · 路面は動かない", tX0, 24,
+        { color: PL.col("text"), size: 12, weight: "700" });
+      D.text(ctx, "x = " + PL.fmt(s.x, 1) + " m", tX1, 24,
+        { color: m, size: 13, align: "right", weight: "700" });
+
+      // 減速中（a 與 v 反向）亮煞車燈：加速度的方向看得見
+      const braking = a * s.v < -0.01;
+      AP2.car(ctx, cx, trackY + 2, cartW * 0.92, { color: "#d9463b", roll: (cx - tX0) / (cartW * 0.09), brake: braking });
+      if (rp) rp.mark(cx, trackY - cartW * 0.12);
+
+      const bodyTop = trackY - cartW * 0.92 * 0.3 - 6;
+      if (Math.abs(s.v) > 0.15) {
+        const aLen = PL.clamp(s.v * 3.5, -72, 72);
+        D.arrow(ctx, cx, bodyTop - 20, cx + aLen, bodyTop - 20,
+          { color: PL.col("accent-2"), width: 2.6, label: "v " + PL.fmt(s.v, 1) + " m/s", lsize: 10 });
+      }
+      // a 箭頭 9 px／(m/s²)，尖端就是「油門／煞車」把手：播放中拖也即時生效
+      if (Math.abs(a) > 0.05) {
+        D.arrow(ctx, cx, bodyTop - 42, cx + a * 9, bodyTop - 42,
+          { color: PL.col("warn"), width: 2.2, label: "a " + PL.fmt(a, 1) + " m/s²", lsize: 10 });
+      }
+      aX0 = cx; grip.place(cx + a * 9, bodyTop - 42);
+
+      // 下半：x–t / v–t（全程 0–TMAX）
+      const gH = Math.max(88, H - graphTop - 16), gap = 14, gW = (W - 40 - gap) / 2, gx1 = 26, gx2 = 26 + gW + gap;
+      const vend = v0 + a * TMAX; let vmin = Math.min(0, v0, vend, ...vHist), vmax = Math.max(0, v0, vend, ...vHist);
+      if (vmax - vmin < 2) vmax = vmin + 2;
+      let gy0 = Math.min(0, ...xs), gy1 = Math.max(0, ...xs); if (gy1 - gy0 < 2) gy1 = gy0 + 2;
+      const g1 = PL.graph(cv, { x: gx1, y: graphTop, w: gW, h: gH }, { x0: 0, x1: TMAX, y0: gy0, y1: gy1 });
+      g1.frame({ title: "x – t", xlabel: "t (s)" }); g1.grid(4, 3);
+      g1.fn(tt => v0 * tt + 0.5 * a * tt * tt, { color: PL.col("text-faint"), width: 1.5, dash: [5, 4] });
+      if (hist.length > 1) g1.curve(hist.map(h => [h[0], h[1]]), { color: m, width: 2.4 });
+      g1.dot(t, s.x, { color: m, glow: m });
+      const g2 = PL.graph(cv, { x: gx2, y: graphTop, w: gW, h: gH }, { x0: 0, x1: TMAX, y0: vmin, y1: vmax });
+      g2.frame({ title: "v – t（傾き=a）", xlabel: "t (s)" }); g2.grid(4, 3);
+      if (hist.length > 1) g2.area(hist.map(h => [h[0], h[2]]), { fill: "rgba(90,162,255,0.12)" });
+      g2.fn(tt => v0 + a * tt, { color: PL.col("accent-2"), width: 2.2 });
+      g2.dot(t, s.v, { color: PL.col("accent-2"), glow: PL.col("accent-2") });
+
+      rT.set(t, 2); rX.set(s.x, 1); rV.set(s.v, 1);
+    }
+    let rp = null;
+    function reset() { t = 0; hist = []; cur = { x: 0, v: sV.get() }; if (rp) rp.clear(); draw(); }
+    const sV = PL.ui.slider(L.controls, { label: "初速度 v₀", min: -8, max: 20, step: 0.5, value: 6, unit: "m/s", digits: 1, onInput: reset });
+    const sA = PL.ui.slider(L.controls, { label: "加速度 a", min: -6, max: 6, step: 0.5, value: 2, unit: "m/s²", digits: 1, onInput: () => draw(), onReset: reset });
+    const row = PL.ui.buttonRow(L.controls);
+    /* 播放／暫停由引擎的傳輸列統一提供（還附單步與速度），實驗不再自備，避免兩個開關互相打架。 */
+    PL.ui.button(row, "リセット", reset);
+    const rT = PL.ui.readout(L.readouts, { label: "時刻 t", unit: "s" });
+    const rX = PL.ui.readout(L.readouts, { label: "位置 x", unit: "m" });
+    const rV = PL.ui.readout(L.readouts, { label: "速さ v", unit: "m/s" });
+    // 改 a 會讓整條路的比例尺重算、車跟著平移；箭頭起點在按下時凍住，才不會越拖越遠
+    let aX0 = 0, aG = null;
+    const grip = PL.ui.handle(cv, { slider: sA, label: "加速度 a（矢印をドラッグ：アクセル／ブレーキ）", toValue: x => (x - (aG == null ? aX0 : aG)) / 9,
+      onGrab: () => { aG = aX0; }, onRelease: () => { aG = null; } });
+
+    cur.v = sV.get();
+    // 跑滿 TMAX 就停在終點（不再自己從頭重跑）；把車拖回起點、或再按播放，才重新開始
+    const anim = PL.loop(dt => {
+      if (dt && t < TMAX) {
+        const a = sA.get();
+        const d = Math.min(dt, TMAX - t);
+        t += d;
+        cur = { x: cur.x + cur.v * d + 0.5 * a * d * d, v: cur.v + a * d };
+        hist.push([t, cur.x, cur.v]);
+        if (t >= TMAX - 1e-9) rp.end();
+      }
+      draw();
+    });
+    rp = PL.motion.replay(cv, {
+      loop: anim, label: "台車（始点までもどすとやり直し）",
+      snapshot: () => ({ t, cur, h: hist, n: hist.length }),
+      restore: st => { t = st.t; cur = st.cur; hist = st.h.slice(0, st.n); },
+      reset: () => { t = 0; hist = []; cur = { x: 0, v: sV.get() }; },
+      redraw: draw
+    });
+    cv.onResize(draw); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
+
+  /* 自由落體 */
+  PL.register("freefall", { build(root) {
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
+    const cv = PL.canvas.create(L.canvasWrap, 0.66);
+    let t = 0, landed = false, strobe = [], landAge = 0;
+    // 已落下距離 fy 與速度 fv 逐格積分：落下途中改 g，球從當下的位置與速度繼續加速（高度 h 是起始條件，改它才重來）
+    let fy = 0, fv = 0;
+    let rp = null;
+    const reset = () => { t = 0; landed = false; strobe = []; landAge = 0; fy = 0; fv = 0; if (rp) rp.clear(); };
+    const sH = PL.ui.slider(L.controls, { label: "はじめの高さ h", min: 5, max: 80, step: 1, value: 45, unit: "m", digits: 0, onInput: reset });
+    const sG = PL.ui.slider(L.controls, { label: "重力加速度 g", min: 1.6, max: 20, step: 0.1, value: 9.8, unit: "m/s²", digits: 1, onInput: () => draw(), onReset: reset });
+    const row = PL.ui.buttonRow(L.controls);
+    const bP = PL.ui.button(row, "はなす", () => { if (landed) reset(); anim.start(); }, { primary: true, trigger: true });
+    PL.ui.button(row, "リセット", reset);
+    const rT = PL.ui.readout(L.readouts, { label: "落ちるまでの時間", unit: "s" });
+    const rV = PL.ui.readout(L.readouts, { label: "速さ v", unit: "m/s" });
+    const rY = PL.ui.readout(L.readouts, { label: "残りの高さ", unit: "m" });
+    /* 把手抓塔頂的電磁鐵（連同吸著的球）上下拖改 h。畫面平常把 h 縮放成整座塔：
+       往下拖時凍住按下時的比例尺，塔頂與球跟著手降；往上拖（加高）時塔已頂到畫面，
+       改成拖到畫布頂端＝80 m、刻度跟著重標。放手再重新縮放 */
+    let hold = null, fy1 = 0;
+    const grip = PL.ui.handle(cv, { slider: sH, label: "電磁石と鋼球（上下に引いて高さ h を変える）",
+      onGrab: () => { anim.stop(); hold = { h: sH.get(), sc: (fy1 - 43) / sH.get(), y: null }; },
+      toValue: (x, y) => {
+        if (hold.y == null) hold.y = y;
+        const dy = hold.y - y;
+        return hold.h + (dy > 0 ? dy / Math.max(10, hold.y) * (80 - hold.h) : dy / hold.sc);
+      },
+      onRelease: () => { hold = null; draw(); } });
+
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const h = sH.get(), g = sG.get(), m = MC();
+      const tFall = Math.sqrt(2 * h / g);
+      const groundY = H - 34;
+      // 球心從 y0（吸在電磁鐵下）落到 y1（碰到沙坑），這段就是 h。
+      // 平常整座塔＝h；拖電磁鐵時比例尺先凍住，塔頂與球才會跟著手上下
+      const y1 = groundY - 12, scale = Math.min(hold ? hold.sc : 1e9, (y1 - 43) / h);
+      const topY = y1 - h * scale - 13, y0 = topY + 13;
+      fy1 = y1;
+      const px0 = 130;
+      const AP = PL.apparatus;
+      cv.calibrate(scale, "m");   // 讓可拖曳的尺能直接量落下高度
+      /* 場景：戶外落體塔。球掛在塔頂伸出的電磁鐵下，斷電釋放，落進沙坑 */
+      AP.outdoor(ctx, W, H, groundY, { ground: "grass", t: t, sunX: W * 0.62 });
+      AP.building(ctx, 8, groundY, px0 - 44, groundY - topY + 4, {});
+      // 塔頂伸出的懸臂與電磁鐵
+      AP.steel(ctx, px0 - 40, topY - 12, 52, 7, 10);
+      AP.steel(ctx, px0 - 11, topY - 7, 22, 12, -6);
+      ctx.fillStyle = "rgb(184,110,52)"; ctx.fillRect(px0 - 9, topY - 5, 18, 7);
+      D.text(ctx, landed || t > 0 ? "電磁石の電流を切る" : "電磁石で吸いつける", px0 + 16, topY - 10, { color: PL.col("text-dim"), size: 9.5 });
+      // 沙坑
+      ctx.fillStyle = PL.theme.isLight() ? "#e6cf9c" : "#4d4230";
+      ctx.beginPath(); ctx.ellipse(px0, groundY + 6, 34, 7, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(120,90,50,0.5)"; ctx.lineWidth = 1; ctx.stroke();
+      const fallen = fy; const y = Math.min(h, fallen);
+      const py = y0 + y * scale;
+      // 頻閃殘影（等時間間隔）：間距越拉越大
+      ctx.save(); ctx.globalAlpha = 0.3;
+      strobe.forEach(sy => AP.sportBall(ctx, px0, y0 + Math.min(h, sy) * scale, 11, "steel"));
+      ctx.restore();
+      // 落地陰影
+      const shA = Math.max(0.06, 0.3 - (h - y) / h * 0.26);
+      ctx.fillStyle = `rgba(40,30,20,${shA})`;
+      ctx.beginPath(); ctx.ellipse(px0, groundY + 5, 14 + (h - y) / h * 4, 3.4, 0, 0, Math.PI * 2); ctx.fill();
+      AP.sportBall(ctx, px0, py, 12, "steel");
+      if (t > 0 && !landed) grip.hide(); else grip.place(px0, y0);
+      if (rp) rp.mark(px0, py);
+      if (landed) AP.dustKick(ctx, px0, groundY + 4, landAge, 1);
+      if (t > 0 && !landed) D.arrow(ctx, px0, py + 18, px0, py + 18 + Math.min(46, fv * 2.4), { color: PL.col("accent-2"), width: 2, label: "v" });
+      // 高度標尺：立在落點旁的測高桿
+      const rx = px0 + 40;
+      ctx.fillStyle = PL.theme.isLight() ? "rgba(255,250,235,0.9)" : "rgba(40,44,52,0.9)";
+      ctx.fillRect(rx - 3, y0 - 4, 6, y1 - y0 + 8);
+      for (let hh = 0; hh <= h; hh += Math.max(5, Math.round(h / 8 / 5) * 5)) {
+        const yy = y1 - hh * scale;
+        D.line(ctx, rx - 3, yy, rx + 5, yy, PL.col("text"), 1.2);
+        D.text(ctx, hh + " m", rx + 8, yy + 3, { color: PL.col("text"), size: 9, weight: "700" });
+      }
+
+      // v–t 迷你圖
+      const bx = W - 118, by = 40, bw = 96, bh = 150;
+      const gg = PL.graph(cv, { x: bx, y: by, w: bw, h: bh }, { x0: 0, x1: tFall, y0: 0, y1: Math.max(g * tFall, fv) });
+      gg.frame({ title: "v – t", xlabel: "t" });
+      gg.fn(tt => g * tt, { color: PL.col("accent-2"), width: 2 });
+      gg.dot(Math.min(t, tFall), fv, { color: m, glow: m });
+
+      rT.set(landed ? t : Math.min(t, tFall), 2); rV.set(fv, 1); rY.set(Math.max(0, h - fallen), 1);
+      if (fallen >= h && !landed) { landed = true; landAge = 0; }
+    }
+    let acc = 0;
+    const anim = PL.loop(dt => {
+      if (dt && !landed) {
+        const g = sG.get();
+        const h = sH.get();
+        let d = dt;
+        // 這一格會穿過地面：只走到剛好碰地的那一刻，著地速度才準（不被影格長短影響）
+        if (fy + fv * d + 0.5 * g * d * d >= h) d = (-fv + Math.sqrt(fv * fv + 2 * g * (h - fy))) / g;
+        t += d; fy = Math.min(h, fy + fv * d + 0.5 * g * d * d); fv += g * d; acc += dt;
+        if (acc > 0.18) { acc = 0; strobe.push(fy); }
+      }
+      else if (dt && landed) { landAge += dt; if (landAge > 1) rp.end(); }
+      draw();
+    });
+    // 落地就停；把鋼球拖回電磁鐵下（或再按「釋放」）重新開始，拖到半路可以倒帶看任一時刻
+    rp = PL.motion.replay(cv, {
+      loop: anim, label: "鋼球（電磁石の下にもどすとやり直し）",
+      snapshot: () => ({ t, fy, fv, landed, landAge, sb: strobe, n: strobe.length }),
+      restore: st => { t = st.t; fy = st.fy; fv = st.fv; landed = st.landed; landAge = st.landAge; strobe = st.sb.slice(0, st.n); },
+      reset: () => { t = 0; landed = false; strobe = []; landAge = 0; fy = 0; fv = 0; },
+      redraw: draw
+    });
+    cv.onResize(draw); draw();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
+
+  /* 拋體運動 */
+  /* 拋體運動 —— 旗艦改版
+   *
+   * PhET 的《Look and Feel》在「鼓勵探索」一節指出幾件事，這一版照著做：
+   *   · 用生活中認得出來的物件，卡通化但不誤導
+   *   · 學生會刻意把參數推到極端，測試模擬會不會有合理的反應
+   *   · 小謎題會讓學生自己去玩到弄懂為止
+   *   · 模擬要好玩，學生才願意一直操作
+   *
+   * 因此這裡不是「一條拋物線加兩個讀數」，而是一座可以瞄準的大砲：
+   *   - 可以選擇發射物（保齡球到氣球，質量差 140 倍）
+   *   - 有靶，打中會有明確回饋，落點會留下痕跡
+   *   - 可以開空氣阻力。開了以後軌跡不再對稱，45° 也不再是最遠角度——
+   *     而且此時「質量」突然變得有影響，這是真空版本永遠看不到的事。
+   */
+  PL.register("projectile", { build(root) {
+    // 軌跡需要橫向寬畫面；參數移到下方，避免右側欄把射程壓扁
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
+    const cv = PL.canvas.create(L.canvasWrap, 0.52, 860);
+    const g = 9.8;
+
+    /* 發射物：質量差距刻意拉大，才看得出空氣阻力對輕重物體的差別 */
+    const AMMO = {
+      bowling: { label: "ボウリングの球", mass: 7.0, radius: 0.11, drag: 0.47, color: "#4a5568", accent: "#151b24" },
+      basket: { label: "バスケットボール", mass: 0.62, radius: 0.12, drag: 0.47, color: "#dd7b3b", accent: "#7a3a12" },
+      melon: { label: "スイカ", mass: 4.0, radius: 0.14, drag: 0.50, color: "#4f9d5a", accent: "#24512b" },
+      balloon: { label: "風船", mass: 0.05, radius: 0.15, drag: 0.55, color: "#d9598f", accent: "#7d264c" }
+    };
+    let ammoKey = "basket";
+
+    /*
+     * 用 landed 停止、t 一律驅動位置，而不是用 flying 當「要不要推進」的開關。
+     *
+     * 舊版：發射把 flying 設成 true，迴圈只在 flying 時推進 t，而球的位置本來就是
+     * 純用 t 算的。這造成兩個問題：發射鈕沒有 start()，得先按傳輸列的播放才會動
+     * （兩個開關）；而且傳輸列的「單步」推進的是迴圈、不是 flying，所以逐格看根本沒反應。
+     * 改成 landed 之後，發射＝t 歸零並開跑、落地＝停住，單步也能一格一格把球往前推。
+     */
+    let t = 0, landed = false, shots = [], landAge = 0, clock = 0, rp = null;
+
+    PL.ui.section(L.controls, "発射のパラメータ");
+    const sV = PL.ui.stepper(L.controls, { label: "初速度 v₀ (m/s)", value: 24, min: 5, max: 45, step: 1, onInput: onParam });
+    const sA = PL.ui.stepper(L.controls, { label: "発射角 θ (°)", value: 45, min: 5, max: 85, step: 1, onInput: onParam });
+    const sH = PL.ui.slider(L.controls, { label: "砲台の高さ h₀", min: 0, max: 15, step: 0.5, value: 0, unit: "m", digits: 1, onInput: onParam });
+
+    PL.ui.section(L.controls, "撃ち出すもの");
+    PL.ui.chipGroup(L.controls, {
+      value: ammoKey,
+      options: Object.keys(AMMO).map(k => ({ value: k, label: AMMO[k].label })),
+      onChange: v => { ammoKey = v; onParam(); }
+    });
+
+    PL.ui.section(L.controls, "条件");
+    const cDrag = PL.ui.checkbox(L.controls, { label: "空気抵抗を入れる", checked: false, onChange: onParam });
+    const sTarget = PL.ui.slider(L.controls, { label: "的までの距離", min: 10, max: 120, step: 1, value: 55, unit: "m", digits: 0, onInput: onParam });
+
+    PL.ui.section(L.controls, "表示");
+    const layers = PL.ui.chipGroup(L.controls, {
+      multi: true, value: ["traj", "vcomp", "marks", "shots"],
+      options: [
+        { value: "traj", label: "予測の軌道" }, { value: "vcomp", label: "速度の成分" },
+        { value: "marks", label: "最高点／到達距離" }, { value: "shots", label: "これまでの落下点" }
+      ]
+    });
+
+    const row = PL.ui.buttonRow(L.controls);
+    /* trigger: true → 這顆就是唯一的「開始」，按下時引擎會順便啟動迴圈並藏掉傳輸列的播放。 */
+    PL.ui.button(row, "発射", () => { t = 0; landAge = 0; landed = false; if (rp) rp.clear(); }, { primary: true, trigger: true });
+    PL.ui.button(row, "落下点を消す", () => { shots = []; t = 0; landed = false; landAge = 0; anim.stop(); if (rp) rp.clear(); drawAll(); });
+
+    PL.ui.note(L.controls,
+      "まず真空でいちばん遠くまで届く角度を見つけ、次に空気抵抗を入れて探しなおすと、いちばんよい角度は小さくなります。" +
+      "次に、風船とボウリングの球を 1 回ずつ撃ちます。真空では 2 つの軌道はまったく同じですが、空気抵抗があると、プログラムがこわれたかと思うほど違います。");
+
+    const rR = PL.ui.readout(L.readouts, { label: "到達距離 R", unit: "m" });
+    const rHm = PL.ui.readout(L.readouts, { label: "最高点の高さ", unit: "m" });
+    const rTf = PL.ui.readout(L.readouts, { label: "飛んでいる時間", unit: "s" });
+    const rS = PL.ui.readout(L.readouts, { label: "いまの速さ", unit: "m/s" });
+    const rHit = PL.ui.readout(L.readouts, { label: "的の中心まで", unit: "m" });
+
+    const charts = PL.el("div", "sim-charts", root);
+    const w1 = PL.el("div", "sim-chart", charts);
+    PL.el("div", "chart-title", w1).textContent = "到達距離 R と発射角 θ";
+    const cvR = PL.canvas.create(w1, 0.58);
+    PL.el("div", "cap", w1).textContent =
+      "真空では R = v₀²sin2θ/g で、45° がいちばん遠く、足して 90° になる 2 つの角度では到達距離が同じです。空気抵抗を入れるとグラフは左にかたむき、いちばんよい角度は 40° より小さくなり、対称でもなくなります。";
+
+    /*
+     * 數值積分求軌跡
+     * 有空氣阻力時沒有簡潔的解析解，因此一律用數值積分，
+     * 讀數也從模擬出來的路徑取值，確保「畫面」與「數字」永遠一致。
+     * 阻力用 F = ½ρC_dA·v²，方向與速度相反。
+     */
+    function simulate() {
+      const ammo = AMMO[ammoKey];
+      const v0 = sV.get(), th = sA.get() * Math.PI / 180, h0 = sH.get();
+      const area = Math.PI * ammo.radius * ammo.radius;
+      const k = cDrag.get() ? 0.5 * 1.225 * ammo.drag * area / ammo.mass : 0;
+
+      const dt = 0.004;
+      let x = 0, y = h0, vx = v0 * Math.cos(th), vy = v0 * Math.sin(th);
+      const path = [[0, h0, Math.hypot(vx, vy)]];
+      let peak = h0, time = 0;
+
+      // 上限保護：極端參數下不要讓迴圈失控
+      for (let step = 0; step < 12000; step += 1) {
+        const speed = Math.hypot(vx, vy);
+        vx += -k * speed * vx * dt;
+        vy += (-g - k * speed * vy) * dt;
+        const prevX = x, prevY = y;
+        x += vx * dt; y += vy * dt;
+        time += dt;
+        if (y > peak) peak = y;
+        if (y <= 0) {
+          // 線性內插回到 y = 0 的那一刻，射程才不會受步長影響
+          const frac = prevY / (prevY - y || 1);
+          x = prevX + (x - prevX) * frac;
+          time -= dt * (1 - frac);
+          path.push([x, 0, Math.hypot(vx, vy)]);
+          break;
+        }
+        if (step % 3 === 0) path.push([x, y, speed]);
+      }
+      return { path, range: x, peak, time, ammo, v0, th, h0 };
+    }
+
+    let model = simulate();
+
+    function onParam() { t = 0; landed = false; landAge = 0; model = simulate(); if (rp) rp.clear(); }
+
+    /* 三個把手：砲管繞砲耳轉（發射角）、砲台上下（高度）、靶左右（距離）。
+       都是發射前的設定：飛行中收起；按下時停掉落地動畫，改完不會自己再射一次 */
+    let pg = null;
+    const halt = () => anim.stop();
+    const gAng = PL.ui.handle(cv, { label: "砲身（砲耳のまわりに回して発射角 θ を変える）", onGrab: halt,
+      onDrag: (x, y) => stepTo(sA, Math.atan2(pg.py - y, x - pg.ox) * 180 / Math.PI, () => { onParam(); chart(); }) });
+    const gH = PL.ui.handle(cv, { slider: sH, label: "砲台（上下に引いて高さ h₀ を変える）", onGrab: halt, toValue: (x, y) => (pg.oy - 2 - y) / pg.sc });
+    // 靶的距離也決定畫面比例尺：逐一試算每個距離畫出來的位置，挑離游標最近的，靶才跟得住手
+    const tgtPx = d => pg.ox + d * Math.min((cv.W - 116) / (Math.max(model.range, d) * 1.18 + 6), (pg.oy - 26) / (Math.max(model.peak, model.h0) * 1.35 + 4));
+    const gT = PL.ui.handle(cv, { slider: sTarget, label: "的（左右に引いて距離を変える）", onGrab: halt,
+      toValue: x => { let best = 10; for (let d = 10; d <= 120; d++) if (Math.abs(tgtPx(d) - x) < Math.abs(tgtPx(best) - x)) best = d; return best; } });
+
+    /* 射程對角度：有阻力時要逐點積分，才看得到最佳角度的移動 */
+    function rangeAt(angleDeg) {
+      const ammo = AMMO[ammoKey];
+      const v0 = sV.get(), h0 = sH.get(), th = angleDeg * Math.PI / 180;
+      const area = Math.PI * ammo.radius * ammo.radius;
+      const k = cDrag.get() ? 0.5 * 1.225 * ammo.drag * area / ammo.mass : 0;
+      const dt = 0.01;
+      let x = 0, y = h0, vx = v0 * Math.cos(th), vy = v0 * Math.sin(th);
+      for (let i = 0; i < 4000; i += 1) {
+        const speed = Math.hypot(vx, vy);
+        vx += -k * speed * vx * dt;
+        vy += (-g - k * speed * vy) * dt;
+        x += vx * dt; y += vy * dt;
+        if (y <= 0) break;
+      }
+      return Math.max(0, x);
+    }
+
+    function scene() {
+      const { ctx, W, H } = cv;
+      cv.clear(); D.bg(cv);
+      const m = MC(), AP = PL.apparatus;
+      const path = model.path, range = model.range, peak = model.peak, time = model.time;
+      const th = model.th, h0 = model.h0;
+      const target = sTarget.get();
+
+      const ox = 76, oy = H - 44;
+      const spanX = Math.max(range, target) * 1.18 + 6;
+      const spanY = Math.max(peak, h0) * 1.35 + 4;
+      const sc = Math.min((W - ox - 40) / spanX, (oy - 26) / spanY);
+      const px = xm => ox + xm * sc;
+      const py = ym => oy - ym * sc;
+      cv.calibrate(sc, "m");
+
+      /* 場景：戶外靶場。地面線就是 y = 0（落地的高度），距離刻度釘在上面。 */
+      AP.outdoor(ctx, W, H, oy, { t: clock * 0.4, ground: "grass" });
+      const gridStep = spanX > 90 ? 20 : 10;
+      for (let d = gridStep; d < spanX; d += gridStep) {
+        if (px(d) > W - 24) break;
+        D.line(ctx, px(d), oy, px(d), oy + 6, PL.theme.pale(0.4), 1.2);
+        D.text(ctx, String(d), px(d), oy + 18, { color: PL.col("text-dim"), size: 9.5, align: "center" });
+      }
+      D.text(ctx, "m", Math.min(W - 18, px(gridStep) - 14), oy + 18, { color: PL.col("text-faint"), size: 9, align: "right" });
+
+      /* 靶：畫在草地上的同心圓靶 + 距離旗 */
+      const tx = px(target);
+      const hitDistance = Math.abs(range - target);
+      const isHit = hitDistance <= 1.5;
+      if (tx < W - 16) {
+        const rx = Math.max(10, 1.5 * sc);
+        ["#f4f1ea", "#e0473c", "#f4f1ea", "#e0473c"].forEach((c, i) => {
+          ctx.fillStyle = c;
+          ctx.beginPath(); ctx.ellipse(tx, oy + 4, rx * (1 - i * 0.24), 3.6 * (1 - i * 0.2), 0, 0, Math.PI * 2); ctx.fill();
+        });
+        AP.flag(ctx, tx + rx + 6, oy + 4, 40, isHit && landed ? "#2fae62" : "#e0473c", clock);
+        D.text(ctx, target + " m", tx, oy + 32, { color: isHit ? PL.col("ok") : PL.col("danger"), size: 10, align: "center", weight: "700" });
+      }
+
+      // 歷次落點：換條件重射時，差異會自己浮現
+      if (layers.has("shots")) {
+        shots.forEach(s => {
+          ctx.fillStyle = "rgba(90,70,50,0.45)";
+          ctx.beginPath(); ctx.ellipse(px(s.x), oy + 2, 5, 2, 0, 0, Math.PI * 2); ctx.fill();
+          D.text(ctx, s.label, px(s.x), oy - 7, { color: PL.col("text-dim"), size: 8.5, align: "center" });
+        });
+      }
+
+      // 預測軌跡
+      if (layers.has("traj") && path.length > 1) {
+        ctx.save();
+        ctx.strokeStyle = PL.theme.isLight() ? "rgba(30,90,140,0.45)" : "rgba(150,210,240,0.45)";
+        ctx.lineWidth = 1.6; ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        path.forEach((p, i) => (i ? ctx.lineTo(px(p[0]), py(p[1])) : ctx.moveTo(px(p[0]), py(p[1]))));
+        ctx.stroke(); ctx.restore();
+      }
+
+      if (layers.has("marks")) {
+        D.line(ctx, px(range), oy - 7, px(range), oy + 7, m, 2);
+        D.text(ctx, "R=" + PL.fmt(range, 1) + "m", px(range), oy - 13, { color: m, size: 10, align: "center", weight: "700" });
+        const apex = path.reduce((best, p) => (p[1] > best[1] ? p : best), path[0]);
+        D.line(ctx, px(apex[0]), py(apex[1]), px(apex[0]), oy, PL.theme.pale(0.3), 1, [3, 3]);
+        D.text(ctx, "H=" + PL.fmt(peak, 1) + "m", px(apex[0]) + 5, py(apex[1]) - 8, { color: PL.col("text-dim"), size: 10, weight: "700" });
+      }
+
+      // 飛行中的發射物與頻閃殘影（每 0.2 s 一顆：水平間距相等、鉛直間距越來越大）
+      const frac = time > 0 ? Math.min(1, t / time) : 0;
+      const idx = Math.min(path.length - 1, Math.max(0, Math.floor(frac * (path.length - 1))));
+      const now = path[idx];
+      const bx = px(now[0]), by = py(now[1]);
+      if (rp) rp.mark(bx, by);
+      const rpx = PL.clamp(model.ammo.radius * sc * 2.6, 8, 12);
+      const kind = { bowling: "bowling", basket: "basketball", melon: "watermelon", balloon: "balloon" }[ammoKey];
+      const flying = t > 0;
+      if (flying && time > 0) {
+        ctx.save(); ctx.globalAlpha = 0.28;
+        for (let tt = 0.2; tt < Math.min(t, time) - 0.05; tt += 0.2) {
+          const k = Math.min(path.length - 1, Math.floor(tt / time * (path.length - 1)));
+          AP.sportBall(ctx, px(path[k][0]), py(path[k][1]), rpx * 0.9, kind, tt * 6);
+        }
+        ctx.restore();
+      }
+
+      // 高台：砲輪要踩在台面上
+      const pivotY = py(h0), CS = 1.15, drop = AP.cannonWheelDrop(CS);
+      if (pivotY + drop < oy - 3) AP.cliff(ctx, 0, ox + 30, pivotY + drop, oy + 2);
+      // 球先畫、大砲後畫：球是從砲口「出來」的
+      if (flying || !landed) AP.sportBall(ctx, bx, by, rpx, kind, t * 6);
+      AP.cannon(ctx, ox, pivotY, th, { s: CS, fired: flying ? t : null });
+      pg = { ox, oy, sc, py: pivotY, drop };
+      const inAir = t > 0 && !landed;
+      [[gAng, ox + 56 * Math.cos(th), pivotY - 56 * Math.sin(th)], [gH, ox - 22, pivotY - 2], [gT, tx, oy + 4]]
+        .forEach(([gp, x, y]) => inAir || x > W - 10 ? gp.hide() : gp.place(x, y));
+      D.text(ctx, sA.get() + "°", ox - 8, pivotY - 30, { color: PL.col("accent-2"), size: 12, weight: "700" });
+
+      if (layers.has("vcomp") && path.length > 1 && flying) {
+        const nxt = path[Math.min(path.length - 1, idx + 1)];
+        const dx = nxt[0] - now[0], dy = nxt[1] - now[1];
+        const norm = Math.hypot(dx, dy) || 1;
+        const len = 34;
+        D.arrow(ctx, bx, by, bx + dx / norm * len, by, { color: PL.col("accent-2"), width: 2, head: 7, label: "vₓ" });
+        D.arrow(ctx, bx, by, bx, by - dy / norm * len, { color: PL.col("warn"), width: 2, head: 7, label: "v_y" });
+      }
+
+      // 落地瞬間給明確回饋——學生要知道自己有沒有打中
+      if (landed) {
+        AP.dustKick(ctx, px(range), oy + 2, landAge, 1.1);
+        if (isHit) AP.confetti(ctx, px(range), oy - 10, landAge, { seed: Math.round(range * 10) });
+        D.text(ctx, isHit ? "命中！" : (range > target ? "遠すぎる" : "届かない"),
+          px(range), oy - 40, { color: isHit ? PL.col("ok") : PL.col("danger"), size: 15, align: "center", weight: "700" });
+      }
+
+      PL.ui.caption(cv, cDrag.get()
+        ? "空気抵抗あり：軌道は上りと下りで対称でなくなり、質量が小さいほど影響が大きい。"
+        : "いまは真空：軌道は完全に対称で、何を撃っても結果は同じ。うすい残像は 0.2 秒ごと。");
+
+      rR.set(range, 1); rHm.set(peak, 1); rTf.set(time, 2);
+      rS.set(now[2], 1); rHit.set(hitDistance, 1);
+    }
+
+    function chart() {
+      cvR.clear();
+      const samples = [];
+      for (let a = 5; a <= 85; a += 5) samples.push([a, rangeAt(a)]);
+      const maxR = Math.max.apply(null, samples.map(s => s[1]).concat([1]));
+      const gph = PL.graph(cvR, { x: 42, y: 14, w: cvR.W - 56, h: cvR.H - 36 }, { x0: 0, x1: 90, y0: 0, y1: maxR * 1.12 });
+      gph.frame({ xlabel: "θ (°)", ylabel: "R (m)" });
+      gph.grid(6, 4);
+      gph.curve(samples, { color: MC(), width: 2.2 });
+      // 標出最佳角度：有阻力時它會明顯離開 45°
+      const best = samples.reduce((a, b) => (b[1] > a[1] ? b : a), samples[0]);
+      gph.vline(best[0], { color: PL.col("warn"), dash: [4, 3], width: 1.4 });
+      gph.label(best[0] + 2, maxR * 0.92, "最大 " + best[0] + "°", { color: PL.col("warn"), size: 10 });
+      gph.dot(sA.get(), rangeAt(sA.get()), { r: 4.5, color: PL.col("accent-2"), glow: PL.col("accent-2") });
+    }
+
+    function drawAll() { scene(); chart(); }
+
+    const anim = PL.loop(dt => {
+      if (dt) {
+        clock += dt;
+        // 只要還沒落地就推進 t——不論是傳輸列的單步，還是發射後的連續播放，走的都是這條路。
+        if (!landed) {
+          t += dt;
+          if (t >= model.time) {
+            t = model.time; landed = true; landAge = 0;
+            shots.push({ x: model.range, label: AMMO[ammoKey].label + (cDrag.get() ? "·抵抗" : "") });
+            if (shots.length > 6) shots.shift();
+          }
+        } else {
+          // 落地後再跑一下，讓揚塵與彩帶播完，然後停住不空轉
+          landAge += dt;
+          if (landAge > 1.5) rp.end();
+        }
+      }
+      scene();
+    }, 50);
+    // 落地就停；把球拖回砲口（或再按「發射」）重新發射，拖到半路可以看任一時刻的位置與速度
+    rp = PL.motion.replay(cv, { loop: anim, label: "砲弾（砲口にもどすとまた撃てる）",
+      snapshot: () => ({ t, landed, landAge, sh: shots.slice() }),
+      restore: q => { t = q.t; landed = q.landed; landAge = q.landAge; shots = q.sh.slice(); },
+      reset: () => { t = 0; landed = false; landAge = 0; }, redraw: scene });
+
+    cv.onResize(scene); cvR.onResize(chart);
+    drawAll(); anim.start();
+    return {
+      stop() { anim.stop(); cv.destroy(); cvR.destroy(); },
+      rerender() { model = simulate(); drawAll(); }
+    };
+  }});
+
+  /* 相對運動：過河船
+   * 參數可在播放中即時調整：船的位置是「逐格積分」出來的（位置 += 速度 × dt），
+   * 不是用 t 反推，所以拉滑桿時船從當下位置繼續走，軌跡也會在該處轉彎，
+   * 學生能直接看見「船速、水流、船頭方向一改，合速度與去向跟著變」。 */
+  PL.register("relative-motion", { build(root) {
+    const L = PL.ui.layout(root, { chrome: "quiet" });
+    const cv = PL.canvas.create(L.canvasWrap, 0.6);
+    const RW = 60; // 河寬 m
+    // 船相對碼頭的位置（x 下游、y 對岸，單位 m）、歷史軌跡、水面波紋相位、抵岸後的停留計時
+    let pos = { x: 0, y: 0 }, trail = [[0, 0]], flowPhase = 0, hold = 0, lastLoopT = 0, trailAcc = 0;
+    let rp = null;
+    const restart = () => { pos = { x: 0, y: 0 }; trail = [[0, 0]]; hold = 0; trailAcc = 0; if (rp) rp.clear(); };
+    // 滑桿只更新畫面，不重置：播放中途改參數時船繼續前進
+    const sB = PL.ui.slider(L.controls, { label: "船の速さ（水に対して）", min: 1, max: 8, step: 0.5, value: 4, unit: "m/s", digits: 1, onInput: () => draw(), onReset: () => { restart(); draw(); } });
+    const sC = PL.ui.slider(L.controls, { label: "川の流れの速さ", min: 0, max: 6, step: 0.5, value: 3, unit: "m/s", digits: 1, onInput: () => draw(), onReset: () => { restart(); draw(); } });
+    const sH = PL.ui.slider(L.controls, { label: "船首の向き（向こう岸の法線から）", min: -60, max: 60, step: 1, value: 0, unit: "°", digits: 0, onInput: () => draw(), onReset: () => { restart(); draw(); } });
+    const row = PL.ui.buttonRow(L.controls);
+    PL.ui.button(row, "もう一度渡る", () => { restart(); draw(); }, { primary: true });
+    const rSpd = PL.ui.readout(L.readouts, { label: "合成した速さ", unit: "m/s" });
+    const rT = PL.ui.readout(L.readouts, { label: "渡る時間", unit: "s" });
+    const rD = PL.ui.readout(L.readouts, { label: "下流へ流される距離", unit: "m" });
+    /* 抓「船」箭頭的尖端：方向＝船頭方向、長度＝船速（12 px 代表 1 m/s），像搖桿一樣即時轉舵；
+       右側水流箭頭左右拖改流速。播放中拖也即時生效，船從當下位置接著走 */
+    let rg = { bx: 0, by: 0, fx: 0 };
+    const gBoat = PL.ui.handle(cv, { label: "船首（「船」の矢印をドラッグ：向き＝船首、長さ＝船の速さ）",
+      onDrag: (x, y) => { const dx = x - rg.bx, dy = rg.by - y; slTo(sH, Math.atan2(dx, dy) * 180 / Math.PI); slTo(sB, Math.hypot(dx, dy) / 12); draw(); } });
+    const gFlow = PL.ui.handle(cv, { slider: sC, label: "川の流れの速さ（矢印を左右に引く）", toValue: x => (x - rg.fx) / 9 });
+
+    function velocity() {
+      const b = sB.get(), c = sC.get(), th = sH.get() * Math.PI / 180;
+      return { b, c, th, vx: c + b * Math.sin(th), vy: b * Math.cos(th) }; // x下游, y對岸
+    }
+
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const { b, c, th, vx, vy } = velocity(), m = MC();
+      // 讀數：「若全程維持目前設定」的渡河時間與漂移（滑桿一動就即時更新）
+      const cross = vy > 0 ? RW / vy : Infinity, drift = vy > 0 ? vx * cross : 0;
+      const bankTop = 40, bankBot = H - 40, riverH = bankBot - bankTop;
+      const AP = PL.apparatus, light = PL.theme.isLight();
+      const sc = riverH / RW, ox = 90, oy = bankBot;
+      /* 俯視的河：兩岸草地、沙質河岸，水面波紋以水流速度往下游漂 */
+      AP.ground(ctx, 0, W, 0, bankTop, "grass");
+      AP.ground(ctx, 0, W, bankBot, H - bankBot, "grass");
+      AP.water(ctx, 0, bankTop, W, riverH, flowPhase, { flow: 1 });
+      ctx.fillStyle = light ? "#e3cf9f" : "#4a3f2c";
+      ctx.fillRect(0, bankTop - 5, W, 6); ctx.fillRect(0, bankBot - 1, W, 6);
+      for (let i = 0; i < 6; i++) AP.tree(ctx, 40 + i * (W - 60) / 5, bankTop - 6, 30, 3 + i);
+      // 起點碼頭
+      ctx.fillStyle = light ? "#a8794a" : "#5a4028";
+      ctx.fillRect(ox - 16, oy - 6, 32, 30);
+      ctx.strokeStyle = "rgba(60,36,14,0.55)"; ctx.lineWidth = 1;
+      for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.moveTo(ox - 16, oy - 6 + k * 6); ctx.lineTo(ox + 16, oy - 6 + k * 6); ctx.stroke(); }
+      D.text(ctx, "向こう岸", 8, bankTop - 10, { color: PL.col("text"), size: 11, weight: "700" });
+      D.text(ctx, "出発する岸（桟橋）", ox + 22, bankBot + 20, { color: PL.col("text"), size: 11, weight: "700" });
+      // 水流方向
+      for (let i = 0; i < 4; i++) {
+        const yy = bankBot - riverH * (i + 0.5) / 4;
+        D.arrow(ctx, W - 96, yy, W - 96 + Math.max(6, c * 9), yy, { color: light ? "rgba(255,255,255,0.9)" : "rgba(190,225,250,0.75)", width: 2 });
+      }
+      D.text(ctx, "川の流れ " + PL.fmt(c, 1) + " m/s", W - 96, bankTop + 16, { color: light ? "#ffffff" : "#d6ecff", size: 10.5, weight: "700" });
+      const bx = ox + pos.x * sc, by = oy - pos.y * sc;
+      // 實際走過的路徑（改參數時會在轉折處看得出來）
+      ctx.save();
+      ctx.strokeStyle = light ? "rgba(255,255,255,0.85)" : "rgba(220,235,255,0.6)"; ctx.lineWidth = 1.6; ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      trail.forEach((p, i) => (i ? ctx.lineTo(ox + p[0] * sc, oy - p[1] * sc) : ctx.moveTo(ox + p[0] * sc, oy - p[1] * sc)));
+      ctx.lineTo(bx, by); ctx.stroke(); ctx.restore();
+      AP.boatTop(ctx, bx, by, 46, -Math.PI / 2 + th, { color: "#e2574c" });
+      if (rp) rp.mark(bx, by);
+      // 速度向量
+      D.arrow(ctx, bx, by, bx + b * Math.sin(th) * 12, by - b * Math.cos(th) * 12, { color: light ? "#4c1d95" : "#ffe08a", width: 2.4, label: "船" });
+      D.arrow(ctx, bx, by, bx + c * 12, by, { color: light ? "#ffffff" : "#cfe8ff", width: 2.2, label: "流れ" });
+      D.arrow(ctx, bx, by, bx + vx * 12, by - vy * 12, { color: light ? "#9f1239" : "#ff8a6a", width: 2.8, label: "合成" });
+      rg = { bx, by, fx: W - 96 };
+      gBoat.place(bx + b * Math.sin(th) * 12, by - b * Math.cos(th) * 12);
+      gFlow.place(W - 96 + c * 9, bankBot - riverH * 0.375);
+      rSpd.set(Math.hypot(vx, vy), 2); rT.set(cross, 2); rD.set(drift, 1);
+    }
+
+    const anim = PL.loop((dt, loopT) => {
+      // 「全部重設」會把迴圈時間歸零：偵測到倒退就把船放回碼頭
+      if (loopT < lastLoopT - 1e-9) restart();
+      lastLoopT = loopT;
+      if (dt) {
+        const { c, vx, vy } = velocity();
+        flowPhase += c * 8 * dt;                      // 波紋相位用累加的，改水速時才不會跳
+        if (pos.y >= RW) {
+          hold += dt;                                 // 抵岸後停一下讓人看清楚落點就停住（不自己重來）
+          if (hold > 0.6) rp.end();
+        } else {
+          pos.x += vx * dt; pos.y = Math.min(RW, pos.y + vy * dt);
+          trailAcc += dt;
+          if (trailAcc >= 0.1 || pos.y >= RW) { trailAcc = 0; trail.push([pos.x, pos.y]); }
+        }
+      }
+      draw();
+    });
+    rp = PL.motion.replay(cv, { loop: anim, label: "小舟（桟橋にもどすともう一度渡る）",
+      snapshot: () => ({ pos: { x: pos.x, y: pos.y }, tr: trail, n: trail.length, hold, trailAcc, lastLoopT }),
+      restore: q => { pos = { x: q.pos.x, y: q.pos.y }; trail = q.tr.slice(0, q.n); hold = q.hold; trailAcc = q.trailAcc; lastLoopT = q.lastLoopT; },
+      reset: () => { pos = { x: 0, y: 0 }; trail = [[0, 0]]; hold = 0; trailAcc = 0; lastLoopT = 0; }, redraw: draw });
+    cv.onResize(draw); anim.start();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
+
+
+  /* 打點計時器（測速度與加速度） */
+  /* 打點計時器 —— 重物拉著小車加速，計時器一點一點把過程打在紙帶上
+   *
+   * 照真實的實驗裝置設計：
+   *   計時器 → 紙帶 → 小車 →（繩）→ 滑輪 → 重物
+   * 重物受重力往下掉，透過跨過滑輪的繩子拉著小車前進，小車越跑越快。
+   * 加速度不是憑空給的，而是 a = mg/(M+m)——調重物質量，點距整排跟著變，
+   * 「釋放 → 小車加速」這句話因此有了看得見的因。
+   *
+   * 兩個刻意的設計：
+   *   · 點是「當場被打出來的」，不是一開始就畫好——因為這個實驗的因果是
+   *     「小車先加速，點才越拉越開」，把點先攤出來等於先給答案。
+   *   · 還沒開始時紙帶上有一排淡預測點：實驗課本來就先算預期再去量，
+   *     而且拉滑桿時預測跟著變，不必先跑一次才知道參數有沒有效。
+   * 下半是同一條紙帶攤平後的樣子，也就是學生真正拿去量的那張紙。
+   */
+  PL.register("ticker-tape", { build(root) {
+    const L = PL.ui.layout(root, { controls: "bottom", chrome: "quiet" });
+    const cv = PL.canvas.create(L.canvasWrap, 0.66, 900);
+
+    const N = 13;              // 觀察的打點間隔數
+    const SLOW = 0.12;         // 慢動作：真實只有零點幾秒，直接播完全看不清楚
+    const G = 9.8;
+    let t = 0, dots = 0, flash = 0;
+
+    /*
+     * 這一版照著真實的實驗裝置設計：小車被跨過滑輪的重物拉著加速。
+     * 加速度不是直接給的，而是由「重物的重量」和「總質量」決定：
+     *   a = m·g / (M + m)
+     * 小車從靜止釋放（v₀ = 0），所以「釋放 → 小車加速」這句話有了具體的因。
+     * 學生調重物質量，就會看到點距整排跟著變——加速的原因被畫了出來。
+     */
+    PL.ui.section(L.controls, "実験装置");
+    const sM = PL.ui.slider(L.controls, { label: "台車の質量 M", min: 0.2, max: 1.2, step: 0.1, value: 0.5, unit: "kg", digits: 1, onInput: reset });
+    const sMw = PL.ui.slider(L.controls, { label: "おもりの質量 m", min: 0.05, max: 0.6, step: 0.05, value: 0.15, unit: "kg", digits: 2, onInput: reset });
+    PL.ui.section(L.controls, "記録タイマー");
+    const sT = PL.ui.slider(L.controls, { label: "打点の周期 T", min: 0.02, max: 0.1, step: 0.01, value: 0.05, unit: "s", digits: 2, onInput: reset });
+
+    const accel = () => sMw.get() * G / (sM.get() + sMw.get());   // a = mg/(M+m)，從靜止
+
+    PL.ui.presets(L.controls, {
+      label: "場面",
+      options: [
+        { label: "軽いおもり · 小さな加速", hint: "おもりが軽く台車が重いので、引く力が小さく加速度も小さい。打点の間隔はゆっくり広がる",
+          apply: () => { sM.set(1.2); sMw.set(0.05); reset(); } },
+        { label: "重いおもり · 大きな加速", hint: "おもりが重く台車が軽いので加速度が大きく、打点の間隔が 1 つごとにはっきり広がる",
+          apply: () => { sM.set(0.3); sMw.set(0.5); reset(); } },
+        { label: "50 Hz の交流電源の記録タイマー", hint: "台湾の交流電源は 60 Hz。実験室でよく使う記録タイマーは 50 Hz か 60 Hz が多い",
+          apply: () => { sT.set(0.02); reset(); } }
+      ]
+    });
+
+    const row = PL.ui.buttonRow(L.controls);
+    /*
+     * 「開始」是單向觸發，不是播放／暫停開關：它把紙帶清空、小車拉回起點、開始跑。
+     * 暫停、單步與速度一律由引擎的傳輸列負責；實驗自己再做一個開關的話，
+     * 兩個開關必須同時打開才會動，而傳輸列按了沒反應時學生看不出原因。
+     */
+    PL.ui.button(row, "スタート", () => { t = 0; dots = 0; flash = 0; if (rp) rp.clear(); anim.start(); draw(); }, { primary: true, trigger: true });
+    PL.ui.button(row, "リセット", reset);
+
+    let rp = null;
+    function reset() { t = 0; dots = 0; flash = 0; anim.stop(); if (rp) rp.clear(); draw(); }
+    // 放手前才能換重物：跑起來就收起把手（改了會重設，等於重做一次）
+    /*
+     * 把手在 mg 箭頭尖端：尖端位置 = 槽碼串底端 + 18 + m·50。
+     * 槽碼串的高度本身也隨 m 變（多一片就長一截），所以不能直接用 (y − 起點)/50 反推，
+     * 改成在滑桿允許的每一個質量裡找「尖端最靠近手指」的那一個。
+     */
+    let wTop0 = 0;
+    const STK = { bigH: 6, smallH: 4 };
+    const tipAt = m => wTop0 + PL.apparatus.stackPlan(m, STK).h + 12 + m * 50;
+    const grip = PL.ui.handle(cv, { slider: sMw, label: "おもりの重力 mg（下に引く＝おもりを 1 枚増やす）", toValue: (x, y) => {
+      let best = sMw.get(), bd = Infinity;
+      for (let m = 0.05; m <= 0.6 + 1e-9; m += 0.05) { const d = Math.abs(tipAt(m) - y); if (d < bd) { bd = d; best = Math.round(m * 100) / 100; } }
+      return best;
+    } });
+
+    PL.ui.note(L.controls,
+      "おもりをはなすとすぐ台車が前へ引かれ、どんどん速くなって、テープの打点の間隔もどんどん広がります。" +
+      "テープのいちばん最初の何点かは固まっていることに注意します。はなした直後のまだ遅いときに打たれたもので、測定の誤差が打点の間隔そのものより大きいので、実験ではまとめて捨てます。");
+
+    const T_END = () => N * sT.get();
+    const xAt = tt => 0.5 * accel() * tt * tt;                    // 小車位移（m），從靜止 v₀=0
+    const xn = k => xAt(k * sT.get());                            // 第 k 點的位置
+
+    const vd = PL.ui.verdict(L.readouts.parentNode || L.readouts, { label: "—", meter: true });
+    const rV = PL.ui.readout(L.readouts, { label: "5 点目の速さ", unit: "m/s" });
+    const rA = PL.ui.readout(L.readouts, { label: "測った加速度", unit: "m/s²" });
+    const rT = PL.ui.readout(L.readouts, { label: "1 区間の時間", unit: "s" });
+    const rN = PL.ui.readout(L.readouts, { label: "打った点の数", unit: "点" });
+
+    const dv = PL.ui.derived(L.canvasWrap.parentNode, [
+      { label: "打点の間隔の差 Δ", unit: "cm", hint: "となり合う 2 つの間隔の差。等加速度なら一定" },
+      { label: "テープから求めた a", unit: "m/s²", hint: "a = Δ / T²。これが測定値" },
+      { label: "理論値 a = mg/(M+m)", unit: "m/s²", hint: "おもりと全体の質量から計算した予想値" },
+      { label: "誤差", unit: "%", hint: "測定値と理論値の差" }
+    ]);
+
+    PL.ui.causality(L.canvasWrap.parentNode, {
+      title: "おもりが台車を引いて加速させ、テープがその様子を記録する",
+      rows: [
+        { name: "おもりの重さが引く力になる", tone: "a", note: "滑車にかけたおもりが重力で落ち、糸を通して台車を引きます。全体の加速度は a = mg/(M+m)：おもりが重く台車が軽いほど、加速度は大きくなります。" },
+        { name: "打点の間隔 = その区間の平均の速さ × T", tone: "b", note: "記録タイマーは決まった時間 T ごとに点を打つので、間隔を測ることは速さを測ることと同じです。間隔の長さそのものが速さを表すので、時間でわる必要はありません。" },
+        { name: "打点の間隔が同じ差で増える → 等加速度", tone: "c", note: "どの区間でも速さが同じだけ増えるなら、等加速度です。となり合う間隔の差 Δ を T² でわって得た a は、mg/(M+m) と一致するはずです。" }
+      ]
+    });
+
+    PL.ui.procedure(L.controls, {
+      title: "記録タイマーの実験のふつうの手順",
+      steps: [
+        "テープを記録タイマーに通して一端を台車の後ろに固定する。台車の反対側の糸を滑車にかけ、おもりをつるす。",
+        "<strong>先に記録タイマーを動かして打点を始めてから、台車をはなす</strong>。おもりが落ちて台車を加速させる。",
+        "台車が止まったらテープを取り、最初の固まっている点は<strong>まとめて捨てる</strong>。はっきりした点から 0、1、2……と番号をつける。",
+        "ものさしの 0 を第 0 点に合わせ、<strong>各点までを一度に測ってから</strong>引き算して各区間の間隔を出す。加速度は、となり合う間隔の差を T² でわって求め、mg/(M+m) と比べる。"
+      ],
+      rule: "順番をまちがえるとテープ全体が使えない：<strong>先に記録タイマーを動かし、それから台車をはなす</strong>。逆にすると、最初の何点かは台車がまだ動いていないときに打たれ、全部同じ位置に重なる。" +
+            "実際の実験では、まず<strong>摩擦をつり合わせる</strong>（長い板の片方を少し高くする）必要がある。そうしないと、測った a は mg/(M+m) よりかなり小さくなる。"
+      });
+
+    function draw() {
+      const { ctx, W, H } = cv; cv.clear(); D.bg(cv);
+      const a = accel(), T = sT.get();
+      const total = xn(N) || 1;
+
+      /* ---------- 上半：實驗台（照真實裝置：計時器→紙帶→小車→繩→滑輪→重物） ---------- */
+      const trackY = H * 0.40;
+      const pulleyX = W - 44, pulleyY = trackY + 8, pulleyR = 12;
+      const x0 = 132, x1 = pulleyX - 44;            // 軌道右端留給滑輪
+      const sc = (x1 - x0) / total;                 // 每公尺對應的像素
+      cv.calibrate(sc, "m");
+      const frac = Math.min(1, xAt(t) / total);
+      const carX = x0 + xAt(t) * sc;
+      const cw = 40, ch = 20;
+
+      /*
+       * 軌道用 pale 而不是 shade。
+       *
+       * theme.shade() 的意思是「比面板再凹進去一層的表面」，只有在淺色主題下才是可見的；
+       * 深色主題它回傳近黑色，對實驗台底板的對比只有 1.01——等於沒畫。
+       * 第一版用 shade 畫軌道又沒有描邊，於是深色主題下小車看起來浮在半空。
+       * 要被看見的東西一律用 theme.pale()，它會隨主題翻面。
+       */
+      const AP = PL.apparatus;
+      /* 場景：實驗室的長桌。上半是桌上的裝置，下半留給「取下後攤平的紙帶」 */
+      const benchY = trackY + 20, benchEnd = pulleyX - pulleyR - 4, sceneBot = H * 0.78 - 46;
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, sceneBot); ctx.clip();
+      AP.labRoom(ctx, W, sceneBot, sceneBot, { bench: "none" });
+      AP.table(ctx, -12, benchEnd, benchY, sceneBot + 4, { thick: 16 });
+      ctx.restore();
+      D.line(ctx, 0, sceneBot, W, sceneBot, PL.col("border"), 1);
+      AP.steel(ctx, x0 - 10, trackY + 12, x1 - x0 + 20, 8, -6);
+      for (let m = 0; m <= total; m += Math.max(0.1, Math.round(total / 8 * 10) / 10)) {
+        const px = x0 + m * sc;
+        if (px > x1) break;
+        D.line(ctx, px, trackY + 19, px, trackY + 25, PL.col("text-faint"), 1);
+        D.text(ctx, PL.fmt(m, 1), px, trackY + 36, { color: PL.col("text-faint"), size: 9, align: "center" });
+      }
+      D.text(ctx, "位置 (m)", x0, trackY + 52, { color: PL.col("text-faint"), size: 10 });
+
+      // 紙帶：從小車後方拉回來，穿過計時器再露出一小截
+      // 紙帶的高度對齊小車車身中段；計時器墊在木塊上，讓振針正好落在紙帶上
+      const tapeY = trackY - 4;
+      AP.woodBlock(ctx, 92, benchY, 70, benchY - (tapeY + 8), 0);
+      AP.paperTape(ctx, 26, carX - cw / 2 + 2, tapeY, 12);
+      // 紙帶上已經打好的點（跟著紙帶一起往右移動）
+      for (let k = 0; k < dots; k++) {
+        const px = carX - (xAt(t) - xn(k)) * sc;
+        if (px > 26 && px < carX - 2) D.disc(ctx, px, tapeY, 2.6, { fill: k === 5 ? MC() : PL.col("text-dim") });
+      }
+
+      // 打點計時器本體（固定在桌上，紙帶從它底下通過）
+      const tx = 92;
+      D.text(ctx, "記録タイマー", tx, tapeY - 58, { color: PL.col("accent-2"), size: 11, align: "center", weight: "700" });
+      AP.tickerTimer(ctx, tx, tapeY, PL.fmt(1 / T, 0) + " Hz", flash > 0);
+      if (flash > 0) D.disc(ctx, tx - 14, tapeY, 5, { fill: PL.col("warn"), glow: PL.col("warn"), glowSize: 12 });
+      // 解剖標註：引線指向振針與限位孔（打點的兩個關鍵部位）
+      D.line(ctx, tx + 14, tapeY - 16, tx + 46, tapeY - 34, PL.col("text-faint"), 1);
+      D.text(ctx, "打点針", tx + 48, tapeY - 38, { color: PL.col("text-dim"), size: 9.5 });
+      D.line(ctx, tx + 2, tapeY + 10, tx + 30, tapeY + 30, PL.col("text-faint"), 1);
+      D.text(ctx, "テープのガイド穴", tx + 32, tapeY + 34, { color: PL.col("text-dim"), size: 9.5 });
+
+      /* 繩子：從小車前緣水平拉到滑輪，再垂下去接重物。滑輪把「水平的拉」轉成「垂直的落」。
+         重物隨小車前進而下落——物理上兩者位移相等，但畫面上垂直空間有限，
+         所以這裡按「小車跑完全程的比例」在可用高度內下落，示意「重物掉、小車加速」。 */
+      const ropeY = trackY - 4;                       // 小車掛鉤的高度＝滑輪頂緣
+      const weightTop = pulleyY + pulleyR + 14;
+      const plan = AP.stackPlan(sMw.get(), STK);
+      // 下落距離不能讓槽碼串掉進下方的紙帶區
+      const weightY = weightTop + Math.max(0, Math.min(H * 0.18, sceneBot - 6 - weightTop - plan.h)) * frac;
+      const hangX = pulleyX + pulleyR;                 // 繩子從滑輪外緣垂下
+      AP.cord(ctx, carX + cw / 2 + 2, ropeY, pulleyX, pulleyY - pulleyR);
+      AP.cord(ctx, hangX, pulleyY, hangX, weightY - 5);
+
+      // 滑輪：用 C 形夾固定在桌緣，輪子伸出桌外，重物才掛得下去
+      AP.steel(ctx, benchEnd - 14, pulleyY - 3, pulleyX - benchEnd + 14, 6, 6);
+      AP.steel(ctx, benchEnd - 14, benchY + 16, 18, 6, -4);
+      AP.steel(ctx, benchEnd + 1, pulleyY - 3, 5, benchY + 22 - pulleyY + 3, -2);
+      AP.brassDisc(ctx, benchEnd - 6, benchY + 26, 3.5);
+      AP.pulley(ctx, pulleyX, pulleyY, pulleyR);
+      D.text(ctx, "滑車", pulleyX, pulleyY - pulleyR - 8, { color: PL.col("text-faint"), size: 10, align: "center" });
+
+      // 重物：槽碼串，100 g 一大片、50 g 一小片——重物超過一片就自動疊成兩片
+      const ww = 24;
+      AP.weightStack(ctx, hangX, weightY, sMw.get(), Object.assign({ w: ww }, STK));
+      const wh = plan.h;
+      const parts = [];
+      if (plan.big) parts.push("100g" + (plan.big > 1 ? "×" + plan.big : ""));
+      if (plan.small) parts.push("50g");
+      // 標籤卡：總質量＋組成（「100g×2＋50g」）。墊一張小卡，免得壓在桌腳與夾具上看不清楚
+      {
+        const l1 = PL.fmt(sMw.get(), 2) + " kg", l2 = parts.join("＋");
+        ctx.save(); ctx.font = "700 9.5px system-ui, sans-serif";
+        const tw = Math.max(ctx.measureText(l1).width, ctx.measureText(l2).width);
+        ctx.restore();
+        const bw = tw + 12, bx = hangX - ww / 2 - 6 - bw, by = weightY - 3;
+        D.rect(ctx, bx, by, bw, 28, { fill: PL.col("panel-2", "rgba(10,14,20,0.7)"), stroke: PL.col("border"), width: 1, r: 5 });
+        D.text(ctx, l1, bx + bw - 6, by + 12, { color: PL.col("text"), size: 9.5, align: "right", weight: "700" });
+        D.text(ctx, l2, bx + bw - 6, by + 23, { color: PL.col("text-dim"), size: 8.5, align: "right" });
+      }
+      // 重物受力箭頭：往下的重力，長度正比於 mg（50 px/kg）；尖端是把手，往下拉＝多掛一片槽碼
+      wTop0 = weightY;
+      const tk0 = weightY + wh + 12;
+      if (t === 0) {
+        D.arrow(ctx, hangX, weightY + wh + 2, hangX, tk0 + sMw.get() * 50,
+          { color: PL.col("accent-2"), width: 1.6, label: "mg" });
+        grip.place(hangX, tk0 + sMw.get() * 50);
+      } else grip.hide();
+
+      // 小車（有車廂與兩個輪子）
+      AP.cart(ctx, carX, trackY + 12, cw, ch);
+      if (rp) rp.mark(carX, trackY + 12 - ch * 0.5);
+      D.text(ctx, "台車", carX, trackY - ch - 10, { color: PL.col("text-dim"), size: 10, align: "center", weight: "700" });
+      // 速度箭頭：長度正比於當前速率，停著時不畫
+      const vNow = a * t;
+      if (t > 0 && vNow > 0) {
+        D.arrow(ctx, carX + cw / 2, trackY + 3, carX + cw / 2 + Math.min(56, vNow * 7), trackY + 3,
+          { color: PL.col("accent-2"), width: 2, label: "v = " + PL.fmt(vNow, 1) });
+      }
+
+      /* ---------- 下半：攤平的紙帶（拿去量的那一張） ---------- */
+      const ty = H * 0.78, tapeX0 = 30, tapeX1 = W - 24;
+      const tsc = (tapeX1 - tapeX0) / total;
+      D.text(ctx, "はずして広げたテープ", tapeX0, ty - 34, { color: PL.col("text-dim"), size: 11 });
+      AP.paperTape(ctx, tapeX0 - 10, tapeX1 + 10, ty, 24);
+
+      // 預測點：還沒打到的位置先用淡點標出來，讓「預期」與「實測」可以對照
+      for (let k = 0; k <= N; k++) {
+        if (k < dots) continue;
+        const px = tapeX0 + xn(k) * tsc;
+        if (px <= tapeX1) D.disc(ctx, px, ty, 2.4, { fill: PL.theme.pale(0.30) });
+      }
+      // 實際打出來的點
+      for (let k = 0; k < dots; k++) {
+        const px = tapeX0 + xn(k) * tsc;
+        if (px <= tapeX1) D.disc(ctx, px, ty, 3.2, { fill: k === 5 ? MC() : PL.col("text"), glow: k === dots - 1 ? PL.col("warn") : null, glowSize: 10 });
+      }
+      // 計數點：每 5 個間隔取一點（50 Hz 下 = 0.1 s），紅圈 O、A、B——
+      // 量測時看的不是每一個計時點，而是「計數點」，這是紙帶分析的第一課
+      const CN = 5;
+      const cntName = ["O", "A", "B", "C", "D"];
+      for (let k = 0; k <= dots; k++) {
+        if (k % CN !== 0) continue;
+        const px = tapeX0 + xn(k) * tsc;
+        if (px > tapeX1) break;
+        D.disc(ctx, px, ty, 7, { stroke: PL.col("danger"), width: 1.4 });
+        D.text(ctx, cntName[k / CN] || "", px, ty - 13, { color: PL.col("danger"), size: 10, align: "center", weight: "700" });
+      }
+      // 累計距離括號：從 O 量到每一個計數點（先量絕對位置、再相減得段距）
+      for (let m2 = 1; m2 * CN <= Math.max(0, dots - 0); m2++) {
+        const ax = tapeX0 + xn(0) * tsc, bx = tapeX0 + xn(m2 * CN) * tsc;
+        if (bx > tapeX1) break;
+        const by2 = ty - 20;
+        D.line(ctx, ax, by2, bx, by2, PL.col("danger"), 1);
+        D.line(ctx, ax, by2 - 4, ax, by2 + 4, PL.col("danger"), 1);
+        D.line(ctx, bx, by2 - 4, bx, by2 + 4, PL.col("danger"), 1);
+        D.text(ctx, "x(" + (cntName[0] || "O") + cntName[m2] + ") = " + PL.fmt(xn(m2 * CN) * 100, 1) + " cm",
+          (ax + bx) / 2, by2 - 7, { color: PL.col("danger"), size: 9.5, align: "center" });
+      }
+      // 點距標註：只標已經打出來的段落，避免預告答案
+      for (let k = 0; k < Math.min(5, Math.max(0, dots - 1)); k++) {
+        const a1 = tapeX0 + xn(k) * tsc, a2 = tapeX0 + xn(k + 1) * tsc;
+        D.line(ctx, a1, ty + 16, a2, ty + 16, PL.col("text-faint"), 1);
+        D.line(ctx, a1, ty + 12, a1, ty + 20, PL.col("text-faint"), 1);
+        D.line(ctx, a2, ty + 12, a2, ty + 20, PL.col("text-faint"), 1);
+        D.text(ctx, PL.fmt((xn(k + 1) - xn(k)) * 100, 1), (a1 + a2) / 2, ty + 31,
+          { color: PL.col("text-faint"), size: 9, align: "center" });
+      }
+      if (dots > 1) D.text(ctx, "打点の間隔（cm）", tapeX0, ty + 31, { color: PL.col("text-faint"), size: 9 });
+      D.text(ctx, "赤い丸＝数える点：5 間隔ごとに 1 点（0.1 s）。O から各点までの距離を先に測り、それから引き算する", tapeX0, ty + 45,
+        { color: PL.col("text-faint"), size: 9.5 });
+
+      /* ---------- 讀數 ---------- */
+      const T2 = T * T;
+      const seg = k => xn(k + 1) - xn(k);
+      const delta = seg(5) - seg(4);
+      const v5 = (xn(6) - xn(4)) / (2 * T);
+      const am = ((xn(6) - xn(5)) - (xn(5) - xn(4))) / T2;
+      const err = a > 0 ? Math.abs(am - a) / a * 100 : 0;
+      rV.set(v5, 2); rA.set(am, 2); rT.set(T, 2); rN.set(dots, 0);
+      dv.set(0, delta * 100, 2); dv.set(1, am, 2); dv.set(2, a, 2); dv.set(3, err, 1);
+      dv.tone(3, err < 3 ? "good" : "");
+
+      /* 步驟清單面板：跟著 demo 狀態高亮當前步驟（標準流程的四步） */
+      const steps = ["テープを通し、おもりをつるす", "先に記録タイマーを動かす", "それから台車をはなす", "テープを取って間隔を測る"];
+      const curStep = dots === 0 ? (t === 0 ? 0 : 1) : (dots >= N ? 3 : 2);
+      const pw = 158, ph = 4 * 24 + 12, px0 = W - pw - 14, py0 = 16;
+      D.rect(ctx, px0, py0, pw, ph, { fill: PL.theme.pale(0.06), stroke: PL.col("border"), width: 1, r: 6 });
+      D.text(ctx, "ふつうの手順", px0 + 10, py0 + 14, { color: PL.col("text-dim"), size: 9.5, weight: "700" });
+      steps.forEach((st, si) => {
+        const sy2 = py0 + 30 + si * 24;
+        const on = si === curStep, done = si < curStep;
+        D.disc(ctx, px0 + 16, sy2 - 4, 8, { fill: on ? PL.col("warn") : done ? PL.col("ok") : PL.theme.pale(0.14) });
+        D.text(ctx, String(si + 1), px0 + 16, sy2 - 1, { color: on || done ? "#04121a" : PL.col("text-dim"), size: 9.5, align: "center", weight: "700" });
+        D.text(ctx, st, px0 + 30, sy2, { color: on ? PL.col("warn") : done ? PL.col("text") : PL.col("text-faint"), size: 10, weight: on ? "700" : "" });
+        if (on) D.text(ctx, "◀", px0 + pw - 16, sy2, { color: PL.col("warn"), size: 10 });
+      });
+
+      const prog = Math.min(1, dots / (N + 1));
+      if (dots === 0) {
+        vd.set("おもりはまだはなしていない：うすい色は「見えるはずの点」。スタートを押すとおもりが台車を引いて走らせ、点を打つ", "info", 0);
+      } else {
+        vd.set("おもりが台車を引いて加速：打点の間隔が 1 区間ごとに " + PL.fmt(delta * 100, 2) + " cm ずつ増える。テープから求めた a = " +
+          PL.fmt(am, 2) + " m/s² は、理論値 mg/(M+m) = " + PL.fmt(a, 2) + " m/s² と一致", "good", prog);
+      }
+    }
+
+    const anim = PL.loop(dt => {
+      if (dt) {
+        const T = sT.get();
+        if (t >= T_END()) { rp.end(); }
+        else {
+          t = Math.min(T_END(), t + dt * SLOW);
+          // 補打這段時間內所有應該打的點（速度倍率調高時一格可能跨過好幾個週期）
+          while (dots <= N && dots * T <= t + 1e-9) { dots += 1; flash = 0.16; }
+        }
+        if (flash > 0) flash = Math.max(0, flash - dt);
+      }
+      draw();
+    });
+    // 打完就停；把小車拖回計時器旁（或再按「開始」）重來，拖到半路紙帶上的點也會跟著退回去
+    rp = PL.motion.replay(cv, { loop: anim, label: "台車（始点までもどすとやり直し）",
+      snapshot: () => ({ t, dots, flash }), restore: q => { t = q.t; dots = q.dots; flash = q.flash; },
+      reset: () => { t = 0; dots = 0; flash = 0; }, redraw: draw });
+    cv.onResize(draw); draw();
+    return { stop() { anim.stop(); cv.destroy(); }, rerender: draw };
+  }});
+})();

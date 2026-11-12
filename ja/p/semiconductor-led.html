@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>pn 接合と LED の発光｜物理実験室 · 電場と電気回路</title>
+<meta name="description" content="順方向の電圧をかけると pn 接合の障壁が低くなり、電子とホールが再結合するときにエネルギーを光として出せます。LED の色はバンドギャップで決まります。" />
+<link rel="canonical" href="https://senior-science.vercel.app/ja/p/semiconductor-led.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="pn 接合と LED の発光｜物理実験室 · 電場と電気回路" />
+<meta property="og:description" content="順方向の電圧をかけると pn 接合の障壁が低くなり、電子とホールが再結合するときにエネルギーを光として出せます。LED の色はバンドギャップで決まります。" />
+<meta property="og:locale" content="zh_TW" />
+<meta property="og:url" content="https://senior-science.vercel.app/ja/p/semiconductor-led.html" />
+<meta property="og:site_name" content="物理実験室" />
+<meta property="og:image" content="https://senior-science.vercel.app/ja/icons/og-card.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="theme-color" content="#13171c" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<link rel="icon" type="image/svg+xml" href="../icons/icon.svg?v=20261112-2027" />
+<link rel="apple-touch-icon" href="../icons/icon-192.png?v=20261112-2027" />
+<link rel="stylesheet" href="../css/style.css?v=20261112-2027" />
+<script>
+(function () {
+  try {
+    var saved = JSON.parse(localStorage.getItem("pl-theme"));
+    // トップページと同じく、初めて来た人にはライトテーマを使う
+    if (saved !== "light" && saved !== "dark") saved = "light";
+    document.documentElement.setAttribute("data-theme", saved);
+  } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+})();
+</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"LearningResource","name":"pn 接合と LED の発光","description":"順方向の電圧をかけると pn 接合の障壁が低くなり、電子とホールが再結合するときにエネルギーを光として出せます。LED の色はバンドギャップで決まります。","inLanguage":"zh-Hant","learningResourceType":"シミュレーション","educationalLevel":"物理基礎 · 物理（電磁気）","isAccessibleForFree":true,"license":"https://creativecommons.org/licenses/by-nc-sa/4.0/","url":"https://senior-science.vercel.app/ja/p/semiconductor-led.html"}</script>
+</head>
+<body class="static-page">
+<header class="license-topbar">
+  <a class="license-home" href="../index.html"><span class="license-home-mark" aria-hidden="true">PH</span>物理実験室</a>
+  <div class="license-topbar-actions">
+    <a class="license-toplink" href="../experiments.html">すべての実験</a>
+    <a class="license-toplink" href="../licensing.html">利用条件</a>
+  </div>
+</header>
+<main class="license-page">
+  <p class="license-kicker">単元 10 · 電場と電気回路</p>
+  <h1>pn 接合と LED の発光</h1>
+  <p class="license-lead">順方向の電圧をかけると pn 接合の障壁が低くなり、電子とホールが再結合するときにエネルギーを光として出せます。LED の色はバンドギャップで決まります。</p>
+  <div class="license-meta">
+    <span>物理基礎 · 物理（電磁気）</span>
+    <span>シミュレーション</span>
+    <span>日本語</span>
+  </div>
+
+  <section class="license-section">
+    <h2>使う公式</h2>
+    <p class="static-formula">E_g≈hc/λ</p>
+  </section>
+
+  <section class="license-section">
+    <h2>学習のポイント</h2>
+    <ul>
+      <li>pn 接合には向きがある</li>
+      <li>順方向では電流が流れ、逆方向では流れない</li>
+      <li>バンドギャップで光の色が決まる</li>
+      <li>LED には電流を制限する抵抗を直列につなぐ</li>
+    </ul>
+  </section>
+
+  <section class="license-section">
+    <h2>やってみる</h2>
+    <p>この実験には、そのまま操作できるシミュレーションがあります。パラメータを変え、ストップウォッチや分度器で測り、データを記録すると、自動でグラフを描いて物理量を求めます。</p>
+    <div class="license-cta">
+      <a class="static-cta" href="../index.html#semiconductor-led">「pn 接合と LED の発光」のシミュレーションを開く</a>
+      <a href="worksheet-semiconductor-led.html">ワークシートを印刷</a>
+    </div>
+  </section>
+
+  <nav class="license-section static-nav">
+    <a href="diode-rectifier.html">← ダイオードによる整流と平滑</a>
+    <a href="oscilloscope.html">オシロスコープと信号の測定 →</a>
+  </nav>
+</main>
+</body>
+</html>

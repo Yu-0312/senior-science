@@ -65,6 +65,14 @@
     return { exponent: slope, r2 };
   }
 
+  // 「y」與「x」的平方根成正比：主詞、受詞的語序各語言不同，所以「」」也算在片語裡（日文版整段替換）
+  function relPhrase(n) {
+    const table = [[1, "」成正比"], [2, "」的平方成正比"], [3, "」的立方成正比"], [0.5, "」的平方根成正比"],
+      [-1, "」成反比"], [-2, "」的平方成反比"], [-0.5, "」的平方根成反比"]];
+    for (const [value, text] of table) if (n != null && Math.abs(n - value) < 0.06) return text;
+    return null;
+  }
+
   // 把 0.5、-0.5、1、2、-1、-2、3 這些常見指數說成人話
   function describeExponent(n) {
     const named = [
@@ -310,10 +318,10 @@
     if (r.direction === "peak") {
       return y + " 隨 " + x + " 先後變化方向不同，中間出現極值（最大 " + fmtValue(r.max) + unit + "）";
     }
-    const word = r.direction === "up" ? "變大" : "變小";
+    const word = r.direction === "up" ? " 變大" : " 變小";
     const named = r.exponent != null ? describeExponent(r.exponent) : null;
-    const tail = named ? "（" + y + " " + named + "）" : "";
-    return x + " 增加時 " + y + " " + word +
+    const tail = named ? "（" + named + "）" : "";
+    return x + " 增加時 " + y + word +
       "：" + fmtValue(r.first) + unit + " → " + fmtValue(r.last) + unit + tail;
   }
 
@@ -337,7 +345,7 @@
     question.textContent = "把「" + r.slider.label + "」從 " +
       fmtValue(r.slider.min, r.slider.digits) + " 調到 " + fmtValue(r.slider.max, r.slider.digits) +
       (r.slider.unit ? " " + r.slider.unit : "") +
-      "，「" + r.readout.label + "」會怎麼變？";
+      "，這時「" + r.readout.label + "」會怎麼變？";
 
     const options = [
       { key: "up", text: "變大" },
@@ -364,9 +372,9 @@
           ? "（" + (r.direction === "up" ? "增加" : "減少") + " " + change.toFixed(0) + "%）" : "") + "。";
       if (r.exponent != null) {
         const law = el("span", "sim-predict-law", result);
-        const named = describeExponent(r.exponent);
-        law.textContent = named
-          ? r.readout.label + " " + named + "於 " + r.slider.label +
+        const phrase = relPhrase(r.exponent);
+        law.textContent = phrase
+          ? "「" + r.readout.label + "」與「" + r.slider.label + phrase +
             "（" + r.readout.label + " ∝ " + formatExponent(r.exponent) + r.slider.label + "）"
           : r.readout.label + " ∝ " + r.slider.label + formatExponent(r.exponent);
       }

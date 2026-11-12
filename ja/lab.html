@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>自由実験室｜物理実験室</title>
+  <meta name="description" content="自分で実験を組み立てる：器具箱から小球、斜面、ばね、滑車、電池、豆電球、電流計・電圧計、レーザー、レンズ、プリズム、測定器具を出して、力学・電気回路・光をその場でシミュレーションします。" />
+  <meta name="theme-color" content="#13171c" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
+  <meta name="color-scheme" content="dark light" />
+  <link rel="canonical" href="https://senior-science.vercel.app/ja/lab.html" />
+  <link rel="alternate" hreflang="zh-Hant" href="https://senior-science.vercel.app/lab.html" />
+  <link rel="alternate" hreflang="ja" href="https://senior-science.vercel.app/ja/lab.html" />
+  <link rel="alternate" hreflang="x-default" href="https://senior-science.vercel.app/lab.html" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="自由実験室｜物理実験室" />
+  <meta property="og:description" content="自分で実験を組み立てる：器具箱から小球、斜面、ばね、滑車、電池、豆電球、メーター、レーザー、レンズ、プリズムを出して、力学・電気回路・光をその場でシミュレーションします。" />
+  <meta property="og:locale" content="zh_TW" />
+  <meta property="og:url" content="https://senior-science.vercel.app/ja/lab.html" />
+  <meta property="og:site_name" content="物理実験室" />
+  <meta property="og:image" content="https://senior-science.vercel.app/ja/icons/og-card.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="物理実験室：教科書の物理を、自分の手で確かめる" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <script>
+    (function () {
+      try {
+        var saved = JSON.parse(localStorage.getItem("pl-theme"));
+        if (saved !== "light" && saved !== "dark") saved = "light";
+        document.documentElement.setAttribute("data-theme", saved);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20261112-2027" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png?v=20261112-2027" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="css/style.css?v=20261112-2027" />
+  <link rel="stylesheet" href="css/lab.css?v=20261112-2027" />
+</head>
+
+<body class="lab-page">
+  <a class="skip-link" href="#lab-canvas">実験台へ移動</a>
+  <header class="lab-top">
+    <a class="lab-home" href="./" title="トップへ戻る">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+      <span>物理実験室</span>
+    </a>
+    <h1 class="lab-title">自由実験室</h1>
+
+    <div class="lab-transport" role="group" aria-label="シミュレーションの操作">
+      <button class="lab-btn lab-play" id="lab-play" type="button" title="再生／一時停止（スペース）">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg><span>再生</span>
+      </button>
+      <button class="lab-btn" id="lab-step" type="button" title="1 コマ進める（1/60 秒）">コマ送り</button>
+      <button class="lab-btn" id="lab-reset" type="button" title="再生する前の配置に戻す">リセット</button>
+      <label class="lab-speed"><span class="sr-only">速さ</span>
+        <select id="lab-speed" aria-label="シミュレーションの速さ">
+          <option value="0.1">0.1×</option><option value="0.25">0.25×</option><option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option><option value="2">2×</option>
+        </select>
+      </label>
+      <span class="lab-time" id="lab-time" aria-live="off">t = 0.00 s</span>
+    </div>
+
+    <div class="lab-actions">
+      <button class="lab-btn icon" id="lab-undo" type="button" title="元に戻す（Ctrl+Z）" aria-label="元に戻す">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+      </button>
+      <button class="lab-btn icon" id="lab-redo" type="button" title="やり直す（Ctrl+Shift+Z）" aria-label="やり直す">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg>
+      </button>
+      <div class="lab-menu">
+        <button class="lab-btn" id="lab-examples-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="lab-examples">サンプル</button>
+        <div class="lab-pop" id="lab-examples" role="menu" hidden></div>
+      </div>
+      <button class="lab-btn" id="lab-detail" type="button" aria-pressed="true" title="器具の横に数値を表示（k、F、n、f…）">数値</button>
+      <button class="lab-btn" id="lab-grid" type="button" aria-pressed="true" title="方眼とスナップ（ドラッグで 1 cm、回転で 15° ずつ）">方眼</button>
+      <div class="lab-menu">
+        <button class="lab-btn" id="lab-file-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="lab-file">ファイル</button>
+        <div class="lab-pop" id="lab-file" role="menu" hidden>
+          <button type="button" role="menuitem" data-act="share">共有リンクをコピー</button>
+          <button type="button" role="menuitem" data-act="export">実験ファイルを保存（.json）</button>
+          <button type="button" role="menuitem" data-act="import">実験ファイルを開く…</button>
+          <button type="button" role="menuitem" data-act="png">画像として保存（.png）</button>
+          <button type="button" role="menuitem" data-act="clear" class="danger">実験台を空にする</button>
+        </div>
+      </div>
+      <button class="lab-btn icon" id="lab-theme" type="button" aria-label="ダーク／ライトを切り替え"></button>
+    </div>
+  </header>
+
+  <main class="lab-main">
+    <aside class="lab-palette" aria-label="器具箱">
+      <div class="lab-tabs" id="lab-tabs" role="tablist" aria-label="器具の分類"></div>
+      <div class="lab-tiles" id="lab-tiles" role="tabpanel"></div>
+      <p class="lab-palette-hint">実験台にドラッグするか、クリックで画面の中央に置きます。糸やばねはクリックしたあと、両端を順にクリックします</p>
+    </aside>
+
+    <section class="lab-stage" id="lab-stage">
+      <canvas id="lab-canvas" tabindex="0" aria-label="実験台。器具箱から器具を追加します。Delete で削除、R で回転、スペースで再生。" aria-describedby="lab-status"></canvas>
+      <div class="lab-empty" id="lab-empty" hidden>
+        <h2>器具を実験台に置いてみよう</h2>
+        <p>左の器具箱は力学、電気、光、測定器具に分かれています。並べて「再生」を押すと、物理法則のとおりに動きます。</p>
+        <ul>
+          <li><b>ばね、糸、ばねばかり</b>：器具をクリックしてから、始点と終点を順にクリックします（物体やフックの上をクリックするとつながります）。水平・鉛直に近いと自動でそろいます</li>
+          <li><b>電気回路</b>：端子から別の端子までドラッグすると導線になります</li>
+          <li><b>光</b>：レーザーや光源を置くと、すぐに光の道すじを計算します</li>
+        </ul>
+        <div class="lab-empty-actions" id="lab-empty-actions"></div>
+      </div>
+      <div class="lab-zoom" role="group" aria-label="拡大・縮小">
+        <button type="button" id="lab-zoom-in" aria-label="拡大">＋</button>
+        <button type="button" id="lab-fit" aria-label="実験台全体を中央に表示">⤢</button>
+        <button type="button" id="lab-zoom-out" aria-label="縮小">－</button>
+      </div>
+      <button type="button" class="lab-cancel" id="lab-cancel" hidden>配置をやめる</button>
+      <p class="lab-status" id="lab-status" aria-live="polite"></p>
+      <div class="lab-toast" id="lab-toast" role="status" aria-live="polite" hidden></div>
+    </section>
+
+    <aside class="lab-inspector" id="lab-inspector" aria-label="器具の設定と測定値"></aside>
+  </main>
+
+  <input type="file" id="lab-import" accept="application/json,.json" hidden />
+
+  <script src="js/site-config.js?v=20261112-2027"></script>
+  <script src="js/sim-core.js?v=20261112-2027"></script>
+  <script src="js/sim-apparatus.js?v=20261112-2027"></script>
+  <script src="js/lab/lab-engine.js?v=20261112-2027"></script>
+  <script src="js/lab/lab-circuit.js?v=20261112-2027"></script>
+  <script src="js/lab/lab-optics.js?v=20261112-2027"></script>
+  <script src="js/lab/lab-items.js?v=20261112-2027"></script>
+  <script src="js/lab/lab-app.js?v=20261112-2027"></script>
+</body>
+</html>

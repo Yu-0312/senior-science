@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RC ローパスフィルターの周波数特性｜物理実験室 · 電場と電気回路</title>
+<meta name="description" content="RC ローパスフィルターは低い周波数を通し、高い周波数を弱めます。入力の周波数を変えていって利得のグラフを見て、回路の設計と信号処理で使うボード線図の考え方につなげます。" />
+<link rel="canonical" href="https://senior-science.vercel.app/ja/p/bode-low-pass.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="RC ローパスフィルターの周波数特性｜物理実験室 · 電場と電気回路" />
+<meta property="og:description" content="RC ローパスフィルターは低い周波数を通し、高い周波数を弱めます。入力の周波数を変えていって利得のグラフを見て、回路の設計と信号処理で使うボード線図の考え方につなげます。" />
+<meta property="og:locale" content="zh_TW" />
+<meta property="og:url" content="https://senior-science.vercel.app/ja/p/bode-low-pass.html" />
+<meta property="og:site_name" content="物理実験室" />
+<meta property="og:image" content="https://senior-science.vercel.app/ja/icons/og-card.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="theme-color" content="#13171c" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<link rel="icon" type="image/svg+xml" href="../icons/icon.svg?v=20261112-2027" />
+<link rel="apple-touch-icon" href="../icons/icon-192.png?v=20261112-2027" />
+<link rel="stylesheet" href="../css/style.css?v=20261112-2027" />
+<script>
+(function () {
+  try {
+    var saved = JSON.parse(localStorage.getItem("pl-theme"));
+    // トップページと同じく、初めて来た人にはライトテーマを使う
+    if (saved !== "light" && saved !== "dark") saved = "light";
+    document.documentElement.setAttribute("data-theme", saved);
+  } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+})();
+</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"LearningResource","name":"RC ローパスフィルターの周波数特性","description":"RC ローパスフィルターは低い周波数を通し、高い周波数を弱めます。入力の周波数を変えていって利得のグラフを見て、回路の設計と信号処理で使うボード線図の考え方につなげます。","inLanguage":"zh-Hant","learningResourceType":"シミュレーション","educationalLevel":"物理基礎 · 物理（電磁気）","isAccessibleForFree":true,"license":"https://creativecommons.org/licenses/by-nc-sa/4.0/","url":"https://senior-science.vercel.app/ja/p/bode-low-pass.html"}</script>
+</head>
+<body class="static-page">
+<header class="license-topbar">
+  <a class="license-home" href="../index.html"><span class="license-home-mark" aria-hidden="true">PH</span>物理実験室</a>
+  <div class="license-topbar-actions">
+    <a class="license-toplink" href="../experiments.html">すべての実験</a>
+    <a class="license-toplink" href="../licensing.html">利用条件</a>
+  </div>
+</header>
+<main class="license-page">
+  <p class="license-kicker">単元 10 · 電場と電気回路</p>
+  <h1>RC ローパスフィルターの周波数特性</h1>
+  <p class="license-lead">RC ローパスフィルターは低い周波数を通し、高い周波数を弱めます。入力の周波数を変えていって利得のグラフを見て、回路の設計と信号処理で使うボード線図の考え方につなげます。</p>
+  <div class="license-meta">
+    <span>物理基礎 · 物理（電磁気）</span>
+    <span>シミュレーション</span>
+    <span>日本語</span>
+  </div>
+
+  <section class="license-section">
+    <h2>使う公式</h2>
+    <p class="static-formula">|H(f)|=(1/(√(1+(f/f_c)²)))</p>
+  </section>
+
+  <section class="license-section">
+    <h2>学習のポイント</h2>
+    <ul>
+      <li>遮断周波数は利得が -3 dB になる所</li>
+      <li>低い周波数はほぼそのまま通る</li>
+      <li>高い周波数では利得がほぼ周波数に反比例して下がる</li>
+      <li>ボード線図では、ふつう周波数の軸を対数にする</li>
+    </ul>
+  </section>
+
+  <section class="license-section">
+    <h2>やってみる</h2>
+    <p>この実験には、そのまま操作できるシミュレーションがあります。パラメータを変え、ストップウォッチや分度器で測り、データを記録すると、自動でグラフを描いて物理量を求めます。</p>
+    <div class="license-cta">
+      <a class="static-cta" href="../index.html#bode-low-pass">「RC ローパスフィルターの周波数特性」のシミュレーションを開く</a>
+      <a href="worksheet-bode-low-pass.html">ワークシートを印刷</a>
+    </div>
+  </section>
+
+  <nav class="license-section static-nav">
+    <a href="electrolysis.html">← 電気分解とファラデーの法則</a>
+    <a href="wire-resistivity.html">導線の抵抗と長さ、断面積（抵抗率） →</a>
+  </nav>
+</main>
+</body>
+</html>

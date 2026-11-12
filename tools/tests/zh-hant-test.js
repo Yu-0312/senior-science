@@ -50,7 +50,7 @@ function listFiles(dir, out) {
   if (!fs.existsSync(dir)) return out;
   fs.readdirSync(dir, { withFileTypes: true }).forEach(d => {
     const p = path.join(dir, d.name);
-    if (d.isDirectory()) { if (!/^(\.git|node_modules|tests)$/.test(d.name)) listFiles(p, out); }
+    if (d.isDirectory()) { if (!/^(\.git|node_modules|tests|ja|i18n)$/.test(d.name)) listFiles(p, out); }
     else if (/\.(js|html|css|json|md)$/.test(d.name)) out.push(p);
   });
   return out;

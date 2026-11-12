@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>水波投影装置：反射、屈折、回折と干渉｜物理実験室 · 波と音</title>
+<meta name="description" content="水波投影装置（リップルタンク）は、目に見えにくい波を明暗のしまで映し出します。直線の波は斜めに置いた板で反射し、浅い所に入ると波の速さが遅く波長が短くなって曲がり、せまいすき間を通ると回折して広がります。同じように振動する 2 つの点波源からは、水面に動かない節線が何本もできます。" />
+<link rel="canonical" href="https://senior-science.vercel.app/ja/p/ripple-tank.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="水波投影装置：反射、屈折、回折と干渉｜物理実験室 · 波と音" />
+<meta property="og:description" content="水波投影装置（リップルタンク）は、目に見えにくい波を明暗のしまで映し出します。直線の波は斜めに置いた板で反射し、浅い所に入ると波の速さが遅く波長が短くなって曲がり、せまいすき間を通ると回折して広がります。同じように振動する 2 つの点波源からは、水面に動かない節線が何本もできます。" />
+<meta property="og:locale" content="zh_TW" />
+<meta property="og:url" content="https://senior-science.vercel.app/ja/p/ripple-tank.html" />
+<meta property="og:site_name" content="物理実験室" />
+<meta property="og:image" content="https://senior-science.vercel.app/ja/icons/og-card.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="theme-color" content="#13171c" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<link rel="icon" type="image/svg+xml" href="../icons/icon.svg?v=20261112-2027" />
+<link rel="apple-touch-icon" href="../icons/icon-192.png?v=20261112-2027" />
+<link rel="stylesheet" href="../css/style.css?v=20261112-2027" />
+<script>
+(function () {
+  try {
+    var saved = JSON.parse(localStorage.getItem("pl-theme"));
+    // トップページと同じく、初めて来た人にはライトテーマを使う
+    if (saved !== "light" && saved !== "dark") saved = "light";
+    document.documentElement.setAttribute("data-theme", saved);
+  } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+})();
+</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"LearningResource","name":"水波投影装置：反射、屈折、回折と干渉","description":"水波投影装置（リップルタンク）は、目に見えにくい波を明暗のしまで映し出します。直線の波は斜めに置いた板で反射し、浅い所に入ると波の速さが遅く波長が短くなって曲がり、せまいすき間を通ると回折して広がります。同じように振動する 2 つの点波源からは、水面に動かない節線が何本もできます。","inLanguage":"zh-Hant","learningResourceType":"シミュレーション","educationalLevel":"物理基礎 · 物理（波）","isAccessibleForFree":true,"license":"https://creativecommons.org/licenses/by-nc-sa/4.0/","url":"https://senior-science.vercel.app/ja/p/ripple-tank.html"}</script>
+</head>
+<body class="static-page">
+<header class="license-topbar">
+  <a class="license-home" href="../index.html"><span class="license-home-mark" aria-hidden="true">PH</span>物理実験室</a>
+  <div class="license-topbar-actions">
+    <a class="license-toplink" href="../experiments.html">すべての実験</a>
+    <a class="license-toplink" href="../licensing.html">利用条件</a>
+  </div>
+</header>
+<main class="license-page">
+  <p class="license-kicker">単元 8 · 波と音</p>
+  <h1>水波投影装置：反射、屈折、回折と干渉</h1>
+  <p class="license-lead">水波投影装置（リップルタンク）は、目に見えにくい波を明暗のしまで映し出します。直線の波は斜めに置いた板で反射し、浅い所に入ると波の速さが遅く波長が短くなって曲がり、せまいすき間を通ると回折して広がります。同じように振動する 2 つの点波源からは、水面に動かない節線が何本もできます。</p>
+  <div class="license-meta">
+    <span>物理基礎 · 物理（波）</span>
+    <span>シミュレーション</span>
+    <span>日本語</span>
+  </div>
+
+  <section class="license-section">
+    <h2>使う公式</h2>
+    <p class="static-formula">v=fλ, ((sin θ₁)/(sin θ₂))=((v₁)/(v₂))=((λ₁)/(λ₂)), |r₁-r₂|=(n-12)λ(節線)</p>
+  </section>
+
+  <section class="license-section">
+    <h2>学習のポイント</h2>
+    <ul>
+      <li>振動数は波源で決まり、浅い所に入っても変わらない</li>
+      <li>浅い所では波が遅く波長が短いので、波面は法線に近づく向きに曲がる</li>
+      <li>すき間の幅が波長と同じくらいのとき回折がいちばん目立つ</li>
+      <li>節線上では経路差が半波長の奇数倍</li>
+    </ul>
+  </section>
+
+  <section class="license-section">
+    <h2>やってみる</h2>
+    <p>この実験には、そのまま操作できるシミュレーションがあります。パラメータを変え、ストップウォッチや分度器で測り、データを記録すると、自動でグラフを描いて物理量を求めます。</p>
+    <div class="license-cta">
+      <a class="static-cta" href="../index.html#ripple-tank">「水波投影装置：反射、屈折、回折と干渉」のシミュレーションを開く</a>
+      <a href="worksheet-ripple-tank.html">ワークシートを印刷</a>
+    </div>
+  </section>
+
+  <nav class="license-section static-nav">
+    <a href="resonance-tube-sound-speed.html">← 気柱の共鳴で音の速さを測る</a>
+    <a href="sound-interference.html">2 つのスピーカーによる音の干渉 →</a>
+  </nav>
+</main>
+</body>
+</html>

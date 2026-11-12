@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>円すい振り子｜物理実験室 · 円運動と万有引力</title>
+<meta name="description" content="おもりが水平面内で等速円運動をし、糸が円すいをえがきます。張力の鉛直成分が重力とつり合い、水平成分が向心力になります。速く回るほど糸は開きます。周期は、おもりからつるした点までの鉛直方向の高さ h だけで決まります。" />
+<link rel="canonical" href="https://senior-science.vercel.app/ja/p/conical-pendulum.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="円すい振り子｜物理実験室 · 円運動と万有引力" />
+<meta property="og:description" content="おもりが水平面内で等速円運動をし、糸が円すいをえがきます。張力の鉛直成分が重力とつり合い、水平成分が向心力になります。速く回るほど糸は開きます。周期は、おもりからつるした点までの鉛直方向の高さ h だけで決まります。" />
+<meta property="og:locale" content="zh_TW" />
+<meta property="og:url" content="https://senior-science.vercel.app/ja/p/conical-pendulum.html" />
+<meta property="og:site_name" content="物理実験室" />
+<meta property="og:image" content="https://senior-science.vercel.app/ja/icons/og-card.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="theme-color" content="#13171c" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<link rel="icon" type="image/svg+xml" href="../icons/icon.svg?v=20261112-2027" />
+<link rel="apple-touch-icon" href="../icons/icon-192.png?v=20261112-2027" />
+<link rel="stylesheet" href="../css/style.css?v=20261112-2027" />
+<script>
+(function () {
+  try {
+    var saved = JSON.parse(localStorage.getItem("pl-theme"));
+    // トップページと同じく、初めて来た人にはライトテーマを使う
+    if (saved !== "light" && saved !== "dark") saved = "light";
+    document.documentElement.setAttribute("data-theme", saved);
+  } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+})();
+</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"LearningResource","name":"円すい振り子","description":"おもりが水平面内で等速円運動をし、糸が円すいをえがきます。張力の鉛直成分が重力とつり合い、水平成分が向心力になります。速く回るほど糸は開きます。周期は、おもりからつるした点までの鉛直方向の高さ h だけで決まります。","inLanguage":"zh-Hant","learningResourceType":"シミュレーション","educationalLevel":"物理基礎 · 物理（力学）","isAccessibleForFree":true,"license":"https://creativecommons.org/licenses/by-nc-sa/4.0/","url":"https://senior-science.vercel.app/ja/p/conical-pendulum.html"}</script>
+</head>
+<body class="static-page">
+<header class="license-topbar">
+  <a class="license-home" href="../index.html"><span class="license-home-mark" aria-hidden="true">PH</span>物理実験室</a>
+  <div class="license-topbar-actions">
+    <a class="license-toplink" href="../experiments.html">すべての実験</a>
+    <a class="license-toplink" href="../licensing.html">利用条件</a>
+  </div>
+</header>
+<main class="license-page">
+  <p class="license-kicker">単元 5 · 円運動と万有引力</p>
+  <h1>円すい振り子</h1>
+  <p class="license-lead">おもりが水平面内で等速円運動をし、糸が円すいをえがきます。張力の鉛直成分が重力とつり合い、水平成分が向心力になります。速く回るほど糸は開きます。周期は、おもりからつるした点までの鉛直方向の高さ h だけで決まります。</p>
+  <div class="license-meta">
+    <span>物理基礎 · 物理（力学）</span>
+    <span>シミュレーション</span>
+    <span>日本語</span>
+  </div>
+
+  <section class="license-section">
+    <h2>使う公式</h2>
+    <p class="static-formula">Tcos θ=mg, Tsin θ=((mv²)/r), tan θ=((ω² r)/g), P=2π√(((Lcos θ)/g))</p>
+  </section>
+
+  <section class="license-section">
+    <h2>学習のポイント</h2>
+    <ul>
+      <li>向心力は新しい種類の力ではなく、張力の水平成分</li>
+      <li>張力 T = mg / cosθ は、いつも重力より大きい</li>
+      <li>角速度が大きいほど開く角 θ は大きい</li>
+      <li>周期は鉛直方向の高さ h = L cosθ だけで決まる</li>
+    </ul>
+  </section>
+
+  <section class="license-section">
+    <h2>やってみる</h2>
+    <p>この実験には、そのまま操作できるシミュレーションがあります。パラメータを変え、ストップウォッチや分度器で測り、データを記録すると、自動でグラフを描いて物理量を求めます。</p>
+    <div class="license-cta">
+      <a class="static-cta" href="../index.html#conical-pendulum">「円すい振り子」のシミュレーションを開く</a>
+      <a href="worksheet-conical-pendulum.html">ワークシートを印刷</a>
+    </div>
+  </section>
+
+  <nav class="license-section static-nav">
+    <a href="satellite-orbit.html">← 人工衛星：軌道の速さ、周期と脱出速度</a>
+    <a href="spring.html">ばね振り子 →</a>
+  </nav>
+</main>
+</body>
+</html>

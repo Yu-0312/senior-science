@@ -28,3 +28,4 @@ yarn-error.log*
 *.bak
 *.tmp
 *.log
+i18n/ja-todo.json

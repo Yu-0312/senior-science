@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>単振り子で重力加速度 g を測る｜物理実験室 · 単振動</title>
+<meta name="description" content="振れが小さい単振り子の周期は、糸の長さと重力加速度だけで決まります。糸の長さを変えて周期を記録し、T² を L に対してグラフにすると原点を通る直線になり、傾きは 4π²/g です。ここからその場所の重力加速度が求められます。" />
+<link rel="canonical" href="https://senior-science.vercel.app/ja/p/pendulum-measure-g.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="単振り子で重力加速度 g を測る｜物理実験室 · 単振動" />
+<meta property="og:description" content="振れが小さい単振り子の周期は、糸の長さと重力加速度だけで決まります。糸の長さを変えて周期を記録し、T² を L に対してグラフにすると原点を通る直線になり、傾きは 4π²/g です。ここからその場所の重力加速度が求められます。" />
+<meta property="og:locale" content="zh_TW" />
+<meta property="og:url" content="https://senior-science.vercel.app/ja/p/pendulum-measure-g.html" />
+<meta property="og:site_name" content="物理実験室" />
+<meta property="og:image" content="https://senior-science.vercel.app/ja/icons/og-card.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="theme-color" content="#13171c" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<link rel="icon" type="image/svg+xml" href="../icons/icon.svg?v=20261112-2027" />
+<link rel="apple-touch-icon" href="../icons/icon-192.png?v=20261112-2027" />
+<link rel="stylesheet" href="../css/style.css?v=20261112-2027" />
+<script>
+(function () {
+  try {
+    var saved = JSON.parse(localStorage.getItem("pl-theme"));
+    // トップページと同じく、初めて来た人にはライトテーマを使う
+    if (saved !== "light" && saved !== "dark") saved = "light";
+    document.documentElement.setAttribute("data-theme", saved);
+  } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+})();
+</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"LearningResource","name":"単振り子で重力加速度 g を測る","description":"振れが小さい単振り子の周期は、糸の長さと重力加速度だけで決まります。糸の長さを変えて周期を記録し、T² を L に対してグラフにすると原点を通る直線になり、傾きは 4π²/g です。ここからその場所の重力加速度が求められます。","inLanguage":"zh-Hant","learningResourceType":"シミュレーション","educationalLevel":"物理（力学）","isAccessibleForFree":true,"license":"https://creativecommons.org/licenses/by-nc-sa/4.0/","url":"https://senior-science.vercel.app/ja/p/pendulum-measure-g.html"}</script>
+</head>
+<body class="static-page">
+<header class="license-topbar">
+  <a class="license-home" href="../index.html"><span class="license-home-mark" aria-hidden="true">PH</span>物理実験室</a>
+  <div class="license-topbar-actions">
+    <a class="license-toplink" href="../experiments.html">すべての実験</a>
+    <a class="license-toplink" href="../licensing.html">利用条件</a>
+  </div>
+</header>
+<main class="license-page">
+  <p class="license-kicker">単元 6 · 単振動</p>
+  <h1>単振り子で重力加速度 g を測る</h1>
+  <p class="license-lead">振れが小さい単振り子の周期は、糸の長さと重力加速度だけで決まります。糸の長さを変えて周期を記録し、T² を L に対してグラフにすると原点を通る直線になり、傾きは 4π²/g です。ここからその場所の重力加速度が求められます。</p>
+  <div class="license-meta">
+    <span>物理（力学）</span>
+    <span>シミュレーション</span>
+    <span>日本語</span>
+  </div>
+
+  <section class="license-section">
+    <h2>使う公式</h2>
+    <p class="static-formula">T=2π√(L/g) ⇒ T²=((4π²)/g)L</p>
+  </section>
+
+  <section class="license-section">
+    <h2>学習のポイント</h2>
+    <ul>
+      <li>振れの角を約 10° より小さくすると、周期は振幅に関係しなくなる</li>
+      <li>n 回の往復の時間を測って n でわると、ストップウォッチを押すときの反応の誤差が小さくなる</li>
+      <li>糸の長さは、つるした点からおもりの球の中心まで測る。糸の端までではない</li>
+      <li>いくつもの点からグラフの傾きを求めるほうが、1 点を式に代入するよりずっと信頼できる</li>
+    </ul>
+  </section>
+
+  <section class="license-section">
+    <h2>やってみる</h2>
+    <p>この実験には、そのまま操作できるシミュレーションがあります。パラメータを変え、ストップウォッチや分度器で測り、データを記録すると、自動でグラフを描いて物理量を求めます。</p>
+    <div class="license-cta">
+      <a class="static-cta" href="../index.html#pendulum-measure-g">「単振り子で重力加速度 g を測る」のシミュレーションを開く</a>
+      <a href="worksheet-pendulum-measure-g.html">ワークシートを印刷</a>
+    </div>
+  </section>
+
+  <nav class="license-section static-nav">
+    <a href="resonance-phase-lag.html">← 強制振動の位相のずれ</a>
+    <a href="spring-measure-k.html">ばね振り子でばね定数 k を測る →</a>
+  </nav>
+</main>
+</body>
+</html>

@@ -602,11 +602,11 @@
     const opts = shuffle([tr.kind].concat(shuffle(pool).slice(0, 3)));
     const y0 = ys[0], y1 = ys[ys.length - 1];
     const how = {
-      up: "從 " + withUnit(y0, r.unit) + " 一路增加到 " + withUnit(y1, r.unit),
-      down: "從 " + withUnit(y0, r.unit) + " 一路減少到 " + withUnit(y1, r.unit),
-      updown: "先升到最高約 " + withUnit(tr.hi, r.unit) + "，再降到 " + withUnit(y1, r.unit),
-      downup: "先降到最低約 " + withUnit(tr.lo, r.unit) + "，再回升到 " + withUnit(y1, r.unit),
-      osc: "在 " + withUnit(tr.lo, r.unit) + " ～ " + withUnit(tr.hi, r.unit) + " 之間來回變化"
+      up: "一路增加（" + withUnit(y0, r.unit) + " → " + withUnit(y1, r.unit) + "）",
+      down: "一路減少（" + withUnit(y0, r.unit) + " → " + withUnit(y1, r.unit) + "）",
+      updown: "先升後降（最高約 " + withUnit(tr.hi, r.unit) + "，最後 " + withUnit(y1, r.unit) + "）",
+      downup: "先降後升（最低約 " + withUnit(tr.lo, r.unit) + "，最後 " + withUnit(y1, r.unit) + "）",
+      osc: "來回振盪（" + withUnit(tr.lo, r.unit) + " ～ " + withUnit(tr.hi, r.unit) + "）"
     }[tr.kind];
     return {
       kicker: "觀 察 點 · 播 放",
@@ -617,7 +617,7 @@
         q: "剛才播放的這段時間裡，「" + r.label + "」是怎麼變化的？",
         choices: opts.map(k => TREND[k]),
         correct: opts.indexOf(tr.kind),
-        explain: "實驗台實測：「" + r.label + "」" + how + "。想想看：是什麼讓它這樣變？"
+        explain: "實驗台實測：「" + r.label + "」的變化是" + how + "。想想看：是什麼讓它這樣變？"
       }
     };
   }
@@ -655,7 +655,7 @@
           choices: ["變大", "變小", "幾乎不變"],
           correct: rel.direction === "up" ? 0 : 1,
           explain: "實驗台掃描：「" + rel.slider.label + "」從 " + withUnit(rel.slider.min, rel.slider.unit) + " 調到 " + withUnit(rel.slider.max, rel.slider.unit) +
-            "，「" + r.label + "」從 " + withUnit(rel.first, r.unit) + " 變成 " + withUnit(rel.last, r.unit) + "。等一下自己調調看，驗證這個結果。"
+            "，這時「" + r.label + "」由 " + withUnit(rel.first, r.unit) + " 變成 " + withUnit(rel.last, r.unit) + "。等一下自己調調看，驗證這個結果。"
         }
       };
     }
@@ -700,7 +700,7 @@
         choices: ["變大", "變小", "幾乎不變"],
         correct: grows ? 0 : 1,
         explain: "實驗台掃描：「" + slider.label + "」從 " + withUnit(rel.slider.min, slider.unit) + " 調到 " + withUnit(rel.slider.max, slider.unit) +
-          "，「" + r.label + "」從 " + withUnit(rel.first, r.unit) + " 變成 " + withUnit(rel.last, r.unit) + "。現在它是 " + withUnit(r.number, r.unit) + "。"
+          "，這時「" + r.label + "」由 " + withUnit(rel.first, r.unit) + " 變成 " + withUnit(rel.last, r.unit) + "。現在它是 " + withUnit(r.number, r.unit) + "。"
       }
     };
   }
@@ -725,10 +725,10 @@
     const ins = ctx.insight;
     if (ins && ins.relations) {
       const rel = ins.relations.find(q => q.slider === slider && q.readout === r);
-      const NICE = { "1": "成正比", "-1": "成反比", "2": "的平方成正比", "-2": "的平方成反比", "0.5": "的平方根成正比", "-0.5": "的平方根成反比" };
+      const NICE = { "1": "」成正比", "-1": "」成反比", "2": "」的平方成正比", "-2": "」的平方成反比", "0.5": "」的平方根成正比", "-0.5": "」的平方根成反比" };
       if (rel && rel.exponent != null) {
         const k = [1, -1, 2, -2, 0.5, -0.5].find(n => Math.abs(rel.exponent - n) < 0.06);
-        if (k != null) extra = "把整個範圍掃過一遍會發現：「" + r.label + "」與「" + slider.label + "」" + NICE[String(k)] + "。";
+        if (k != null) extra = "把整個範圍掃過一遍會發現：「" + r.label + "」與「" + slider.label + NICE[String(k)] + "。";
       } else if (rel && rel.direction === "peak") {
         extra = "注意：這不是一路單調的關係，「" + r.label + "」在中間會出現極值。";
       }

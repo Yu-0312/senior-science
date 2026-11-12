@@ -332,7 +332,7 @@
         kind: "predict", noPenalty: true,
         title: exp.title,
         scenario: firstSentence(exp.concept),
-        prompt: "先猜猜看：把「" + x.label + "」從 " + withUnit(pr.xs[0], x.unit) + " 調到 " + withUnit(pr.xs[pr.xs.length - 1], x.unit) + "，「" + y.label + "」會怎麼變？",
+        prompt: "先猜猜看：把「" + x.label + "」從 " + withUnit(pr.xs[0], x.unit) + " 調到 " + withUnit(pr.xs[pr.xs.length - 1], x.unit) + "，這時「" + y.label + "」會怎麼變？",
         note: "猜錯不扣分，下一步會在實驗台上驗證。",
         options: ["變大", "變小", "幾乎不變"], fixedOrder: true, correct, prediction
       });
@@ -467,7 +467,7 @@
       quiz.push({ kind: "scenario", title: "情境題",
         prompt: "小安" + pick(roles) + "「" + exp.title + "」。他希望「" + y.label + "」比現在" + (wantUp ? "大" : "小") + "一些，而且一次只能改一個參數。哪個做法有效？",
         options: order, correct: order.indexOf(correctText), canPeek: true,
-        explain: "實驗台實測：「" + x.label + "」增加時「" + y.label + "」" + (up ? "變大" : "變小") + "，所以要" + correctText + "。取平均只會讓量測更準，不會改變結果本身。" });
+        explain: "實驗台實測：「" + x.label + "」增加時「" + y.label + "」會" + (up ? "變大" : "變小") + "，所以要" + correctText + "。取平均只會讓量測更準，不會改變結果本身。" });
     }
 
     /* ⑦ 主站題庫：逐題撰寫的題目（情境、實驗設計、誤差判讀）與每次數值不同的計算題 */
@@ -872,7 +872,7 @@
       if (item.prediction && L.predictionPick != null) {
         const p = item.prediction, S = L.lab.summary;
         const truth = ["變大", "變小", "幾乎不變"][p.correct];
-        text += " 剛才的預測：你選「" + ["變大", "變小", "幾乎不變"][L.predictionPick] + "」，實驗結果是「" + S.readouts[p.rel.r].label + "」" + truth +
+        text += " 剛才的預測：你選「" + ["變大", "變小", "幾乎不變"][L.predictionPick] + "」，實驗結果是「" + S.readouts[p.rel.r].label + "」會" + truth +
           (L.predictionPick === p.correct ? "，猜對了。" : "，跟你想的不一樣，記住這個結果。");
       }
       setFoot("good", item.mode === "explore" ? "做得好！" : "達成目標！", text);

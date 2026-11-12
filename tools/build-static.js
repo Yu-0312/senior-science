@@ -622,7 +622,9 @@ function main() {
     "\n</urlset>\n";
   fs.writeFileSync(path.join(ROOT, "sitemap.xml"), sitemap, "utf8");
 
-  const robots = "User-agent: *\nAllow: /\n\nSitemap: " + siteUrl + "sitemap.xml\n";
+  // 有日文版（tools/build-ja.js）的站，robots.txt 也列出 ja/sitemap.xml
+  const jaSitemap = fs.existsSync(path.join(ROOT, "tools", "build-ja.js")) ? "Sitemap: " + siteUrl + "ja/sitemap.xml\n" : "";
+  const robots = "User-agent: *\nAllow: /\n\nSitemap: " + siteUrl + "sitemap.xml\n" + jaSitemap;
   fs.writeFileSync(path.join(ROOT, "robots.txt"), robots, "utf8");
 
   console.log("已產生靜態頁面：");

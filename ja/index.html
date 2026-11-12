@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>物理実験室｜動かして学ぶ中高の物理</title>
+  <meta name="description" content="中学理科から高校物理までのインタラクティブな物理実験。12 単元、どの実験にもリアルタイムのシミュレーション、手順、測定値、グラフがあります。" />
+  <meta name="theme-color" content="#13171c" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
+  <meta name="color-scheme" content="dark light" />
+  <script>
+    (function () {
+      try {
+        var saved = JSON.parse(localStorage.getItem("pl-theme"));
+        if (saved !== "light" && saved !== "dark") {
+          // 首次造訪預設亮色：實驗室的器材與場景是為明亮的實驗檯設計的，
+          // 深色改成手動選項而不是跟著作業系統走。
+          saved = "light";
+        }
+        document.documentElement.setAttribute("data-theme", saved);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+      // 直接開實驗的網址：先別畫首頁，否則初始化完成前會閃一下首頁才換成實驗頁（app.js 的 showView 會拿掉）
+      var h = location.hash.replace(/^#/, "");
+      if (h && h !== "home") document.documentElement.setAttribute("data-boot", "exp");
+    })();
+  </script>
+
+  <link rel="canonical" href="https://senior-science.vercel.app/ja/" />
+  <link rel="alternate" hreflang="zh-Hant" href="https://senior-science.vercel.app/" />
+  <link rel="alternate" hreflang="ja" href="https://senior-science.vercel.app/ja/" />
+  <link rel="alternate" hreflang="x-default" href="https://senior-science.vercel.app/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="物理実験室｜動かして学ぶ中高の物理" />
+  <meta property="og:description" content="中学理科から高校物理までのインタラクティブな物理実験。どれもその場で操作できます。" />
+  <meta property="og:locale" content="zh_TW" />
+  <meta property="og:url" content="https://senior-science.vercel.app/ja/" />
+  <meta property="og:site_name" content="物理実験室" />
+  <meta property="og:image" content="https://senior-science.vercel.app/ja/icons/og-card.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="物理実験室：教科書の物理を、自分の手で確かめる" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20261112-2027" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png?v=20261112-2027" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="物理実験室" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Serif+JP:wght@700;900&display=swap" crossorigin media="print" onload="this.media='all'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Serif+JP:wght@700;900&display=swap" crossorigin /></noscript>
+  <link rel="stylesheet" href="css/style.css?v=20261112-2027" />
+
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["$$", "$$"]] },
+      svg: { fontCache: "global" },
+      startup: {
+        ready: () => {
+          MathJax.startup.defaultReady();
+          window.dispatchEvent(new Event("mathjax-ready"));
+        }
+      },
+      options: { skipHtmlTags: ["script", "noscript", "style", "textarea"], enableMenu: false }
+    };
+  </script>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+</head>
+
+<body>
+  <a class="skip-link" href="#main-content">本文へ移動</a>
+  <div class="aurora" aria-hidden="true"><i></i></div>
+
+  <div class="app">
+    <header class="topbar">
+      <button class="menu-toggle" id="menu-toggle" aria-label="メニュー">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <div class="brand" id="brand-home" title="トップへ戻る">
+        <div class="brand-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2.8 10.8h18.4"/>
+            <path d="M4.4 10.8v1.6h15.2v-1.6"/>
+            <path d="M5.8 12.4V19.2"/>
+            <path d="M18.2 12.4V19.2"/>
+            <path d="M5.8 16h12.4"/>
+            <path d="M10.1 10.8V8.1L8.35 10.8"/>
+            <path d="M11.7 10.8V8.1"/>
+            <path d="M9.65 8.1h1.2"/>
+            <path d="M14.2 10.8V9.0h3.2v1.8"/>
+            <path d="M17.4 9.45h0.95"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <div class="brand-name">物理実験室</div>
+          <div class="sub">動かして学ぶ物理 · 中学理科から高校物理まで</div>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <div class="pill"><span class="dot" aria-hidden="true"></span><span class="ver">v1.0</span> · <span id="clock">--:--:--</span></div>
+      <a class="icon-btn license-link" href="duo/" aria-label="チャレンジ版" title="チャレンジ版：予想 → 実験 → 問題">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2H22l-6 4.8 2.3 7L12 16.8 5.7 21l2.3-7-6-4.8h7.6z"/></svg>
+        <span>チャレンジ</span>
+      </a>
+      <a class="icon-btn license-link" href="lab.html" aria-label="自由実験室" title="自由実験室：器具を並べて自分で実験を組み立てる">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3h6M10 3v6L4.5 18.5A1.6 1.6 0 0 0 5.9 21h12.2a1.6 1.6 0 0 0 1.4-2.5L14 9V3"/></svg>
+        <span>実験室</span>
+      </a>
+      <a class="icon-btn license-link" href="licensing.html" aria-label="利用条件を見る" title="利用条件を見る">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l3 3v17H6z"/><path d="M15 2v4h4M9 11h6M9 15h6M9 19h4"/></svg>
+        <span>利用条件</span>
+      </a>
+      <a class="icon-btn license-link" href="../" hreflang="zh-Hant" lang="zh-Hant" aria-label="中文版" title="中文版">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.6 3.6 5.6 3.6 9s-1.2 6.4-3.6 9M12 3c-2.4 2.6-3.6 5.6-3.6 9s1.2 6.4 3.6 9"/></svg>
+        <span>中文</span>
+      </a>
+      <button class="icon-btn" id="theme-toggle" aria-label="テーマを切り替え"></button>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar" id="sidebar" aria-label="単元一覧">
+        <div class="sidebar-head">
+          <div class="title">単元一覧</div>
+          <div class="stat">
+            <div><div class="num" id="side-exp">0</div><div class="cap">実験テーマ</div></div>
+            <div><div class="num" id="side-int">0</div><div class="cap">シミュレーション</div></div>
+          </div>
+        </div>
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="search-input" type="search" placeholder="実験・用語・公式を検索…" autocomplete="off" />
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-label"><span>学習の進み具合</span><span id="progress-count">0 / 0</span></div>
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        </div>
+        <nav id="module-list" aria-label="すべての実験"></nav>
+        <input id="import-save-file" type="file" accept="application/json,.json" hidden />
+      </aside>
+      <button class="sidebar-handle" id="sidebar-toggle" type="button" aria-controls="sidebar" aria-expanded="true" aria-label="単元一覧をたたむ" title="単元一覧をたたんで実験台を広げる">
+        <svg class="handle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/><path d="M5 5v14"/></svg>
+      </button>
+      <div class="scrim" id="scrim" aria-hidden="true"></div>
+
+      <main class="main" id="main-content" tabindex="-1">
+        <section id="home-view">
+          <div class="hero">
+            <div class="hero-copy">
+              <div class="hero-badge"><span class="hero-badge-mark" aria-hidden="true"></span>台湾の108課綱がベース · 用語は日本の高校物理に合わせています</div>
+              <h1 class="hero-title"><span class="hero-line">教科書の物理を、</span><span class="hero-line">自分の<em>手で</em>確かめる</span></h1>
+              <p class="hero-sub">12 単元、<span id="hero-exp-count">0</span>  の実験。中学理科から高校物理まで、一部は大学の入門まで扱います。どの実験もパラメータを変えるとすぐ結果が見られ、ストップウォッチや分度器、印刷できるワークシートも付いています。</p>
+              <div class="hero-actions">
+                <a class="btn-hero" id="hero-resume" href="#" hidden><span class="btn-hero-k">前回の続き</span><span class="btn-hero-v" id="hero-resume-title">—</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                <button class="btn-hero ghost" id="hero-browse" type="button">単元をすべて見る<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+              </div>
+              <dl class="hero-stats">
+                <div><dt class="hstat-l">単元</dt><dd class="hstat-n" id="stat-mod">0</dd></div>
+                <div><dt class="hstat-l">実験テーマ</dt><dd class="hstat-n" id="stat-exp">0</dd></div>
+                <div><dt class="hstat-l">シミュレーション</dt><dd class="hstat-n" id="stat-int">0</dd></div>
+              </dl>
+            </div>
+
+            <figure class="hero-specimen">
+              <div class="specimen-head" aria-hidden="true">
+                <span class="specimen-live"><i></i>LIVE</span>
+                <span>FIG. 01 · 単振り子</span>
+              </div>
+              <svg class="specimen-svg" viewBox="0 0 400 360" role="img" aria-labelledby="specimen-cap">
+                <defs>
+                  <linearGradient id="trace-fade" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="#fff" stop-opacity="1"/>
+                    <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+                  </linearGradient>
+                  <mask id="trace-mask"><rect x="40" y="236" width="320" height="124" fill="url(#trace-fade)"/></mask>
+                  <clipPath id="trace-clip"><rect x="40" y="236" width="320" height="124"/></clipPath>
+                </defs>
+                <g class="sp-ceiling">
+                  <path d="M128 40h144"/>
+                  <path d="M136 40l-8-10M152 40l-8-10M168 40l-8-10M184 40l-8-10M200 40l-8-10M216 40l-8-10M232 40l-8-10M248 40l-8-10M264 40l-8-10M280 40l-8-10"/>
+                </g>
+                <path class="sp-ref" d="M200 40V214"/>
+                <path class="sp-arc" d="M200 120 A80 80 0 0 0 170.03 114.17"/>
+                <text class="sp-label" x="160" y="106" text-anchor="end">θ₀ = 22°</text>
+                <g class="sp-swing">
+                  <path class="sp-rod" d="M200 40V200"/>
+                  <text class="sp-label sp-label-l" x="208" y="132">L</text>
+                  <circle class="sp-bob" cx="200" cy="200" r="15"/>
+                  <circle class="sp-bob-hi" cx="195" cy="195" r="4"/>
+                </g>
+                <circle class="sp-pivot" cx="200" cy="40" r="4.5"/>
+                <path class="sp-axis" d="M40 236H360"/>
+                <text class="sp-label sp-label-axis" x="360" y="228" text-anchor="end">x</text>
+                <text class="sp-label sp-label-axis" x="44" y="354">t ↓</text>
+                <g clip-path="url(#trace-clip)" mask="url(#trace-mask)">
+                  <polyline class="sp-trace" points="140.0,156 140.7,158 142.9,160 146.5,162 151.5,164 157.6,166 164.7,168 172.8,170 181.5,172 190.6,174 200.0,176 209.4,178 218.5,180 227.2,182 235.3,184 242.4,186 248.5,188 253.5,190 257.1,192 259.3,194 260.0,196 259.3,198 257.1,200 253.5,202 248.5,204 242.4,206 235.3,208 227.2,210 218.5,212 209.4,214 200.0,216 190.6,218 181.5,220 172.8,222 164.7,224 157.6,226 151.5,228 146.5,230 142.9,232 140.7,234 140.0,236 140.7,238 142.9,240 146.5,242 151.5,244 157.6,246 164.7,248 172.8,250 181.5,252 190.6,254 200.0,256 209.4,258 218.5,260 227.2,262 235.3,264 242.4,266 248.5,268 253.5,270 257.1,272 259.3,274 260.0,276 259.3,278 257.1,280 253.5,282 248.5,284 242.4,286 235.3,288 227.2,290 218.5,292 209.4,294 200.0,296 190.6,298 181.5,300 172.8,302 164.7,304 157.6,306 151.5,308 146.5,310 142.9,312 140.7,314 140.0,316 140.7,318 142.9,320 146.5,322 151.5,324 157.6,326 164.7,328 172.8,330 181.5,332 190.6,334 200.0,336 209.4,338 218.5,340 227.2,342 235.3,344 242.4,346 248.5,348 253.5,350 257.1,352 259.3,354 260.0,356 259.3,358 257.1,360 253.5,362 248.5,364 242.4,366 235.3,368 227.2,370 218.5,372 209.4,374 200.0,376 190.6,378 181.5,380 172.8,382 164.7,384 157.6,386 151.5,388 146.5,390 142.9,392 140.7,394 140.0,396 140.7,398 142.9,400 146.5,402 151.5,404 157.6,406 164.7,408 172.8,410 181.5,412 190.6,414 200.0,416 209.4,418 218.5,420 227.2,422 235.3,424 242.4,426 248.5,428 253.5,430 257.1,432 259.3,434 260.0,436 259.3,438 257.1,440"/>
+                </g>
+                <g class="sp-pen"><circle cx="200" cy="236" r="5"/></g>
+              </svg>
+              <figcaption id="specimen-cap" class="specimen-cap">
+                <span class="specimen-formula">T = 2π√(L/g) ≈ 2.01 s<span class="specimen-dim">L = 1.00 m</span></span>
+                <a class="specimen-link" href="#pendulum">この実験を開く<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+              </figcaption>
+            </figure>
+          </div>
+
+          <section class="hero-entry" aria-labelledby="hero-modes-title">
+            <h2 class="hero-prompt" id="hero-modes-title">どこから始めますか？</h2>
+            <div class="hero-modes" role="group" aria-labelledby="hero-modes-title">
+              <button class="hero-mode teacher" id="enter-teacher" type="button">
+                <span class="hero-mode-top">
+                  <span class="hero-mode-no" aria-hidden="true">01</span>
+                  <span class="hero-mode-tag">先生・授業で投影</span>
+                </span>
+                <span class="hero-mode-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+                </span>
+                <span class="hero-mode-name">演示用</span>
+                <span class="hero-mode-desc">画面がシンプルで、開いてすぐ操作できます。そのまま投影に使えます</span>
+                <span class="hero-mode-go" aria-hidden="true"><span>演示を始める</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+              </button>
+              <button class="hero-mode student" id="enter-student" type="button">
+                <span class="hero-mode-top">
+                  <span class="hero-mode-no" aria-hidden="true">02</span>
+                  <span class="hero-mode-tag">生徒・自分で学ぶ</span>
+                </span>
+                <span class="hero-mode-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z"/></svg>
+                </span>
+                <span class="hero-mode-name">自習用（フル版）</span>
+                <span class="hero-mode-desc">課題の説明、グラフの読み方のヒント、一歩ずつのガイド付き</span>
+                <span class="hero-mode-go" aria-hidden="true"><span>自習を始める</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+              </button>
+              <a class="hero-mode duo" id="enter-duo" href="duo/">
+                <span class="hero-mode-top">
+                  <span class="hero-mode-no" aria-hidden="true">03</span>
+                  <span class="hero-mode-tag">ステージ・ゲーム形式</span>
+                </span>
+                <span class="hero-mode-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.2H22l-6 4.8 2.3 7L12 16.8 5.7 21l2.3-7-6-4.8h7.6z"/></svg>
+                </span>
+                <span class="hero-mode-name">チャレンジ版</span>
+                <span class="hero-mode-desc">まず予想して、実験台を目標の値に合わせ、データの問題と場面の問題を解きます</span>
+                <span class="hero-mode-go" aria-hidden="true"><span>チャレンジを始める</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+              </a>
+              <a class="hero-mode lab" id="enter-lab" href="lab.html">
+                <span class="hero-mode-top">
+                  <span class="hero-mode-no" aria-hidden="true">04</span>
+                  <span class="hero-mode-tag">自由研究・DIY</span>
+                </span>
+                <span class="hero-mode-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6L4.5 18.5A1.6 1.6 0 0 0 5.9 21h12.2a1.6 1.6 0 0 0 1.4-2.5L14 9V3"/><path d="M7 15h10"/></svg>
+                </span>
+                <span class="hero-mode-name">自由実験室</span>
+                <span class="hero-mode-desc">器具箱から器具を出して自分で組み立てます。力学・電気回路・光がその場でシミュレーションされます</span>
+                <span class="hero-mode-go" aria-hidden="true"><span>組み立てを始める</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+              </a>
+            </div>
+            <p class="hero-mode-hint">最初の 2 つは同じ実験を使っていて、画面に出す情報の量が違うだけです。「チャレンジ版」は実験ごとにステージになっていて、「自由実験室」では自分で実験を組み立てられます。</p>
+
+            <div class="hero-highlight" role="note" aria-label="設計の考え方">
+              <span class="hero-highlight-k" aria-hidden="true">NOTE</span>
+              <p><b>結論はあらかじめ書いたものではなく、測って出したものです。</b>単振り子の <span class="nowrap">\(T \propto \sqrt{L}\)</span>や「振幅で周期は変わらない」こと、二重スリットの <span class="nowrap">\(\Delta x \propto \lambda L / d\)</span>も、プログラムが実際にパラメータを動かしてモデルから測った結果です。</p>
+            </div>
+          </section>
+
+          <section class="module-section" aria-labelledby="module-section-title">
+            <div class="section-label" id="module-section-title" data-sec="01">単元</div>
+            <p class="section-intro">運動の表し方から原子物理まで。各単元は実験のまとまりで、開くと最初の実験から始まります。</p>
+            <div class="module-grid" id="module-grid"></div>
+          </section>
+
+          <section class="study-center" aria-labelledby="study-center-title">
+            <div class="study-center-head">
+              <div>
+                <div class="section-label compact" id="study-center-title" data-sec="02">学習センター</div>
+                <p class="study-center-intro">進み具合はこの端末に保存されます。毎日やる実験の予定も立てられ、次に開いたときは前回の続きから始められます。</p>
+              </div>
+              <div class="save-status" id="save-status" aria-live="polite">この端末に保存</div>
+            </div>
+            <div class="study-grid">
+              <article class="study-card save-card">
+                <div class="study-card-kicker">学習データ</div>
+                <h3>進み具合のバックアップと復元</h3>
+                <p>見た実験、練習問題、単元チェック、ふり返り、計画の設定が含まれます。</p>
+                <div class="study-card-actions">
+                  <button class="study-btn primary" id="home-export-save" type="button">データを書き出す</button>
+                  <button class="study-btn" id="home-import-save" type="button">データを読み込む</button>
+                  <button class="study-btn danger" id="btn-reset" type="button">進み具合をリセット</button>
+                </div>
+              </article>
+              <article class="study-card plan-card">
+                <div class="study-card-kicker">学習計画</div>
+                <h3>毎日の実験の予定を作る</h3>
+                <div class="plan-controls">
+                  <label>
+                    <span>日数</span>
+                    <select id="plan-days">
+                      <option value="7">7 日間の集中</option>
+                      <option value="14">14 日間でしっかり復習</option>
+                      <option value="30" selected>30 日間で全部</option>
+                      <option value="custom">自分で決める</option>
+                    </select>
+                  </label>
+                  <label id="custom-days-wrap" hidden>
+                    <span>日数を入力</span>
+                    <input id="custom-days" type="number" min="3" max="120" value="21" />
+                  </label>
+                  <label>
+                    <span>1 日の時間（分）</span>
+                    <input id="plan-minutes" type="number" min="10" max="180" step="5" value="35" />
+                  </label>
+                </div>
+                <div class="study-card-actions">
+                  <button class="study-btn primary" id="btn-create-plan" type="button">計画を作る</button>
+                  <button class="study-btn" id="btn-clear-plan" type="button">計画を消す</button>
+                </div>
+              </article>
+              <article class="study-card offline-card">
+                <div class="study-card-kicker">オフラインとインストール</div>
+                <h3 id="offline-title">ネットがなくても使えます</h3>
+                <p id="offline-status">オフラインの状態を確認しています…</p>
+                <div class="study-card-actions">
+                  <button class="study-btn primary" id="btn-install" type="button" hidden>ホーム画面に追加</button>
+                  <button class="study-btn" id="btn-cache-all" type="button">全実験をダウンロード</button>
+                </div>
+                <div class="offline-progress" id="offline-progress" hidden>
+                  <div class="offline-progress-bar"><div id="offline-progress-fill"></div></div>
+                  <span id="offline-progress-text">準備しています…</span>
+                </div>
+              </article>
+
+              <article class="study-card today-card" id="today-plan-card">
+                <div class="study-card-kicker">今日の予定</div>
+                <h3 id="today-plan-title">まだ計画がありません</h3>
+                <p id="today-plan-summary">日数を選ぶと、まだやっていない実験を毎日の予定に均等に割り振ります。</p>
+                <div class="today-progress">
+                  <div class="today-progress-label"><span id="today-progress-text">0 / 0</span><span id="today-progress-percent">0%</span></div>
+                  <div class="today-progress-bar"><div id="today-progress-fill"></div></div>
+                </div>
+                <div class="study-card-actions compact-actions">
+                  <button class="study-btn primary" id="btn-next-unseen" type="button">次の未完了の実験</button>
+                </div>
+                <div class="today-task-list" id="today-task-list"></div>
+                <div class="review-focus">
+                  <div class="review-focus-title">復習を優先</div>
+                  <div class="review-focus-list" id="review-focus-list"></div>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="learning-ladder" id="learning-ladder" aria-labelledby="learning-ladder-title">
+            <div class="section-label" id="learning-ladder-title" data-sec="03">つながりで学ぶ</div>
+            <p class="learning-ladder-intro">テーマを 1 つ選んでください。中学で見た現象から始めて、高校のモデルと測定、最後に大学の内容へ進みます。どの段階からも対応する実験を開けます。</p>
+            <div class="path-tabs" id="path-tabs" role="tablist" aria-label="テーマを選ぶ"></div>
+            <div class="path-timeline" id="path-timeline"></div>
+          </section>
+
+          <section class="openness" aria-labelledby="openness-title">
+            <div class="section-label" id="openness-title" data-sec="04">このプロジェクトについて</div>
+            <div class="openness-grid">
+              <article class="openness-card">
+                <h3>無料です。今後も有料にはしません</h3>
+                <p>CC BY-NC-SA 4.0 で公開しています。授業、部活動、自習、営利目的でない普及活動なら、出典を書けば自由に使ったり共有したり改変したりできます。</p>
+              </article>
+              <article class="openness-card">
+                <h3>ソースコードを公開しているので、自分が手を離しても使い続けられます</h3>
+                <p>コードはすべて GitHub にあります。静的なサイトで、サーバー側の処理もデータベースもありません。だれでもダウンロードして自分で公開したり、引き継いで保守したりできます。</p>
+                <p class="openness-links">
+                  <a href="https://github.com/Yu-0312/senior-science" target="_blank" rel="noopener">GitHub のソースコード</a>
+                  <a href="licensing.html">利用条件</a>
+                  <a href="experiments.html">実験の一覧</a>
+                </p>
+              </article>
+              <article class="openness-card">
+                <h3>先生向けの資料</h3>
+                <p>どの実験にもワークシートがあり、実験の目的、記録表、グラフ用の方眼、グラフから値を求める欄が入っています。そのまま印刷して配れます。授業で使ってみて困ったことや要望があれば、知らせてもらえると助かります。</p>
+              </article>
+            </div>
+          </section>
+
+          <div class="disclaimer">
+            台湾の 108 課綱に合わせて個人で作った教材で、シミュレーションのプログラムも文章もオリジナルです。物理モデルは簡略化していて、数値はおもに考え方を説明するためのものです。授業と学習の補助として使ってください。
+          </div>
+        </section>
+
+        <section id="exp-view" style="display:none">
+          <div class="exp-header" id="exp-header">
+            <div class="exp-crumb" id="exp-crumb"></div>
+            <h1 id="exp-title"></h1>
+            <p class="lead" id="exp-lead"></p>
+            <div class="exp-learning-path" id="exp-learning-path" hidden></div>
+          </div>
+
+          <div class="content-grid">
+            <div class="card">
+              <div class="card-title" role="heading" aria-level="2"><span class="accent-bar"></span>シミュレーション</div>
+              <div class="card-body"><div id="sim-root"></div></div>
+            </div>
+
+            <div class="card guide">
+              <div class="card-title" role="heading" aria-level="2"><span class="accent-bar"></span>考え方 · 公式 · ポイント</div>
+              <div class="card-body">
+                <div><h3>この実験で扱うこと</h3><p id="guide-concept"></p></div>
+                <div><h3>使う公式</h3><div class="formula-box" id="guide-formula"></div></div>
+                <div><h3>学習のポイント</h3><ul class="points" id="guide-points"></ul></div>
+                <div class="guide-exam" id="guide-exam" hidden><h3>テストでの問われ方</h3><p id="guide-exam-how"></p></div>
+                <div class="observe-track" id="observe-track" aria-label="実験の進み具合">
+                  <h3>実験の進み具合</h3>
+                  <ol class="observe-steps" id="observe-steps"></ol>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <section class="card finish-card" id="finish-card" aria-labelledby="finish-title">
+            <div class="finish-head">
+              <div>
+                <p class="finish-kicker">最後に</p>
+                <h3 id="finish-title">実験のまとめ · 確認問題</h3>
+                <p class="finish-lead" id="finish-lead">実験中の観察問題はできましたか？ここで理解できたかを確かめます。</p>
+              </div>
+              <div class="finish-meter" id="finish-meter" aria-live="polite"><b id="finish-count">0 / 0</b><span>問 正解</span></div>
+            </div>
+            <div class="practice-list" id="practice-list"></div>
+          </section>
+
+          <section class="learning-output" id="learning-output" aria-label="今回の学習のまとめ"></section>
+
+          <div class="exp-nav">
+            <button class="nav-btn prev" id="nav-prev"><span class="nav-dir">前の実験</span><span class="nav-title">—</span></button>
+            <button class="nav-btn next" id="nav-next"><span class="nav-dir">次の実験</span><span class="nav-title">—</span></button>
+          </div>
+        </section>
+
+        <section id="search-results" style="display:none" aria-label="検索結果" aria-live="polite">
+          <div class="section-label">検索結果 · <span id="sr-count" style="margin:0 4px">0</span> 件</div>
+          <div class="sr-list" id="sr-list"></div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="stage-bar" id="stage-bar" role="toolbar" aria-label="演示の操作">
+    <button class="stage-picker" id="stage-picker" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="stage-menu" title="実験を選ぶ（/）">
+      <span class="stage-picker-mod" id="stage-picker-mod">—</span>
+      <span class="stage-picker-title" id="stage-picker-title">実験を選ぶ</span>
+      <span class="stage-picker-count" id="stage-picker-count"></span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <button class="stage-nav" id="stage-prev" type="button" aria-label="前の実験" title="前の実験（←）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+    <button class="stage-nav" id="stage-next" type="button" aria-label="次の実験" title="次の実験（→）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+    <span class="stage-spacer"></span>
+    <span class="stage-keys" aria-hidden="true"><kbd>スペース</kbd> 再生 · <kbd>R</kbd> リセット · <kbd>←</kbd><kbd>→</kbd> 実験を切り替え · <kbd>/</kbd> メニュー · <kbd>G</kbd> グラフ</span>
+    <button class="stage-btn stage-theme" id="stage-theme" type="button" title="ダーク／ライトを切り替え（プロジェクターが暗いときはライト）"></button>
+    <button class="stage-btn" id="stage-chart" type="button" title="結果のグラフを大きく表示（G）" aria-pressed="false" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4v16h16"/><path d="M7 15l4-4 3 3 5-6"/></svg><span>グラフを拡大</span></button>
+    <button class="stage-btn" id="stage-full" type="button" title="全画面（F）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>全画面</span></button>
+    <button class="stage-btn stage-exit" id="stage-exit" type="button" title="演示を終わる（Esc）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg><span>演示を終わる</span></button>
+  </div>
+  <div class="stage-menu" id="stage-menu" role="dialog" aria-label="実験を選ぶ" hidden>
+    <div class="stage-menu-search"><input id="stage-menu-input" type="search" placeholder="実験名で検索（例：単振り子、レンズ、回路…）" autocomplete="off" /></div>
+    <div class="stage-menu-list" id="stage-menu-list"></div>
+  </div>
+
+  <section class="chapter-checkpoint" id="chapter-checkpoint" role="dialog" aria-modal="true" aria-labelledby="checkpoint-title" hidden>
+    <div class="checkpoint-backdrop"></div>
+    <div class="checkpoint-panel" id="checkpoint-panel" tabindex="-1">
+      <div id="checkpoint-content"></div>
+    </div>
+  </section>
+
+  <script src="js/site-config.js?v=20261112-2027"></script>
+  <script src="js/curriculum.js?v=20261112-2027"></script>
+  <script src="js/advanced-curriculum.js?v=20261112-2027"></script>
+  <script src="js/comprehensive-curriculum.js?v=20261112-2027"></script>
+  <script src="js/extension-registry.js?v=20261112-2027"></script>
+  <script src="js/open-curriculum.js?v=20261112-2027"></script>
+  <script src="js/school-curriculum.js?v=20261112-2027"></script>
+  <script src="js/exam-curriculum.js?v=20261112-2027"></script>
+    <script src="js/sim-core.js?v=20261112-2027"></script>
+
+  <script src="js/experiment-manifest.js?v=20261112-2027"></script>
+
+
+  <script src="js/app.js?v=20261112-2027"></script>
+</body>
+</html>

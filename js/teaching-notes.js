@@ -184,7 +184,7 @@
       if (n == null) return null;
       return n >= 3
         ? ["三個測站以上：可以交會出震央位置", "ok"]
-        : ["只有 " + n + " 個測站：圓still交不出唯一解，至少需要三站", "warn"];
+        : ["只有 " + n + " 個測站：圓還交不出唯一的交點，至少需要三站", "warn"];
     },
     "damped-oscillation": (r, ctx) => {
       const beta = r("阻尼 β").n;

@@ -2412,6 +2412,8 @@ body.stage-only .content-grid > .card:first-child { background: transparent; bor
   .brand { gap: 7px; }
   .brand-text { min-width: 0; }
   .brand-text .brand-name { font-size: 15px; letter-spacing: 0.02em; overflow: hidden; text-overflow: ellipsis; }
+  /* 有語言切換的站（物理）頂列多一顆按鈕；授權在頁尾也有連結，窄版先收掉這顆，讓品牌名稱留得下 */
+  .topbar:has(a[hreflang]) .license-link[href="licensing.html"] { display: none; }
 }
 @media (max-width: 380px) {
   .brand-logo { display: none; }
