@@ -920,12 +920,16 @@
     if (target) it.ends[i].at = target;
     if (P && P.drawing) {
       const E = endsOf(it);
-      if (Math.hypot(E[1].x - E[0].x, E[1].y - E[0].y) < 2) { removeItem(it.id); setSel(null); ui.selEnd = null; changed(); status("太短了，已取消。"); return; }
+      const len = Math.hypot(E[1].x - E[0].x, E[1].y - E[0].y);
+      if (len < 2) { removeItem(it.id); setSel(null); ui.selEnd = null; changed(); status("太短了，已取消。"); return; }
+      // 畫出來的彈簧就當作原長：不然預設 20 cm 的彈簧一畫成 60 cm，還沒掛東西就先被拉長 40 cm
+      if (it.type === "spring") it.p.L0 = Math.max(2, Math.min(150, Math.round(len)));
     }
     ui.selEnd = { id: it.id, i };
     pushUndo(before); changed();
     const E = endsOf(it), ref = endRefPoint(it, i);
     let msg = target ? "已接到「" + (byId(target.id) ? T[byId(target.id).type].name : "") + "」。" : "已放下。";
+    if (P && P.drawing && it.type === "spring") msg += "自然長度設成畫出來的 " + it.p.L0 + " cm，可以在右邊改。";
     if (ref) msg += "角度 " + angleText(Math.atan2(-(E[i].y - ref.y), E[i].x - ref.x) / DEG) + "，方向鍵可以再微調（Alt 0.1 cm）。";
     status(msg);
   }
