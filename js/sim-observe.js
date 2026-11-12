@@ -228,7 +228,7 @@
       {
         t: 5.0,
         title: "聲音「嗡～嗡～」一下大一下小",
-        hint: "上面是兩個頻率接近的原始波，下面是疊加後的結果。疊加波的外框（包絡）一下大一下小，這就是拍。",
+        hint: "上面是兩個頻率接近的原始波，下面是疊加後的結果。疊加波的外框（包絡）一下大一下小，這叫做拍。",
         quiz: {
           q: "440 Hz 和 443 Hz 的兩支音叉同時響，會聽到什麼？",
           choices: ["443 Hz 的一個音", "拍頻 3 Hz 的嗡嗡起伏", "完全沒有聲音", "883 Hz"],
@@ -736,7 +736,7 @@
     return {
       kicker: "觀 察 點 · 改 變 參 數",
       title: "你剛改了「" + slider.label + "」",
-      hint: "「" + slider.label + "」從 " + withUnit(x0, slider.unit) + (up ? " 調大" : " 調小") + "到 " + withUnit(x1, slider.unit) + "。其他條件都沒動，這就是控制變因。",
+      hint: "「" + slider.label + "」從 " + withUnit(x0, slider.unit) + (up ? " 調大" : " 調小") + "到 " + withUnit(x1, slider.unit) + "。其他條件都沒動，這叫控制變因。",
       resumeText: "繼續實驗 ▶",
       skipText: "先不回答，繼續實驗 ▶",
       quiz: {

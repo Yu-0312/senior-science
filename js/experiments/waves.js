@@ -401,7 +401,7 @@
     let t = 0;
     const sF1 = PL.ui.slider(L.controls, { label: "頻率 f₁", min: 4, max: 12, step: 0.1, value: 8, unit: "Hz", digits: 1 });
     const sF2 = PL.ui.slider(L.controls, { label: "頻率 f₂", min: 4, max: 12, step: 0.1, value: 9, unit: "Hz", digits: 1 });
-    PL.ui.note(L.controls, "兩個頻率相近的聲音疊加，響度週期性強弱起伏，這就是「拍」。");
+    PL.ui.note(L.controls, "兩個頻率相近的聲音疊加，響度週期性強弱起伏，這叫做「拍」。");
     const rBeat = PL.ui.readout(L.readouts, { label: "拍頻 |f₁−f₂|", unit: "Hz" });
     // 兩支音叉各自上下拖微調頻率（像在叉臂上滑動小夾子），兩個把手錯開高度以免互搶
     const gF1 = PL.ui.handle(cv, relGrip(sF1, 0.04, "音叉 1（上下拖微調 f₁）"));
