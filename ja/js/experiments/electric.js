@@ -862,7 +862,7 @@
       stateNote.textContent = feedback || defaultNote;
       updateGuide(); drawCircuit(dt); drawFitChart(s); drawCharacteristic(s);
       rI.set(s.I, 3); rU.set(s.U, 3); rIr.set(s.drop, 3); rP.set(s.loadP, 3); rLoss.set(s.lossP, 3); rEta.set(s.eta, 1);
-      rMeter.set(ammeterOver || voltmeterOver ? (ammeterOver ? "電流計が範囲オーバー" : "電圧計が範囲オーバー") : "測定範囲は問題なし");
+      rMeter.set(ammeterOver || voltmeterOver ? (ammeterOver ? "電流計が範囲オーバー" : "電圧計が範囲オーバー") : "測定範囲内");
       rFit.set(fit ? "E=" + PL.fmt(fit.E, 2) + " V；r=" + PL.fmt(fit.r, 2) + " Ω" : "違う設定で少なくとも 2 点記録する");
     }
 

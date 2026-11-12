@@ -252,6 +252,14 @@ JS.forEach(f => {
   if (f === "js/site-config.js") s = s.split(BASE).join(BASE + "ja/");
   outputs.push([f, localizeCommon(s)]);
 });
+// CSS 的 content: "…"（離線提示、檢視欄標題）也是學生看得到的字
+COPY.filter(f => /\.css$/.test(f)).forEach(f => {
+  const css = fs.readFileSync(path.join(ROOT, f), "utf8").replace(/(content:\s*)"([^"\n]*)"/g, (m, pre, text, idx, whole) => {
+    const ja = lookup(text, f, whole.slice(0, idx).split("\n").length, m);
+    return ja == null ? m : pre + '"' + ja.replace(/"/g, '\\"') + '"';
+  });
+  outputs.push([f, localizeCommon(css)]);
+});
 {
   const m = JSON.parse(fs.readFileSync(path.join(ROOT, "manifest.json"), "utf8"));
   ["name", "short_name", "description"].forEach(k => { if (m[k]) { const ja = lookup(m[k], "manifest.json", 0, k); if (ja != null) m[k] = ja; } });
@@ -274,8 +282,7 @@ if (MODE === "todo") {
   outputs.forEach(([f, s]) => { const p = path.join(OUT, f); fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, s); });
   COPY.forEach(f => {
     const p = path.join(OUT, f); fs.mkdirSync(path.dirname(p), { recursive: true });
-    if (/\.css$/.test(f)) fs.writeFileSync(p, localizeCommon(fs.readFileSync(path.join(ROOT, f), "utf8")));
-    else fs.copyFileSync(path.join(ROOT, f), p);
+    if (!/\.css$/.test(f)) fs.copyFileSync(path.join(ROOT, f), p);   // CSS 已在上面翻好、放進 outputs
   });
   const tmp = path.join(OUT, "tools", "build-static.js");
   fs.mkdirSync(path.dirname(tmp), { recursive: true });

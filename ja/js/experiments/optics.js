@@ -102,7 +102,7 @@
         D.text(ctx, "全反射！", cx + 10, cy + 30, { color: PL.col("danger"), size: 13 });
         rTh2.set("全反射");
       }
-      rTIR.set(n1 > n2 ? Math.asin(n2 / n1) * 180 / Math.PI : "あてはまらない");
+      rTIR.set(n1 > n2 ? Math.asin(n2 / n1) * 180 / Math.PI : "該当なし");
 
       // 光點：c 對應畫面速率 150 px/s，頻率固定，間距 = 速率 / 頻率
       const c = 150, f = 6.5, v1 = c / n1, v2 = c / n2;
@@ -521,7 +521,7 @@
       rX.set(s.x, 1); rFocus.set(s.valid ? (s.blur <= 0.05 ? "はっきり" : "まだぼやけている") : "D ≤ 4f"); rN.set(recorded.length, 0); note.textContent = feedback;
       const separation = recorded.length === 2 ? Math.abs(recorded[1] - recorded[0]) : 0;
       const measured = recorded.length === 2 ? (s.Dcm * s.Dcm - separation * separation) / (4 * s.Dcm) : 0;
-      rD.set(recorded.length === 2 ? separation : "まだ記録していない", recorded.length === 2 ? 1 : undefined);
+      rD.set(recorded.length === 2 ? separation : "未記録", recorded.length === 2 ? 1 : undefined);
       rF.set(recorded.length === 2 ? measured : "測る抵抗", recorded.length === 2 ? 1 : undefined);
     }
     function plot() {

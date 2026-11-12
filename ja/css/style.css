@@ -859,7 +859,7 @@ button.exp-path-step:hover { border-color: var(--m-ink, var(--m-color, var(--acc
 
 /* 離線時在頂欄給明確提示，避免使用者以為網站壞了 */
 body.is-offline .topbar::after {
-  content: "目前離線 · 已下載的內容仍可使用";
+  content: "オフライン · ダウンロード済みの内容は使えます";
   position: absolute; left: 0; right: 0; bottom: -1px;
   padding: 3px 14px; background: var(--warn); color: #241a00;
   font-size: 11px; font-weight: 700; text-align: center;
@@ -1137,7 +1137,7 @@ body.stage-only .stage-side .sim-charts { display: grid; grid-template-columns: 
 body.stage-only .stage-side .sim-chart { padding: 8px 10px; }
 body.stage-only .stage-side .sim-chart .chart-title { margin-bottom: 2px; }
 body.stage-only .sim-predict .sim-predict-kicker { font-size: 0; }
-body.stage-only .sim-predict .sim-predict-kicker::before { content: "課堂提問・先讓全班舉手"; font-size: 11.5px; }
+body.stage-only .sim-predict .sim-predict-kicker::before { content: "授業での発問・まず全員に手を挙げてもらう"; font-size: 11.5px; }
 body.stage-only .sim-predict .sim-predict-note { display: none; }
 
 /* 右欄分頁 */
@@ -2153,7 +2153,7 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   /* 檢視欄裡的「實驗操作」卡：播放鍵佔一整行最上面，次要按鈕在旁，速度與時間同一行 */
   .lab-sim > .sim-transport { padding: 11px 12px 12px; gap: 8px; }
   .lab-sim > .sim-transport::before {
-    content: "實驗操作"; order: 0; flex-basis: 100%;
+    content: "実験の操作"; order: 0; flex-basis: 100%;
     color: var(--text); font-size: 12.5px; font-weight: 800; letter-spacing: 0.4px;
   }
   .lab-sim .sim-transport-play { order: 1; flex: 1 1 auto; min-height: 40px; font-size: 14px; }

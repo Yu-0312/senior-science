@@ -406,7 +406,7 @@
       rMu.set(SURFACES[key].mu, 3);
       const avg = panel.records.length
         ? panel.records.reduce((s, p) => s + p[1], 0) / panel.records.length : null;
-      rAvg.set(avg == null ? "まだ記録していない" : avg.toFixed(3));
+      rAvg.set(avg == null ? "未記録" : avg.toFixed(3));
       panel.draw();
     }
 

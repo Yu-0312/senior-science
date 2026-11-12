@@ -88,7 +88,7 @@
         r.addEventListener("click", () => apply(row));
         r.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); apply(row); } });
       });
-      count.textContent = rows.length ? rows.length + " 行" : "まだ記録していない";
+      count.textContent = rows.length ? rows.length + " 行" : "未記録";
       wrap.hidden = !rows.length;
       hint.hidden = rows.length > 0;
       undoBtn.disabled = clearBtn.disabled = csvBtn.disabled = !rows.length;
