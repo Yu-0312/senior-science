@@ -57,15 +57,31 @@
   function load(json) {
     const o = typeof json === "string" ? JSON.parse(json) : json;
     if (!o || !Array.isArray(o.items)) throw new Error("格式不符");
-    const num = (v, d) => (typeof v === "number" && isFinite(v) ? v : d);
+    /*
+     * 數值除了要是有限的數，還要落在器材自己宣告的範圍裡（lab-items.js 的 params）。
+     * 以前只擋 NaN／Infinity：分享連結或匯入檔裡寫「質量 0、半徑 −5」照樣收下，
+     * 一按播放物理引擎就除以零，那顆球的座標變成 NaN，從畫面上消失。
+     * 座標也夾在合理範圍內，器材數量設上限，免得一條連結就把分頁卡死。
+     */
+    const LIMIT = 1e5, MAX_ITEMS = 400;
+    const num = (v, d) => (typeof v === "number" && isFinite(v) ? Math.max(-LIMIT, Math.min(LIMIT, v)) : d);
     const items = [];
-    o.items.forEach(raw => {
-      if (!raw || !T[raw.type] || typeof raw.id !== "string") return;
+    o.items.slice(0, MAX_ITEMS).forEach(raw => {
+      if (!raw || typeof raw.type !== "string" || !Object.prototype.hasOwnProperty.call(T, raw.type) || typeof raw.id !== "string") return;
       const d = T[raw.type];
+      const spec = {};
+      (d.params || []).forEach(q => { spec[q.k] = q; });
       const it = { id: raw.id.slice(0, 20), type: raw.type, x: num(raw.x, 200), y: num(raw.y, 100), a: num(raw.a, 0), p: clone(d.defaults) };
       if (raw.p && typeof raw.p === "object") Object.keys(it.p).forEach(k => {
-        const v = raw.p[k];
-        if (typeof v === typeof it.p[k] || (typeof it.p[k] === "number" && typeof v === "number")) it.p[k] = typeof v === "number" && !isFinite(v) ? it.p[k] : v;
+        let v = raw.p[k];
+        if (typeof it.p[k] === "number") {
+          if (typeof v !== "number" || !isFinite(v)) return;
+          const q = spec[k];
+          if (q && q.kind === "select") { if (!(q.options || []).some(opt => opt[0] === v)) return; }
+          else if (q && typeof q.min === "number" && typeof q.max === "number") v = Math.max(q.min, Math.min(q.max, v));
+          else v = num(v, it.p[k]);
+          it.p[k] = v;
+        } else if (typeof v === typeof it.p[k]) it.p[k] = v;
       });
       if (d.makeEnds) {
         it.ends = d.makeEnds(it);

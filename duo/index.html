@@ -8,13 +8,13 @@
   <meta property="og:title" content="物理 Duo · 每個實驗都是一關" />
   <meta property="og:description" content="先預測、動手調實驗、讀數據、解情境題。台灣國中到高中物理，全部可即時操作。" />
   <meta name="theme-color" content="#58cc02" />
-  <link rel="icon" type="image/svg+xml" href="../icons/icon.svg" />
+  <link rel="icon" type="image/svg+xml" href="../icons/icon.svg?v=20261113-2220" />
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <!-- 字型表不擋首屏（理由同首頁）：先用系統字型畫出來，Google Fonts 到了再換上 -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Noto+Sans+TC:wght@500;700;900&display=swap" crossorigin media="print" onload="this.media='all'" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Noto+Sans+TC:wght@500;700;900&display=swap" crossorigin /></noscript>
-  <link rel="stylesheet" href="duo.css?v=20261112-2027" />
+  <link rel="stylesheet" href="duo.css?v=20261113-2220" />
 </head>
 <body>
   <!--
@@ -33,7 +33,14 @@
   -->
   <header class="top">
     <div class="top-in">
-      <a class="logo" href="../" title="回到物理實驗室">
+      <!--
+        回主站的連結獨立成一顆箭頭：以前只有標誌「物理Duo」本身是連結，
+        看起來是這一頁的標題而不是出口；右欄的「回物理實驗室」在手機上又排到整張地圖最下面。
+      -->
+      <a class="top-back" href="../" aria-label="回物理實驗室" title="回物理實驗室">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+      </a>
+      <a class="logo" href="./" aria-label="物理 Duo 學習地圖">
         <span class="logo-mark" aria-hidden="true">物理</span><span class="logo-word">Duo</span>
       </a>
       <nav class="tabs" aria-label="主選單">
@@ -110,15 +117,16 @@
     </footer>
   </section>
 
-  <script src="../js/site-config.js?v=20261112-2027"></script>
-  <script src="../js/curriculum.js?v=20261112-2027"></script>
-  <script src="../js/advanced-curriculum.js?v=20261112-2027"></script>
-  <script src="../js/comprehensive-curriculum.js?v=20261112-2027"></script>
-  <script src="../js/extension-registry.js?v=20261112-2027"></script>
-  <script src="../js/open-curriculum.js?v=20261112-2027"></script>
-  <script src="../js/school-curriculum.js?v=20261112-2027"></script>
-  <script src="../js/exam-curriculum.js?v=20261112-2027"></script>
-  <script src="../js/question-bank.js?v=20261112-2027"></script>
-  <script src="duo.js?v=20261112-2027"></script>
+  <script src="../js/site-config.js?v=20261113-2220"></script>
+  <script src="../js/safe.js?v=20261113-2220"></script>
+  <script src="../js/curriculum.js?v=20261113-2220"></script>
+  <script src="../js/advanced-curriculum.js?v=20261113-2220"></script>
+  <script src="../js/comprehensive-curriculum.js?v=20261113-2220"></script>
+  <script src="../js/extension-registry.js?v=20261113-2220"></script>
+  <script src="../js/open-curriculum.js?v=20261113-2220"></script>
+  <script src="../js/school-curriculum.js?v=20261113-2220"></script>
+  <script src="../js/exam-curriculum.js?v=20261113-2220"></script>
+  <script src="../js/question-bank.js?v=20261113-2220"></script>
+  <script src="duo.js?v=20261113-2220"></script>
 </body>
 </html>

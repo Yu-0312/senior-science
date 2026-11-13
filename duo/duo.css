@@ -28,6 +28,11 @@ svg { display: block; }
 .top-in { display: flex; align-items: center; gap: 16px; max-width: 1080px; margin: 0 auto; padding: 10px 16px; }
 .logo { flex: none; white-space: nowrap; display: inline-flex; align-items: baseline; gap: 2px; text-decoration: none; font-weight: 900; font-size: 26px; letter-spacing: -0.02em; }
 .logo-mark { color: var(--green); }
+/* 回主站：獨立的一顆箭頭，放在標誌左邊 */
+.top-back { flex: none; display: grid; place-items: center; width: 40px; height: 40px; margin-right: -8px; border-radius: 12px; color: var(--muted); text-decoration: none; }
+.top-back:hover { background: var(--bg-2); color: var(--ink); }
+.top-back:focus-visible { outline: 3px solid var(--blue, #1cb0f6); outline-offset: 2px; }
+.top-back svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
 .logo-word { color: var(--ink); }
 .tabs { flex: none; display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: var(--bg-2); border: 2px solid var(--line); }
 .tab { white-space: nowrap; position: relative; min-height: 38px; padding: 0 14px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font-weight: 800; cursor: pointer; }
@@ -362,9 +367,10 @@ table.data td.ask { color: var(--blue-ink); font-weight: 900; }
   .lesson-lab { order: 2; }
 }
 @media (max-width: 640px) {
-  .top-in { gap: 8px; padding: 8px 12px; }
-  .logo { font-size: 21px; }
-  .tab { padding: 0 9px; font-size: 13px; }
+  .top-in { gap: 6px; padding: 8px 10px 8px 4px; }
+  .top-back { width: 34px; margin-right: -6px; }
+  .logo { font-size: 20px; }
+  .tab { padding: 0 8px; font-size: 13px; }
   .stat { height: 34px; padding: 0 7px; gap: 3px; }
   .stats { gap: 4px; min-width: 0; }
   .toast { bottom: 12px; }
@@ -402,3 +408,20 @@ table.data td.ask { color: var(--blue-ink); font-weight: 900; }
 
 /* 只給螢幕報讀器的文字（例如學習地圖的一級標題） */
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/*
+ * 窄螢幕的頂欄（2026-11）
+ * 以前 360px 以下（常見的 Android 手機寬度）頂欄比螢幕寬，整頁可以左右晃動：
+ * 標誌＋兩個分頁＋兩個數字排不進去。越窄收掉越多：先收 XP（過關畫面會再顯示），再縮分頁與標誌。
+ */
+@media (max-width: 420px) {
+  .stat.xp { display: none; }
+  .stats { flex: none; }
+}
+@media (max-width: 350px) {
+  .top-in { gap: 4px; padding-right: 8px; }
+  .logo { font-size: 18px; }
+  .tabs { padding: 3px; gap: 2px; }
+  .tab { padding: 0 6px; font-size: 12.5px; min-height: 36px; }
+  .stat { padding: 0 6px; }
+}
