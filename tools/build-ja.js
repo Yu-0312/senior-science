@@ -248,7 +248,7 @@ const outputs = [];
 HTML.forEach(f => outputs.push([f, localizeHtml(translateHtml(fs.readFileSync(path.join(ROOT, f), "utf8"), f))]));
 JS.forEach(f => {
   let s = translateJs(fs.readFileSync(path.join(ROOT, f), "utf8"), f);
-  if (f === "sw.js") s = s.replace(/"physics-lab-" \+ BUILD/, '"physics-lab-ja-" + BUILD');
+  if (f === "sw.js") s = s.replace(/"physics-lab-" \+ BUILD/, '"physics-lab-ja-" + BUILD').replace('const PAGE_LANG = "zh-Hant"', 'const PAGE_LANG = "ja"');
   if (f === "js/site-config.js") s = s.split(BASE).join(BASE + "ja/");
   outputs.push([f, localizeCommon(s)]);
 });

@@ -4,7 +4,7 @@
  * 之前的寫法把版本號分別寫死在 index.html 與這份清單裡，兩邊很容易對不起來；
  * 一旦不同步，預先快取的就是永遠不會被請求到的網址，等於白做一次下載。
  */
-const BUILD = "20261112-2027";
+const BUILD = "20261113-2220";
 const CACHE = "physics-lab-" + BUILD;
 /*
  * 第三方資源（釘死版本的 MathJax、Google Fonts）另放一個不隨 BUILD 清掉的快取。
@@ -28,6 +28,7 @@ const CORE = ["./", "index.html", "licensing.html", "manifest.json"];
 const VERSIONED = [
   "css/style.css",
   "js/site-config.js",
+  "js/safe.js",
   "js/experiment-manifest.js",
   "js/curriculum.js",
   "js/advanced-curriculum.js",
@@ -100,6 +101,16 @@ const ASSETS = CORE
   .concat(VERSIONED.map(path => path + "?v=" + BUILD))
   .concat(ICONS.map(path => path + "?v=" + BUILD));
 const EXPERIMENT_ASSETS = EXPERIMENTS.map(path => path + "?v=" + BUILD);
+/*
+ * 「下載全部實驗」時一起存的子站台：關卡挑戰版、自訂實驗室、全部實驗索引。
+ * 以前只存實驗程式，按完之後離線打開關卡版，拿到的是套了錯誤路徑的首頁（見下方 fetch 的說明）。
+ * 頁面本身不帶版本號（HTML 一律網路優先），它們引用的 css／js 要帶。
+ */
+const SUBAPP_PAGES = ["duo/", "duo/embed.html", "lab.html", "experiments.html"];
+const SUBAPP_VERSIONED = ["duo/duo.css", "duo/duo.js"];
+const OFFLINE_ASSETS = EXPERIMENT_ASSETS
+  .concat(SUBAPP_VERSIONED.map(path => path + "?v=" + BUILD))
+  .concat(SUBAPP_PAGES);
 
 self.addEventListener("install", e => {
   e.waitUntil(
@@ -128,12 +139,12 @@ self.addEventListener("message", event => {
   event.waitUntil(
     caches.open(CACHE).then(async cache => {
       let done = 0;
-      for (const asset of EXPERIMENT_ASSETS) {
+      for (const asset of OFFLINE_ASSETS) {
         try { await cache.add(asset); } catch (e) { /* 單一檔案失敗不中斷整體 */ }
         done += 1;
         const clients = await self.clients.matchAll();
         clients.forEach(c => c.postMessage({
-          type: "cache-progress", done, total: EXPERIMENT_ASSETS.length
+          type: "cache-progress", done, total: OFFLINE_ASSETS.length
         }));
       }
       /*
@@ -148,7 +159,7 @@ self.addEventListener("message", event => {
         }
       } catch (e) { /* 校園網路擋 jsdelivr 時，公式會退成可讀的純文字 */ }
       const clients = await self.clients.matchAll();
-      clients.forEach(c => c.postMessage({ type: "cache-complete", total: EXPERIMENT_ASSETS.length }));
+      clients.forEach(c => c.postMessage({ type: "cache-complete", total: OFFLINE_ASSETS.length }));
     })
   );
 });
@@ -192,31 +203,71 @@ self.addEventListener("fetch", e => {
     return;
   }
 
-  // HTML 必須優先取得最新版本，否則 GitHub Pages 更新後仍可能先開到舊首頁。
+  /*
+   * HTML：網路優先，離線才看快取。
+   *
+   * 快取的鍵不含查詢字串：這個站的頁面內容和 ?… 無關（路由走 #，關卡版的實驗台
+   * embed.html?id=…&maxh=… 是同一份 HTML、參數由頁面自己讀）。以前連查詢字串一起當鍵，
+   * 每個「實驗 × 視窗高度」各存一份 embed.html，快取只增不減；
+   * 離線時網址只要有一個參數和當初不同就找不到，等於沒存。
+   */
   if (req.mode === "navigate" || req.destination === "document") {
+    const key = url.origin + url.pathname;
     e.respondWith(
       fetch(req).then(res => {
-        if (res && res.status === 200) {
+        if (res && res.status === 200 && res.type === "basic") {
           const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(req, copy));
+          caches.open(CACHE).then(c => c.put(key, copy)).catch(() => {});
         }
         return res;
-      }).catch(() => caches.match(req).then(cached => cached || caches.match("./")))
+      }).catch(() => caches.match(key).then(cached => cached || offlineFallback(url)))
     );
     return;
   }
 
-  // 同網域靜態資源：快取優先，並在背景更新（stale-while-revalidate）
+  // 同網域靜態資源：快取優先。帶 ?v=<版本> 的網址內容不會變，有快取就不必再問一次網路；
+  // 其餘（圖示、manifest）先給快取、背景更新（stale-while-revalidate）
   e.respondWith(
     caches.match(req).then(cached => {
+      if (cached && url.searchParams.get("v") === BUILD) return cached;
       const network = fetch(req).then(res => {
         if (res && res.status === 200 && res.type === "basic") {
           const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(req, copy));
+          caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
         }
         return res;
-      }).catch(() => cached);
+      }).catch(() => cached || Response.error());
       return cached || network;
     })
   );
 });
+
+/*
+ * 離線而且這一頁沒存過。
+ *
+ * 以前一律回首頁的 HTML。但瀏覽器的網址還是原本那一頁（例如 /p/pendulum.html、/duo/），
+ * 首頁裡的相對路徑（css/style.css、js/app.js）就從那個目錄去找，全部落空：
+ * 畫面是一頁沒有樣式、沒有內容的首頁，看起來像網站壞掉。
+ * 只有「本來就是首頁」的網址才回首頁；其他頁面回一張說明，並給回首頁的連結。
+ */
+const PAGE_LANG = "zh-Hant";
+function offlineFallback(url) {
+  const scope = new URL(self.registration.scope);
+  const isHome = url.pathname === scope.pathname || url.pathname === scope.pathname + "index.html";
+  if (isHome) return caches.match(scope.href).then(home => home || offlinePage(scope.href));
+  return offlinePage(scope.href);
+}
+function offlinePage(home) {
+  const title = "目前沒有網路";
+  const text = "這一頁還沒有存到這台裝置上，連上網路後再打開一次就可以了。已經開過的實驗在首頁仍然可以用。";
+  const link = "回首頁";
+  const html = '<!doctype html><html lang="' + PAGE_LANG + '"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1"><title>' + title + '</title>' +
+    '<style>body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;box-sizing:border-box;' +
+    'background:#eef2f8;color:#16202e;font-family:system-ui,-apple-system,sans-serif;line-height:1.8}' +
+    'main{max-width:30em}h1{margin:0 0 8px;font-size:24px}p{margin:0 0 20px;color:#3d4b60}' +
+    'a{display:inline-block;padding:10px 20px;border-radius:999px;background:#16202e;color:#fff;text-decoration:none;font-weight:700}' +
+    '@media (prefers-color-scheme:dark){body{background:#13171c;color:#eaece8}p{color:#a6afa7}a{background:#eaece8;color:#13171c}}</style></head>' +
+    '<body><main><h1>' + title + '</h1><p>' + text + '</p><a href="' + home + '">' + link + '</a></main></body></html>';
+  return new Response(html, { status: 503, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+}
