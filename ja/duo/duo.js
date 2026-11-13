@@ -32,10 +32,9 @@
   if (!C || !C.modules) { document.body.textContent = "単元データを読み込めませんでした。ページを再読み込みしてください。"; return; }
 
   /* ------------------------------ 小工具 ------------------------------ */
-  const store = {
-    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
-  };
+  // 網址與 localStorage 都經過 js/safe.js（和主站共用，理由見那支檔案開頭）
+  const SAFE = window.PhysicsLabSafe;
+  const store = SAFE.makeStore(() => window.localStorage);
   const shuffle = arr => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const pick = arr => arr[Math.floor(Math.random() * arr.length)];
   const today = () => { const d = new Date(); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); };
@@ -70,12 +69,32 @@
 
   /* ------------------------------ 進度 ------------------------------ */
   const KEY = "duo2-state";
-  const state = Object.assign({ xp: 0, done: {}, streak: { count: 0, last: "" }, mistakes: [] }, store.get(KEY, {}));
+  /*
+   * 讀進度時逐欄檢查形狀。以前直接 Object.assign(預設值, 存檔)：存檔裡只要有一欄不對
+   * （streak 是 null、mistakes 不是陣列），renderStats 第一行就丟例外，整個關卡地圖畫不出來。
+   */
+  function loadState() {
+    const raw = store.object(KEY);
+    const num = v => (typeof v === "number" && isFinite(v) && v >= 0 ? v : 0);
+    const text = v => (typeof v === "string" ? v : "");
+    const done = SAFE.dict();
+    if (SAFE.isPlain(raw.done)) Object.keys(raw.done).forEach(id => {
+      const rec = raw.done[id];
+      if (SAFE.isPlain(rec)) done[id] = { stars: Math.max(1, Math.min(3, Math.round(num(rec.stars)) || 1)), at: num(rec.at) };
+    });
+    const streak = SAFE.isPlain(raw.streak) ? raw.streak : {};
+    const mistakes = (Array.isArray(raw.mistakes) ? raw.mistakes : [])
+      .filter(m => SAFE.isPlain(m) && typeof m.id === "string" && typeof m.prompt === "string")
+      .map(m => ({ id: m.id, kind: text(m.kind), prompt: m.prompt, answer: text(m.answer), explain: text(m.explain) }))
+      .slice(0, 80);
+    return { xp: Math.round(num(raw.xp)), done, streak: { count: Math.round(num(streak.count)), last: text(streak.last) }, mistakes };
+  }
+  const state = loadState();
   const save = () => store.set(KEY, state);
 
   const FLAT = [];
   C.modules.forEach((m, mi) => m.experiments.forEach(exp => FLAT.push({ exp, mod: m, mi })));
-  const byId = {};
+  const byId = SAFE.dict();   // 沒有原型：byId["constructor"] 是 undefined
   FLAT.forEach((f, i) => { f.order = i; byId[f.exp.id] = f; });
   const nextUndone = () => FLAT.find(f => !state.done[f.exp.id]) || null;
 
@@ -242,7 +261,7 @@
   function renderReview() {
     const list = $("#review-list"); list.innerHTML = "";
     if (!state.mistakes.length) { el("div", "review-empty", list, "まちがえた問題はまだありません。まちがえると自動でここに入ります。"); return; }
-    const groups = {};
+    const groups = SAFE.dict();
     state.mistakes.forEach(m => { (groups[m.id] = groups[m.id] || []).push(m); });
     Object.keys(groups).forEach(id => {
       const f = byId[id]; if (!f) return;
@@ -584,7 +603,7 @@
     setFrame("embed.html?id=" + encodeURIComponent(id) + "&theme=light&maxh=" + maxh);
     clearTimeout(L.timeout);
     L.timeout = setTimeout(() => labReady(true), 9000);   // 載不到也要能出題（退回觀念題）
-    if (decodeURIComponent(location.hash.slice(1)) !== id) history.pushState(null, "", "#" + id);
+    if (SAFE.hashId(location.hash) !== id) history.pushState(null, "", "#" + encodeURIComponent(id));
   }
 
   function labReady(failed) {
@@ -1046,13 +1065,15 @@
       if (!btnCheck.disabled && !btnCheck.hidden) { e.preventDefault(); btnCheck.click(); }
       return;
     }
+    // Ctrl／⌘＋數字是瀏覽器切分頁的快速鍵，不能被當成選第幾個選項
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     const n = Number(e.key);
     if (n >= 1 && n <= 6 && L.phase === "answer" && L.current && L.current.options && n <= L.current.options.length) selectChoice(n - 1);
   });
 
   /* ------------------------------ 啟動 ------------------------------ */
   renderMap();
-  const hash = decodeURIComponent(location.hash.slice(1));
+  const hash = SAFE.hashId(location.hash);
   if (hash && byId[hash]) openLesson(hash);
   /*
    * 瀏覽器「上一頁」：開關卡時網址會帶 #實驗 id。以前按上一頁網址變了但關卡畫面還開著，
@@ -1060,7 +1081,7 @@
    */
   // pushState 建立的歷史紀錄來回切換只會觸發 popstate，手動改網址才會觸發 hashchange——兩個都要聽
   function syncFromUrl() {
-    const id = decodeURIComponent(location.hash.slice(1));
+    const id = SAFE.hashId(location.hash);
     if (id && byId[id]) { if (!L.f || L.f.exp.id !== id) openLesson(id); }
     else if (L.f) closeLesson();
   }
