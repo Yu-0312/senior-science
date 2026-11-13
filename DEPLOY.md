@@ -64,6 +64,8 @@ repo 首頁側邊欄就出現了 License 與 License-2 兩個分頁。
 
 ```bash
 node tools/tests/run-all.js
+node tools/shell-check.js        # 需要 Playwright：路由、存檔、搜尋、離線退路
+node tools/stage-fit-check.js    # 需要 Playwright：教師版一頁不捲動
 ```
 
 測試全綠不代表畫面是對的。這個專案至今每一個嚴重的顯示問題都是靠截圖發現的，
@@ -85,5 +87,13 @@ node tools/tests/run-all.js
 首頁、lab.html、licensing.html 有 `hreflang` 對照連結，`robots.txt` 同時列出兩份 sitemap。
 
 ## 快取與版本號
+
+```bash
+node tools/bump-version.js --build   # 版本號取現在的台北時間，並重建 p/、experiments.html、ja/
+node tools/bump-version.js 20261113-1  # 自己指定版本號（之後要自己跑 build-static、build-ja）
+```
+
+不要再用 sed 把「舊版號」換成「新版號」：只要有一頁落後一版，舊字串就對不到它。
+這支不比對舊版號，手寫頁面裡的 `?v=` 一律換成新的。
 
 `js/`、`css/` 的引用都帶 `?v=<build>`。**改了 `js/` 或 `css/` 就要更新版本號**，版本號同時寫在 `js/site-config.js` 與 `sw.js`，`build-consistency` 測試會擋住兩邊不一致的情況。

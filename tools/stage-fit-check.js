@@ -20,8 +20,9 @@ try { ({ chromium } = require("playwright")); } catch (e) {
 const ROOT = path.resolve(__dirname, "..");
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 const server = http.createServer((req, res) => {
-  const file = path.join(ROOT, decodeURIComponent(req.url.split("?")[0]));
-  if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end(); return; }
+  const file = path.normalize(path.join(ROOT, decodeURIComponent(req.url.split("?")[0])));
+  // 要比對到路徑分隔符號：只用 startsWith(ROOT) 的話，隔壁叫 senior-science-xxx 的資料夾也會被放行
+  if (!(file + path.sep).startsWith(ROOT + path.sep) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end(); return; }
   res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream" });
   fs.createReadStream(file).pipe(res);
 });

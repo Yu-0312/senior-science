@@ -37,6 +37,7 @@ node --max-old-space-size=4096 tools/tests/meaning-audit.js   # 這支單跑要�
 | `ja-test.js` | 日文版：每個字串都有翻譯、`ja/` 和重跑 `build-ja` 的結果相同、日文不用「——」「〜しましょう」「ぜひ」「することができます」，也不留中文字形 |
 | `control-response-test.js` | **暫停狀態下**每一根滑桿、每一個步進器（− +）都要造成看得見的改變；選項晶片列出沒有立即反應的 |
 | `formula-text-test.js` | 公式轉純文字（說明頁 `p/` 與離線退路共用）：不認得的 LaTeX 指令不可被吃掉，⇌、↑↓、上下標、向量箭頭等都要保留 |
+| `safe-test.js` | 外部輸入的防線（`js/safe.js`）：壞掉的網址片段、`#constructor` 這類查到原型的 id、形狀不對的 localStorage、學習計劃與匯入存檔的逐筆檢查，都不能讓網站停在空白頁 |
 | `record-test.js` | 實驗記錄表：記一行存下當下的參數與讀數、點一列滑桿與讀數都回到那一列、讀數算不出來時不報錯、欄位變更時舊紀錄作廢 |
 
 `meaning-audit` 與 `control-response-test` 看起來重疊，其實守的是不同狀態：
@@ -54,6 +55,7 @@ node --max-old-space-size=4096 tools/tests/meaning-audit.js   # 這支單跑要�
 深色主題的白方塊、淺色主題的黑底板、左右不等高、滑桿拉了沒反應。
 **發佈前請實際打開瀏覽器看過。**
 教師演示版的「一頁不捲動」另有瀏覽器實測：`node tools/stage-fit-check.js`（需要 Playwright，不在 run-all 之列）。
+應用外殼（`js/app.js`、`duo/duo.js`、`sw.js`）在這些測試裡一行都不會被執行，它的路由、存檔、搜尋與離線退路由 `node tools/shell-check.js` 在真的瀏覽器裡驗（同樣需要 Playwright）。
 
 ## 測試自己出過的錯（避免重蹈）
 

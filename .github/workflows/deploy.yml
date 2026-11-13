@@ -25,7 +25,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Node 20 已於 2026-04 結束維護。建置腳本與全部測試都在 Node 22 上跑過
+          node-version: '22'
       # 靜態說明頁、學習單、sitemap 與 robots 都由課程資料自動產生，
       # 這裡重新建置一次，確認它們和實驗清單沒有失去同步。
       - name: Build experiment manifest
