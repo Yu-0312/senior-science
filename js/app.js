@@ -6,14 +6,34 @@
 (function () {
   "use strict";
   const C = window.PhysicsLabCurriculum;
-  const PL = window.PhysicsLab;
+  const SAFE = window.PhysicsLabSafe;
   const $ = (s, r) => (r || document).querySelector(s);
-  const el = PL.el;
+  /*
+   * 模擬引擎（sim-core.js）改成第一次開實驗前才載入（見 ensureEngine），
+   * 所以這裡不能在啟動時就抓 window.PhysicsLab：首頁根本沒有它。
+   * 外殼自己只需要一個建立元素的小工具，引擎的其他功能都在開實驗之後才用得到。
+   */
+  const engine = () => window.PhysicsLab || null;
+  const el = (tag, cls, parent) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (parent) parent.appendChild(e);
+    return e;
+  };
+  const fmtNumber = (n, d) => {
+    const PL = engine();
+    if (PL && PL.fmt) return PL.fmt(n, d);
+    return isFinite(n) ? String(Number(Number(n).toFixed(d == null ? 2 : d))) : "—";
+  };
 
   // 建立扁平的實驗索引（含所屬模組），供導覽與搜尋使用
   const FLAT = [];
   C.modules.forEach(m => m.experiments.forEach((e, i) => FLAT.push({ exp: e, mod: m, indexInMod: i })));
-  const byId = {};
+  /*
+   * 以 id 查實驗用「沒有原型的物件」：網址 #constructor、#toString 這類字串在一般物件上
+   * 會查到 Object.prototype 的東西，被當成實驗打開就整頁壞掉（tools/tests/safe-test.js）。
+   */
+  const byId = SAFE.dict();
   FLAT.forEach((f, i) => { f.order = i; byId[f.exp.id] = f; });
   const LEARNING_PATHS = Array.isArray(C.learningPaths) ? C.learningPaths : [];
 
@@ -164,7 +184,8 @@
      * 能確保每個課程項目都真的有程式可以載入。
      */
     const mapped = Object.keys(EXPERIMENT_FILES);
-    const available = new Set(mapped.concat(PL.ids ? PL.ids() : []));
+    const PL = engine();
+    const available = new Set(mapped.concat(PL && PL.ids ? PL.ids() : []));
     const expected = new Set(ids);
     const missingSimulations = ids.filter(id => !available.has(id));
     const extraSimulations = mapped.filter(id => !expected.has(id));
@@ -201,13 +222,15 @@
     return audit;
   }
 
-  const store = {
-    get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
-  };
+  /*
+   * localStorage 一律經過 safe.js：讀出來的形狀不對就退回預設值。
+   * 以前這裡直接 new Set(JSON.parse(…))，存檔只要被寫成一個數字，網站每次開都停在空白頁。
+   */
+  const store = SAFE.makeStore(() => window.localStorage);
   const STUDY_PLAN_KEY = "pl-study-plan";
+  const readPlan = () => SAFE.cleanPlan(store.get(STUDY_PLAN_KEY, null), id => !!byId[id]);
 
-  let viewed = new Set(store.get("pl-progress", []));
+  let viewed = new Set(store.strings("pl-progress"));
   let currentSim = null;
   let currentId = null;
   let checkpointState = null;
@@ -241,7 +264,8 @@
      改成開啟實驗時才載入對應的檔案。對應表由 tools/build-manifest.js 產生，
      它是「真的把每個檔案跑一次」得到的，不受註冊寫法影響。
      --------------------------------------------------------------------- */
-  const EXPERIMENT_FILES = window.PhysicsLabExperimentFiles || {};
+  // 複製到沒有原型的物件：EXPERIMENT_FILES["constructor"] 必須是 undefined
+  const EXPERIMENT_FILES = Object.assign(SAFE.dict(), window.PhysicsLabExperimentFiles || {});
   const loadedFiles = new Map();
   /*
    * 新版上線、但這個分頁還沒重新整理（見 startApp 的 controllerchange）。
@@ -259,41 +283,57 @@
       tag.src = src;
       tag.async = false;              // 保持執行順序，避免相依性問題
       tag.onload = () => resolve(src);
-      tag.onerror = () => reject(new Error("載入失敗：" + src));
+      tag.onerror = () => {
+        /*
+         * 載入失敗不能留在快取裡。以前失敗的 Promise 一直放在 loadedFiles，
+         * 網路斷一下（或捷運過隧道）之後，同一個實驗在重新整理之前永遠開不起來，
+         * 畫面還寫著「尚在開發中」。失敗就把紀錄和 <script> 都拿掉，下一次開啟會重新抓。
+         */
+        loadedFiles.delete(src);
+        tag.remove();
+        reject(new Error("載入失敗：" + src));
+      };
       document.head.appendChild(tag);
     });
     loadedFiles.set(src, promise);
     return promise;
   }
+  const versioned = path => {
+    const build = (window.PhysicsLabSite && window.PhysicsLabSite.build) || "";
+    return path + (build ? "?v=" + build : "");
+  };
 
-  /* 確保某個實驗的程式碼已經就緒 */
-    /*
-   * 器材繪製層（sim-apparatus.js）跟實驗程式一樣是延遲載入的。
+  /*
+   * 引擎與外掛
    *
-   * 理由和實驗檔完全相同：首頁不跑任何模擬，卻要學生先把整個器材庫下載完，
-   * 等於把省下來的流量又花掉。它只在第一個實驗真正要開啟前才載入，
-   * 之後留在 PL.apparatus 上供所有實驗共用。
+   * sim-core.js（引擎）、量測工具、洞察、教師提示、無障礙、記錄表、器材繪製層、觀察點，
+   * 都只在「建置實驗」時才有事做，首頁用不到。全部延到第一次開實驗前才載：
+   * 首次載入少約 45 KB gzip（引擎）＋ 42 KB（外掛）。
+   *
+   * 一次把所有 <script> 插進去（async = false）：瀏覽器平行下載、依插入順序執行，
+   * 所以引擎一定先於外掛，外掛的順序也維持原本 index.html 的順序（鉤子依註冊順序執行）。
+   *
+   * 引擎和器材層是必要的，載不到就回報失敗；其餘外掛少一支只是少一個輔助功能，不擋實驗。
+   * 失敗後下一次開實驗會整組重試（loadScript 不快取失敗）。
    */
-  let apparatusPromise = null;
-  function ensureApparatus() {
-    if (PL.apparatus) return Promise.resolve(true);
-    if (!apparatusPromise) {
-      const build = (window.PhysicsLabSite && window.PhysicsLabSite.build) || "";
-      /*
-       * 觀察點引擎（sim-observe.js）也跟著器材層一起載：它只在實驗建置時才有事做，
-       * 而且一定要在第一個實驗建置「之前」掛上鉤子——器材層剛好也是建置前必等的那一步。
-       */
-      const v = build ? "?v=" + build : "";
-      /*
-       * 量測工具、洞察、教師提示、無障礙這四支也只在實驗建置時掛鉤子（PL._hooks），首頁用不到，
-       * 一起改成延遲載入：首次載入少約 42 KB gzip。順序維持原本 index.html 的順序（鉤子依註冊順序執行）。
-       */
-      const addons = ["sim-tools", "sim-insight", "teaching-notes", "sim-a11y", "sim-record"].map(f => loadScript("js/" + f + ".js" + v).catch(err => { console.warn(err); }));
-      apparatusPromise = Promise.all(addons.concat([loadScript("js/sim-apparatus.js" + v), loadScript("js/sim-observe.js" + v).catch(err => { console.warn(err); })]))
-        .then(() => true)
-        .catch(err => { console.error(err); apparatusPromise = null; return false; });
+  const ENGINE_ADDONS = ["js/sim-tools.js", "js/sim-insight.js", "js/teaching-notes.js", "js/sim-a11y.js", "js/sim-record.js"];
+  let enginePromise = null;
+  function ensureEngine() {
+    const PL = engine();
+    if (PL && PL.apparatus) return Promise.resolve(true);
+    if (!enginePromise) {
+      const optional = f => loadScript(versioned(f)).catch(err => { console.warn(err); });
+      // 插入順序就是執行順序：引擎 → 五支外掛 → 器材層 → 觀察點（觀察點要在第一個實驗建置前掛好鉤子）
+      const core = loadScript(versioned("js/sim-core.js"));
+      const addons = ENGINE_ADDONS.map(optional);
+      const apparatus = loadScript(versioned("js/sim-apparatus.js"));
+      addons.push(optional("js/sim-observe.js"));
+      enginePromise = Promise.all([core, apparatus].concat(addons))
+        .then(() => !!(engine() && engine().apparatus))
+        .catch(err => { console.error(err); return false; })
+        .then(ok => { if (!ok) enginePromise = null; return ok; });
     }
-    return apparatusPromise;
+    return enginePromise;
   }
 
   /*
@@ -307,23 +347,28 @@
   function ensureQuestionBank() {
     if (window.PhysicsLabQuestionBank) return Promise.resolve(true);
     if (!questionBankPromise) {
-      const build = (window.PhysicsLabSite && window.PhysicsLabSite.build) || "";
-      questionBankPromise = loadScript("js/question-bank.js" + (build ? "?v=" + build : ""))
+      questionBankPromise = loadScript(versioned("js/question-bank.js"))
         .then(() => true)
         .catch(err => { console.error(err); questionBankPromise = null; return false; });
     }
     return questionBankPromise;
   }
 
+  /*
+   * 確保某個實驗的程式碼已經就緒。回傳三種結果，畫面上的說法不一樣：
+   *   "ready"    可以建置
+   *   "missing"  課程目錄有這個實驗、但沒有對應的程式（真的還沒做）
+   *   "failed"   有程式但載不到（離線、網路不穩）：要能重試，不能說成「尚在開發中」
+   */
   function ensureExperiment(id) {
-    if (PL.has(id)) return ensureApparatus().then(() => true);
     const file = EXPERIMENT_FILES[id];
-    if (!file) return Promise.resolve(false);
-    const build = (window.PhysicsLabSite && window.PhysicsLabSite.build) || "";
-    return ensureApparatus()
-      .then(() => loadScript("js/experiments/" + file + (build ? "?v=" + build : "")))
-      .then(() => PL.has(id))
-      .catch(err => { console.error(err); return false; });
+    const has = () => !!(engine() && engine().has(id));
+    if (!has() && !file) return Promise.resolve("missing");
+    return ensureEngine().then(ok => {
+      if (!ok) return "failed";
+      if (has()) return "ready";
+      return loadScript(versioned("js/experiments/" + file)).then(() => (has() ? "ready" : "missing"));
+    }).catch(err => { console.error(err); return "failed"; });
   }
 
   /*
@@ -338,14 +383,14 @@
     const idle = window.requestIdleCallback || (fn => setTimeout(fn, 1200));
     idle(() => {
       if (updatePending) return;   // 預先抓檔會觸發整頁重新整理（見 loadScript），等使用者自己換頁
+      const PL = engine();
       [order - 1, order + 1].forEach(i => {
         const item = FLAT[i];
-        if (!item || PL.has(item.exp.id)) return;
+        if (!item || (PL && PL.has(item.exp.id))) return;
         const file = EXPERIMENT_FILES[item.exp.id];
         // 一定要帶版本號：js/ 是一年 immutable 快取，不帶版本的網址部署後會拿到舊程式，
         // 而且和 ensureExperiment() 的網址不同，兩邊都載就會把同一支檔案執行兩次。
-        const build = (window.PhysicsLabSite && window.PhysicsLabSite.build) || "";
-        if (file) loadScript("js/experiments/" + file + (build ? "?v=" + build : "")).catch(() => {});
+        if (file) loadScript(versioned("js/experiments/" + file)).catch(() => {});
       });
     });
   }
@@ -423,6 +468,12 @@
   const moonIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>';
 
   /* ------------------------------- 側邊目錄 ------------------------------- */
+  /*
+   * 模組標題是 <button>、實驗是 <a href="#id">（2026-11）。
+   * 以前兩者都是掛了 click 的 <div>：Tab 鍵走不到、報讀器不知道它能按，
+   * 等於整份課程目錄只能用滑鼠操作（WCAG 2.1.1）。換成原生元件之後，
+   * 鍵盤、中鍵開新分頁、長按複製連結都是瀏覽器本來就會的事，不必自己處理。
+   */
   function buildSidebar() {
     const wrap = $("#module-list");
     wrap.innerHTML = "";
@@ -430,24 +481,35 @@
       const mod = el("div", "module", wrap);
       mod.style.setProperty("--m-color", m.color);
       mod.dataset.mod = m.id;
-      const head = el("div", "module-head", mod);
-      const no = el("div", "module-no", head); no.textContent = String(moduleIndex + 1).padStart(2, "0");
-      const t = el("div", "module-title", head); t.innerHTML = m.title + '<span class="track">' + m.track + "</span>";
-      const car = el("div", "module-caret", head); car.textContent = "▶";
-      head.addEventListener("click", () => mod.classList.toggle("open"));
+      const listId = "side-list-" + m.id;
+      const head = el("button", "module-head", mod);
+      head.type = "button";
+      head.setAttribute("aria-expanded", "false");
+      head.setAttribute("aria-controls", listId);
+      const no = el("span", "module-no", head); no.textContent = String(moduleIndex + 1).padStart(2, "0");
+      const t = el("span", "module-title", head); t.textContent = m.title;
+      const track = el("span", "track", t); track.textContent = m.track;
+      const car = el("span", "module-caret", head); car.textContent = "▶"; car.setAttribute("aria-hidden", "true");
+      head.addEventListener("click", () => setModuleOpen(mod, !mod.classList.contains("open")));
 
       const list = el("div", "exp-list", mod);
+      list.id = listId;
       m.experiments.forEach((e, i) => {
-        const item = el("div", "exp-item", list);
+        const item = el("a", "exp-item", list);
+        item.href = "#" + e.id;
         item.dataset.id = e.id;
-        const idx = el("div", "idx", item); idx.textContent = i + 1;
-        const name = el("div", "exp-name", item); name.textContent = e.title;
-        if (e.interactive) { const tag = el("span", "tag-int", item); tag.textContent = "互動"; }
-        const chk = el("span", "check", item); chk.textContent = "✓";
-        item.addEventListener("click", () => location.hash = "#" + e.id);
+        const idx = el("span", "idx", item); idx.textContent = i + 1; idx.setAttribute("aria-hidden", "true");
+        const name = el("span", "exp-name", item); name.textContent = e.title;
+        const chk = el("span", "check", item); chk.textContent = "✓"; chk.setAttribute("aria-hidden", "true");
+        const done = el("span", "sr-only check-text", item); done.textContent = "（已完成）";
       });
     });
     refreshViewedMarks();
+  }
+  function setModuleOpen(mod, open) {
+    mod.classList.toggle("open", open);
+    const head = mod.querySelector(".module-head");
+    if (head) head.setAttribute("aria-expanded", String(open));
   }
 
   /* ------------------------------- 首頁 ------------------------------- */
@@ -594,54 +656,149 @@
     });
   }
 
+  /*
+   * 首頁的課程目錄（2026-11 改版）
+   *
+   * 左邊 12 個模組是分頁（role="tab"，方向鍵切換），右邊是選到的模組：
+   * 簡介、個人進度、「從這裡開始」的按鈕，以及這個模組的每一個實驗（連結）。
+   * 以前的模組卡點下去直接跳進第一個沒做過的實驗，首頁上沒有地方能看一個模組的內容；
+   * 要挑實驗只能靠左邊那條和模組卡重複的側欄。現在首頁不放側欄，目錄只有這一份。
+   */
+  const ARROW_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+  let catalogModule = "";
+  function pickCatalogModule() {
+    if (catalogModule && C.modules.some(m => m.id === catalogModule)) return catalogModule;
+    const last = byId[store.get("pl-last-viewed", "")];
+    return (last ? last.mod : C.modules[0]).id;
+  }
+  function buildCatalog() {
+    const tabs = $("#catalog-modules"), panel = $("#catalog-panel");
+    if (!tabs || !panel) return;
+    catalogModule = pickCatalogModule();
+    tabs.innerHTML = "";
+    C.modules.forEach((m, index) => {
+      const tab = el("button", "catalog-tab", tabs);
+      tab.type = "button";
+      tab.id = "catalog-tab-" + m.id;
+      tab.dataset.mod = m.id;
+      tab.style.setProperty("--m-color", m.color);
+      tab.setAttribute("role", "tab");
+      tab.setAttribute("aria-controls", "catalog-panel");
+      const no = el("span", "catalog-tab-no", tab); no.textContent = String(index + 1).padStart(2, "0"); no.setAttribute("aria-hidden", "true");
+      const name = el("span", "catalog-tab-name", tab); name.textContent = m.title;
+      const count = el("span", "catalog-tab-count", tab);
+      tab.addEventListener("click", () => selectCatalogModule(m.id));
+    });
+    // 分頁慣例：左右／上下鍵在分頁之間移動並選取，Home／End 到頭尾
+    tabs.addEventListener("keydown", e => {
+      const list = Array.from(tabs.querySelectorAll(".catalog-tab"));
+      const at = list.indexOf(document.activeElement);
+      if (at < 0) return;
+      let to = -1;
+      if (e.key === "ArrowDown" || e.key === "ArrowRight") to = (at + 1) % list.length;
+      else if (e.key === "ArrowUp" || e.key === "ArrowLeft") to = (at - 1 + list.length) % list.length;
+      else if (e.key === "Home") to = 0;
+      else if (e.key === "End") to = list.length - 1;
+      if (to < 0) return;
+      e.preventDefault();
+      selectCatalogModule(list[to].dataset.mod);
+      list[to].focus();
+    });
+    selectCatalogModule(catalogModule);
+  }
+  function selectCatalogModule(id, reveal) {
+    const m = C.modules.find(x => x.id === id) || C.modules[0];
+    catalogModule = m.id;
+    const tabs = $("#catalog-modules"), panel = $("#catalog-panel");
+    if (!tabs || !panel) return;
+    tabs.querySelectorAll(".catalog-tab").forEach(tab => {
+      const on = tab.dataset.mod === m.id;
+      tab.classList.toggle("is-active", on);
+      tab.setAttribute("aria-selected", String(on));
+      tab.tabIndex = on ? 0 : -1;
+      // 手機上模組是一排可橫向捲動的晶片：選到的那顆要捲進畫面
+      if (on && reveal && tab.scrollIntoView) tab.scrollIntoView({ block: "nearest", inline: "center" });
+    });
+    panel.setAttribute("aria-labelledby", "catalog-tab-" + m.id);
+    panel.style.setProperty("--m-color", m.color);
+    panel.innerHTML = "";
+
+    const index = C.modules.indexOf(m);
+    const done = m.experiments.filter(exp => viewed.has(exp.id)).length;
+    const total = m.experiments.length;
+    const head = el("div", "catalog-head", panel);
+    const no = el("span", "catalog-no", head); no.textContent = String(index + 1).padStart(2, "0"); no.setAttribute("aria-hidden", "true");
+    const titles = el("div", "catalog-titles", head);
+    const title = el("h3", "catalog-title", titles); title.textContent = m.title;
+    const track = el("span", "catalog-track", titles); track.textContent = m.track;
+    const intro = el("p", "catalog-intro", panel); intro.textContent = m.intro;
+
+    const bar = el("div", "catalog-bar", panel);
+    const progress = el("div", "catalog-progress", bar);
+    const meter = el("span", "catalog-meter", progress); meter.setAttribute("aria-hidden", "true");
+    el("i", null, meter).style.width = (total ? done / total * 100 : 0) + "%";
+    const label = el("span", "catalog-progress-label", progress);
+    label.textContent = "做過 " + done + " / " + total + " 個實驗";
+    const next = m.experiments.find(exp => !viewed.has(exp.id)) || m.experiments[0];
+    const go = el("a", "catalog-go", bar);
+    go.href = "#" + next.id;
+    const goText = el("span", null, go);
+    goText.textContent = done === 0 ? "從第一個開始" : done === total ? "從頭再做一次" : "接著做：" + next.title;
+    go.insertAdjacentHTML("beforeend", ARROW_SVG);
+
+    const list = el("ol", "catalog-list", panel);
+    m.experiments.forEach((exp, i) => {
+      const li = el("li", null, list);
+      const a = el("a", "catalog-exp" + (viewed.has(exp.id) ? " is-done" : ""), li);
+      a.href = "#" + exp.id;
+      const idx = el("span", "catalog-exp-idx", a); idx.textContent = viewed.has(exp.id) ? "✓" : String(i + 1); idx.setAttribute("aria-hidden", "true");
+      // 名稱和課綱標籤疊成兩行：標籤常常比名稱還長（「必修物理 光的折射 · 選修物理III 3-1」），
+      // 排在同一行會把名稱擠成一個字一行
+      const text = el("span", "catalog-exp-text", a);
+      const name = el("span", "catalog-exp-name", text); name.textContent = exp.title;
+      if (viewed.has(exp.id)) { const sr = el("span", "sr-only", text); sr.textContent = "（已完成）"; }
+      if (exp.exam && exp.exam.tag) { const tag = el("span", "catalog-exp-tag", text); tag.textContent = exp.exam.tag; }
+    });
+    refreshCatalogCounts();
+  }
+  function refreshCatalogCounts() {
+    document.querySelectorAll("#catalog-modules .catalog-tab").forEach(tab => {
+      const m = C.modules.find(x => x.id === tab.dataset.mod);
+      if (!m) return;
+      const done = m.experiments.filter(exp => viewed.has(exp.id)).length;
+      const count = tab.querySelector(".catalog-tab-count");
+      if (count) count.textContent = done + "/" + m.experiments.length;
+      tab.classList.toggle("is-complete", done === m.experiments.length);
+      tab.setAttribute("aria-label", m.title + "，做過 " + done + " / " + m.experiments.length + " 個實驗");
+    });
+  }
+  /* 從別的地方（麵包屑、複習清單）跳到首頁目錄的某個模組 */
+  function showCatalogModule(id) {
+    catalogModule = id;
+    const jump = () => {
+      selectCatalogModule(id, true);
+      const sec = $("#catalog");
+      if (sec) sec.scrollIntoView({ block: "start" });
+      const tab = document.getElementById("catalog-tab-" + id);
+      if (tab) tab.focus({ preventScroll: true });
+    };
+    if (SAFE.hashId(location.hash) && SAFE.hashId(location.hash) !== "home") {
+      window.addEventListener("hashchange", () => requestAnimationFrame(jump), { once: true });
+      location.hash = "#home";
+    } else jump();
+  }
+
   function buildHome() {
     const heroExperimentCount = $("#hero-exp-count");
     if (heroExperimentCount) heroExperimentCount.textContent = C.totalExperiments;
-    const grid = $("#module-grid");
-    grid.innerHTML = "";
-    /*
-     * 模組卡（2026-10 改版）：大號序號＋模組色細線＋個人進度條。
-     * 卡片本身就是入口，所以給它按鈕語意與鍵盤操作——原本是純 div，Tab 走不到。
-     */
-    const arrowSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
-    C.modules.forEach((m, index) => {
-      const card = el("div", "mcard", grid);
-      card.style.setProperty("--m-color", m.color);
-      card.dataset.mod = m.id;
-      card.setAttribute("role", "link");
-      card.setAttribute("tabindex", "0");
-      /*
-       * 不另設 aria-label，名稱直接取卡片上看得到的字（序號、課綱、標題、說明、進度）。
-       * 以前是「模組 1：…，N 個實驗」，和畫面上的「01 …」對不起來（WCAG 2.5.3 Label in Name）：
-       * 語音控制的使用者照著畫面念，叫不到這張卡。
-       */
-      const top = el("div", "mcard-top", card);
-      const no = el("div", "mcard-no", top); no.textContent = String(index + 1).padStart(2, "0");
-      const tr = el("div", "mcard-track", top); tr.textContent = m.track;
-      const ti = el("div", "mcard-title", card); ti.textContent = m.title;
-      const intro = el("div", "mcard-intro", card); intro.textContent = m.intro;
-      const meta = el("div", "mcard-meta", card);
-      meta.innerHTML = '<span class="mcard-count"><b>' + m.experiments.length + '</b> 個實驗</span>' +
-        '<span class="mcard-progress" aria-hidden="true"><i></i></span>' +
-        '<span class="mcard-done">0 / ' + m.experiments.length + '</span>' +
-        '<span class="mcard-go">' + arrowSvg + '</span>';
-      const open = () => {
-        const first = m.experiments.find(exp => !viewed.has(exp.id)) || m.experiments[0];
-        location.hash = "#" + first.id;
-      };
-      card.addEventListener("click", open);
-      card.addEventListener("keydown", e => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
-      });
-    });
+    buildCatalog();
     refreshHomeProgress();
     renderLearningLadder();
     // 統計數字
     $("#stat-mod").textContent = C.totalModules;
     $("#stat-exp").textContent = C.totalExperiments;
-    $("#stat-int").textContent = C.totalInteractive;
-    $("#side-exp").textContent = C.totalExperiments;
-    $("#side-int").textContent = C.totalInteractive;
+    const start = $("#hero-start");
+    if (start && FLAT[0]) start.href = "#" + FLAT[0].exp.id;
   }
 
   /* ------------------------------- 實驗頁 ------------------------------- */
@@ -856,7 +1013,7 @@
   }
 
   function getPracticeDone() {
-    return new Set(store.get("pl-practice-done", []));
+    return new Set(store.strings("pl-practice-done"));
   }
 
   function setPracticeDone(id, done) {
@@ -866,8 +1023,7 @@
   }
 
   function getPracticeAnswers() {
-    const state = store.get("pl-practice-answers", {});
-    return state && typeof state === "object" && !Array.isArray(state) ? state : {};
+    return store.object("pl-practice-answers");
   }
 
   function setPracticeAnswer(id, answer) {
@@ -1059,7 +1215,7 @@
 
     const feedback = el("p", "practice-feedback" + (solved ? " is-correct" : ""), item);
     feedback.hidden = !solved;
-    if (solved) feedback.textContent = "答對了。正確答案 " + PL.fmt(q.answer, 3) + (q.unit ? " " + q.unit : "");
+    if (solved) feedback.textContent = "答對了。正確答案 " + fmtNumber(q.answer, 3) + (q.unit ? " " + q.unit : "");
 
     const actions = el("div", "practice-actions", item);
     const hintBtn = el("button", "practice-btn", actions);
@@ -1101,7 +1257,7 @@
       const ok = Math.abs(value - q.answer) <= Math.abs(q.answer) * tol + 1e-9;
       feedback.classList.toggle("is-correct", ok);
       if (ok) {
-        feedback.textContent = "答對了。正確答案 " + PL.fmt(q.answer, 3) + (q.unit ? " " + q.unit : "") +
+        feedback.textContent = "答對了。正確答案 " + fmtNumber(q.answer, 3) + (q.unit ? " " + q.unit : "") +
           "（容差 ±" + (tol * 100).toFixed(0) + "%）";
         status.textContent = "答對";
         setPracticeDone(id, true);
@@ -1304,10 +1460,7 @@
 
   function collectLearningSave() {
     const data = {};
-    for (let i = 0; i < localStorage.length; i += 1) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith("pl-")) data[key] = localStorage.getItem(key);
-    }
+    store.keys("pl-").forEach(key => { const value = store.raw(key); if (value != null) data[key] = value; });
     return {
       app: "senior-science",
       version: 1,
@@ -1327,7 +1480,8 @@
     document.body.appendChild(a);
     a.click();
     a.remove();
-    URL.revokeObjectURL(url);
+    // 有些瀏覽器的下載是非同步開始的，馬上撤銷網址會讓下載變成 0 位元組
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
     showSaveStatus("已匯出學習存檔", "ok");
   }
 
@@ -1338,16 +1492,22 @@
     const reader = new FileReader();
     reader.onerror = () => showSaveStatus("讀取檔案失敗", "warn");
     reader.onload = () => {
-      let entries;
+      let entries, skipped = 0;
       try {
         const save = JSON.parse(String(reader.result || ""));
         if (!save || save.app !== "senior-science" || !save.data || typeof save.data !== "object") {
           showSaveStatus("存檔格式不正確", "warn");
           return;
         }
-        // 先把資料驗完、整理好，再動現有進度。
-        // 原本是「先清空全部 pl- 鍵，再寫入」，中途若失敗就等於把使用者的進度洗掉了。
-        entries = Object.entries(save.data).filter(([key, value]) => key.startsWith("pl-") && typeof value === "string");
+        /*
+         * 先把資料驗完、整理好，再動現有進度。
+         * 逐筆檢查形狀（safe.js 的 saveEntryOk）：以前只確認「值是字串」，
+         * 一份 pl-progress 寫成 5 的存檔匯入之後，這台裝置每次開站都停在空白頁，
+         * 而且沒有任何畫面可以把它清掉。形狀不對的那幾筆略過，其餘照常匯入。
+         */
+        const all = Object.entries(save.data);
+        entries = all.filter(([key, value]) => SAFE.saveEntryOk(key, value));
+        skipped = all.length - entries.length;
         if (!entries.length) { showSaveStatus("存檔內沒有可用的學習資料", "warn"); return; }
       } catch (e) {
         showSaveStatus("存檔不是有效的 JSON", "warn");
@@ -1356,28 +1516,24 @@
 
       // 保留一份現況，寫入失敗就回復。
       const backup = {};
-      for (let i = 0; i < localStorage.length; i += 1) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith("pl-")) backup[key] = localStorage.getItem(key);
-      }
-      try {
-        Object.keys(backup).forEach(key => localStorage.removeItem(key));
-        entries.forEach(([key, value]) => localStorage.setItem(key, value));
-      } catch (e) {
-        Object.keys(backup).forEach(key => localStorage.removeItem(key));
-        Object.entries(backup).forEach(([key, value]) => localStorage.setItem(key, value));
+      store.keys("pl-").forEach(key => { const value = store.raw(key); if (value != null) backup[key] = value; });
+      const wipe = () => Object.keys(backup).forEach(key => store.remove(key));
+      wipe();
+      if (!entries.every(([key, value]) => store.setRaw(key, value))) {
+        store.keys("pl-").forEach(key => store.remove(key));
+        Object.entries(backup).forEach(([key, value]) => store.setRaw(key, value));
         showSaveStatus("寫入失敗，已回復原本進度", "warn");
         return;
       }
 
-      viewed = new Set(store.get("pl-progress", []));
+      viewed = new Set(store.strings("pl-progress"));
       applyTheme(preferredTheme());
       // 側邊目錄的完成標記與展開狀態也要一起重畫，否則畫面與存檔不一致。
       refreshViewedMarks();
       renderStudyCenter();
-      syncPlanControls(store.get(STUDY_PLAN_KEY, null));
+      syncPlanControls(readPlan());
       route();
-      showSaveStatus("已匯入 " + entries.length + " 筆學習資料", "ok");
+      showSaveStatus("已匯入 " + entries.length + " 筆學習資料" + (skipped ? "，略過 " + skipped + " 筆格式不符的資料" : ""), skipped ? "warn" : "ok");
     };
     reader.readAsText(file);
   }
@@ -1442,7 +1598,7 @@
   }
 
   function clearStudyPlan() {
-    localStorage.removeItem(STUDY_PLAN_KEY);
+    store.remove(STUDY_PLAN_KEY);
     renderStudyCenter();
     showSaveStatus("已清除學習計劃", "warn");
   }
@@ -1459,6 +1615,15 @@
     if (customWrap) customWrap.hidden = select.value !== "custom";
     if (custom && !preset) custom.value = days;
     if (minutes) minutes.value = plan ? plan.minutes : minutes.value;
+  }
+  /*
+   * 使用者自己改了「計劃天數」：只切換自訂欄位，不能把選單改回現有計劃的天數。
+   * 以前這裡直接呼叫 syncPlanControls(plan)，已經有 30 天計劃的人選「7 天衝刺」會立刻被彈回 30 天，
+   * 除非先按「清除計劃」，否則永遠排不出別的天數。
+   */
+  function onPlanDaysChange() {
+    const select = $("#plan-days"), customWrap = $("#custom-days-wrap");
+    if (select && customWrap) customWrap.hidden = select.value !== "custom";
   }
 
   function renderTodayTasks(plan, dayIndex) {
@@ -1550,7 +1715,7 @@
     const title = $("#today-plan-title");
     const summary = $("#today-plan-summary");
     if (!title || !summary) return;
-    const plan = store.get(STUDY_PLAN_KEY, null);
+    const plan = readPlan();
     syncPlanControls(plan);
     const allPlanned = plan ? plan.schedule.flatMap(day => day.ids).filter(id => byId[id]) : [];
     const allDone = allPlanned.filter(id => viewed.has(id)).length;
@@ -1564,6 +1729,9 @@
     const progressPct = $("#today-progress-percent"); if (progressPct) progressPct.textContent = pct + "%";
     renderReviewFocus();
 
+    // 沒有計劃時不畫一條 0 / 0 的空進度條
+    const progressBox = document.querySelector("#today-plan-card .today-progress");
+    if (progressBox) progressBox.hidden = !today;
     if (!plan) {
       title.textContent = "尚未建立計劃";
       summary.textContent = "選擇天數後，系統會把尚未完成的實驗平均分配到每日任務。";
@@ -1587,11 +1755,15 @@
    * 之後任何換頁（包括從首頁捲到一半點模組卡）都要回頁首與淡入。
    */
   let booted = false;
+  function stopCurrentSim() {
+    if (currentSim && currentSim.stop) { try { currentSim.stop(); } catch (e) {} }
+    currentSim = null;
+  }
   function openExp(id) {
     const f = byId[id];
     if (!f) { location.hash = ""; return; }
-    if (currentSim && currentSim.stop) { try { currentSim.stop(); } catch (e) {} }
-    currentSim = null; currentId = id;
+    stopCurrentSim(); currentId = id;
+    syncDemoMode();   // 一定在建置實驗之前：sim-core 建置時才讀模式
     const { exp, mod } = f;
     Object.assign(OBS, { id, stages: [], done: {}, nudged: false });
     document.querySelectorAll(".finish-nudge").forEach(n => n.remove());
@@ -1610,15 +1782,25 @@
     const firstOpen = !booted;
     if (!firstOpen) { view.classList.remove("fade-in"); void view.offsetWidth; view.classList.add("fade-in"); }
 
-    // 頁首
-    $("#exp-crumb").innerHTML = '<b>模組' + mod.no + " · " + mod.title + '</b><span class="sep">/</span>' +
-      "第 " + (f.indexInMod + 1) + " 個實驗";
+    // 頁首：麵包屑是真的連結（回首頁、回這個模組的目錄），不再只是一行字
+    const crumb = $("#exp-crumb");
+    crumb.innerHTML = "";
+    const homeLink = el("a", "exp-crumb-link", crumb); homeLink.href = "#home"; homeLink.textContent = "首頁";
+    el("span", "sep", crumb).textContent = "/";
+    const modLink = el("button", "exp-crumb-link exp-crumb-mod", crumb); modLink.type = "button";
+    modLink.textContent = "模組" + mod.no + " · " + mod.title;
+    modLink.title = "回到首頁目錄的「" + mod.title + "」";
+    modLink.addEventListener("click", () => showCatalogModule(mod.id));
+    el("span", "sep", crumb).textContent = "/";
+    const here = el("span", "exp-crumb-here", crumb);
+    here.textContent = "第 " + (f.indexInMod + 1) + " / " + mod.experiments.length + " 個實驗";
+    here.setAttribute("aria-current", "page");
     $("#exp-title").textContent = exp.title;
     $("#exp-lead").textContent = exp.concept;
     // 學測／分科／課本實驗對應：標題上方一枚標籤，教材區多一段「考題怎麼問」
     const examTag = exp.exam && exp.exam.tag;
     if (examTag) {
-      const b = el("span", "exp-exam-tag", $("#exp-crumb"));
+      const b = el("span", "exp-exam-tag", crumb);
       b.textContent = examTag;
     }
     const examBox = $("#guide-exam");
@@ -1637,32 +1819,31 @@
      * 避免慢的網路下舊實驗蓋掉新實驗。
      */
     const simRoot = $("#sim-root");
-    simRoot.innerHTML = "";
     const token = ++openToken;
-    const loading = el("div", "sim-loading", simRoot);
-    loading.setAttribute("role", "status");
-    loading.textContent = "載入互動模擬…";
-
-    ensureExperiment(exp.id).then(ready => {
-      if (token !== openToken) return;          // 使用者已經換到別的實驗
+    const mount = () => {
       simRoot.innerHTML = "";
-      if (!ready) {
-        const empty = el("div", "empty", simRoot);
-        empty.textContent = "此實驗的互動模擬尚在開發中。";
-        return;
-      }
-      try {
-        currentSim = PL.get(exp.id).build(simRoot) || {};
-        arrangeStage();
-        setTimeout(arrangeStage, 0);   // 掛載鉤子（示範重點、課堂提問）有時晚一拍才插進來
-      } catch (err) {
-        console.error("模擬載入失敗：" + exp.id, err);
+      const loading = el("div", "sim-loading", simRoot);
+      loading.setAttribute("role", "status");
+      loading.textContent = "載入互動模擬…";
+      ensureExperiment(exp.id).then(state => {
+        if (token !== openToken) return;          // 使用者已經換到別的實驗，或回首頁了
         simRoot.innerHTML = "";
-        const failed = el("div", "empty", simRoot);
-        failed.textContent = "此模擬載入時發生問題，請重新整理後再試。";
-      }
-      prefetchNeighbours(f.order);
-    });
+        if (state !== "ready") { showSimProblem(simRoot, state, mount); return; }
+        try {
+          currentSim = engine().get(exp.id).build(simRoot) || {};
+          arrangeStage();
+          setTimeout(arrangeStage, 0);   // 掛載鉤子（示範重點、課堂提問）有時晚一拍才插進來
+        } catch (err) {
+          console.error("模擬載入失敗：" + exp.id, err);
+          showSimProblem(simRoot, "crashed", mount);
+        }
+        buildExpToc();
+        setTimeout(buildExpToc, 60);     // 預測、記錄表這些區塊由鉤子晚一拍才插入
+        prefetchNeighbours(f.order);
+      });
+    };
+    mount();
+    buildExpToc();
 
     // 教材：公式與重點
     $("#guide-concept").textContent = exp.concept;
@@ -1716,21 +1897,111 @@
     document.title = exp.title + "｜物理實驗室";
   }
 
-  function setNav(btn, target, dir) {
-    if (!target) { btn.disabled = true; btn.onclick = null; btn.querySelector(".nav-title").textContent = "—"; btn.querySelector(".nav-dir").textContent = dir; return; }
-    btn.disabled = false;
-    btn.querySelector(".nav-dir").textContent = dir;
-    btn.querySelector(".nav-title").textContent = target.exp.title;
-    btn.onclick = () => location.hash = "#" + target.exp.id;
+  /*
+   * 模擬開不起來時說清楚是哪一種狀況，並且給一顆重試。
+   * 以前不管是「離線所以檔案抓不到」還是「真的還沒做」，畫面都寫「此實驗的互動模擬尚在開發中」，
+   * 學生在捷運上斷線一下就以為這個實驗不存在。
+   */
+  function showSimProblem(root, state, retry) {
+    const box = el("div", "empty sim-problem", root);
+    box.setAttribute("role", "alert");
+    const msg = el("p", "sim-problem-text", box);
+    if (state === "missing") { msg.textContent = "這個實驗的互動模擬還在製作中，概念、公式與題目可以先看下面。"; return; }
+    msg.textContent = state === "crashed"
+      ? "這個模擬啟動時出了問題。"
+      : (navigator.onLine === false ? "目前沒有網路，這個實驗的程式還沒存到這台裝置上。" : "實驗程式沒有載入成功，可能是網路不穩。");
+    const hint = el("p", "sim-problem-hint", box);
+    hint.textContent = state === "crashed"
+      ? "重試一次；還是不行的話請重新整理頁面。"
+      : "連上網路後按重試。常在沒有網路的地方用，可以先到首頁的學習中心按「下載全部實驗」。";
+    const again = el("button", "study-btn primary", box); again.type = "button"; again.textContent = "重試";
+    again.addEventListener("click", retry);
+  }
+
+  /* 上一個／下一個是連結：沒有的那一邊拿掉 href（連結沒有 disabled），報讀器也讀得出「不可用」 */
+  function setNav(link, target, dir) {
+    link.querySelector(".nav-dir").textContent = dir;
+    link.querySelector(".nav-title").textContent = target ? target.exp.title : "—";
+    if (target) { link.href = "#" + target.exp.id; link.removeAttribute("aria-disabled"); }
+    else { link.removeAttribute("href"); link.setAttribute("aria-disabled", "true"); }
+  }
+
+  /* ------------------------------- 本頁導覽 -------------------------------
+   * 實驗頁很長（1366 寬時約 4,300 px）：實驗台、預測、記錄、量到的關係、挑戰、概念、總結題、課本銜接。
+   * 這一列貼在頂欄下面，只列出「這個實驗真的有、而且現在看得到」的區塊，
+   * 捲到哪一段就把那一段標起來。區塊由各外掛在建置後才插入，所以建置完再掃一次。
+   */
+  const TOC_SECTIONS = [
+    ["stage", "實驗台", "#sim-root .sim-visual-panel"],   // .sim-stage 是 display: contents，量不到位置
+    ["predict", "先預測", "#sim-root .sim-predict"],
+    ["relations", "量到的關係", "#sim-root .sim-causality, #sim-root .sim-relations"],
+    ["challenge", "挑戰", "#sim-root .sim-challenge"],
+    ["record", "記錄表", "#sim-root .sim-record"],
+    ["guide", "概念與公式", "#guide-card"],
+    ["finish", "總結題", "#finish-card"],
+    ["output", "課本銜接", "#learning-output"]
+  ];
+  let tocObserver = null, tocTargets = [];
+  function buildExpToc() {
+    const nav = $("#exp-toc");
+    if (!nav) return;
+    if (tocObserver) { tocObserver.disconnect(); tocObserver = null; }
+    nav.innerHTML = "";
+    tocTargets = [];
+    // 教師演示版是一頁式實驗台，沒有往下的內容
+    if (document.body.classList.contains("stage-only")) { nav.hidden = true; return; }
+    /*
+     * 依「畫面上由上到下」排，不是依上面清單的順序：實驗台用 grid 排版，
+     * 各區塊在畫面上的先後和 DOM 順序不同，寬螢幕與手機也不一樣。
+     */
+    const found = [];
+    TOC_SECTIONS.forEach(([key, label, selector]) => {
+      const node = Array.from(document.querySelectorAll(selector)).find(n => n.getClientRects().length > 0);
+      if (node) found.push({ key, label, node, top: node.getBoundingClientRect().top });
+    });
+    found.sort((a, b) => a.top - b.top);
+    found.forEach(({ key, label, node }) => {
+      const btn = el("button", "exp-toc-link", nav);
+      btn.type = "button"; btn.dataset.key = key; btn.textContent = label;
+      btn.addEventListener("click", () => {
+        node.scrollIntoView({ behavior: "smooth", block: "start" });
+        setTocActive(key);
+      });
+      node.dataset.tocKey = key;
+      node.classList.add("toc-anchor");
+      tocTargets.push({ key, node });
+    });
+    nav.hidden = tocTargets.length < 3;
+    if (nav.hidden || typeof IntersectionObserver !== "function") return;
+    // 以視窗上方三分之一那條線為準：穿過那條線的區塊就是「目前在看」的
+    tocObserver = new IntersectionObserver(() => {
+      const line = window.innerHeight * 0.33;
+      let best = tocTargets[0], bestTop = -Infinity;
+      tocTargets.forEach(t => {
+        const top = t.node.getBoundingClientRect().top;
+        if (top <= line && top > bestTop) { best = t; bestTop = top; }
+      });
+      if (best) setTocActive(best.key);
+    }, { rootMargin: "-20% 0px -60% 0px", threshold: [0, 1] });
+    tocTargets.forEach(t => tocObserver.observe(t.node));
+    setTocActive(tocTargets[0].key);
+  }
+  function setTocActive(key) {
+    document.querySelectorAll("#exp-toc .exp-toc-link").forEach(b => {
+      const on = b.dataset.key === key;
+      b.classList.toggle("is-active", on);
+      if (on) b.setAttribute("aria-current", "true"); else b.removeAttribute("aria-current");
+    });
   }
 
   function highlightSidebar(id, modId) {
-    document.querySelectorAll(".exp-item.active").forEach(x => x.classList.remove("active"));
+    document.querySelectorAll(".exp-item.active").forEach(x => { x.classList.remove("active"); x.removeAttribute("aria-current"); });
     const item = document.querySelector('.exp-item[data-id="' + CSS.escape(id) + '"]');
     if (item) {
       item.classList.add("active");
+      item.setAttribute("aria-current", "page");
       const mod = item.closest(".module");
-      if (mod && !mod.classList.contains("open")) mod.classList.add("open");
+      if (mod && !mod.classList.contains("open")) setModuleOpen(mod, true);
       /*
        * 側欄捲到目前的實驗。以前直接 scrollIntoView：開實驗的同一個工作裡整頁新內容還沒排版，
        * 它會強制同步排版一次（CPU 節流 4 倍時約 160 ms，是開實驗最貴的一步），
@@ -1757,8 +2028,11 @@
   let dwellTimer = 0;
   let dwellId = null;
 
+  let dwellAbort = null;
   function cancelDwell() {
     if (dwellTimer) { clearTimeout(dwellTimer); dwellTimer = 0; }
+    // 沒觸發的監聽器要跟著拿掉：#sim-root 是同一個元素，每換一個實驗就多掛三個，會一直累積
+    if (dwellAbort) { dwellAbort.abort(); dwellAbort = null; }
     dwellId = null;
   }
 
@@ -1769,9 +2043,15 @@
     // 動手調整任何參數就立刻算數，不必等滿時間。
     const simRoot = $("#sim-root");
     if (!simRoot) return;
-    const onInteract = () => { if (dwellId === id) completeExperiment(id); };
+    /*
+     * 只算「人」的操作（isTrusted）。有些實驗在建置時由程式自己撥滑桿、補發 input 事件
+     * （步進器的初始化、情境預設），以前這些也被當成動手操作：拋體運動一打開就被記成做過，
+     * 用方向鍵掃過去照樣會把進度灌滿。
+     */
+    const onInteract = e => { if (e.isTrusted && dwellId === id) completeExperiment(id); };
+    dwellAbort = typeof AbortController === "function" ? new AbortController() : null;
     ["pointerdown", "input", "change"].forEach(type =>
-      simRoot.addEventListener(type, onInteract, { once: true, passive: true })
+      simRoot.addEventListener(type, onInteract, dwellAbort ? { passive: true, signal: dwellAbort.signal } : { once: true, passive: true })
     );
   }
 
@@ -1798,25 +2078,19 @@
     refreshHomeProgress();
     renderStudyCenter();
   }
-  /* 首頁：模組卡的個人進度＋英雄區的「繼續上次」。第一次來的人看不到後者，不會多一顆用不到的按鈕。 */
+  /* 首頁：目錄的個人進度＋英雄區的「繼續上次」。第一次來的人看到的是「從第一個實驗開始」。 */
   function refreshHomeProgress() {
-    document.querySelectorAll(".mcard[data-mod]").forEach(card => {
-      const mod = C.modules.find(m => m.id === card.dataset.mod);
-      if (!mod) return;
-      const done = mod.experiments.filter(exp => viewed.has(exp.id)).length;
-      const total = mod.experiments.length;
-      const bar = card.querySelector(".mcard-progress i");
-      if (bar) bar.style.width = (total ? done / total * 100 : 0) + "%";
-      const label = card.querySelector(".mcard-done");
-      if (label) label.textContent = done + " / " + total;
-      card.classList.toggle("is-started", done > 0);
-      card.classList.toggle("is-complete", total > 0 && done === total);
-    });
-    const resume = $("#hero-resume");
+    const done = $("#stat-done"); if (done) done.textContent = viewed.size;
+    if ($("#catalog-panel") && $("#catalog-modules .catalog-tab")) {
+      // 首頁開著時才重畫目錄面板；在實驗頁時下一次回首頁（route）會重畫
+      if (currentId == null) selectCatalogModule(pickCatalogModule()); else refreshCatalogCounts();
+    }
+    const resume = $("#hero-resume"), start = $("#hero-start");
     if (resume) {
-      const last = store.get("pl-last-viewed", "");
-      const target = last && byId[last];
+      const target = byId[store.get("pl-last-viewed", "")];
       resume.hidden = !target;
+      // 兩顆主按鈕不同時出現：做過實驗的人看到「繼續上次」，第一次來的人看到「從第一個實驗開始」
+      if (start) start.hidden = !!target;
       if (target) {
         resume.href = "#" + target.exp.id;
         const title = $("#hero-resume-title"); if (title) title.textContent = target.exp.title;
@@ -1824,44 +2098,219 @@
       }
     }
   }
-  function resetProgress() {
-    // 清除後無法復原（除非先匯出存檔），所以先確認一次
-    if (typeof window.confirm === "function" && !window.confirm("確定要清除全部學習進度嗎？建議先「匯出存檔」備份。")) return;
-    viewed = new Set(); store.set("pl-progress", []); localStorage.removeItem("pl-last-viewed");
-    cancelDwell(); refreshViewedMarks();
+
+  /*
+   * 確認對話框：取代 window.confirm。
+   * confirm 會凍結整個分頁，在手機與已安裝的 PWA 裡跳出的是系統視窗（標題還寫著網址），
+   * 也沒辦法把「會刪掉什麼」寫清楚。回傳 Promise<boolean>；Esc 或點背景等於取消。
+   */
+  let confirmState = null;
+  function confirmDialog(opts) {
+    const root = $("#confirm");
+    if (!root) return Promise.resolve(typeof window.confirm === "function" ? window.confirm(opts.title + "\n" + opts.text) : true);
+    if (confirmState) confirmState.finish(false);
+    return new Promise(resolve => {
+      const ok = $("#confirm-ok"), cancel = $("#confirm-cancel");
+      const before = document.activeElement;
+      $("#confirm-title").textContent = opts.title;
+      $("#confirm-text").textContent = opts.text;
+      ok.textContent = opts.confirmLabel || "確定";
+      ok.classList.toggle("danger-solid", !!opts.danger);
+      root.hidden = false;
+      const finish = value => {
+        if (!confirmState) return;
+        confirmState = null;
+        root.hidden = true;
+        ok.removeEventListener("click", onOk); cancel.removeEventListener("click", onCancel);
+        root.querySelector(".confirm-backdrop").removeEventListener("click", onCancel);
+        if (before && before.focus) before.focus();
+        resolve(value);
+      };
+      const onOk = () => finish(true), onCancel = () => finish(false);
+      confirmState = { finish };
+      ok.addEventListener("click", onOk); cancel.addEventListener("click", onCancel);
+      root.querySelector(".confirm-backdrop").addEventListener("click", onCancel);
+      // 預設焦點放在「取消」：不能復原的動作不該按一下 Enter 就發生
+      setTimeout(() => cancel.focus(), 0);
+    });
   }
 
-  /* ------------------------------- 搜尋 ------------------------------- */
-  function runSearch(q) {
-    q = (q || "").trim().toLowerCase();
-    if (!q) { if (location.hash.replace("#", "")) return; showView("home"); return; }
-    const hits = FLAT.filter(f =>
-      f.exp.title.toLowerCase().includes(q) ||
-      f.exp.concept.toLowerCase().includes(q) ||
-      f.mod.title.toLowerCase().includes(q) ||
-      f.exp.points.some(p => p.toLowerCase().includes(q))
-    );
-    const list = $("#sr-list"); list.innerHTML = "";
-    $("#sr-count").textContent = hits.length;
-    if (!hits.length) {
-      // 搜尋字串來自使用者輸入，之前直接串進 innerHTML，等於把輸入當 HTML 執行。
-      const empty = el("div", "empty", list);
-      empty.textContent = "找不到符合「" + q + "」的實驗。";
-    }
-    hits.forEach(f => {
-      const item = el("div", "sr-item", list);
-      item.style.setProperty("--m-color", f.mod.color);
-      const mod = el("div", "sr-mod", item); mod.textContent = "模組" + f.mod.no + " · " + f.mod.title;
-      const title = el("div", "sr-title", item); title.textContent = f.exp.title;
-      const desc = el("div", "sr-desc", item); desc.textContent = f.exp.concept;
-      item.setAttribute("role", "button");
-      item.setAttribute("tabindex", "0");
-      item.addEventListener("click", () => location.hash = "#" + f.exp.id);
-      item.addEventListener("keydown", e => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); location.hash = "#" + f.exp.id; }
+  /*
+   * 重設進度
+   * 以前只清掉「看過的實驗」和「上次看到哪」，但確認視窗寫的是「清除全部學習進度」：
+   * 練習題、章節檢核、預測與挑戰紀錄、記錄表、一句話結論、學習計劃全都還在，
+   * 重設完打開實驗，題目照樣顯示「答對」。現在把這些一起清掉；
+   * 主題、側欄收合、離線下載與自訂實驗室的作品不是學習進度，留著。
+   */
+  const PROGRESS_KEYS = ["pl-progress", "pl-last-viewed", "pl-practice-done", "pl-practice-answers", "pl-study-plan", "pl-seed", "pl-observe-done"];
+  const PROGRESS_PREFIXES = ["pl-checkpoint-", "pl-reflection-", "pl-predict-", "pl-puzzle-", "pl-challenge-", "pl-record-"];
+  function resetProgress() {
+    confirmDialog({
+      title: "清除全部學習進度？",
+      text: "會清掉這台裝置上做過的實驗、練習題與章節檢核的作答、預測與挑戰紀錄、記錄表、一句話結論和學習計劃，而且不能復原。想留一份的話，先按「匯出存檔」。",
+      confirmLabel: "全部清除",
+      danger: true
+    }).then(yes => {
+      if (!yes) return;
+      store.keys("pl-").forEach(key => {
+        if (PROGRESS_KEYS.includes(key) || PROGRESS_PREFIXES.some(prefix => key.indexOf(prefix) === 0)) store.remove(key);
       });
+      viewed = new Set();
+      cancelDwell(); refreshViewedMarks();
+      showSaveStatus("已清除全部學習進度", "warn");
     });
-    showView("search");
+  }
+
+  /* ------------------------------- 搜尋 -------------------------------
+   * 搜尋面板（/ 或 Ctrl+K）蓋在目前畫面上，結果是連結，關掉就回到原本的地方。
+   *
+   * 以前搜尋結果是第三個「畫面」，網址卻沒有跟著變：在實驗頁搜尋之後把字清掉，
+   * 畫面停在舊的結果上，點側欄的同一個實驗也回不去（hash 沒變，不會觸發 hashchange）。
+   *
+   * 比對範圍：標題、模組名稱、概念、學習重點，以及公式的可讀版本（F = ma、T ∝ √L）。
+   * 標題命中排最前面，其次是模組，最後才是內文。
+   */
+  let searchIndex = null;
+  function buildSearchIndex() {
+    if (searchIndex) return searchIndex;
+    searchIndex = FLAT.map(f => ({
+      f,
+      title: f.exp.title.toLowerCase(),
+      mod: (f.mod.title + " 模組" + f.mod.no).toLowerCase(),
+      body: (f.exp.concept + " " + (f.exp.points || []).join(" ") + " " + plainFormula(String(f.exp.formula || "").replace(/<[^>]*>/g, " ").replace(/\\[()[\]]/g, " "))).toLowerCase()
+    }));
+    return searchIndex;
+  }
+  function searchExperiments(query) {
+    const terms = (query || "").toLowerCase().split(/\s+/).filter(Boolean);
+    if (!terms.length) return [];
+    const squash = text => text.replace(/\s+/g, "");
+    const scored = [];
+    buildSearchIndex().forEach(item => {
+      let score = 0;
+      for (const term of terms) {
+        const t = squash(term);
+        if (item.title.includes(term) || squash(item.title).includes(t)) score += item.title.indexOf(term) === 0 ? 120 : 100;
+        else if (item.mod.includes(term)) score += 40;
+        else if (item.body.includes(term) || squash(item.body).includes(t)) score += 10;
+        else return;   // 每個詞都要命中
+      }
+      scored.push({ item, score });
+    });
+    return scored.sort((a, b) => b.score - a.score || a.item.f.order - b.item.f.order).map(x => x.item.f);
+  }
+  /* 把命中的字標起來（用 DOM 節點，不經過 innerHTML：查詢字串是使用者輸入） */
+  function appendHighlighted(parent, text, terms) {
+    const lower = text.toLowerCase();
+    let at = 0;
+    while (at < text.length) {
+      let best = -1, len = 0;
+      terms.forEach(term => { const i = lower.indexOf(term, at); if (i >= 0 && (best < 0 || i < best)) { best = i; len = term.length; } });
+      if (best < 0) break;
+      if (best > at) parent.appendChild(document.createTextNode(text.slice(at, best)));
+      const mark = el("mark", null, parent); mark.textContent = text.slice(best, best + len);
+      at = best + len;
+    }
+    if (at < text.length) parent.appendChild(document.createTextNode(text.slice(at)));
+  }
+  const PALETTE_LIMIT = 40;
+  let paletteActive = -1, paletteReturnFocus = null;
+  function paletteOptions() { return Array.from(document.querySelectorAll("#palette-list .palette-item")); }
+  function setPaletteActive(index, scroll) {
+    const items = paletteOptions();
+    paletteActive = items.length ? Math.max(0, Math.min(items.length - 1, index)) : -1;
+    items.forEach((node, i) => {
+      const on = i === paletteActive;
+      node.classList.toggle("is-active", on);
+      node.setAttribute("aria-selected", String(on));
+      if (on && scroll) node.scrollIntoView({ block: "nearest" });
+    });
+    const input = $("#search-input");
+    if (input) {
+      if (paletteActive >= 0) input.setAttribute("aria-activedescendant", items[paletteActive].id);
+      else input.removeAttribute("aria-activedescendant");
+    }
+  }
+  function addPaletteItem(list, f, terms) {
+    const a = el("a", "palette-item", list);
+    a.href = "#" + f.exp.id;
+    a.id = "palette-opt-" + list.querySelectorAll(".palette-item").length;
+    a.setAttribute("role", "option");
+    a.style.setProperty("--m-color", f.mod.color);
+    const mod = el("span", "palette-mod", a); mod.textContent = "模組" + f.mod.no + " · " + f.mod.title;
+    const title = el("span", "palette-title", a);
+    if (terms && terms.length) appendHighlighted(title, f.exp.title, terms); else title.textContent = f.exp.title;
+    if (viewed.has(f.exp.id)) { const done = el("span", "palette-done", a); done.textContent = "做過"; }
+    const desc = el("span", "palette-desc", a); desc.textContent = f.exp.concept;
+    a.addEventListener("click", () => {
+      // 連結本身會改 hash；點的是「目前這個實驗」時 hash 不變，只要把面板關掉
+      closePalette(false);
+    });
+    a.addEventListener("pointermove", () => { const i = paletteOptions().indexOf(a); if (i !== paletteActive) setPaletteActive(i, false); });
+    return a;
+  }
+  function renderPalette(query) {
+    const list = $("#palette-list"), count = $("#palette-count");
+    if (!list) return;
+    list.innerHTML = "";
+    const q = (query || "").trim();
+    const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!terms.length) {
+      // 還沒打字：給「接著做」的捷徑，面板一打開就有東西可以按
+      const picks = [];
+      const last = byId[store.get("pl-last-viewed", "")];
+      if (last) picks.push(["繼續上次", last]);
+      const next = FLAT.find(f => !viewed.has(f.exp.id) && f !== last);
+      if (next) picks.push(["還沒做過", next]);
+      if (currentId && byId[currentId]) {
+        const after = FLAT[byId[currentId].order + 1];
+        if (after && !picks.some(x => x[1] === after)) picks.push(["下一個實驗", after]);
+      }
+      picks.forEach(([label, f]) => {
+        const group = el("p", "palette-group", list); group.textContent = label;
+        addPaletteItem(list, f, null);
+      });
+      const tip = el("p", "palette-tip", list);
+      tip.textContent = "可以打實驗名稱（單擺、透鏡）、概念（動量守恆）或公式裡的符號（F = ma）。";
+      if (count) count.textContent = "共 " + FLAT.length + " 個實驗";
+      setPaletteActive(picks.length ? 0 : -1, false);
+      return;
+    }
+    const hits = searchExperiments(q);
+    if (!hits.length) {
+      const empty = el("p", "palette-empty", list);
+      empty.textContent = "找不到符合「" + q + "」的實驗。換一個說法試試，或到「全部實驗」逐一瀏覽。";
+      if (count) count.textContent = "找不到結果";
+      setPaletteActive(-1, false);
+      return;
+    }
+    hits.slice(0, PALETTE_LIMIT).forEach(f => addPaletteItem(list, f, terms));
+    if (hits.length > PALETTE_LIMIT) {
+      const more = el("p", "palette-tip", list);
+      more.textContent = "還有 " + (hits.length - PALETTE_LIMIT) + " 筆，多打幾個字可以縮小範圍。";
+    }
+    if (count) count.textContent = "找到 " + hits.length + " 個實驗";
+    setPaletteActive(0, false);
+  }
+  function openPalette(initial) {
+    const root = $("#palette"), input = $("#search-input");
+    if (!root || !input) return;
+    if (root.hidden) paletteReturnFocus = document.activeElement;
+    root.hidden = false;
+    document.body.classList.add("palette-open");
+    const trigger = $("#search-open"); if (trigger) trigger.setAttribute("aria-expanded", "true");
+    if (typeof initial === "string") input.value = initial;
+    renderPalette(input.value);
+    input.focus(); input.select();
+  }
+  function closePalette(restoreFocus) {
+    const root = $("#palette");
+    if (!root || root.hidden) return;
+    root.hidden = true;
+    document.body.classList.remove("palette-open");
+    const trigger = $("#search-open"); if (trigger) trigger.setAttribute("aria-expanded", "false");
+    const back = paletteReturnFocus; paletteReturnFocus = null;
+    if (restoreFocus !== false && back && back.isConnected && back.focus) back.focus();
   }
 
   /* ------------------------------- 視圖切換 ------------------------------- */
@@ -1869,7 +2318,10 @@
     document.documentElement.removeAttribute("data-boot");
     $("#home-view").style.display = name === "home" ? "" : "none";
     $("#exp-view").style.display = name === "exp" ? "" : "none";
-    $("#search-results").style.display = name === "search" ? "" : "none";
+    // 版面依畫面切換：首頁沒有側欄與目錄鈕（首頁自己就有目錄），實驗頁才有
+    const app = document.querySelector(".app");
+    if (app) app.setAttribute("data-view", name);
+    if (name !== "exp") closeSidebarMobile();
     syncStageMode(name);
   }
 
@@ -1890,14 +2342,35 @@
     document.body.classList.toggle("stage-only", on);
     if (!on) { closeStageMenu(); toggleStageChart(false); }
     else arrangeStage();
+    if (on !== was) buildExpToc();
     // 畫布高度依「是否一頁式」計算；切換時讓 sim-core 重新量一次
     if (on !== was) requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
   }
+  /*
+   * 精簡版（demo-mode）跟著「這個分頁是不是教師演示」走，只有這一個來源。
+   *
+   * 以前模式另外記在 localStorage 而且永遠不會自己復原：只要有人按過一次「教師演示版」，
+   * 之後即使離開演示，從目錄、搜尋或「繼續上次」打開的每一個實驗都是沒有預測、挑戰、
+   * 麵包屑的精簡版，要回首頁按「自學完整版」才救得回來（而那顆按鈕會跳到第一個實驗）。
+   * pl-demo-mode 這個鍵留著，只是用來轉告 sim-core（它在建置實驗時讀）。
+   */
+  function syncDemoMode() {
+    const demo = stageFlag();
+    document.body.classList.toggle("demo-mode", demo);
+    store.setRaw("pl-demo-mode", demo ? "1" : "0");
+  }
   function exitStageMode() {
     setStageFlag(false);
+    syncDemoMode();
     closeStageMenu();
     syncStageMode("home");
     location.hash = "";
+  }
+  /* 從實驗頁直接進教師演示（頁首的「教師演示」鈕）：留在同一個實驗，重建成一頁式實驗台 */
+  function presentCurrent() {
+    if (!currentId || !byId[currentId]) return;
+    setStageFlag(true);
+    openExp(currentId);
   }
 
   /*
@@ -2311,8 +2784,15 @@
     } catch (e) {}
   }
 
-  function closeSidebarMobile() { $("#sidebar").classList.remove("open"); $("#scrim").classList.remove("show"); }
-  function toggleSidebar() { $("#sidebar").classList.toggle("open"); $("#scrim").classList.toggle("show"); }
+  function setSidebarDrawer(open) {
+    const side = $("#sidebar"), scrim = $("#scrim"), btn = $("#menu-toggle");
+    if (!side) return;
+    side.classList.toggle("open", open);
+    if (scrim) scrim.classList.toggle("show", open);
+    if (btn) { btn.setAttribute("aria-expanded", String(open)); btn.setAttribute("aria-label", open ? "關閉課程目錄" : "開啟課程目錄"); }
+  }
+  function closeSidebarMobile() { setSidebarDrawer(false); }
+  function toggleSidebar() { setSidebarDrawer(!$("#sidebar").classList.contains("open")); }
 
   /*
    * 對話框的鍵盤焦點鎖定
@@ -2486,13 +2966,25 @@
 
   /* ------------------------------- 路由 ------------------------------- */
   function route() {
-    const id = decodeURIComponent(location.hash.replace(/^#/, ""));
+    closePalette(false);
+    const id = SAFE.hashId(location.hash);
     if (!id || id === "home") {
+      const wasExp = currentId != null;
       setStageFlag(false);
-      showView("home"); document.title = "物理實驗室｜台灣中學互動物理";
+      syncDemoMode();
+      /*
+       * 作廢還在路上的實驗載入：以前慢網路下點了實驗又馬上回首頁，
+       * 檔案抓到之後模擬照樣建在看不見的實驗頁裡，還把 currentSim 指到它。
+       */
+      openToken += 1;
       cancelDwell();
-      if (currentSim && currentSim.stop) { try { currentSim.stop(); } catch (e) {} }
-      currentSim = null; currentId = null; return;
+      stopCurrentSim(); currentId = null;
+      const simRoot = $("#sim-root"); if (simRoot) simRoot.innerHTML = "";
+      showView("home"); document.title = "物理實驗室｜台灣中學互動物理";
+      if (wasExp) { selectCatalogModule(pickCatalogModule()); refreshHomeProgress(); }
+      // 從實驗頁回來要回到頁首；一開站就在首頁時不動（免得打斷瀏覽器還原的捲動位置）
+      if (wasExp && booted) window.scrollTo(0, 0);
+      return;
     }
     const target = byId[id];
     if (!target) { location.hash = ""; return; }
@@ -2513,7 +3005,38 @@
   function startApp() {
     if (initialized) return;
     initialized = true;
-    init();
+    try { init(); } catch (err) { console.error("物理實驗室啟動失敗", err); showBootFailure(err); }
+  }
+
+  /*
+   * 最後一道防線：初始化丟例外時，畫面不能停在空白。
+   * 以前任何一個沒料到的例外（壞掉的存檔、改版後對不上的資料）都會讓首頁只剩頂欄，
+   * 使用者除了自己去清瀏覽器資料之外沒有辦法。這裡給兩條路：重新整理，或清掉這個網站
+   * 存在這台裝置上的資料（先提供匯出，免得進度白白沒了）。
+   */
+  function showBootFailure(err) {
+    document.documentElement.removeAttribute("data-boot");
+    const main = $("#main-content") || document.body;
+    const app = document.querySelector(".app"); if (app) app.setAttribute("data-view", "error");
+    main.querySelectorAll("#home-view, #exp-view").forEach(n => { n.style.display = "none"; });
+    const box = el("section", "boot-failure", main);
+    box.setAttribute("role", "alert");
+    const h = el("h1", null, box); h.textContent = "網站沒有順利啟動";
+    const p1 = el("p", null, box);
+    p1.textContent = "多半是這台裝置上存的學習資料和新版對不上。先試重新整理；還是一樣的話，把存檔匯出備份，再清除這台裝置上的資料。";
+    const detail = el("p", "boot-failure-detail", box);
+    detail.textContent = "錯誤訊息：" + String((err && err.message) || err).slice(0, 200);
+    const actions = el("div", "study-card-actions", box);
+    const reload = el("button", "study-btn primary", actions); reload.type = "button"; reload.textContent = "重新整理";
+    reload.addEventListener("click", () => location.reload());
+    const save = el("button", "study-btn", actions); save.type = "button"; save.textContent = "匯出存檔";
+    save.addEventListener("click", () => { try { exportLearningSave(); } catch (e) { console.error(e); } });
+    const wipe = el("button", "study-btn danger", actions); wipe.type = "button"; wipe.textContent = "清除這台裝置上的資料";
+    wipe.addEventListener("click", () => {
+      store.keys("pl-").forEach(key => store.remove(key));
+      location.hash = "";
+      location.reload();
+    });
   }
 
   /* ---------------------------------------------------------------------
@@ -2542,7 +3065,7 @@
         return;
       }
       status.textContent = navigator.onLine
-        ? "基本內容已可離線使用。按下方按鈕可把全部 " + FLAT.length + " 個實驗與公式排版一次存起來（約 1.2 MB），之後沒有網路也能開。"
+        ? "基本內容已可離線使用。按下方按鈕可把全部 " + FLAT.length + " 個實驗、關卡挑戰版、自訂實驗室與公式排版一次存起來（約 1.3 MB），之後沒有網路也能開。"
         : "目前沒有網路連線。已經看過的實驗仍可正常開啟。";
     }
     describe();
@@ -2638,9 +3161,14 @@
     }
     $("#menu-toggle").addEventListener("click", toggleSidebar);
     $("#scrim").addEventListener("click", closeSidebarMobile);
-    $("#brand-home").addEventListener("click", () => location.hash = "");
+    // 品牌連結（href="#home"）：已經在首頁時 hash 不變，自己捲回頁首
+    $("#brand-home").addEventListener("click", () => { if (currentId == null) window.scrollTo({ top: 0, behavior: "smooth" }); });
+    // 側欄的實驗是連結：點「目前這個實驗」時 hash 不變、不會換頁，手機上至少要把抽屜收起來
+    $("#module-list").addEventListener("click", e => { if (e.target.closest && e.target.closest(".exp-item")) closeSidebarMobile(); });
     const stageExit = $("#stage-exit");
     if (stageExit) stageExit.addEventListener("click", exitStageMode);
+    const present = $("#exp-present");
+    if (present) present.addEventListener("click", presentCurrent);
     const stagePicker = $("#stage-picker");
     if (stagePicker) stagePicker.addEventListener("click", toggleStageMenu);
     const stagePrev = $("#stage-prev"); if (stagePrev) stagePrev.addEventListener("click", () => stepStage(-1));
@@ -2672,10 +3200,8 @@
      * 先把模式寫進 localStorage 並套到 body，再導向第一個實驗；之後進任何實驗都維持這個模式。
      */
     function enterWithMode(demo) {
-      document.body.classList.toggle("demo-mode", demo);
-      store.set("pl-demo-mode-flag", demo);   // 給 app 端記錄；sim-core 讀的是原始鍵
-      try { localStorage.setItem("pl-demo-mode", demo ? "1" : "0"); } catch (e) {}
       setStageFlag(demo);   // 教師演示版＝純實驗台；自學完整版維持原本完整介面
+      syncDemoMode();
       const last = store.get("pl-last-viewed", "");
       location.hash = "#" + (demo && last && byId[last] ? last : FLAT[0].exp.id);
       // 老師要先挑今天要演示的實驗：進場直接把選單打開
@@ -2685,7 +3211,10 @@
     if (teacherBtn) teacherBtn.addEventListener("click", () => enterWithMode(true));
     const studentBtn = $("#enter-student");
     if (studentBtn) studentBtn.addEventListener("click", () => enterWithMode(false));
-    $("#hero-browse").addEventListener("click", () => ($(".module-section") || $("#module-grid")).scrollIntoView({ behavior: "smooth", block: "start" }));
+    $("#hero-browse").addEventListener("click", () => {
+      const sec = $("#catalog");
+      if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
     $("#btn-reset").addEventListener("click", resetProgress);
     $("#home-export-save").addEventListener("click", exportLearningSave);
     $("#home-import-save").addEventListener("click", () => $("#import-save-file").click());
@@ -2693,23 +3222,47 @@
       importLearningSave(event.target.files && event.target.files[0]);
       event.target.value = "";
     });
-    $("#plan-days").addEventListener("change", () => syncPlanControls(store.get(STUDY_PLAN_KEY, null)));
+    $("#plan-days").addEventListener("change", onPlanDaysChange);
     $("#btn-create-plan").addEventListener("click", createStudyPlan);
     $("#btn-clear-plan").addEventListener("click", clearStudyPlan);
     $("#btn-next-unseen").addEventListener("click", goNextUnseen);
 
-    // 每個按鍵都掃 237 筆實驗會讓打字卡頓，改成停手後才搜尋。
+    // 搜尋面板：頂欄的搜尋列、首頁的按鈕、鍵盤（/、Ctrl+K）都開同一個
     const search = $("#search-input");
-    let searchTimer = 0;
-    search.addEventListener("input", () => {
-      clearTimeout(searchTimer);
-      searchTimer = setTimeout(() => runSearch(search.value), 140);
-    });
-    search.addEventListener("keydown", e => {
-      if (e.key === "Escape") { search.value = ""; runSearch(""); search.blur(); }
-    });
+    const searchOpen = $("#search-open");
+    if (searchOpen) { searchOpen.setAttribute("aria-expanded", "false"); searchOpen.addEventListener("click", () => openPalette()); }
+    if (search) {
+      // 226 筆、每筆只比對預先組好的小寫字串，逐鍵搜尋不到 1 ms，不需要延遲；
+      // 但選字中（isComposing）先不搜，免得注音打到一半結果一直跳
+      search.addEventListener("input", e => { if (!e.isComposing) renderPalette(search.value); });
+      search.addEventListener("compositionend", () => renderPalette(search.value));
+    }
+    const paletteBackdrop = $("#palette-backdrop"); if (paletteBackdrop) paletteBackdrop.addEventListener("click", () => closePalette());
+    const paletteClose = $("#palette-close"); if (paletteClose) paletteClose.addEventListener("click", () => closePalette());
 
     document.addEventListener("keydown", e => {
+      // 對話框由上而下：確認框 → 搜尋面板 → 章節檢核。開著的那一個吃掉按鍵，後面的畫面不反應。
+      if (confirmState) {
+        if (e.key === "Escape") { e.preventDefault(); confirmState.finish(false); }
+        trapFocus($("#confirm-panel"), e);
+        return;
+      }
+      const palette = $("#palette");
+      if (palette && !palette.hidden) {
+        if (e.key === "Escape") { e.preventDefault(); closePalette(); }
+        else if (e.key === "ArrowDown") { e.preventDefault(); setPaletteActive(paletteActive + 1, true); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); setPaletteActive(paletteActive - 1, true); }
+        else if (e.key === "Enter" && !e.isComposing) {
+          // 注音／倉頡選字時的 Enter 是「確定這個字」，不是「開啟第一筆結果」
+          const pick = paletteOptions()[paletteActive];
+          if (pick) { e.preventDefault(); pick.click(); }
+        }
+        trapFocus(palette.querySelector(".palette-panel"), e);
+        return;
+      }
+      if (e.key.toLowerCase() === "k" && (e.ctrlKey || e.metaKey) && !e.repeat && !checkpointState && !document.body.classList.contains("stage-only")) {
+        e.preventDefault(); openPalette(); return;
+      }
       if (checkpointState) {
         if (e.key === "Escape") leaveCheckpoint();
         trapFocus($("#checkpoint-panel"), e);
@@ -2743,8 +3296,10 @@
       const onWidget = e.defaultPrevented || !!(e.target.closest && e.target.closest('button, a[href], summary, tr[tabindex], [role="button"], [role="radio"], [role="tab"], [role="checkbox"], [role="switch"], [role="slider"], [role="link"], [contenteditable="true"]'));
       if (currentId && $("#exp-view").style.display !== "none") {
         const f = byId[currentId];
-        if (!onWidget && e.key === "ArrowRight" && FLAT[f.order + 1]) { location.hash = "#" + FLAT[f.order + 1].exp.id; }
-        if (!onWidget && e.key === "ArrowLeft" && FLAT[f.order - 1]) { location.hash = "#" + FLAT[f.order - 1].exp.id; }
+        // 按著修飾鍵的方向鍵是瀏覽器或系統的（Alt+← 上一頁、⌘+← 行首），不能拿來換實驗
+        const plain = !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey;
+        if (plain && !onWidget && f && e.key === "ArrowRight" && FLAT[f.order + 1]) { location.hash = "#" + FLAT[f.order + 1].exp.id; }
+        if (plain && !onWidget && f && e.key === "ArrowLeft" && FLAT[f.order - 1]) { location.hash = "#" + FLAT[f.order - 1].exp.id; }
         // 空白鍵＝播放／暫停（PhET 慣例）：雙手留在鍵盤上就能推進 demo
         if (!onWidget && e.key === " " && !e.repeat) {
           const playBtn = document.querySelector(".sim-transport-play");
@@ -2760,12 +3315,8 @@
           if (stepBtn && !stepBtn.hidden && !stepBtn.disabled) { e.preventDefault(); stepBtn.click(); }
         }
       }
-      // 「/」聚焦搜尋：從任何地方一鍵找實驗
-      if ((e.key === "/" || (e.key.toLowerCase() === "k" && (e.ctrlKey || e.metaKey))) && !e.repeat) {
-        e.preventDefault();
-        const search = $("#search-input");
-        if (search) { search.focus(); search.select(); }
-      }
+      // 「/」開搜尋面板：從任何地方一鍵找實驗（Ctrl／⌘+K 在上面處理，輸入框裡也有效）
+      if (e.key === "/" && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); openPalette(); }
       if (e.key === "Escape") closeSidebarMobile();
     });
 
@@ -2785,15 +3336,6 @@
     window.addEventListener("hashchange", route);
     route();
     booted = true;
-
-    // 版本連線時間
-    const clock = $("#clock");
-    if (clock) {
-      // 分頁在背景、或手機版（頂列的時鐘藥丸本來就隱藏）時不更新：每秒格式化時間也是一筆開銷
-      const narrow = window.matchMedia ? window.matchMedia("(max-width: 600px)") : { matches: false };
-      const tick = () => { if (document.hidden || narrow.matches) return; const d = new Date(); clock.textContent = d.toLocaleTimeString("zh-TW", { hour12: false }); };
-      tick(); setInterval(tick, 1000);
-    }
 
     // PWA
     if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
@@ -2833,7 +3375,7 @@
    * 慢速網路下實驗台多等將近一秒。loadScript 有去重，之後 openExp 用的是同一批下載。
    */
   (function () {
-    const early = decodeURIComponent(location.hash.replace(/^#/, ""));
+    const early = SAFE.hashId(location.hash);
     if (early && byId[early]) ensureExperiment(early).catch(() => {});
   })();
 

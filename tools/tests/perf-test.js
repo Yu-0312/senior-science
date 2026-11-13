@@ -41,10 +41,20 @@ const eagerGz = eager.reduce((s, p) => s + gzipSize(p), 0) + gzipSize("css/style
  * 2026-10 收緊到 215 KB：sim-tools／sim-insight／teaching-notes／sim-a11y 只掛實驗建置的鉤子，
  * 改由 app.js 的 ensureApparatus() 在第一次開實驗前載入，首次載入由約 239 KB 降到約 199 KB。
  * 上限收緊，免得省下來的流量又被慢慢吃回去。
+ *
+ * 2026-11 收緊到 190 KB：模擬引擎 sim-core.js（gzip 45 KB）也改成第一次開實驗前才載
+ * （app.js 的 ensureEngine），同時首頁改版多了搜尋面板與課程目錄。合計由約 211 KB 降到約 182 KB。
  */
 R.section("首次載入（以壓縮後為準）");
-R.ok(eagerGz < 215 * 1024, "首次載入 gzip " + kb(eagerGz) + "（上限 215 KB）",
+R.ok(eagerGz < 190 * 1024, "首次載入 gzip " + kb(eagerGz) + "（上限 190 KB）",
   "原始 " + kb(eagerRaw) + "，" + eager.length + " 支腳本 + style.css + index.html");
+R.ok(eager.indexOf("js/sim-core.js") < 0, "模擬引擎不在首次載入之列（首頁不跑模擬）");
+{
+  // 引擎延後載入之後，app.js 啟動時不可以直接用 window.PhysicsLab：首頁上它是 undefined
+  const appSrc = fs.readFileSync("js/app.js", "utf8");
+  R.ok(!/const PL = window\.PhysicsLab;/.test(appSrc) && /function ensureEngine\(/.test(appSrc),
+    "app.js 透過 ensureEngine() 取用引擎，不在啟動時就抓 window.PhysicsLab");
+}
 
 const expDir = "js/experiments";
 const expFiles = fs.readdirSync(expDir).filter(f => f.endsWith(".js"));
