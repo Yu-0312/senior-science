@@ -285,13 +285,13 @@ ${OG_IMAGE ? `<meta property="og:image" content="${escapeHtml(OG_IMAGE)}" />
     // 從搜尋結果進說明頁是深色、點進互動版又變亮色，像是兩個不同的網站）
     if (saved !== "light" && saved !== "dark") saved = "light";
     document.documentElement.setAttribute("data-theme", saved);
-  } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+  } catch (e) { document.documentElement.setAttribute("data-theme", "light"); }
 })();
 </script>
 ${o.jsonLd ? '<script type="application/ld+json">' + JSON.stringify(o.jsonLd) + "</script>\n" : ""}</head>
 <body class="static-page">
 <header class="license-topbar">
-  <a class="license-home" href="${o.base}index.html"><span class="license-home-mark" aria-hidden="true">PH</span>物理實驗室</a>
+  <a class="license-home" href="${o.base}index.html"><span class="license-home-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.8 10.8h18.4M4.4 10.8v1.6h15.2v-1.6M5.8 12.4v6.8M18.2 12.4v6.8M5.8 16h12.4M10.1 10.8V8.1l-1.75 2.7M11.7 10.8V8.1M9.65 8.1h1.2M14.2 10.8V9h3.2v1.8"/></svg></span>物理實驗室</a>
   <div class="license-topbar-actions">
     <a class="license-toplink" href="${o.base}experiments.html">全部實驗</a>
     <a class="license-toplink" href="${o.base}licensing.html">授權</a>

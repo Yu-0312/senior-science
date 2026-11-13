@@ -32,26 +32,25 @@
   <meta name="theme-color" content="#080b11" media="(prefers-color-scheme: dark)" />
   <meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)" />
   <meta name="color-scheme" content="dark light" />
-  <link rel="stylesheet" href="css/style.css?v=20261112-2027" />
+  <link rel="stylesheet" href="css/style.css?v=20261113-2220" />
   <!-- 授權頁原本沒有套用主題，從淺色模式的實驗室點進來會突然變成深色。
        在樣式套用前先同步主題，順便避免閃爍。 -->
   <script>
     (function () {
       try {
         var saved = JSON.parse(localStorage.getItem("pl-theme"));
-        if (saved !== "light" && saved !== "dark") {
-          saved = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-        }
+        // 沒選過主題的人一律亮色，和首頁同一套規則（以前這一頁跟著作業系統走，從首頁點進來會突然變黑）
+        if (saved !== "light" && saved !== "dark") saved = "light";
         document.documentElement.setAttribute("data-theme", saved);
       } catch (e) {
-        document.documentElement.setAttribute("data-theme", "dark");
+        document.documentElement.setAttribute("data-theme", "light");
       }
     })();
   </script>
 </head>
 <body>
   <header class="license-topbar">
-    <a class="license-home" href="index.html"><span class="license-home-mark" aria-hidden="true">PH</span>物理實驗室</a>
+    <a class="license-home" href="index.html"><span class="license-home-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.8 10.8h18.4M4.4 10.8v1.6h15.2v-1.6M5.8 12.4v6.8M18.2 12.4v6.8M5.8 16h12.4M10.1 10.8V8.1l-1.75 2.7M11.7 10.8V8.1M9.65 8.1h1.2M14.2 10.8V9h3.2v1.8"/></svg></span>物理實驗室</a>
     <div class="license-topbar-actions">
       <button class="icon-btn" id="license-theme-toggle" type="button" aria-label="切換主題"></button>
       <a class="license-toplink" href="index.html">回到實驗室</a>
