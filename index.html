@@ -23,7 +23,7 @@
       if (h && h !== "home") {
         document.documentElement.setAttribute("data-boot", "exp");
         var pre = document.createElement("link");
-        pre.rel = "preload"; pre.as = "script"; pre.href = "js/sim-core.js?v=20261113-2220";
+        pre.rel = "preload"; pre.as = "script"; pre.href = "js/sim-core.js?v=20261114-0944";
         document.head.appendChild(pre);
       }
     })();
@@ -55,8 +55,8 @@
 
   <!-- PWA -->
   <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20261113-2220" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png?v=20261113-2220" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20261114-0944" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png?v=20261114-0944" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="物理實驗室" />
@@ -74,7 +74,7 @@
   -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Serif+TC:wght@700;900&display=swap" crossorigin media="print" onload="this.media='all'" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Serif+TC:wght@700;900&display=swap" crossorigin /></noscript>
-  <link rel="stylesheet" href="css/style.css?v=20261113-2220" />
+  <link rel="stylesheet" href="css/style.css?v=20261114-0944" />
 
   <!-- MathJax（LaTeX 公式排版） -->
   <script>
@@ -413,7 +413,11 @@
             <div class="section-label" id="openness-title" data-sec="04">關於這個專案</div>
             <div class="hero-highlight" role="note" aria-label="設計理念">
               <span class="hero-highlight-k" aria-hidden="true">NOTE</span>
-              <p><b>結論是量出來的，不是寫死的。</b>單擺的 <span class="nowrap">\(T \propto \sqrt{L}\)</span>、振幅不影響週期，雙狹縫的 <span class="nowrap">\(\Delta x \propto \lambda L / d\)</span>，都是程式實際調參數、跑模型量出來的。</p>
+              <!--
+                這兩條關係直接寫成文字，不經過 MathJax：首頁沒有任何地方會觸發排版
+                （MathJax 是開實驗時才載的），以前第一次進站的人在這裡看到的是 \(T \propto \sqrt{L}\) 的原始碼。
+              -->
+              <p><b>結論是量出來的，不是寫死的。</b>單擺的 <span class="nowrap formula-inline">T ∝ √L</span>、振幅不影響週期，雙狹縫的 <span class="nowrap formula-inline">Δx ∝ λL / d</span>，都是程式實際調參數、跑模型量出來的。</p>
             </div>
             <div class="openness-grid">
               <article class="openness-card">
@@ -586,15 +590,15 @@
   </section>
 
   <!-- 核心 -->
-  <script src="js/site-config.js?v=20261113-2220"></script>
-  <script src="js/safe.js?v=20261113-2220"></script>
-  <script src="js/curriculum.js?v=20261113-2220"></script>
-  <script src="js/advanced-curriculum.js?v=20261113-2220"></script>
-  <script src="js/comprehensive-curriculum.js?v=20261113-2220"></script>
-  <script src="js/extension-registry.js?v=20261113-2220"></script>
-  <script src="js/open-curriculum.js?v=20261113-2220"></script>
-  <script src="js/school-curriculum.js?v=20261113-2220"></script>
-  <script src="js/exam-curriculum.js?v=20261113-2220"></script>
+  <script src="js/site-config.js?v=20261114-0944"></script>
+  <script src="js/safe.js?v=20261114-0944"></script>
+  <script src="js/curriculum.js?v=20261114-0944"></script>
+  <script src="js/advanced-curriculum.js?v=20261114-0944"></script>
+  <script src="js/comprehensive-curriculum.js?v=20261114-0944"></script>
+  <script src="js/extension-registry.js?v=20261114-0944"></script>
+  <script src="js/open-curriculum.js?v=20261114-0944"></script>
+  <script src="js/school-curriculum.js?v=20261114-0944"></script>
+  <script src="js/exam-curriculum.js?v=20261114-0944"></script>
   <!--
     模擬引擎（sim-core.js，gzip 45 KB）不在這裡載入：首頁不跑任何模擬。
     app.js 在第一次開實驗前才載（ensureEngine），和量測工具、器材層、實驗檔一起平行下載、依序執行。
@@ -602,9 +606,9 @@
   -->
 
   <!-- 實驗程式延遲載入：只掛對應表，開啟實驗時才抓對應的檔案 -->
-  <script src="js/experiment-manifest.js?v=20261113-2220"></script>
+  <script src="js/experiment-manifest.js?v=20261114-0944"></script>
 
   <!-- 應用外殼 -->
-  <script src="js/app.js?v=20261113-2220"></script>
+  <script src="js/app.js?v=20261114-0944"></script>
 </body>
 </html>

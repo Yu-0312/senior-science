@@ -268,6 +268,8 @@ const section = t => console.log("\n=== " + t + " ===");
     }));
     ok(cat.selected === "newton" && cat.links, "首頁目錄用方向鍵換模組，實驗都是連結", cat.title);
     ok(cat.sidebar === "none", "首頁不放側欄（目錄只有一份）");
+    // 首頁不會觸發 MathJax：上面不可以留著 \\( … \\) 這種要等排版的原始碼
+    ok(await p.evaluate(() => !/\\\(|\\\[/.test(document.querySelector("#home-view").innerText)), "首頁沒有未排版的公式原始碼");
     await p.context().close();
   }
 

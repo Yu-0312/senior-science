@@ -4,7 +4,7 @@
  * 之前的寫法把版本號分別寫死在 index.html 與這份清單裡，兩邊很容易對不起來；
  * 一旦不同步，預先快取的就是永遠不會被請求到的網址，等於白做一次下載。
  */
-const BUILD = "20261113-2220";
+const BUILD = "20261114-0944";
 const CACHE = "physics-lab-" + BUILD;
 /*
  * 第三方資源（釘死版本的 MathJax、Google Fonts）另放一個不隨 BUILD 清掉的快取。
