@@ -43,7 +43,7 @@ const eagerGz = eager.reduce((s, p) => s + gzipSize(p), 0) + gzipSize("css/style
  * 上限收緊，免得省下來的流量又被慢慢吃回去。
  *
  * 2026-11 收緊到 190 KB：模擬引擎 sim-core.js（gzip 45 KB）也改成第一次開實驗前才載
- * （app.js 的 ensureEngine），同時首頁改版多了搜尋面板與課程目錄。合計由約 211 KB 降到約 182 KB。
+ * （app.js 的 ensureEngine），同時首頁改版多了搜尋面板與課程目錄。合計由約 211 KB 降到約 183 KB。
  */
 R.section("首次載入（以壓縮後為準）");
 R.ok(eagerGz < 190 * 1024, "首次載入 gzip " + kb(eagerGz) + "（上限 190 KB）",
