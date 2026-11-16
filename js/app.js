@@ -275,6 +275,17 @@
    */
   let updatePending = false;
 
+  /* 先下載、不執行。同一個網址只提示一次；已經載過（或正在載）的不必再提示 */
+  const preloaded = new Set();
+  function preloadScript(src) {
+    if (preloaded.has(src) || loadedFiles.has(src) || updatePending) return;
+    preloaded.add(src);
+    const link = document.createElement("link");
+    link.rel = "preload"; link.as = "script"; link.href = src;
+    // 抓不到就把提示拿掉，之後真的要載入時由 loadScript 重新抓、並處理失敗
+    link.onerror = () => { preloaded.delete(src); link.remove(); };
+    document.head.appendChild(link);
+  }
   function loadScript(src) {
     if (loadedFiles.has(src)) return loadedFiles.get(src);
     if (updatePending) { location.reload(); return new Promise(() => {}); }
@@ -364,6 +375,12 @@
     const file = EXPERIMENT_FILES[id];
     const has = () => !!(engine() && engine().has(id));
     if (!has() && !file) return Promise.resolve("missing");
+    /*
+     * 實驗檔和引擎一起下載。實驗檔要等引擎執行完才能執行（它呼叫 PhysicsLab.register），
+     * 以前因此等引擎八支檔案全部到齊才開始抓，白白多等一趟來回（慢速 4G 上約 0.2–0.3 秒）。
+     * 用 preload 先把檔案抓下來但不執行；等一下 loadScript 用同一個網址，直接拿到這份。
+     */
+    if (!has() && file && !(engine() && engine().apparatus)) preloadScript(versioned("js/experiments/" + file));
     return ensureEngine().then(ok => {
       if (!ok) return "failed";
       if (has()) return "ready";
@@ -769,7 +786,8 @@
       const count = tab.querySelector(".catalog-tab-count");
       if (count) count.textContent = done + "/" + m.experiments.length;
       tab.classList.toggle("is-complete", done === m.experiments.length);
-      tab.setAttribute("aria-label", m.title + "，做過 " + done + " / " + m.experiments.length + " 個實驗");
+      // 不另設 aria-label：名稱直接取看得到的字（模組名稱＋進度），語音控制照著畫面念才叫得到（WCAG 2.5.3）
+      tab.title = "做過 " + done + " / " + m.experiments.length + " 個實驗";
     });
   }
   /* 從別的地方（麵包屑、複習清單）跳到首頁目錄的某個模組 */
@@ -1759,9 +1777,37 @@
     if (currentSim && currentSim.stop) { try { currentSim.stop(); } catch (e) {} }
     currentSim = null;
   }
+  /*
+   * 每開一個實驗就換一個全新的 #sim-root，舊的整個丟掉。
+   *
+   * 以前一直重用同一個節點、只把內容清空。但引擎和各個附加模組（觀察提問、記錄表、版面平衡）
+   * 都把監聽器、ResizeObserver、輪詢計時器掛在 root 上，並用 root.isConnected 判斷「這個實驗還在不在」——
+   * root 永遠連在頁面上，所以它們永遠不會收：
+   *   · 連開 30 個實驗，每一輪多留 8,800 個節點、1,900 個監聽器，舊實驗每 300 ms 的輪詢照跑；
+   *   · 開過 30 個實驗之後，暫停中拉一次滑桿要 198 ms（剛開站是 41 ms）：前面每個實驗都跟著重畫；
+   *   · 晚到的計時器（記錄表最多等 2 秒才建）同樣擋不住，程式上沒有東西阻止它把舊實驗的面板塞進新實驗。
+   * 引擎那邊另外有一道保險（每次建置一個 AbortController，見 sim-core.js 的 register）；
+   * 這裡負責讓「舊 root 已經不在頁面上」這件事成立，舊程式抓著的參考全部落空。
+   */
+  function freshSimRoot() {
+    const old = $("#sim-root");
+    if (!old || !old.parentNode) return old;
+    // 建到一半就失敗的實驗沒有 api.stop 可以呼叫，由 root 上的 signal 收尾
+    if (old._plAbort) { try { old._plAbort.abort(); } catch (e) {} }
+    const next = document.createElement("div");
+    next.id = "sim-root";
+    old.parentNode.replaceChild(next, old);
+    return next;
+  }
   function openExp(id) {
     const f = byId[id];
     if (!f) { location.hash = ""; return; }
+    /*
+     * 回到頁首，而且放在最前面做：這時畫面還沒被動過，瀏覽器不必為了算捲動範圍重新排版。
+     * 以前放在函式最後，整頁內容剛換完就設捲動位置，等於強迫同步排版一次
+     * （CPU 節流 4 倍時約 100 ms，是開實驗第二貴的一步）。剛載入網址時本來就在頁首，不必動。
+     */
+    if (booted) { const main = $(".main"); if (main && main.scrollTop) main.scrollTop = 0; window.scrollTo(0, 0); }
     stopCurrentSim(); currentId = id;
     syncDemoMode();   // 一定在建置實驗之前：sim-core 建置時才讀模式
     const { exp, mod } = f;
@@ -1780,7 +1826,15 @@
      * 標題與說明要等淡入跑完才算「畫出來」，最大內容繪製（LCP）平白慢了 0.3–0.4 秒。
      */
     const firstOpen = !booted;
-    if (!firstOpen) { view.classList.remove("fade-in"); void view.offsetWidth; view.classList.add("fade-in"); }
+    /*
+     * 重播淡入：在兩個內容相同、名字不同的動畫之間輪流換（.fade-in ↔ .fade-in-alt），動畫名稱一變就會重新播。
+     * 以前是「拿掉 class → 讀 offsetWidth → 加回去」，中間那次讀取會強迫整頁同步排版。
+     */
+    if (!firstOpen) {
+      const alt = view.classList.contains("fade-in");
+      view.classList.toggle("fade-in", !alt);
+      view.classList.toggle("fade-in-alt", alt);
+    }
 
     // 頁首：麵包屑是真的連結（回首頁、回這個模組的目錄），不再只是一行字
     const crumb = $("#exp-crumb");
@@ -1818,7 +1872,7 @@
      * 期間使用者若已經切到別的實驗（openToken 改變），就放棄這次建置，
      * 避免慢的網路下舊實驗蓋掉新實驗。
      */
-    const simRoot = $("#sim-root");
+    const simRoot = freshSimRoot();
     const token = ++openToken;
     const mount = () => {
       simRoot.innerHTML = "";
@@ -1837,21 +1891,28 @@
           console.error("模擬載入失敗：" + exp.id, err);
           showSimProblem(simRoot, "crashed", mount);
         }
-        buildExpToc();
-        setTimeout(buildExpToc, 60);     // 預測、記錄表這些區塊由鉤子晚一拍才插入
+        scheduleExpToc();
+        setTimeout(scheduleExpToc, 60);  // 預測、記錄表這些區塊由鉤子晚一拍才插入
         prefetchNeighbours(f.order);
       });
     };
     mount();
-    buildExpToc();
+    // 本頁導覽那一列先把位置佔住（免得內容晚一格被往下推），內容等畫面排好再填
+    const toc = $("#exp-toc");
+    if (toc) toc.hidden = document.body.classList.contains("stage-only");
+    scheduleExpToc();
 
     // 教材：公式與重點
     $("#guide-concept").textContent = exp.concept;
     $("#guide-formula").innerHTML = exp.formula;
     const ul = $("#guide-points"); ul.innerHTML = "";
     exp.points.forEach(p => { const li = el("li", null, ul); li.textContent = p; });
-    // 題目練習要等題庫就緒；換頁競爭用與模擬同一個 token 擋掉
-    ensureQuestionBank().then(() => {
+    /*
+     * 題目練習要等題庫就緒；換頁競爭用與模擬同一個 token 擋掉。
+     * 題庫排在模擬的程式後面抓：它在頁面下方，卻有 37 KB，以前和引擎同時下載，
+     * 慢速連線上會把實驗台出現的時間往後推約 0.2 秒。
+     */
+    ensureExperiment(exp.id).then(() => ensureQuestionBank()).then(() => {
       if (token !== openToken) return;
       renderPractice(f);
     });
@@ -1892,8 +1953,6 @@
     markVisited(id);
     highlightSidebar(id, mod.id);
     updateStageBar(id);
-    // 回到頁首。剛載入網址時本來就在頁首；設 scrollTop 會強制整頁同步排版，省下這一次
-    if (!firstOpen) { $(".main").scrollTop = 0; window.scrollTo(0, 0); }
     document.title = exp.title + "｜物理實驗室";
   }
 
@@ -1942,14 +2001,35 @@
     ["output", "課本銜接", "#learning-output"]
   ];
   let tocObserver = null, tocTargets = [];
+  /* 回首頁時把目錄的觀察器收掉：它觀察的區塊都在舊實驗裡，留著只會抓住整棵舊畫面不放 */
+  function clearExpToc() {
+    if (tocObserver) { tocObserver.disconnect(); tocObserver = null; }
+    tocTargets = [];
+    cancelAnimationFrame(tocRaf); clearTimeout(tocTimer); tocRaf = tocTimer = 0;
+    const nav = $("#exp-toc"); if (nav) nav.innerHTML = "";
+  }
+  /*
+   * 目錄要量每個區塊在畫面上的位置。換實驗的同一個工作裡整頁內容剛被改過，
+   * 這時去量會強迫瀏覽器當場排版，而且開一次實驗量了三次（CPU 節流 4 倍時合計約 190 ms）。
+   * 改成等瀏覽器自己把這一格畫完再量：那時版面是現成的，量測幾乎不花時間；同一格內的多次要求併成一次。
+   */
+  let tocRaf = 0, tocTimer = 0;
+  function scheduleExpToc() {
+    if (tocRaf || tocTimer) return;
+    tocRaf = requestAnimationFrame(() => {
+      tocRaf = 0;
+      tocTimer = setTimeout(() => { tocTimer = 0; buildExpToc(); }, 0);
+    });
+  }
   function buildExpToc() {
     const nav = $("#exp-toc");
     if (!nav) return;
-    if (tocObserver) { tocObserver.disconnect(); tocObserver = null; }
-    nav.innerHTML = "";
-    tocTargets = [];
     // 教師演示版是一頁式實驗台，沒有往下的內容
-    if (document.body.classList.contains("stage-only")) { nav.hidden = true; return; }
+    if (document.body.classList.contains("stage-only") || $("#exp-view").style.display === "none") {
+      if (tocObserver) { tocObserver.disconnect(); tocObserver = null; }
+      nav.innerHTML = ""; tocTargets = []; nav.hidden = true;
+      return;
+    }
     /*
      * 依「畫面上由上到下」排，不是依上面清單的順序：實驗台用 grid 排版，
      * 各區塊在畫面上的先後和 DOM 順序不同，寬螢幕與手機也不一樣。
@@ -1960,6 +2040,12 @@
       if (node) found.push({ key, label, node, top: node.getBoundingClientRect().top });
     });
     found.sort((a, b) => a.top - b.top);
+    // 和現在這一列完全一樣（同樣的區塊、同樣的節點）就不重建，目前標示的那一格也不會閃一下
+    if (!nav.hidden && found.length === tocTargets.length && nav.children.length === found.length &&
+        found.every((x, i) => tocTargets[i].key === x.key && tocTargets[i].node === x.node)) return;
+    if (tocObserver) { tocObserver.disconnect(); tocObserver = null; }
+    nav.innerHTML = "";
+    tocTargets = [];
     found.forEach(({ key, label, node }) => {
       const btn = el("button", "exp-toc-link", nav);
       btn.type = "button"; btn.dataset.key = key; btn.textContent = label;
@@ -2979,7 +3065,8 @@
       openToken += 1;
       cancelDwell();
       stopCurrentSim(); currentId = null;
-      const simRoot = $("#sim-root"); if (simRoot) simRoot.innerHTML = "";
+      freshSimRoot();
+      clearExpToc();
       showView("home"); document.title = "物理實驗室｜台灣中學互動物理";
       if (wasExp) { selectCatalogModule(pickCatalogModule()); refreshHomeProgress(); }
       // 從實驗頁回來要回到頁首；一開站就在首頁時不動（免得打斷瀏覽器還原的捲動位置）
@@ -3276,7 +3363,8 @@
         }
         if (e.key === "Escape" && $("#sim-root").classList.contains("stage-chart-big")) { toggleStageChart(false); return; }
         if (e.key === "Escape" && !document.fullscreenElement) { exitStageMode(); return; }
-        if (e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA" && !e.repeat) {
+        // 按著 Ctrl／⌘／Alt 的是瀏覽器的組合鍵（⌘F 頁內搜尋、⌘G 找下一個、⌘1 切分頁），不能攔
+        if (e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA" && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
           if (e.key === "/") { e.preventDefault(); openStageMenu(); return; }
           if (e.key === "f" || e.key === "F") { e.preventDefault(); toggleStageFullscreen(); return; }
           if ((e.key === "g" || e.key === "G") && $("#stage-chart") && !$("#stage-chart").hidden) { e.preventDefault(); toggleStageChart(); return; }
@@ -3301,16 +3389,21 @@
         if (plain && !onWidget && f && e.key === "ArrowRight" && FLAT[f.order + 1]) { location.hash = "#" + FLAT[f.order + 1].exp.id; }
         if (plain && !onWidget && f && e.key === "ArrowLeft" && FLAT[f.order - 1]) { location.hash = "#" + FLAT[f.order - 1].exp.id; }
         // 空白鍵＝播放／暫停（PhET 慣例）：雙手留在鍵盤上就能推進 demo
-        if (!onWidget && e.key === " " && !e.repeat) {
+        const noMod = !e.ctrlKey && !e.metaKey && !e.altKey;
+        if (!onWidget && e.key === " " && !e.repeat && noMod) {
           const playBtn = document.querySelector(".sim-transport-play");
           if (playBtn && !playBtn.hidden) { e.preventDefault(); playBtn.click(); }
         }
-        // R＝全部重設；S＝單步。自學與上台都少一次滑鼠移動
-        if ((e.key === "r" || e.key === "R") && !e.repeat) {
+        /*
+         * R＝全部重設；S＝單步。自學與上台都少一次滑鼠移動。
+         * 只認單獨按下的鍵：以前 Ctrl／⌘+R 也被攔下來當成「重設實驗」，
+         * 在實驗頁按重新整理沒有反應（preventDefault 把瀏覽器的重新載入擋掉了）；⌘+S 另存網頁同理。
+         */
+        if ((e.key === "r" || e.key === "R") && !e.repeat && noMod) {
           const resetBtn = document.querySelector(".sim-transport-reset");
           if (resetBtn && !resetBtn.hidden) { e.preventDefault(); resetBtn.click(); }
         }
-        if ((e.key === "s" || e.key === "S") && !e.repeat) {
+        if ((e.key === "s" || e.key === "S") && !e.repeat && noMod) {
           const stepBtn = document.querySelector(".sim-transport-btn");
           if (stepBtn && !stepBtn.hidden && !stepBtn.disabled) { e.preventDefault(); stepBtn.click(); }
         }

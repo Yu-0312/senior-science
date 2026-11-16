@@ -115,7 +115,8 @@
       function paint() {
         var light = document.documentElement.getAttribute("data-theme") === "light";
         btn.innerHTML = light ? moon + "<span>深色</span>" : sun + "<span>淺色</span>";
-        btn.setAttribute("aria-pressed", String(light));
+        // 名稱要包含按鈕上看得到的「深色／淺色」（WCAG 2.5.3），和首頁的主題鈕同一個說法
+        btn.setAttribute("aria-label", light ? "切換為深色主題" : "切換為淺色主題");
       }
       btn.addEventListener("click", function () {
         var next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";

@@ -19,6 +19,8 @@
       if (theme === "dark") { var tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.setAttribute("content", "#13171c"); }
       // 直接開實驗的網址：先別畫首頁，否則初始化完成前會閃一下首頁才換成實驗頁（app.js 的 showView 會拿掉）。
       // 同時先開始下載模擬引擎：它不在頁尾的腳本清單裡（首頁用不到），等 app.js 執行才抓會慢一拍。
+      // 只先抓引擎本體。試過把其餘七支也一起預先下載：慢速連線上實驗台早 0.18 秒出現，
+      // 但它們和 app.js 搶頻寬，標題與說明反而晚 0.2 秒，兩邊相抵，所以沒有這樣做。
       var h = location.hash.replace(/^#/, "");
       if (h && h !== "home") {
         document.documentElement.setAttribute("data-boot", "exp");
@@ -118,7 +120,7 @@
       <button class="menu-toggle" id="menu-toggle" type="button" aria-label="開啟課程目錄" aria-controls="sidebar" aria-expanded="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
       </button>
-      <a class="brand" id="brand-home" href="#home" aria-label="物理實驗室首頁">
+      <a class="brand" id="brand-home" href="#home" title="回首頁">
         <span class="brand-logo" aria-hidden="true">
           <!-- 與 PWA 圖示同一套語彙：實驗桌（黑白線稿，米色底由 CSS 提供） -->
           <svg viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round">
@@ -139,7 +141,7 @@
           <span class="sub">台灣中學互動物理</span>
         </span>
       </a>
-      <button class="search-trigger" id="search-open" type="button" aria-haspopup="dialog" aria-keyshortcuts="/">
+      <button class="search-trigger" id="search-open" type="button" aria-label="搜尋實驗、概念、公式" aria-haspopup="dialog" aria-keyshortcuts="/">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <span class="search-trigger-text">搜尋實驗、概念、公式</span>
         <kbd aria-hidden="true">/</kbd>
@@ -534,11 +536,11 @@
       <div class="palette-input">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <input id="search-input" type="search" placeholder="搜尋實驗、概念、公式…" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list" aria-label="搜尋實驗" />
-        <button class="palette-close" id="palette-close" type="button" aria-label="關閉搜尋"><kbd aria-hidden="true">Esc</kbd><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <button class="palette-close" id="palette-close" type="button" aria-label="關閉搜尋"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="palette-list" id="palette-list" role="listbox" aria-label="搜尋結果"></div>
       <div class="palette-foot">
-        <span class="palette-keys" aria-hidden="true"><kbd>↑</kbd><kbd>↓</kbd> 選擇 · <kbd>Enter</kbd> 開啟</span>
+        <span class="palette-keys" aria-hidden="true"><kbd>↑</kbd><kbd>↓</kbd> 選擇 · <kbd>Enter</kbd> 開啟 · <kbd>Esc</kbd> 關閉</span>
         <span id="palette-count" aria-live="polite"></span>
       </div>
     </div>
