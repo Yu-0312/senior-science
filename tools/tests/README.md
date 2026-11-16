@@ -38,6 +38,8 @@ node --max-old-space-size=4096 tools/tests/meaning-audit.js   # 這支單跑要�
 | `control-response-test.js` | **暫停狀態下**每一根滑桿、每一個步進器（− +）都要造成看得見的改變；選項晶片列出沒有立即反應的 |
 | `formula-text-test.js` | 公式轉純文字（說明頁 `p/` 與離線退路共用）：不認得的 LaTeX 指令不可被吃掉，⇌、↑↓、上下標、向量箭頭等都要保留 |
 | `safe-test.js` | 外部輸入的防線（`js/safe.js`）：壞掉的網址片段、`#constructor` 這類查到原型的 id、形狀不對的 localStorage、學習計劃與匯入存檔的逐筆檢查，都不能讓網站停在空白頁 |
+| `lifecycle-test.js` | 離開實驗（`api.stop`）或在同一個 root 上重建之後，root 上不留監聽器、沒有還在跑的 `setInterval`、`ResizeObserver` 全部 disconnect、動畫迴圈都停了；上一個實驗留下的旗標會清掉；過期的建置不會再把記錄表插進畫面。新增掛在 root 上的監聽器請用 `context.signal`，計時器與觀察器用 `context.dispose` 登記 |
+| `minify-test.js` | 部署時拿掉註解與縮排的工具（`tools/minify.js`）：除號／正規表示式／註解的斜線分得清、字串與樣板字串裡長得像註解的內容原樣保留、行數不變、看不懂就放棄；全站會送出去的檔案都處理得了；本機不會誤把原始碼改掉 |
 | `record-test.js` | 實驗記錄表：記一行存下當下的參數與讀數、點一列滑桿與讀數都回到那一列、讀數算不出來時不報錯、欄位變更時舊紀錄作廢 |
 
 `meaning-audit` 與 `control-response-test` 看起來重疊，其實守的是不同狀態：
@@ -55,7 +57,7 @@ node --max-old-space-size=4096 tools/tests/meaning-audit.js   # 這支單跑要�
 深色主題的白方塊、淺色主題的黑底板、左右不等高、滑桿拉了沒反應。
 **發佈前請實際打開瀏覽器看過。**
 教師演示版的「一頁不捲動」另有瀏覽器實測：`node tools/stage-fit-check.js`（需要 Playwright，不在 run-all 之列）。
-應用外殼（`js/app.js`、`duo/duo.js`、`sw.js`）在這些測試裡一行都不會被執行，它的路由、存檔、搜尋與離線退路由 `node tools/shell-check.js` 在真的瀏覽器裡驗（同樣需要 Playwright）。
+應用外殼（`js/app.js`、`duo/duo.js`、`sw.js`）在這些測試裡一行都不會被執行，它的路由、存檔、搜尋、離線退路、換實驗後的殘留與快捷鍵由 `node tools/shell-check.js` 在真的瀏覽器裡驗（同樣需要 Playwright）。
 
 ## 測試自己出過的錯（避免重蹈）
 

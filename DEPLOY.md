@@ -64,7 +64,7 @@ repo 首頁側邊欄就出現了 License 與 License-2 兩個分頁。
 
 ```bash
 node tools/tests/run-all.js
-node tools/shell-check.js        # 需要 Playwright：路由、存檔、搜尋、離線退路
+node tools/shell-check.js        # 需要 Playwright：路由、存檔、搜尋、離線退路、換實驗不留監聽器、快捷鍵
 node tools/stage-fit-check.js    # 需要 Playwright：教師版一頁不捲動
 ```
 
@@ -85,6 +85,19 @@ node tools/stage-fit-check.js    # 需要 Playwright：教師版一頁不捲動
 `ja/` 由 `tools/build-ja.js` 產生並一起提交；Vercel 建置時也會重跑一次（`vercel.json` 的 buildCommand）。
 `/ja/sw.js` 和 `/sw.js` 一樣不快取，`/ja/js`、`/ja/css` 和中文版一樣帶 `?v=` 快取一年。
 首頁、lab.html、licensing.html 有 `hreflang` 對照連結，`robots.txt` 同時列出兩份 sitemap。
+
+## 部署時縮小 JS／CSS
+
+`vercel.json` 的 buildCommand 最後一步是 `node tools/minify.js --in-place`：把 `js/`、`css/`、`duo/`、`sw.js`（以及 `ja/` 底下同樣的檔案）的**註解與縮排**拿掉。
+程式註解是中文、壓縮率不好，只佔字元數的 15%，卻佔 brotli 傳輸量的 22%。
+
+- 版控裡的檔案不動，只有 Vercel 建置出來的那一份被改寫。`--in-place` 看到 `VERCEL` 或 `CI` 環境變數才動手；本機執行只會印一行「跳過」，什麼都不改（要看結果用 `node tools/minify.js --out /tmp/site`）。
+- 這一步不會讓部署失敗：不是部署環境就跳過，某個檔案處理不了就讓那個檔案原樣上線。Vercel 的建置紀錄最後一行會寫「minify：N 個檔案，改寫 M 個」；如果寫的是「跳過」，到專案設定打開 Automatically expose System Environment Variables。
+- 不改名、不合併行、不動字串，**行數完全不變**：線上報錯的行號和 GitHub 上同一版原始碼是同一行。
+- 沒有 npm 相依。分詞器看不懂的寫法（跨行字串之類）會整個檔案放棄、原樣上線；處理後的 JS 必須能編譯、每一行只能少字不能多字，否則同樣放棄。
+- `node tools/minify.js`（不帶參數）只檢查不寫檔，會列出省了多少；`tools/tests/minify-test.js` 在 run-all 裡把關。
+
+如果哪天懷疑是它造成的問題：把 `vercel.json` 的 `&& node tools/minify.js --in-place` 拿掉重新部署，網站就回到原樣的檔案。
 
 ## 快取與版本號
 

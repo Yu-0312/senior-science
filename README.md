@@ -251,7 +251,8 @@ flowchart LR
 - **步進器與選項晶片也會即時重繪**：「− 數值 +」步進器與選項晶片是按鈕，原本不會觸發引擎的暫停重繪；現在數值改變時補發 `input` 事件，暫停狀態下按一下就看得到變化（`control-response-test` 同時檢查滑桿、步進器與晶片）。
 - **手機優先**：以 `pointer: coarse` 判斷觸控裝置，滑桿、按鈕與清單項目均達 WCAG 2.5.5 的 44px；量角器與尺在觸控時命中範圍加倍。實驗頁在窄螢幕改為「預測 → 播放 → 模擬台 → 讀數」，畫布前的內容高度減少 71%。
 - **螢幕報讀器可用**：每個模擬的畫布都有隨狀態更新的文字描述，另附「文字版讀數」對照表與 `aria-live` 播報。
-- **延遲載入**：模擬引擎、教學掛鉤與實驗程式都在開啟實驗時才載入。首次載入 gzip 約 **183 KB**（上限 190 KB 由 `perf-test` 把關）；26 個實驗檔合計 gzip 約 560 KB 不在其中，打開單一實驗最多再載 40 KB。
+- **延遲載入**：模擬引擎、教學掛鉤與實驗程式都在開啟實驗時才載入。首次載入 gzip 約 **183 KB**（上限 190 KB 由 `perf-test` 把關；這是版控裡帶註解的原始碼，部署時 `tools/minify.js` 會把註解與縮排拿掉，實際傳輸再少約兩成）；26 個實驗檔合計 gzip 約 560 KB 不在其中，打開單一實驗最多再載 40 KB。
+- **換實驗不留東西**：每次建置實驗有一個 `AbortController`（`context.signal`／`context.dispose`），掛在實驗台上的監聽器、ResizeObserver 與輪詢計時器都登記在上面，離開實驗或重建時一併收掉；主站每開一個實驗也換一個新的 `#sim-root`。連開幾十個實驗，節點數與監聽器數不會增加（`lifecycle-test` 與 `shell-check` 把關）。
 - **PWA 與離線**：可安裝到主畫面；Service Worker 只預先快取主要程式，實驗程式打開時才快取。需要完整離線時可主動下載全部實驗，有進度回報。
 - **可被搜尋引擎索引的靜態層**：`tools/build-static.js` 由課程資料自動產生 226 個實驗說明頁、226 份可列印學習單、總索引頁、`sitemap.xml` 與 `robots.txt`，並附結構化資料（schema.org LearningResource）。
 - **給老師的可列印學習單**：每個實驗一張，含實驗目的、公式、動手前預測、資料記錄表格、方格作圖區、由圖求值與誤差欄位。
@@ -343,9 +344,9 @@ node tools/tests/run-all.js          # 全部（約 1 分鐘）
 node tools/tests/run-all.js --fast   # 略過兩支耗時稽核
 ```
 
-22 支稽核守著不同的東西：226 個實驗在兩種主題下都能建置與重繪、主要實驗對照解析解、每根滑桿都造成看得見的改變（**動畫跑著時與暫停時分開量**）、圖表曲線與底板的對比、量具讀數規則、觸控目標尺寸、壓縮後的首次載入大小、全站版本號一致性。詳見 [`tools/tests/README.md`](tools/tests/README.md)。
+32 支稽核守著不同的東西：226 個實驗在兩種主題下都能建置與重繪、主要實驗對照解析解、每根滑桿都造成看得見的改變（**動畫跑著時與暫停時分開量**）、圖表曲線與底板的對比、量具讀數規則、觸控目標尺寸、壓縮後的首次載入大小、全站版本號一致性。詳見 [`tools/tests/README.md`](tools/tests/README.md)。
 
-教師演示版的「一頁不捲動」用真的瀏覽器逐一檢查 226 個實驗（需要 Playwright，不在上面 22 支之內）：
+教師演示版的「一頁不捲動」用真的瀏覽器逐一檢查 226 個實驗（需要 Playwright，不在 run-all 之列）：
 
 ```bash
 node tools/stage-fit-check.js          # 1280×720、1366×768、1920×1080
@@ -354,10 +355,10 @@ node tools/stage-fit-check.js          # 1280×720、1366×768、1920×1080
 應用外殼（路由、存檔、搜尋、離線、鍵盤操作）同樣要真的瀏覽器才驗得到：
 
 ```bash
-node tools/shell-check.js              # 壞掉的網址與存檔、載入失敗後重試、搜尋面板、重設進度、離線退路
+node tools/shell-check.js              # 壞掉的網址與存檔、載入失敗後重試、搜尋面板、重設進度、離線退路、換實驗不留監聽器、快捷鍵
 ```
 
-關卡挑戰版的出題與嵌入實驗台同樣需要真的瀏覽器，不在上面 22 支之內。改到 `sim-insight.js`、`sim-core.js` 的滑桿／步進器，或 `duo/` 之後，至少要在瀏覽器裡打開幾關，確認「調整實驗」題的目標調得到、預測題的答案和實驗台一致。
+關卡挑戰版的出題與嵌入實驗台同樣需要真的瀏覽器，不在 run-all 之列。改到 `sim-insight.js`、`sim-core.js` 的滑桿／步進器，或 `duo/` 之後，至少要在瀏覽器裡打開幾關，確認「調整實驗」題的目標調得到、預測題的答案和實驗台一致。
 
 **但這些測試驗不到畫面對不對。** 它們量的是繪圖指令與程式邏輯，不是學生看到什麼。本專案至今每一個嚴重的顯示問題都是使用者截圖才發現的：深色主題的白方塊、淺色主題的黑底板、左右不等高、滑桿拉了沒反應、小車浮在半空。**發佈前請實際打開瀏覽器看過，深色與淺色各一次。**
 
@@ -426,7 +427,8 @@ senior-science/
 │  ├─ bump-version.js     一個指令換掉全站版本號（--build 順便重建產生的頁面）
 │  ├─ stage-fit-check.js  教師版一頁不捲動的瀏覽器實測
 │  ├─ shell-check.js      應用外殼（路由、存檔、搜尋、離線）的瀏覽器實測
-│  └─ tests/              29 支自動化稽核
+│  ├─ minify.js           部署時拿掉 JS／CSS 的註解與縮排（只在 Vercel 建置時改寫，版控裡的檔案不動）
+│  └─ tests/              32 支自動化稽核
 └─ js/
    ├─ site-config.js      正式網址、版本號
    ├─ safe.js             外部輸入的防線：網址片段、localStorage、匯入的存檔
@@ -566,7 +568,7 @@ node tools/build-ja.js           # 重新產生 ja/
 
 ```mermaid
 flowchart LR
-    push(["git push main"]) --> V["▲ Vercel<br/>build-manifest<br/>build-static<br/>build-ja<br/>verify-static"] --> L(["上線"])
+    push(["git push main"]) --> V["▲ Vercel<br/>build-manifest<br/>build-static<br/>build-ja<br/>verify-static<br/>minify"] --> L(["上線"])
     push --> GA["GitHub Actions<br/>重新建置＋全部測試<br/>檢查產物已提交"]
 ```
 

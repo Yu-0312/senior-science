@@ -16,6 +16,11 @@
  *   · 課程目錄不能用鍵盤操作
  *   · 離線時沒存過的頁面變成一頁沒有樣式的首頁
  *
+ * 2026-11 第二輪再加三項：
+ *   · 每開一個實驗就多留一組監聽器、觀察器與輪詢，站開得越久、拉滑桿越卡
+ *   · 實驗頁的 Ctrl／⌘+R 被攔下來當成「重設實驗」，沒辦法重新整理
+ *   · 自訂實驗室放著不動也每秒重畫 60 次
+ *
  * 每一項都留在這裡。和 stage-fit-check.js 一樣不在 run-all 之列（CI 沒有瀏覽器），發佈前手動跑。
  */
 "use strict";
@@ -270,6 +275,103 @@ const section = t => console.log("\n=== " + t + " ===");
     ok(cat.sidebar === "none", "首頁不放側欄（目錄只有一份）");
     // 首頁不會觸發 MathJax：上面不可以留著 \\( … \\) 這種要等排版的原始碼
     ok(await p.evaluate(() => !/\\\(|\\\[/.test(document.querySelector("#home-view").innerText)), "首頁沒有未排版的公式原始碼");
+    await p.context().close();
+  }
+
+  /* ------------------------------------------------------------------ */
+  section("換實驗不留東西");
+  {
+    /*
+     * 以前每個實驗掛在 #sim-root 上的監聽器、觀察器、輪詢都不會收：連開三十個實驗之後，
+     * 暫停中拉一下滑桿，前面三十個實驗（早就不在畫面上了）也各重畫一次，一次輸入要花將近 0.2 秒。
+     * 這裡數「拉滑桿時畫布被畫了幾筆」：先開過別的實驗，筆數也必須和剛打開網站時一樣。
+     */
+    const count = `
+      window.__draw = 0;
+      ["stroke", "fill", "fillRect", "fillText", "strokeRect", "clearRect", "drawImage"].forEach(k => {
+        const o = CanvasRenderingContext2D.prototype[k];
+        CanvasRenderingContext2D.prototype[k] = function () { window.__draw++; return o.apply(this, arguments); };
+      });`;
+    const drag = page => page.evaluate(async () => {
+      const s = document.querySelector("#sim-root input[type=range]");
+      const frame = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+      await frame(); await frame();
+      const d0 = window.__draw;
+      for (let i = 0; i < 12; i++) {
+        s.value = String(+s.min + (+s.max - +s.min) * (i % 6) / 6);
+        s.dispatchEvent(new Event("input", { bubbles: true }));
+        await frame();
+      }
+      return window.__draw - d0;
+    });
+    const fresh = await open("/index.html#pendulum", { wait: 1800, init: count });
+    const base0 = await drag(fresh);
+    await fresh.context().close();
+
+    const p = await open("/index.html", { init: count });
+    const ids = await p.evaluate(() => window.PhysicsLabCurriculum.modules.flatMap(m => m.experiments.map(e => e.id)).filter((_, i) => i % 23 === 0).slice(0, 9));
+    const roots = [];
+    for (const id of ids) {
+      await p.evaluate(i => { location.hash = "#" + i; }, id);
+      await p.waitForFunction(i => { const r = document.querySelector("#sim-root"); return r && r.dataset.simId === i; }, id, { timeout: 8000 }).catch(() => {});
+      roots.push(await p.evaluateHandle(() => document.querySelector("#sim-root")));
+      await p.waitForTimeout(150);
+    }
+    await p.evaluate(() => { location.hash = "#pendulum"; }); await p.waitForTimeout(1500);
+    const state = await p.evaluate(list => ({
+      count: document.querySelectorAll("#sim-root").length,
+      stale: list.filter(r => r.isConnected).length,
+      aborted: list.filter(r => r._plAbort && r._plAbort.signal.aborted).length
+    }), await p.evaluateHandle(list => list, roots));
+    ok(state.count === 1 && state.stale === 0, "每開一個實驗換一個新的 #sim-root，舊的都離開頁面", JSON.stringify(state));
+    ok(state.aborted === roots.length, "舊實驗的 signal 都已中止（監聽器、計時器、觀察器跟著收掉）", state.aborted + " / " + roots.length);
+    const after = await drag(p);
+    ok(base0 > 0 && Math.abs(after - base0) <= base0 * 0.1, "開過 " + ids.length + " 個實驗之後拉滑桿，畫布的繪圖量和剛開站時一樣", base0 + " 筆 → " + after + " 筆");
+    ok(!p.errors.length, "過程中沒有 JS 錯誤", p.errors.slice(0, 2).join(" | "));
+    await p.context().close();
+  }
+
+  /* ------------------------------------------------------------------ */
+  section("快捷鍵不搶瀏覽器的組合鍵");
+  {
+    const press = (page, init) => page.evaluate(o => {
+      const e = new KeyboardEvent("keydown", Object.assign({ bubbles: true, cancelable: true }, o));
+      document.body.dispatchEvent(e);
+      return e.defaultPrevented;
+    }, init);
+    const p = await open("/index.html#pendulum", { wait: 1800 });
+    await p.evaluate(() => document.body.focus());
+    ok(!(await press(p, { key: "r", ctrlKey: true })) && !(await press(p, { key: "r", metaKey: true })), "Ctrl／⌘+R 留給瀏覽器重新整理（以前被攔下來當成重設實驗）");
+    ok(!(await press(p, { key: "s", ctrlKey: true })) && !(await press(p, { key: " ", ctrlKey: true })), "Ctrl+S、Ctrl+空白鍵也不攔");
+    ok(await press(p, { key: "r" }), "單獨按 R 仍然是重設實驗");
+    await p.click("#exp-present"); await p.waitForTimeout(900);
+    await p.evaluate(() => document.body.focus());
+    const stage = await p.evaluate(() => document.body.classList.contains("stage-only"));
+    ok(stage && !(await press(p, { key: "f", ctrlKey: true })) && !(await press(p, { key: "g", metaKey: true })) && !(await press(p, { key: "1", altKey: true })),
+      "教師演示版：Ctrl+F 頁內搜尋、⌘+G、Alt+1 都不攔");
+    ok(await press(p, { key: "/" }) , "教師演示版：單獨按 / 仍然開實驗選單");
+    await p.context().close();
+  }
+
+  /* ------------------------------------------------------------------ */
+  section("自訂實驗室：閒置時不空轉");
+  {
+    const p = await open("/lab.html", { wait: 2600, init: `
+      window.__frames = 0;
+      (function () { const o = CanvasRenderingContext2D.prototype.setTransform;
+        CanvasRenderingContext2D.prototype.setTransform = function () { if (this.canvas && this.canvas.id === "lab-canvas") window.__frames++; return o.apply(this, arguments); }; })();` });
+    const frames = async ms => { await p.evaluate(() => { window.__frames = 0; }); await p.waitForTimeout(ms); return p.evaluate(() => window.__frames); };
+    const idle = await frames(2000);
+    ok(idle >= 2 && idle <= 8, "放著不動時每 0.5 秒才重畫一次（以前每秒 60 次）", idle + " 格／2 秒");
+    await p.click("#lab-examples-btn");
+    await p.click("#lab-examples button >> nth=1"); await p.mouse.move(5, 300); await p.waitForTimeout(400);
+    await p.keyboard.press("Space");
+    const running = await frames(1000);
+    ok(running >= 40, "按播放就恢復每一格都畫", running + " 格／1 秒");
+    await p.keyboard.press("Space"); await p.waitForTimeout(1900);
+    const paused = await frames(2000);
+    ok(paused <= 8, "暫停 1.5 秒後又回到保險頻率", paused + " 格／2 秒");
+    ok(!p.errors.length, "沒有 JS 錯誤", p.errors.slice(0, 2).join(" | "));
     await p.context().close();
   }
 
