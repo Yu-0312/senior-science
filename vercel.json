@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "node tools/build-manifest.js && node tools/build-static.js && node tools/build-ja.js && node tools/verify-static.js",
+  "buildCommand": "node tools/build-manifest.js && node tools/build-static.js && node tools/build-ja.js && node tools/verify-static.js && node tools/minify.js --in-place",
   "outputDirectory": ".",
   "cleanUrls": false,
   "redirects": [
