@@ -1554,7 +1554,27 @@
 
   /* ============================== 啟動 ============================== */
   let lastPlacing = false;
+  /*
+   * 沒有東西在動，就不必每秒重畫 60 次。
+   * 這個迴圈以前不管畫面有沒有變，每一格都重解電路、重追光路、整張重畫；
+   * 實驗台擺著不動時（學生在看題目、老師在講解）照樣吃掉一成左右的 CPU，手機和平板因此發燙、掉電。
+   * 現在分三種情況：
+   *   · 模擬在跑、導線有電流（流動動畫）、短路警示在閃、手上拿著或正在畫東西：照常每一格都畫；
+   *   · 剛剛有操作（滑鼠、觸控、鍵盤、滾輪、視窗大小）：之後 1.5 秒照常畫；
+   *   · 其餘：每 0.5 秒畫一次當保險。萬一有哪條路徑改了畫面、卻沒被上面兩條抓到，半秒內也會補上。
+   */
+  let wakeUntil = 0, lastDraw = 0;
+  const wake = () => { wakeUntil = performance.now() + 1500; };
+  function animating() {
+    // sim.dirty 不列入：編輯模式下它一直是 true（按播放才重建世界），而改動一定來自操作，已經由 wake 涵蓋
+    if (sim.status === "running" || ui.drag || ui.place || ui.draw || ui.pinch || ui.snap) return true;
+    for (let i = 0; i < state.wires.length; i++) if (Math.abs(state.wires[i].I || 0) > 1e-4) return true;
+    for (let i = 0; i < state.items.length; i++) { const rt = state.items[i].rt; if (rt && rt.short) return true; }
+    return false;
+  }
   function loop(now) {
+    if (now > wakeUntil && now - lastDraw < 500 && !animating()) { lastFrame = now; requestAnimationFrame(loop); return; }
+    lastDraw = now;
     const dt = Math.min(0.05, Math.max(0, (now - (lastFrame || now)) / 1000)); lastFrame = now;
     if (sim.status === "running") advance(dt * sim.speed);
     try { evalCircuit(dt); } catch (e) { console.warn("電路求解失敗", e); }
@@ -1605,6 +1625,9 @@
       rd.readAsText(f);
     });
     $("#lab-theme").addEventListener("click", () => setTheme(isLight() ? "dark" : "light"));
+    // 任何操作都把重畫迴圈叫醒（見 loop 上面的說明）
+    ["pointerdown", "pointermove", "pointerup", "pointercancel", "wheel", "keydown", "keyup", "input", "change", "resize", "focus"].forEach(type =>
+      window.addEventListener(type, wake, { capture: true, passive: true }));
     document.addEventListener("pointerdown", e => { if (!e.target.closest(".lab-menu")) closeMenus(); });
     document.addEventListener("keydown", e => {
       const tag = (e.target.tagName || "").toLowerCase();
@@ -1617,6 +1640,8 @@
       if (tag === "button" && (e.key === " " || e.key === "Enter")) return;
       if (e.key === " ") { e.preventDefault(); play(); return; }
       if (e.key === "Delete" || e.key === "Backspace") { if (ui.sel || ui.selWire) { e.preventDefault(); deleteSelection(); } return; }
+      // 其餘單鍵快捷鍵不吃 Ctrl／⌘ 組合：以前 ⌘+R 重新整理會先把選到的元件轉 90° 並存檔，⌘+←（上一頁）會被拿去微調位置
+      if (mod) return;
       if (e.key === "r" || e.key === "R") { rotateSel(e.shiftKey ? -1 : 1); return; }
       // 方向鍵微調端點：選到（點過、剛放下）的端點優先，每次 1 cm（Shift 10、Alt 0.1）
       const se = ui.selEnd && byId(ui.selEnd.id);
