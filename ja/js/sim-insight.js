@@ -418,7 +418,7 @@
    * 就攤在眼前，預測變成照抄。圖還在、只是模糊，作答（或按「直接顯示」）就揭開；
    * 已經預測過的實驗、教師演示版都不蓋。
    */
-  function veilCharts(root, predict) {
+  function veilCharts(root, predict, context) {
     const charts = root.querySelector(":scope > .sim-charts");
     const body = document.body;
     if (!charts || !body || !body.classList) return;
@@ -445,6 +445,8 @@
      */
     const offs = [];
     const on = (node, type, fn) => { node.addEventListener(type, fn, true); offs.push(() => node.removeEventListener(type, fn, true)); };
+    // 遮罩沒被揭開就離開實驗時，掛在 root 上的這幾個監聽器也要收掉
+    if (context && context.dispose) context.dispose(() => offs.splice(0).forEach(off => off()));
     const lift = () => {
       charts.classList.remove("is-veiled");
       wraps.forEach(w => { w.inert = false; });
@@ -979,7 +981,7 @@
     }
 
     refineBrief(context, insight);
-    if (predict) veilCharts(context.root, predict);
+    if (predict) veilCharts(context.root, predict, context);
 
     // 動畫每一格也更新挑戰判定（有些讀數會隨模擬時間改變）
     const previousTick = context.onTick;

@@ -17,11 +17,13 @@
       if (theme === "dark") { var tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.setAttribute("content", "#13171c"); }
       // 直接開實驗的網址：先別畫首頁，否則初始化完成前會閃一下首頁才換成實驗頁（app.js 的 showView 會拿掉）。
       // 同時先開始下載模擬引擎：它不在頁尾的腳本清單裡（首頁用不到），等 app.js 執行才抓會慢一拍。
+      // 只先抓引擎本體。試過把其餘七支也一起預先下載：慢速連線上實驗台早 0.18 秒出現，
+      // 但它們和 app.js 搶頻寬，標題與說明反而晚 0.2 秒，兩邊相抵，所以沒有這樣做。
       var h = location.hash.replace(/^#/, "");
       if (h && h !== "home") {
         document.documentElement.setAttribute("data-boot", "exp");
         var pre = document.createElement("link");
-        pre.rel = "preload"; pre.as = "script"; pre.href = "js/sim-core.js?v=20261114-0944";
+        pre.rel = "preload"; pre.as = "script"; pre.href = "js/sim-core.js?v=20261116-2110";
         document.head.appendChild(pre);
       }
     })();
@@ -44,8 +46,8 @@
   <meta name="twitter:card" content="summary_large_image" />
 
   <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20261114-0944" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png?v=20261114-0944" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg?v=20261116-2110" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png?v=20261116-2110" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="物理実験室" />
@@ -54,7 +56,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Serif+JP:wght@700;900&display=swap" crossorigin media="print" onload="this.media='all'" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Serif+JP:wght@700;900&display=swap" crossorigin /></noscript>
-  <link rel="stylesheet" href="css/style.css?v=20261114-0944" />
+  <link rel="stylesheet" href="css/style.css?v=20261116-2110" />
 
   <script>
     window.MathJax = {
@@ -81,7 +83,7 @@
       <button class="menu-toggle" id="menu-toggle" type="button" aria-label="単元一覧を開く" aria-controls="sidebar" aria-expanded="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
       </button>
-      <a class="brand" id="brand-home" href="#home" aria-label="物理実験室のトップページ">
+      <a class="brand" id="brand-home" href="#home" title="トップへ戻る">
         <span class="brand-logo" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round">
             <path d="M2.8 10.8h18.4"/>
@@ -101,7 +103,7 @@
           <span class="sub">動かして学ぶ物理</span>
         </span>
       </a>
-      <button class="search-trigger" id="search-open" type="button" aria-haspopup="dialog" aria-keyshortcuts="/">
+      <button class="search-trigger" id="search-open" type="button" aria-label="実験・用語・公式を検索" aria-haspopup="dialog" aria-keyshortcuts="/">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <span class="search-trigger-text">実験・用語・公式を検索</span>
         <kbd aria-hidden="true">/</kbd>
@@ -451,11 +453,11 @@
       <div class="palette-input">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <input id="search-input" type="search" placeholder="実験・用語・公式を検索…" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list" aria-label="実験を検索" />
-        <button class="palette-close" id="palette-close" type="button" aria-label="検索を閉じる"><kbd aria-hidden="true">Esc</kbd><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <button class="palette-close" id="palette-close" type="button" aria-label="検索を閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="palette-list" id="palette-list" role="listbox" aria-label="検索結果"></div>
       <div class="palette-foot">
-        <span class="palette-keys" aria-hidden="true"><kbd>↑</kbd><kbd>↓</kbd> 選ぶ · <kbd>Enter</kbd> 開く</span>
+        <span class="palette-keys" aria-hidden="true"><kbd>↑</kbd><kbd>↓</kbd> 選ぶ · <kbd>Enter</kbd> 開く · <kbd>Esc</kbd> 閉じる</span>
         <span id="palette-count" aria-live="polite"></span>
       </div>
     </div>
@@ -501,18 +503,18 @@
     </div>
   </section>
 
-  <script src="js/site-config.js?v=20261114-0944"></script>
-  <script src="js/safe.js?v=20261114-0944"></script>
-  <script src="js/curriculum.js?v=20261114-0944"></script>
-  <script src="js/advanced-curriculum.js?v=20261114-0944"></script>
-  <script src="js/comprehensive-curriculum.js?v=20261114-0944"></script>
-  <script src="js/extension-registry.js?v=20261114-0944"></script>
-  <script src="js/open-curriculum.js?v=20261114-0944"></script>
-  <script src="js/school-curriculum.js?v=20261114-0944"></script>
-  <script src="js/exam-curriculum.js?v=20261114-0944"></script>
+  <script src="js/site-config.js?v=20261116-2110"></script>
+  <script src="js/safe.js?v=20261116-2110"></script>
+  <script src="js/curriculum.js?v=20261116-2110"></script>
+  <script src="js/advanced-curriculum.js?v=20261116-2110"></script>
+  <script src="js/comprehensive-curriculum.js?v=20261116-2110"></script>
+  <script src="js/extension-registry.js?v=20261116-2110"></script>
+  <script src="js/open-curriculum.js?v=20261116-2110"></script>
+  <script src="js/school-curriculum.js?v=20261116-2110"></script>
+  <script src="js/exam-curriculum.js?v=20261116-2110"></script>
 
-  <script src="js/experiment-manifest.js?v=20261114-0944"></script>
+  <script src="js/experiment-manifest.js?v=20261116-2110"></script>
 
-  <script src="js/app.js?v=20261114-0944"></script>
+  <script src="js/app.js?v=20261116-2110"></script>
 </body>
 </html>

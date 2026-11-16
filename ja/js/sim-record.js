@@ -113,6 +113,8 @@
     // 讀數在建置當下還是「—」，第一幀畫完才有數字；等一下再決定哪些欄位是數值
     let tries = 0;
     const attempt = () => {
+      // root 還連著不代表還是同一個實驗；以這次建置的 signal 為準，過期就不再把記錄表塞進別人的畫面
+      if (context.signal && context.signal.aborted) return;
       if (!context.root.isConnected && tries > 0) return;
       const ready = (context.readouts || []).some(r => r.number != null);
       if (!ready && ++tries < 6) { setTimeout(attempt, 400); return; }
