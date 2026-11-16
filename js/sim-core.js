@@ -550,8 +550,10 @@
     const wantReadouts = opts.readouts !== "none";
     const quietChrome = opts.chrome === "quiet";
     root.dataset.labLayout = controlsMode;
-    if (!wantBrief) root.dataset.labNoBrief = "1";
-    if (!wantProcedure) root.dataset.labNoProcedure = "1";
+    // 同一個 root 重建時，上一次留下的旗標要清掉（以前只會設、不會收）
+    if (!wantBrief) root.dataset.labNoBrief = "1"; else delete root.dataset.labNoBrief;
+    if (!wantProcedure) root.dataset.labNoProcedure = "1"; else delete root.dataset.labNoProcedure;
+    root.classList.remove("show-procedure", "show-wiggle", "is-ambient");
     const commandBar = el("div", "sim-command-bar", root);
     const commandTitle = el("div", "sim-command-title", commandBar);
     const stageLabel = el("span", "sim-command-stage", commandTitle); stageLabel.textContent = profile.stage;
@@ -2227,7 +2229,7 @@
       root.classList.add("show-wiggle");
       ui.playBtn.classList.add("wiggle");
       setTimeout(stopWiggle, 6000);
-      root.addEventListener("pointerdown", stopWiggle, { once: true });
+      root.addEventListener("pointerdown", stopWiggle, context.signal ? { once: true, signal: context.signal } : { once: true });
     }
 
     /*
@@ -2261,8 +2263,10 @@
         paint();
       });
     }
-    root.addEventListener("input", repaintIfPaused);
-    root.addEventListener("change", repaintIfPaused);
+    // 掛在這次建置的 signal 上：下次在同一個 root 重建，或離開實驗時，監聽器就一併卸掉
+    const lopt = context.signal ? { signal: context.signal } : false;
+    root.addEventListener("input", repaintIfPaused, lopt);
+    root.addEventListener("change", repaintIfPaused, lopt);
 
     paint();
     context.api = api;
@@ -2308,7 +2312,8 @@
     // 沒掛在頁面上（測試替身、離線建置）就沒有版面可以量，也不要留計時器抓著整個實驗
     if (!root.isConnected) return;
     // 部分掛鉤晚一拍才插入
-    setTimeout(safe(() => { if (root.isConnected) { moveNotes(); lastW = 0; balance(); } }), 0);
+    const expired = () => !root.isConnected || !!(context.signal && context.signal.aborted);
+    setTimeout(safe(() => { if (!expired()) { moveNotes(); lastW = 0; balance(); } }), 0);
 
     let pending = 0, lastW = 0;
     const gapNow = () => {
@@ -2352,7 +2357,7 @@
       node._labHome = null;
     }
     function balance() {
-      if (!root.isConnected) return;
+      if (expired()) return;
       const body = document.body;
       const off = body && body.classList && (body.classList.contains("stage-only") || body.classList.contains("demo-mode"));
       const w = Math.round(root.getBoundingClientRect().width);
@@ -2383,6 +2388,7 @@
     if (typeof ResizeObserver !== "undefined") {
       const ro = new ResizeObserver(schedule);
       ro.observe(root);
+      if (context.dispose) context.dispose(() => { try { ro.disconnect(); } catch (e) {} cancelAnimationFrame(pending); });
     }
     // 第一次排版由上面的 setTimeout 負責（它會先搬因果面板再平衡）
   }
@@ -2398,7 +2404,25 @@
           root._labProfile = profile;
           if (root.dataset) root.dataset.simId = id;
           const previous = buildContext;
-          const context = { root, id, profile, loops: [], controls: [], canvases: [], sliders: [], readouts: [], resetButtons: [], tools: null, onTick: null };
+          /*
+           * 每次建置一個 AbortController，掛在 root 上。
+           * 掛在 root 上的監聽器、ResizeObserver、輪詢計時器以前都假設「root 被丟掉就自然消失」，
+           * 但同一個 root 可能被重建（載入失敗後重試、嵌入頁），也可能整棵還被計時器的閉包抓著放不掉：
+           * 實測連開 30 個實驗，每一輪多留 8,800 個節點與 1,900 個監聽器，舊實驗的輪詢也還在跑。
+           * 現在重建時先 abort 上一次的，離開實驗（api.stop）時也 abort。
+           * 所有跟著實驗生命週期的登記都走 context.signal（監聽器）或 context.dispose（其他）。
+           */
+          if (root._plAbort) { try { root._plAbort.abort(); } catch (e) {} }
+          const ac = typeof AbortController === "function" ? new AbortController() : null;
+          root._plAbort = ac;
+          const context = { root, id, profile, loops: [], controls: [], canvases: [], sliders: [], readouts: [], resetButtons: [], tools: null, onTick: null,
+            signal: ac ? ac.signal : undefined,
+            dispose(fn) { if (ac) ac.signal.addEventListener("abort", () => { try { fn(); } catch (e) {} }, { once: true }); } };
+          // 畫布各自有一個看容器寬度的 ResizeObserver，以前沒有人呼叫 destroy()；迴圈也在這裡補停一次
+          context.dispose(() => {
+            context.loops.forEach(l => { try { l.stop(); } catch (e) {} });
+            context.canvases.forEach(cv => { try { if (cv && cv.destroy) cv.destroy(); } catch (e) {} });
+          });
           buildContext = context;
           let api;
           try {
@@ -2412,6 +2436,7 @@
             const originalStop = api.stop;
             api.stop = function () {
               try { if (context.tools && context.tools.destroy) context.tools.destroy(); } catch (e) {}
+              try { if (ac) ac.abort(); } catch (e) {}
               return originalStop.apply(this, arguments);
             };
           }

@@ -490,6 +490,7 @@
           if (!root.isConnected) { clearInterval(poll); return; }
           checkNear();
         }, 300);
+        if (context.dispose) context.dispose(() => clearInterval(poll));
 
     function fire(p) {
       if (document.querySelector(".sim-observe-backdrop")) { busy = false; return; }
@@ -793,7 +794,8 @@
     // 那樣每開一個實驗就多留一組閉包，整個實驗 context 都放不掉。
     let lastUser = 0;
     const builtAt = Date.now();
-    root.addEventListener("pointerdown", () => { lastUser = Date.now(); }, true);
+    const sigOpt = context.signal ? { capture: true, signal: context.signal } : true;
+    root.addEventListener("pointerdown", () => { lastUser = Date.now(); }, sigOpt);
     const userAt = () => Math.max(lastUser, GLOBAL_INPUT.key > builtAt ? GLOBAL_INPUT.key : 0);
 
     /* ---------- ① 播放觀察 ---------- */
@@ -841,6 +843,10 @@
       const stop0 = api.stop;
       api.stop = function () { clearInterval(pollPlay); clearInterval(pollParam); return stop0.apply(this, arguments); };
     }
+    if (context.dispose) {
+      // 同一個 root 被重建、或沒有 api.stop 的實驗，也要停掉輪詢
+      context.dispose(() => { clearInterval(pollPlay); clearInterval(pollParam); });
+    }
 
     /* ---------- ② 改變參數觀察 ---------- */
     let paramArmed = stages.indexOf("param") >= 0 && !AUTO.done(id).param;
@@ -865,7 +871,7 @@
         changing = { k, before: base.readouts, x0: base.values[k], running: anyRunning(), steady };
       }
       if (anyRunning()) changing.running = true;
-    }, true);
+    }, sigOpt);
     const pollParam = setInterval(() => {
       if (!paramArmed) return;
       const now = Date.now();

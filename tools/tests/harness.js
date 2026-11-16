@@ -104,7 +104,13 @@ function makeEl(tag) {
     removeAttribute(k) { delete this.attributes[k]; },
     hasAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attributes, k); },
 
-    addEventListener(t, fn) { (this._listeners[t] = this._listeners[t] || []).push(fn); },
+    addEventListener(t, fn, opts) {
+      // 和真瀏覽器一樣支援 { signal }：signal 已中止就不掛；之後中止時自動移除
+      const sig = opts && typeof opts === "object" ? opts.signal : null;
+      if (sig && sig.aborted) return;
+      (this._listeners[t] = this._listeners[t] || []).push(fn);
+      if (sig) sig.addEventListener("abort", () => this.removeEventListener(t, fn), { once: true });
+    },
     removeEventListener(t, fn) {
       const a = this._listeners[t]; if (!a) return;
       const i = a.indexOf(fn); if (i >= 0) a.splice(i, 1);

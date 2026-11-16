@@ -646,6 +646,8 @@
         const orig = api.stop;
         api.stop = function () { clearInterval(poll); return orig.apply(this, arguments); };
       }
+      // 同一個 root 被重建（載入失敗後重試）時沒有人會呼叫舊的 api.stop，也要停
+      if (ctx.dispose) ctx.dispose(() => clearInterval(poll));
     }
   }
 
